@@ -12,17 +12,32 @@
 //   READ from the plugin's code, where a control writes values the XML does not
 //   state: the CHORUS buttons and LEDs (rva 0x351410 / 0x3515B0), the keyboard's
 //   click velocity and octave shift (rva 0x2D4AA0 / 0x2D4C40).
-// NOT YET PORTED (drawn idle): the LFO-rate LED and the output bar graphs (the
-//   plugin pushes them from its audio side: vm.vs.dm, extraId), MIDI CC assign,
-//   the SYSTEM-8 transfer buttons, writing a patch back into a bank.
+// NOT PORTED: the SYSTEM-8 transfer buttons (SEND / GET, PLUG-OUT) -- the user's decision.
+// The patch window is the plugin's own patch manager (gui/juno_pm.c, CLAIMS A39) compiled into
+// the same module: banks, write, rename, new / delete, copy / cut / paste / insert, undo / redo,
+// import / export, the files (files.js).
 
 import { WasmEngine } from "./engine.js";
+import { Files, DIRS } from "./files.js";
 
 const Q = new URLSearchParams(location.search);
 const XML_URL = Q.get("xml") || "../../truth/Script.xml";
 const IMG_BASE = Q.get("skin") || "../../truth/Script/";
 const BANK_URL = Q.get("bank") || "../../truth/presetbankog1.bin";
 const HEADER = 23, STRIDE = 20223, NAME = 16;
+// the patch window's own values (the manager keeps them, CLAIMS A39): panelPatch, patchManager,
+// patchListMain, patchListSub
+const PM_PANEL = 0x0FFFC002, PM_IDS = new Set([0x0FFFC002, 0x0FFFC004, 0x0FFFC005, 0x0FFFC006]);
+// the list's key codes (rva 0x3278C0): letters as their capitals; these for the rest; Shift 1, Ctrl 2
+const PM_KEYS = { ArrowUp: 0x100, ArrowDown: 0x101, ArrowLeft: 0x102, ArrowRight: 0x103, Enter: 0x108,
+                  Escape: 0x109, Delete: 0x10B, " ": 0x20 };
+// the manager's messages (the plugin's own texts are in TextCodeTable.dat, not in truth/)
+const PM_MSG = {
+  2: "A file could not be read as a JUNO-60 patch bank.",
+  3: "The bank could not be written to the file.",
+  37: "This name cannot be a bank's name: it is empty, starts with a period, has one of \" * / : < > ? \\ |, or another bank has it.",
+  38: "Delete the current bank?",
+};
 
 // ------------------------------------------------------------------ XML helpers
 const kids = (e, tag) => Array.from(e.children).filter(c => c.tagName === tag);
@@ -168,6 +183,7 @@ class Model {
     this.eng = new Map();
     this.local = new Map();
     this.version = 0;
+    this.pm = null;                 // the patch manager: it keeps the patch window's values
   }
   refresh() {
     const v = this.E.values();
@@ -180,20 +196,23 @@ class Model {
   get(ref) {
     const L = this.leaf(ref);
     if (!L) return 0;
+    if (this.pm && PM_IDS.has(L.id)) return this.pm.value(L.id);
     if (this.eng.has(L.id)) return this.eng.get(L.id);
     if (this.local.has(L.id)) return this.local.get(L.id);
     return L.def;
   }
-  // a panel control's edit: the model set (rva 0x283DB0), then the commit every
-  // control makes after it (rva 0x2DD100); setBare: the set alone (the patch
-  // browser's own set of the patch number, rva 0x338090)
-  set(ref, v) { this.setBare(ref, v); this.E.commit(); }
-  setBare(ref, v) {
+  // a panel control's edit: the model set (rva 0x283DB0) -- the PATCH button's value to the patch
+  // manager too, whose window opens from 0 to 1 -- then the commit every control makes after it
+  // (rva 0x2DD100; its notify: panels may open or close), then what the page does after it
+  set(ref, v) {
     const L = this.leaf(ref);
     if (!L) return;
     if (L.max > L.min) v = Math.max(L.min, Math.min(L.max, v));
-    if (this.E.set(L.id, v)) this.refresh();
-    else {
+    const r = this.E.set(L.id, v);
+    if (this.pm && PM_IDS.has(L.id)) this.pm.setValue(L.id, v);
+    this.E.commit();
+    if (r) this.refresh();
+    else if (!(this.pm && PM_IDS.has(L.id))) {
       this.local.set(L.id, v);
       this.version++;
     }
@@ -242,15 +261,21 @@ class Skin {
     this.kbStates = new Int32Array(128);  // its note value as last drawn
     this.drag = null;
     this.tip = null;
-    this.banks = [];              // [{name, bytes}]
-    this.bank = 0;
-    this.patch = 0;
-    this.patchSel = 0;
+    this.pm = null;               // the patch manager (CLAIMS A39): the patch window's librarian
+    this.pmCap = false;           // the list holds the mouse (a press on it)
+    this.ask = null;              // a dialog's answer the page asked for first (a menu, the file picker)
+    this.answers = null;          // a check's scripted dialog answers (as JUNO-60.exe's --pm-script)
+    this.editor = false;          // the editor is open (its controls shown): from the boot's attach
+    this.trace = null;            // a check's call log: the page's own events (zoomfit, ledshow)
     this.noteFlash = 0;
     this.dirty = true;
     this.tree = this.build("main", 0, 0);
-    this.patchTree = this.build("patch", 117, 22);   // its own window, over the panel
+    this.size = this.tree.size;   // the panels' Script.xml sizes: their windows' (docs/WINDOW_ZOOM.md)
+    const ps = this.S.panels.get("patch");
+    const [pw, ph] = ints(text(ps, "size"));
+    this.patchTree = this.build("patch", (this.size[0] - pw) >> 1, (this.size[1] - ph) >> 1);   // its own window, over the panel
   }
+  log(s) { if (this.trace) this.trace.push(s); }
 
   // panel tree -> [{panel...}] with absolute positions
   build(type, ox, oy) {
@@ -368,22 +393,74 @@ class Skin {
     return String(s) + (unit ? " " + unit : "");
   }
 
+  // after a set's commit: the notify's panels (the LED shows), the patch window's open (both windows
+  // convert), the values the page itself follows (as JUNO-60.exe's val_set)
   changed(L, v) {
+    this.ledShows();
+    if (L.id === PM_PANEL && v === 1) { this.zoomConv(0); this.zoomConv(1); }
     if (L.name === "fm.SYNTH.COM.TEMPO") this.E.setTempo(40 + v / 10);   // "40.0BPM" + 0.1 per step
     if (L.name === "vm.vs.mainZoom") this.applyZoom();
     if (L.name === "fm.PATCH.CTRL.TEMPO SYNC") this.noteFlash = performance.now();
+    this.pmStatus();
     this.dirty = true;
+  }
+
+  // An LFO LED shown or hidden runs its update (vt+0xB0 = rva 0x325070: the LED's read and its
+  // frame, as at a tick): the editor's attach shows the open controls; at a model notify the panels
+  // whose open conditions read a changed value open or close (rva 0x2C4890: show vt+0xA0, hide
+  // vt+0xA8, both through rva 0x2C4B20 -> vt+0xB0), in tree order (docs/LED_METER.md rule 11).
+  ledList() {
+    if (!this.leds) {
+      this.leds = [];
+      const walk = n => { for (const it of n.items) { if (it.kind === "panel") walk(it); else if (it.type === "lfoLed" && it.pic) this.leds.push(it); } };
+      walk(this.tree);
+    }
+    return this.leds;
+  }
+  ledShows() {
+    if (!this.editor) return;
+    this.M.refresh();
+    const vis = new Set(this.visible(this.tree));
+    for (const c of this.ledList()) {
+      const v = vis.has(c);
+      if (v !== !!c.shown) {
+        c.frame = this.E.ledFrame(c.pic.n);
+        this.log(`ledshow ${c.pic.n} ${c.frame}`);
+        this.dirty = true;
+      }
+      c.shown = v;
+    }
+  }
+
+  // A window's coordinate conversion (the plugin's getter, rva 0x2AA590: a draw, an invalidation, a
+  // hit test): its zoom value, at most its fit to the screen (rva 0x312750, the first positive fit
+  // kept), and the value set to that -- the value object's own set, no commit (docs/WINDOW_ZOOM.md).
+  // The screen: the page's (window.screen), the browser's analog of the virtual screen.
+  zoomConv(win) {
+    const ref = win ? "vm.vs.patchZoom" : "vm.vs.mainZoom", L = this.M.leaf(ref);
+    if (!L) return 62;
+    const v = this.M.get(ref), [w, h] = win ? this.patchTree.size : this.size;
+    const z = this.E.zoomGet(win, v, screen.width | 0, screen.height | 0, w, h);
+    if (z !== v) {
+      this.log(`zoomfit ${win} ${z}`);
+      if (this.E.fn.modelSet(this.E.ctx, L.id, z)) this.M.refresh();
+      else { this.M.local.set(L.id, z); this.M.version++; }
+      this.dirty = true;
+    }
+    return this.M.get(ref);
   }
 
   // the LED's and the meters' ticks of the plugin's 50 ms window timer (WM_TIMER -> each
   // open control's slot +96): the LED of the open LFO panel, both meters; true if one changed
   meterTick() {
     let moved = false;
+    for (const c of this.ledList()) {             // an LED shown at the last notify (rva 0x324FF0)
+      if (!c.shown) continue;
+      const f = this.E.ledFrame(c.pic.n);
+      if (f !== c.frame) { c.frame = f; moved = true; }
+    }
     for (const c of this.visible(this.tree)) {
-      if (c.type === "lfoLed" && c.pic) {
-        const f = this.E.ledFrame(c.pic.n);
-        if (f !== c.frame) { c.frame = f; moved = true; }
-      } else if (c.type === "barGraphX") {
+      if (c.type === "barGraphX") {
         const r = this.E.meterTick(c.ch, c.decay, c.state, c.rect, c.horiz);
         c.state = r.state;
         const b = this.E.barDraw(c.rect, r.fill, c.horiz, c.fade);
@@ -396,9 +473,13 @@ class Skin {
   // ---------------------------------------------------------------- draw
   draw() {
     const g = this.g;
+    if (this.editor) this.zoomConv(0);           // each draw converts (the plugin's getter)
     g.clearRect(0, 0, this.cv.width, this.cv.height);
     this.drawPanel(this.tree);
-    if (this.M.get("vm.vs.panelPatch") === 1) this.drawPatchWindow();
+    if (this.M.get("vm.vs.panelPatch") === 1) {
+      if (this.editor) this.zoomConv(1);
+      this.drawPatchWindow();
+    }
     if (this.tip) this.drawTip();
   }
   drawPanel(node) {
@@ -615,6 +696,7 @@ class Skin {
   kbSend(key, v) {
     const r = v <= 0 ? -64 : 0;
     this.E.keybedWrite(key, r ? r : v);
+    this.ledShows();                             // its notifies (rva 0x2D47E0): a panel may open
     this.dirty = true;
   }
   // a press (rva 0x2D4920): a note in the shifted key range other than the held key; with
@@ -673,8 +755,9 @@ class Skin {
       const t = this.ccTarget(x, y);
       if (t) { this.ccMenu(ev, t); return; }
     }
+    // the patch window's presses come with their click count (mdown): here only the capture
+    if (this.M.get("vm.vs.panelPatch") === 1) { if (ev.button === 0) this.cv.setPointerCapture(ev.pointerId); return; }
     // any other press -- a right one too: the panel's controls do not test the button (rva 0x2AAAF0)
-    if (this.M.get("vm.vs.panelPatch") === 1 && this.patchDown(x, y, ev)) return;
     const c = this.hit(x, y);
     if (!c) return;
     this.cv.setPointerCapture(ev.pointerId);
@@ -736,11 +819,20 @@ class Skin {
     }
     this.dirty = true;
   }
+  // the patch window's press (mousedown: a pointerdown has no click count). Windows gives the list a
+  // double click (WM_LBUTTONDBLCLK) as every second press of a series, a press otherwise
+  mdown(ev) {
+    if (this.M.get("vm.vs.panelPatch") !== 1 || ev.button !== 0) return;
+    const [x, y] = this.point(ev);
+    this.patchDown(x, y, ev, ev.detail >= 2 && ev.detail % 2 === 0);
+    this.dirty = true;
+  }
   partnerHeld(c) {
     for (const p of this.pressed) if (p !== c && p.type === "ju60UnlatchButton" && p.role && p.role !== c.role) return true;
     return false;
   }
   move(ev) {
+    if (this.pmCap) { const [px, py] = this.point(ev); this.patchMove(px, py); return; }
     const d = this.drag;
     if (!d) return;
     const [x, y] = this.point(ev);
@@ -775,6 +867,7 @@ class Skin {
     this.dirty = true;
   }
   up(ev) {
+    if (this.pmCap) { const [px, py] = this.point(ev); this.patchUp(px, py); }
     const d = this.drag;
     if (d && d.c.type === "keyboardX" && this.kb.drag) {   // up: the drag ends, the key released
       const [x, y] = this.point(ev);
@@ -805,6 +898,7 @@ class Skin {
     this.dirty = true;
   }
   dblclick(ev) {
+    if (this.M.get("vm.vs.panelPatch") === 1) return;   // not through the patch window
     const [x, y] = this.point(ev);
     const c = this.hit(x, y);
     if (!c || !(c.type === "slider" || (c.type === "knob" && c.bmp.n > 4))) return;
@@ -820,76 +914,143 @@ class Skin {
 
   // --------------------------------------------------- functions and menus
   action(fn, args) {
-    if (fn === "ManagePatch" && (args === "inc" || args === "dec")) {
-      const b = this.banks[this.bank];
-      if (!b) return;
-      this.loadPatch((this.patch + (args === "inc" ? 1 : 63)) % 64, true);
-    } else if (fn === "ManagePatch" && args === "load") {
-      this.loadPatch(this.patchSel, true);
-    } else if (fn === "ManagePatchBank" && (args === "inc" || args === "dec")) {
-      if (!this.banks.length) return;
-      this.bank = (this.bank + (args === "inc" ? 1 : this.banks.length - 1)) % this.banks.length;
-      this.dirty = true;
-    } else if (fn === "ManagePatchBank" && args === "import") {
-      this.importBank();
-    } else if (fn === "ManagePatchBank" && args === "export") {
-      const b = this.banks[this.bank];
-      if (!b) return;
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([b.bytes]));
-      a.download = b.name + ".bin";
-      a.click();
+    if ((fn === "ManagePatch" || fn === "ManagePatchBank") && args &&
+        !["sendTemp", "getTemp", "sendUser", "getUser"].includes(args)) {
+      // the patch manager's buttons (rva 0x322E60 / 0x323FD0); select / import open a dialog first
+      if (fn === "ManagePatchBank" && args === "select") this.askMenu(null, () => this.pmCall(() => this.pm.func(fn, args)));
+      else if (fn === "ManagePatchBank" && args === "import") this.askFiles(() => this.pmCall(() => this.pm.func(fn, args)));
+      else this.pmCall(() => this.pm.func(fn, args));
     } else if (fn === "Help" || fn === "About") {
       this.status(fn === "About" ? "JUNO-60: the plugin's own GUI (Script.xml) on the C99 port" :
         "Drag knobs and sliders up/down (shift: fine), double-click: default, wheel: one step. " +
-        "CHORUS I + II: hold shift, or slide from I onto II. Keys: lower = louder.");
+        "CHORUS I + II: hold shift, or slide from I onto II. Keys: lower = louder. PATCH: the patch window.");
     } else {
-      this.status(`${fn} ${args || ""}: not part of this port (SYSTEM-8 link / bank writing)`);
+      this.status(`${fn} ${args || ""}: not part of this port (the SYSTEM-8 link)`);
     }
   }
 
-  // the patch browser's load (rva 0x338090: the patch, its set of the patch number); the
-  // ManagePatch buttons' handler then commits (rva 0x322E60), the list does not (rva 0x3278C0)
-  loadPatch(idx, commit = false) {
-    const b = this.banks[this.bank];
-    if (!b) return;
-    this.E.loadPatch(b.bytes, idx);
-    this.patch = this.patchSel = idx;
-    this.M.setBare("vm.vs.patchId", idx);
-    if (commit) this.E.commit();
+  // ---------------------------------------------------------------- the patch manager (CLAIMS A39)
+  // a call into the manager, then the window's status and a redraw
+  pmCall(f) {
+    if (!this.pm) return 0;
+    const r = f();
     this.M.refresh();
-    this.status(`${b.name}: ${idx + 1} ${this.patchNameText()}`);
+    this.pmStatus();
     this.dirty = true;
+    return r;
   }
-
-  addBank(name, bytes) {
-    const magic = new TextDecoder().decode(bytes.slice(0, 16));
-    if (magic !== "KoaBankFile00003" || bytes.length < HEADER + 64 * STRIDE) throw new Error(name + ": not a JUNO-60 bank");
-    this.banks.push({ name, bytes });
-    return this.banks.length - 1;
+  // the status line: the bank and the patch the view last read (as JUNO-60.exe's pm_status)
+  pmStatus() {
+    if (!this.pm) return;
+    const [b, p] = this.pm.viewValues();
+    this.status(`${this.pm.bankName(b) || ""}: ${p + 1} ${this.patchNameText()}`);
   }
-  importBank() {
+  // The dialogs. The plugin's are modal: its code waits for the answer. A page cannot wait for its
+  // own menus or the file picker, so it asks them FIRST, at the commands that open them before
+  // anything else (the bank menu: ctrl+B, the bank button, a press on the bank name outside its
+  // button -- rva 0x3344C0 asks first; the open dialog: ctrl+I, the import button -- rva 0x32F2B0
+  // asks first), and the manager's call then gets that answer. The text edits and the message
+  // boxes are the browser's own modal ones (prompt, confirm, alert). A check answers all of them
+  // from its script (this.answers), as JUNO-60.exe's --pm-script does.
+  pmIO() {
+    const F = this.files, take = kind => {
+      if (!this.answers) return undefined;
+      const i = this.answers.findIndex(a => a[0] === kind);
+      return i < 0 ? null : this.answers.splice(i, 1)[0][1];
+    };
+    const self = this;
+    return {
+      read: p => F.read(p), write: (p, d) => F.write(p, d), remove: p => F.remove(p), move: (a, b) => F.move(a, b),
+      exists: p => F.exists(p), list: d => F.list(d),
+      text(what, offered) {
+        const a = take("text");
+        if (self.trace) self.trace.push(["text", offered, a === undefined ? null : a]);
+        if (a !== undefined) return a;
+        return window.prompt(what ? "Bank name" : "Patch name", offered);
+      },
+      menu(items, checked) {
+        const a = take("menu");
+        let r;
+        if (a !== undefined) r = a === null ? -1 : a % items.length;    // a shown item, or none
+        else if (self.ask && self.ask.menu !== undefined) {
+          const asked = self.ask;
+          self.ask = null;
+          r = JSON.stringify(asked.items) === JSON.stringify(items) ? asked.menu : -1;
+          if (r !== asked.menu) console.error("patch window: the menu asked first is not the manager's", asked.items, items);
+        } else { console.error("patch window: a menu the page did not ask first"); r = -1; }
+        if (self.trace) self.trace.push(["menu", items, checked, r]);
+        return r;
+      },
+      confirm(msg) {
+        const a = take("box");
+        if (self.trace) self.trace.push(["box", msg]);
+        if (a !== undefined) return a === null || a === 1;
+        if (msg === 38) return window.confirm(PM_MSG[38]);           // OK / Cancel
+        window.alert(PM_MSG[msg] || "?");                            // OK
+        return true;
+      },
+      openFiles(title, ext) {
+        const a = take("file");
+        let r;                                                         // a script's: the shell dialog's way --
+        if (a !== undefined) r = a === null || !a.length ? null       // the first item's path, the others' names
+          : [a[0], ...a.slice(1).map(p => p.replace(/\\/g, "/").split("/").pop())];
+        else if (self.ask && self.ask.files !== undefined) { r = self.ask.files; self.ask = null; }
+        else { console.error("patch window: an open dialog the page did not ask first"); r = null; }
+        if (self.trace) self.trace.push(["fdopen", r]);
+        return r;
+      },
+      saveFile(title, suggested) {
+        const a = take("file");
+        let r;
+        if (a !== undefined) r = a === null ? null : a[0];
+        else r = DIRS.down + "/" + suggested;                          // the browser's download
+        if (self.trace) self.trace.push(["fdsave", r, suggested]);
+        return r;
+      },
+      onCall(kind, a, b, c) {
+        if (kind === "load") self.log("queue_record " + Array.from(a, x => x.toString(16).padStart(2, "0")).join(""));
+        else if (kind === "set") self.log(`pm_set ${a >>> 0} ${b | 0} ${c | 0}`);
+        else self.log("pm_" + kind);
+        if (self.trace && self.trace.calls) self.trace.calls.push([kind, a, b, c]);
+        if (kind === "notify") self.ledShows();                     // a panel may open (a load changed it)
+      },
+    };
+  }
+  // the bank menu, asked before the manager asks it: the banks, the current one checked
+  askMenu(ev, go) {
+    if (this.answers) { go(); return; }                              // a check: the script answers
+    const n = this.pm.nbanks(), cur = this.pm.curBank(), items = [], checked = [];
+    for (let i = 0; i < n; i++) { items.push(this.pm.bankName(i)); checked.push(i === cur); }
+    const m = this.menu(ev || { clientX: this.lastX || 100, clientY: this.lastY || 100 });
+    let done = false;
+    const answer = r => { if (done) return; done = true; this.ask = { menu: r, items }; this.closeMenu(); go(); };
+    items.forEach((nm, i) => {
+      const b = document.createElement("div");
+      b.className = "mi" + (checked[i] ? " on" : "");
+      b.textContent = nm;
+      b.onclick = () => answer(i);
+      m.appendChild(b);
+    });
+    this.menuCancel = () => answer(-1);                            // dismissed: the menu's cancel
+  }
+  // the open dialog, asked first: the files picked go to the desktop folder; the manager gets the
+  // first one's path and the others' names (rva 0x40B5D0 reads them so)
+  askFiles(go) {
+    if (this.answers) { go(); return; }
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = ".bin";
+    inp.multiple = true;
+    let done = false;
+    const answer = files => { if (done) return; done = true; this.ask = { files }; go(); };
     inp.onchange = async () => {
-      const f = inp.files[0];
-      if (!f) return;
-      try {
-        this.bank = this.addBank(f.name.replace(/\.bin$/i, ""), new Uint8Array(await f.arrayBuffer()));
-        this.status(`bank ${this.banks[this.bank].name} loaded: 64 patches`);
-        this.dirty = true;
-      } catch (e) { this.status(String(e)); }
+      const fs = Array.from(inp.files || []);
+      if (!fs.length) { answer(null); return; }
+      for (const f of fs) this.files.put(DIRS.desk + "/" + f.name, new Uint8Array(await f.arrayBuffer()));
+      answer([DIRS.desk + "/" + fs[0].name, ...fs.slice(1).map(f => f.name)]);
     };
+    inp.addEventListener("cancel", () => answer(null));
     inp.click();
-  }
-  bankNames(b) {
-    const out = [];
-    for (let i = 0; i < 64; i++) {
-      const r = b.bytes.subarray(HEADER + i * STRIDE, HEADER + i * STRIDE + NAME);
-      out.push(String.fromCharCode(...Array.from(r, x => (x >= 32 && x < 127 ? x : 32))).replace(/\s+$/, ""));
-    }
-    return out;
   }
 
   // the OPTION menu (menuButton): the view-model values it lists
@@ -951,6 +1112,9 @@ class Skin {
     if (this.menuOff) document.removeEventListener("pointerdown", this.menuOff);
     if (this.menuKey) document.removeEventListener("keydown", this.menuKey);
     this.menuEl = this.menuOff = this.menuKey = null;
+    const c = this.menuCancel;                  // a bank menu dismissed: the manager gets its cancel
+    this.menuCancel = null;
+    if (c) c();
   }
 
   // ------------------------------------------------------- the CC assign control
@@ -999,26 +1163,33 @@ class Skin {
   }
 
   // ------------------------------------------------- the patch manager window
+  // The list's cells as the plugin draws them (rva 0x326930): 4 columns of 16; a cell's text the
+  // number, ": ", the 16-char name, at (column x width + left + 3, row x height + top + 1), the
+  // selected cell in the second text writer (listC, rva 0x328550), the others in the first (listN);
+  // while a drag holds a target, the cells show the move (rva 0x326B20). The bank name: its button's
+  // frame and the current bank's name.
   drawPatchWindow() {
-    const g = this.g;
+    const g = this.g, pm = this.pm;
     g.fillStyle = "rgba(0,0,0,0.55)";
     g.fillRect(0, 0, this.cv.width, this.cv.height);
     this.drawPanelForce(this.patchTree);
-    const b = this.banks[this.bank];
+    if (!pm) return;
     for (const c of this.patchTree.items) {
       if (c.type === "patchBankName") {
         const [bx, by] = ints(text(c.el, "buttonPosition"));
         const [tx, ty] = ints(text(c.el, "textPosition"));
         drawFrame(g, c.bmp, 0, c.x + bx, c.y + by);
-        drawText(g, c.writers[0], b ? b.name : "(no bank)", c.x + tx, c.y + ty, c.w - tx, c.h - ty);
-      }
-      if (c.type === "patch" && b) {
-        const names = this.bankNames(b);
-        const cols = 4, rows = 16, cw = c.w / cols, rh = c.h / rows;
-        for (let i = 0; i < 64; i++) {
-          const x = c.x + Math.floor(i / rows) * cw, y = c.y + (i % rows) * rh;
-          const wr = i === this.patchSel ? c.writers[1] : c.writers[0];
-          drawText(g, { ...wr, alignV: "center" }, `${String(i + 1).padStart(2, "0")} ${names[i]}`, x + 8, y, cw - 12, rh);
+        drawText(g, c.writers[0], pm.bankName(pm.curBank()) || "", c.x + tx, c.y + ty, c.w - tx, c.h - ty);
+      } else if (c.type === "patch") {
+        const b = pm.curBank(), sel = pm.sel(), [src, tgt] = pm.drag(), cw = c.w / 4, rh = c.h / 16;
+        for (let k = 0; k < 64; k++) {
+          const x = c.x + Math.trunc(Math.trunc(k / 16) * cw) + 3, y = c.y + Math.trunc((k % 16) * rh) + 1;
+          const r = tgt < 0 ? k : k === tgt ? src : (src <= k && k < tgt) ? k + 1 : (tgt < k && k <= src) ? k - 1 : k;
+          const nm = pm.patchName(b, r);
+          if (nm === null) continue;
+          const num = pm.number(k);
+          const wr = k === sel && c.writers[1] ? c.writers[1] : c.writers[0];
+          drawText(g, { ...wr, alignV: "center" }, num ? `${num}: ${nm}` : nm, x, y, Math.trunc(cw) - 4, Math.trunc(rh));
         }
       }
     }
@@ -1034,39 +1205,80 @@ class Skin {
       }
     }
   }
-  patchDown(x, y, ev) {
-    const t = this.patchTree;
-    for (const c of t.items) {
-      if (c.kind !== "control") continue;
-      if (c.type === "patch") {
-        if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
-          const cols = 4, rows = 16;
-          const i = Math.floor((x - c.x) / (c.w / cols)) * rows + Math.floor((y - c.y) / (c.h / rows));
-          if (i >= 0 && i < 64) {
-            this.patchSel = i;
-            if (ev.detail >= 2) this.loadPatch(i);   // double click: read the patch
-          }
-          this.dirty = true;
-          return true;
-        }
-      } else if (c.type === "unlatchButton" && c.bmp && c.bmp.img) {
-        if (c.args === "sendUser" || c.args === "getUser") continue;
-        const [w, h] = frameSize(c.bmp);
-        if (x >= c.x && x < c.x + w && y >= c.y && y < c.y + h) {
-          this.pressed.add(c);
-          this.action(c.fn, c.args);
-          this.dirty = true;
-          return true;
-        }
-      }
-    }
-    const [w, h] = this.patchTree.size;
-    if (x < t.x || y < t.y || x >= t.x + w || y >= t.y + h) {
-      this.M.set("vm.vs.panelPatch", 0);           // a click outside closes the window
-      this.dirty = true;
+  // the window's two mouse controls on the manager (rva 0x327D70, 0x33F0A0): their rectangles, the
+  // bank name's button (its bitmap's frame at buttonPosition)
+  pwRect(type) {
+    const c = this.patchTree.items.find(x => x.kind === "control" && x.type === type);
+    return c ? [c.x, c.y, c.x + c.w, c.y + c.h] : null;
+  }
+  pwButton() {
+    const c = this.patchTree.items.find(x => x.kind === "control" && x.type === "patchBankName");
+    if (!c || !c.bmp || !c.bmp.img) return null;
+    const [bx, by] = ints(text(c.el, "buttonPosition")), [w, h] = frameSize(c.bmp);
+    return [c.x + bx, c.y + by, c.x + bx + w, c.y + by + h];
+  }
+  patchDown(x, y, ev, dbl) {
+    const t = this.patchTree, lr = this.pwRect("patch");
+    this.lastX = ev.clientX; this.lastY = ev.clientY;
+    if (lr && this.pmCall(() => this.pm.mouse(dbl ? 2 : 0, x, y, lr))) { this.pmCap = true; return true; }
+    const br = this.pwRect("patchBankName");
+    if (br && x >= br[0] && x < br[2] && y >= br[1] && y < br[3]) {
+      const bt = this.pwButton();
+      const go = () => this.pmCall(() => this.pm.bankMouse(dbl ? 2 : 0, x, y, br, bt));
+      // on the button: the rename (a text edit); elsewhere on it: the bank menu, asked first
+      if (bt && x >= bt[0] && x < bt[2] && y >= bt[1] && y < bt[3]) go();
+      else this.askMenu(ev, go);
       return true;
     }
+    for (const c of t.items) {
+      if (c.kind !== "control" || c.type !== "unlatchButton" || !c.bmp || !c.bmp.img) continue;
+      if (c.args === "sendUser" || c.args === "getUser") continue;
+      const [w, h] = frameSize(c.bmp);
+      if (x >= c.x && x < c.x + w && y >= c.y && y < c.y + h) {
+        this.pressed.add(c);
+        this.action(c.fn, c.args);
+        this.dirty = true;
+        return true;
+      }
+    }
+    const [w, h] = t.size;
+    if (x < t.x || y < t.y || x >= t.x + w || y >= t.y + h) {
+      this.M.set("vm.vs.panelPatch", 0);           // a press outside closes the window
+      this.dirty = true;
+    }
     return true;
+  }
+  patchMove(x, y) {
+    const lr = this.pwRect("patch");
+    if (!this.pmCap || !lr) return false;
+    this.pmCall(() => this.pm.mouse(3, x, y, lr));
+    return true;
+  }
+  patchUp(x, y) {
+    if (!this.pmCap) return false;
+    this.pmCap = false;
+    const lr = this.pwRect("patch");
+    if (lr) this.pmCall(() => this.pm.mouse(1, x, y, lr));
+    return true;
+  }
+  // the list's keys (rva 0x3278C0): letters as their capitals, Space, the arrows, Enter, Escape,
+  // Delete; Shift 1, Ctrl 2. ctrl+B (the bank menu) and ctrl+I (the open dialog) ask first.
+  patchKey(ev) {
+    if (!this.pm || this.M.get("vm.vs.panelPatch") !== 1 || this.menuEl) return false;
+    const k = ev.key.length === 1 && /[a-z]/i.test(ev.key) ? ev.key.toUpperCase().charCodeAt(0) : PM_KEYS[ev.key];
+    if (k === undefined) return false;
+    const flags = (ev.shiftKey ? 1 : 0) | (ev.ctrlKey || ev.metaKey ? 2 : 0);
+    const go = () => this.pmCall(() => this.pm.key(k, flags).handled);
+    if (k === 0x42 && (flags & 2)) { this.askMenu(null, go); return true; }
+    if (k === 0x49 && (flags & 2)) { this.askFiles(go); return true; }
+    return go();
+  }
+  // a check's "patch IDX COMMIT" (as JUNO-60.exe's): the selection, then the window's LOAD button
+  // (1) or the list's ctrl+O (0)
+  scriptedPatch(idx, commit) {
+    this.pm.select(Math.max(0, Math.min(63, idx)));
+    if (commit) this.action("ManagePatch", "load");
+    else this.pmCall(() => this.pm.key(0x4F, 2));
   }
 
   // ------------------------------------------------------------ MIDI in
@@ -1083,7 +1295,7 @@ class Skin {
   }
 
   applyZoom() {
-    const z = Math.max(25, Math.min(200, this.M.get("vm.vs.mainZoom"))) / 100;
+    const z = Math.max(25, Math.min(200, this.editor ? this.zoomConv(0) : this.M.get("vm.vs.mainZoom"))) / 100;
     this.cv.style.width = Math.round(this.cv.width * z) + "px";
     this.cv.style.height = Math.round(this.cv.height * z) + "px";
   }
@@ -1109,32 +1321,71 @@ export async function boot(canvas, status) {
   }));
   const missing = [...S.bitmaps.entries()].filter(([, b]) => !b.img).map(([n]) => n);
   status("starting the engine…");
-  const E = await new WasmEngine().init();
+  const E = await new WasmEngine().init(Q.has("rate") ? +Q.get("rate") : 0);   // ?rate=: a check's (no audio)
   const [w, h] = ints(text(S.panels.get("main"), "size"));
   canvas.width = w;
   canvas.height = h;
   const skin = new Skin(S, E, canvas, status);
   skin.M.refresh();
-  if (Q.has("zoom")) skin.M.set("vm.vs.mainZoom", +Q.get("zoom"));
-  skin.applyZoom();
-  try {
-    const bytes = new Uint8Array(await (await fetch(BANK_URL)).arrayBuffer());
-    skin.addBank("Factory", bytes);
-    skin.loadPatch(0);
-  } catch (e) { status("no factory bank: " + e); }
-  // ?banks=<manifest>: more banks for the patch window, [{name, file}] with
-  // each file relative to the manifest (the user's own banks: input, never truth)
-  if (Q.get("banks")) {
+  // the patch manager's folders (files.js): the data folder from IndexedDB (?fresh: none), the
+  // plugin's Patch folder the banks the page was given -- the factory bank and, from ?banks=<manifest>
+  // ([{name, file}], each file relative to the manifest: the user's own banks, input, never truth)
+  // ?pmsetup=<json>: a check's folders instead ({dirs: {data, patch, old, script}, files: [{path, url}]}:
+  // tools/verify/skin_pm_check.py, the patch manager gate's setup), no settings, nothing persisted
+  const setup = Q.get("pmsetup") ? await (await fetch(Q.get("pmsetup"))).json() : null;
+  const files = skin.files = new Files({
+    persist: !Q.has("fresh") && !setup,
+    onDownload: (name, bytes) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([bytes]));
+      a.download = name;
+      a.click();
+    },
+  });
+  await files.open();
+  if (setup) for (const f of setup.files) files.put(f.path, new Uint8Array(await (await fetch(f.url)).arrayBuffer()));
+  else try { files.put(DIRS.patch + "/Factory.bin", new Uint8Array(await (await fetch(BANK_URL)).arrayBuffer())); }
+  catch (e) { status("no factory bank: " + e); }
+  if (Q.get("banks") && !setup) {
     try {
       const url = new URL(Q.get("banks"), location.href);
       for (const b of await (await fetch(url)).json()) {
-        try { skin.addBank(b.name, new Uint8Array(await (await fetch(new URL(b.file, url))).arrayBuffer())); }
+        try { files.put(DIRS.patch + "/" + b.name + ".bin", new Uint8Array(await (await fetch(new URL(b.file, url))).arrayBuffer())); }
         catch (e) { console.warn("bank " + b.name + ": " + e); }
       }
     } catch (e) { console.warn("banks: " + e); }
   }
+  // the manager (CLAIMS A39): its settings (PatchManager/BankName, Patch/Format: the plugin keeps them
+  // in its settings file, the page in localStorage), the banks at its first attach, initialize's load
+  const pm = skin.pm = skin.M.pm = E.patchManager(skin.pmIO(), setup ? setup.dirs : { data: DIRS.data, patch: DIRS.patch, old: DIRS.old, script: "" });
+  const setting = k => { try { return setup ? null : localStorage.getItem("juno60." + k); } catch (e) { return null; } };
+  if (setting("PatchManager/BankName") !== null) pm.setPref(setting("PatchManager/BankName"));
+  if (!setup) pm.loadFormat(setting("Patch/Format"));
+  pm.attach();                                     // the editor's first open (rva 0x32FD50): the banks
+  pm.initialize();                                 // IComponent::initialize's load (rva 0x320643)
+  // then the editor opens (IPlugView::attached): its window lays out at the screen's fit, its open
+  // controls shown -- an LFO LED's show reads it (docs/WINDOW_ZOOM.md, docs/LED_METER.md)
+  skin.editor = true;
+  skin.zoomConv(0);
+  skin.ledShows();
+  if (Q.has("zoom")) skin.M.set("vm.vs.mainZoom", +Q.get("zoom"));
+  skin.applyZoom();
+  skin.pmStatus();
+  // the editor's last close (rva 0x32EEC0): every bank saved, the settings written; a page can end
+  // without its unload, so it also saves when it is hidden
+  const save = closing => {
+    try {
+      if (closing) pm.detach(); else pm.saveAll();
+      if (pm.pref() !== null) localStorage.setItem("juno60.PatchManager/BankName", pm.pref());
+      localStorage.setItem("juno60.Patch/Format", String(pm.format()));
+    } catch (e) { console.warn("save: " + e); }
+  };
+  window.addEventListener("pagehide", () => save(true));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") save(false); });
+  document.addEventListener("keydown", e => { if (skin.patchKey(e)) { e.preventDefault(); skin.dirty = true; } });
   E.setTempo(40 + skin.M.get("fm.SYNTH.COM.TEMPO") / 10);
   canvas.addEventListener("pointerdown", e => skin.down(e));
+  canvas.addEventListener("mousedown", e => skin.mdown(e));
   canvas.addEventListener("contextmenu", e => e.preventDefault());   // the right button is the panel's
   canvas.addEventListener("pointermove", e => skin.move(e));
   canvas.addEventListener("pointerup", e => skin.up(e));
@@ -1145,6 +1396,7 @@ export async function boot(canvas, status) {
   // of what changed in the model
   setInterval(() => {               // the plugin's UI timer: the drain, then what changed
     E.uiTick();
+    if (!setup) pm.tick();          // the manager's 50 ms timer (rva 0x32F280): its autosave (a check ticks it)
     let kb = false;
     for (let i = 0; i < 128 && !kb; i++) kb = (E.keybedState(i) > 0) !== (skin.kbStates[i] > 0);
     if (skin.M.refresh() || kb) skin.dirty = true;
@@ -1164,6 +1416,6 @@ export async function boot(canvas, status) {
   }
   if (missing.length) status("missing sprite sheets: " + missing.join(", "));
   else status("ready -- click a key or a control (audio starts on the first click)");
-  window.__skin = { S, E, skin, missing };
+  window.__skin = { S, E, skin, missing, pm, files };
   return skin;
 }

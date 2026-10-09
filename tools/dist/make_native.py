@@ -35,7 +35,7 @@ EXE = os.path.join(OUT, 'JUNO-60.exe')
 ID_XML, ID_BANKS, ID_PNG0 = 100, 101, 200
 # the port's own build flags (Makefile): -ffp-contract=off is load-bearing
 CFLAGS = ['-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-Wall', '-Wno-unused-function']
-LIBS = ['-lgdiplus', '-lshlwapi', '-lwinmm', '-lcomdlg32', '-lgdi32', '-lole32', '-lshell32', '-lavrt', '-lm']
+LIBS = ['-lgdiplus', '-lshlwapi', '-lwinmm', '-lcomdlg32', '-lgdi32', '-lole32', '-lshell32', '-lavrt', '-luuid', '-lm']
 
 
 def rle0(data):
@@ -126,7 +126,8 @@ def main():
             f.write('%d RCDATA "%s"\n' % (ID_PNG0 + i, rc_path(os.path.join(sdir, p))))
     res = os.path.join(BUILD, 'assets.res.o')
     subprocess.check_call([rc, '-O', 'coff', '-o', res, os.path.join(BUILD, 'assets.rc')])
-    srcs = [os.path.join(REPO, 'gui', 'win', 'juno60_win.c'), os.path.join(REPO, 'gui', 'juno_bridge.c')]
+    srcs = [os.path.join(REPO, 'gui', 'win', 'juno60_win.c'), os.path.join(REPO, 'gui', 'juno_bridge.c'),
+            os.path.join(REPO, 'gui', 'juno_pm.c')]
     srcs += sorted(os.path.join(REPO, 'src', f) for f in os.listdir(os.path.join(REPO, 'src')) if f.endswith('.c'))
     defs = ['-D' + sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == '--define']
     exe = sys.argv[sys.argv.index('--out') + 1] if '--out' in sys.argv else EXE

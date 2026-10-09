@@ -92,3 +92,4 @@ esp32s3/build_*/
 # rate-law self test binary
 tests/test_rate_laws
 tests/test_multi_instance
+.snapshot_tree

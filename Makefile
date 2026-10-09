@@ -165,6 +165,22 @@ verify: test libjuno.so
 	fresh $(SCRATCH)/led_meter_ref.pkl || python3 tools/verify/led_meter_gate.py --ref || FAIL=1; \
 	python3 tools/verify/led_meter_gate.py --port || FAIL=1; \
 	python3 tools/verify/led_meter_gate.py --port-tooth || FAIL=1; \
+	echo "=== THE PATCH WINDOW (CLAIMS A39): the plugin's patch manager -- keys, buttons, list and bank name mouse, dialogs, files, histories, model calls after every command, plugin vs port; 19 teeth ==="; \
+	for sp in 9:40 1:200 2:200 3:200 4:200 5:200 6:200 7:200 100:200; do \
+	  s=$${sp%%:*}; n=$${sp##*:}; \
+	  fresh $(SCRATCH)/patch_manager_ref2_$${s}_$${n}.pkl || rm -f $(SCRATCH)/patch_manager_ref2_$${s}_$${n}.pkl; \
+	  python3 tools/verify/patch_manager_gate.py --seed $$s --steps $$n > $(SCRATCH)/pm_gate_$$s.log 2>&1 || FAIL=1; \
+	  grep -v '^REACH' $(SCRATCH)/pm_gate_$$s.log | tail -5; \
+	done; \
+	for ts in 1:9:40 2:5:200 3:9:40 4:1:200 5:6:200 6:9:40 7:9:40 8:100:200 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 14:9:40 15:9:40 16:1:200 17:9:40 18:9:40 19:1:200; do \
+	  t=$${ts%%:*}; r=$${ts#*:}; \
+	  python3 tools/verify/patch_manager_gate.py --seed $${r%%:*} --steps $${r##*:} --tooth $$t > $(SCRATCH)/pm_tooth_$$t.log 2>&1 || { echo "patch manager tooth $$t DID NOT BITE"; FAIL=1; }; \
+	  tail -1 $(SCRATCH)/pm_tooth_$$t.log; \
+	done; \
+	echo "=== THE WINDOW ZOOM (CLAIMS A40): a window's fit to the screen -- the plugin's getter and fit, its editor attached, vs the port's; 16 screens; 4 teeth ==="; \
+	fresh $(SCRATCH)/zoom_fit_ref.pkl || python3 tools/verify/zoom_fit_gate.py --ref || FAIL=1; \
+	python3 tools/verify/zoom_fit_gate.py --port || FAIL=1; \
+	python3 tools/verify/zoom_fit_gate.py --port-tooth || FAIL=1; \
 	echo "=== REINIT == CREATE: juno_gui_reinit leaves a fresh context (state save, CCs, a learn, the keyboard note value, a render) ==="; \
 	python3 tools/verify/reinit_check.py || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
@@ -243,6 +259,10 @@ completeness:
 # must FAIL. cc_menu_gate runs the plugin's own right-button handler on the plugin's own
 # panel tree against the program's CC assign menu (CLAIMS A38); its teeth are builds
 # with -DCC_TOOTH=N (1 and 8 cannot bite: the search order is not observable here).
+# The program's own teeth (-DEXE_TOOTH=n): 1 a hidden LED not updated (the LED show rule),
+# 2 no window zoom conversion at the patch window's open. exe_pm_check plays the patch
+# manager gate's references through the program's patch window (CLAIMS A39); the web
+# target's skin_pm_check plays them through the page's, with teeth on the page's code.
 native: libjuno.so
 	python3 tools/dist/make_native.py
 	python3 tools/dist/native_check.py
@@ -252,6 +272,10 @@ native: libjuno.so
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,4 --tooth cc
 	python3 tools/verify/cc_menu_gate.py
 	for t in 2 3 4 5 6 7; do python3 tools/verify/cc_menu_gate.py --quick --tooth $$t || exit 1; done
+	for t in 1 2; do python3 tools/dist/make_native.py --define EXE_TOOTH=$$t --out scratchpad/dist/JUNO-60_t$$t.exe || exit 1; \
+	  if python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60_t$$t.exe --seeds 1,2,3,4,5,6,7,8 > scratchpad/exe_tooth_$$t.log 2>&1; \
+	  then echo "exe tooth $$t DID NOT BITE"; exit 1; else echo "exe tooth $$t BITES"; fi; done
+	python3 tools/dist/exe_pm_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 9:40,1:200,2:200,3:200,4:200,5:200,6:200,7:200,100:200
 
 webapp: libjuno.so
 	bash gui/web/build.sh
@@ -263,13 +287,19 @@ webapp: libjuno.so
 	env node tools/verify/skin_check.mjs
 	env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe
 	for t in velocity hold gap ccedge ccmods; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
+	python3 tools/verify/skin_pm_check.py --seeds 9:40,1:200,2:200,3:200,4:200,5:200,6:200,7:200,100:200
+	python3 tools/verify/skin_pm_check.py --seeds 9:40 --tooth capture
+	for t in keys button; do python3 tools/verify/skin_pm_check.py --seeds 1:200 --tooth $$t || exit 1; done
 
 # Shared library for the test GUI (gui/juno_gui.py via ctypes).
 gui: libjuno.so
 # The product code keeps every stack frame under 16 KB: the WASM stack is 64 KB and a
 # 121 KB context copied onto it overflowed silently (playbook 158).
 FRAME_GUARD := -Werror=frame-larger-than=16384
-libjuno.so: gui/juno_bridge.c $(SRC) $(HDR)
+# the shared library's sources (tools/verify/patch_manager_gate.py builds its teeth from them)
+print-libjuno-srcs:
+	@echo gui/juno_bridge.c gui/juno_pm.c $(SRC)
+libjuno.so: gui/juno_bridge.c gui/juno_pm.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(FRAME_GUARD) -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
 
 # TRACK B candidate engine: the sealed engine with hand-written NATIVE kernels

@@ -217,6 +217,12 @@ typedef struct {
      * defaults, setState, a patch load, the model's own edits and the UI timer's drain; never
      * by process() (EXECUTED: probes/host_api/state_save_census.py). */
     int32_t store[JUNO_STATE_N];
+    /* THE MODEL'S RECORD IMAGE (CLAIMS A39, docs/PATCH_MANAGER.md): the record body the
+     * plugin's serializer (rva 0x335990) writes for the model -- what its patch manager
+     * writes into a bank slot, keeps in an undo snapshot and takes as the init record.
+     * EXECUTED: a patch load keeps the loaded body byte for byte (any bytes: the model holds
+     * each leaf's raw bytes); a model set encodes its value at its leaf (prec_put). */
+    unsigned char prec[JUNO_REC_BYTES - 16];
     /* THE CORE'S SECOND QUEUE (core+512) as its drain (rva 0x320120, the UI timer) applies it:
      * the store records the push queues for a mapped CC (rva 0x3221F0: id, the CC's value),
      * one per parameter, in the order of their LATEST push (a drain applies each as an
@@ -395,6 +401,7 @@ static void ctx_init(juno_ctx *c, float sample_rate, int chorus_mode)
     c->host_bpm = 128.0f;   /* plugin recall-default TEMPO (880 -> 40+88.0) */
     juno_ccmap_boot(&c->ccmap);
     for (v = 0; v < JUNO_STATE_N; ++v) c->store[v] = JUNO_STATE_ENT[v].dflt;
+    memcpy(c->prec, JUNO_DEFAULT_REC + 16, sizeof c->prec);   /* the boot serialization */
     c->ui_nq = 0;
     c->ui_cc = -1;
     ks_reset(c);
@@ -1492,15 +1499,39 @@ static int state_k(uint32_t id)
  * another (EXECUTED: the store-link census, every entry alone at four values):
  * the LFO RATE and VCF CUTOFF bytes set their host-only float to byte x (1 /
  * 255) in single precision; nothing else. */
+/* The record image's leaf of state entry k (a JUNO_PATCH_EV leaf: the load's decode, read at the
+ * full record's offset) takes the entry's value in the load's encoding, inverted: INT1X7 the low
+ * byte, INT2X4 two nibbles, INT4X4 four, INT8X4 eight, the high one first (EXECUTED: every
+ * leaf's model set at 7 values, the serializer's bytes, probes/patchmgr/record_image.py). An
+ * entry that is no leaf (the setting values, the host-only ones) changes no byte. */
+static void prec_put(juno_ctx *c, int k)
+{
+    uint32_t id = JUNO_STATE_ENT[k].id, v = (uint32_t)c->store[k];
+    int e, i, n;
+    unsigned char *r;
+    for (e = 0; e < JUNO_PATCH_EV_N; ++e)
+        if (JUNO_PATCH_EV[e].id == id) break;
+    if (e == JUNO_PATCH_EV_N) return;
+    r = c->prec + (JUNO_PATCH_EV[e].roff - 16);
+    switch (JUNO_PATCH_EV[e].dec) {
+    case JUNO_DEC_INT1X7: r[0] = (unsigned char)v; return;
+    case JUNO_DEC_INT2X4: r[0] = (unsigned char)((v >> 4) & 15); r[1] = (unsigned char)(v & 15); return;
+    case JUNO_DEC_INT8X4: n = 8; break;
+    default:              n = 4; break;
+    }
+    for (i = 0; i < n; ++i) r[i] = (unsigned char)((v >> (4 * (n - 1 - i))) & 15);
+}
+
 static void store_put(juno_ctx *c, int k, int32_t v, int masked)
 {
     uint32_t id = JUNO_STATE_ENT[k].id;
     if (masked && JUNO_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask);
     c->store[k] = v;
+    prec_put(c, k);
     if (id == 0x00600004u || id == 0x0060003Au) {
         float h = (float)v * (1.0f / 255.0f);
         int kh = state_k(id == 0x00600004u ? 0x00A00000u : 0x00A02802u);
-        if (kh >= 0) memcpy(&c->store[kh], &h, 4);
+        if (kh >= 0) { memcpy(&c->store[kh], &h, 4); prec_put(c, kh); }
     }
 }
 static void store_set(juno_ctx *c, int k, int32_t v) { store_put(c, k, v, 1); }
@@ -2759,14 +2790,53 @@ static int32_t rec_value(const unsigned char *r, const juno_patch_ev *e)
  * outside the parameter list (e.g. the LFO / OSC waves) never reach the engine:
  * the model record keeps the defaults there. Returns the events applied, 0 for
  * an idx whose record is not in `bank`. */
+static int load_rec(juno_ctx *c, const unsigned char *hdr, const unsigned char *r);
+
 int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx)
 {
-    const unsigned char *r;
-    int k, hold = 1;
     if (!c || !bank || len <= 0) return 0;
     if (idx < 0 || idx >= juno_bank_num_patches(bank, (unsigned long)len)) return 0;
-    if (!ctx_model(c, bank)) return 0;
-    r = bank + 23 + (size_t)idx * JUNO_REC_BYTES;
+    return load_rec(c, bank, bank + 23 + (size_t)idx * JUNO_REC_BYTES);
+}
+
+/* The same load of one record BODY (the 20207 bytes after a bank file's 16-byte name: what the
+ * plugin's patch manager holds per slot, rva 0x335850's input): the patch manager's read, undo
+ * and redo. The name in front is the body's own (its 8 name words, rva 0x33BC80). */
+int juno_gui_load_record(juno_ctx *c, const unsigned char *body, int len)
+{
+    unsigned char *r;
+    int k, n;
+    if (!c || !body || len != JUNO_REC_BYTES - 16) return 0;
+    r = malloc(JUNO_REC_BYTES);
+    if (!r) return 0;
+    for (k = 0; k < 16; ++k) r[k] = (unsigned char)(body[140 + 2 * k] * 16 + body[141 + 2 * k]);
+    memcpy(r + 16, body, JUNO_REC_BYTES - 16);
+    n = load_rec(c, 0, r);
+    free(r);
+    return n;
+}
+int juno_gui_queue_record(juno_ctx *c, const unsigned char *body, int len)
+{
+    int r;
+    if (!c) return 0;
+    c->drv_queue_mode = 1;
+    r = juno_gui_load_record(c, body, len);
+    c->drv_queue_mode = 0;
+    return r;
+}
+
+/* The model's record image (the serializer's bytes, rva 0x335990): `cap` >= 20207 */
+int juno_gui_record(const juno_ctx *c, unsigned char *out, int cap)
+{
+    if (!c || !out || cap < (int)sizeof c->prec) return 0;
+    memcpy(out, c->prec, sizeof c->prec);
+    return (int)sizeof c->prec;
+}
+
+static int load_rec(juno_ctx *c, const unsigned char *hdr, const unsigned char *r)
+{
+    int k, hold = 1;
+    if (!ctx_model(c, hdr)) return 0;
     memcpy(c->bank + 23, r, 16);          /* the patch's name: display only */
     for (k = 0; k < JUNO_PATCH_EV_N; ++k)
         if (JUNO_PATCH_EV[k].id == KEY_HOLD_ID) hold = rec_value(r, &JUNO_PATCH_EV[k]);
@@ -2786,6 +2856,7 @@ int juno_gui_load_patch(juno_ctx *c, const unsigned char *bank, int len, int idx
 #if KS_TOOTH == 4
     if (hold == 0) ks_release(c);             /* TOOTH 4: the release after the load's records */
 #endif
+    memcpy(c->prec, r + 16, sizeof c->prec);  /* the model keeps the record's bytes as given */
     return JUNO_PATCH_EV_N;
 }
 
@@ -2818,6 +2889,13 @@ int juno_gui_queue_patch(juno_ctx *c, const unsigned char *bank, int len, int id
  * at 0 releases the keyboard's keys (ks_release). The set alone: a panel
  * control then commits (juno_gui_commit), the patch browser's own set of the
  * patch number does not. 0 for an id outside the state list. */
+/* The model's value of the state entry `id` (what getState writes for it); 0 for an id outside */
+int32_t juno_gui_model_get(const juno_ctx *c, uint32_t id)
+{
+    int k = c ? state_k(id) : -1;
+    return k < 0 ? 0 : c->store[k];
+}
+
 int juno_gui_model_set(juno_ctx *c, uint32_t id, int32_t v)
 {
     int k = c ? state_k(id) : -1;
@@ -3598,6 +3676,52 @@ int juno_gui_bar_draw(const int *rect, const int *fill, int horiz, int fade, int
         }
     }
     return nb;
+}
+
+/* ---- A WINDOW'S ZOOM (docs/WINDOW_ZOOM.md; tools/verify/zoom_fit_gate.py) ----------
+ * The fit (rva 0x312750, slot 36 of the panel window, vtable rva 0x9490E8): the largest
+ * zoom, in percent, at which the panel (w x h, its Script.xml size) fits the virtual
+ * screen (cx x cy: GetSystemMetrics 78 and 79) less 40 x 120 pixels -- the smaller of
+ * (cy - 120) * 100 / h and (cx - 40) * 100 / w, each an integer division (idiv). The
+ * window keeps the first positive one (+0x13c). Teeth: -DZF_TOOTH=n (the gate's TEETH). */
+#ifndef ZF_TOOTH
+#define ZF_TOOTH 0
+#endif
+int juno_gui_zoom_fit(int cx, int cy, int w, int h)
+{
+    int a, b;
+    if (w <= 0 || h <= 0) return 0;                              /* (a panel is never empty) */
+#if ZF_TOOTH == 1
+    a = (cy - 40) * 100 / h; b = (cx - 120) * 100 / w;           /* TOOTH 1: the margins swapped */
+#else
+    a = (cy - 120) * 100 / h; b = (cx - 40) * 100 / w;
+#endif
+#if ZF_TOOTH == 2
+    return a >= b ? a : b;                                       /* TOOTH 2: the larger one */
+#elif ZF_TOOTH == 3
+    return (int)((double)(cy - 120) * 100 / h + 0.5) < (int)((double)(cx - 40) * 100 / w + 0.5)
+         ? (int)((double)(cy - 120) * 100 / h + 0.5) : (int)((double)(cx - 40) * 100 / w + 0.5);   /* TOOTH 3: rounded */
+#else
+    return a >= b ? b : a;
+#endif
+}
+
+/* The zoom a window's coordinate conversions read (rva 0x2AA590, called by each of them,
+ * rva 0x2AC0F0..0x2AC55E: a draw, an invalidation, a hit test): its zoom value, at most the
+ * fit -- and the value set to that (the value object's set, vt+0x70; no model commit).
+ * `cache`: the window's fit (start at 0; the first positive fit stays). Returns the zoom;
+ * the caller stores it when it differs from `value`. EXECUTED: the editor's attach clamps
+ * vm.vs.mainZoom, the patch window's open vm.vs.patchZoom. */
+int juno_gui_zoom_get(int value, int cx, int cy, int w, int h, int *cache)
+{
+    int f;
+#if ZF_TOOTH == 4
+    f = juno_gui_zoom_fit(cx, cy, w, h);                         /* TOOTH 4: no fit kept */
+#else
+    if (*cache > 0) f = *cache;
+    else f = *cache = juno_gui_zoom_fit(cx, cy, w, h);
+#endif
+    return f < value ? f : value;
 }
 
 /* The store and the peaks as they are (the gate's inspection): last, sum, period,

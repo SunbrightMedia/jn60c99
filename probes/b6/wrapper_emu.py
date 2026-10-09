@@ -105,6 +105,7 @@ class Wrapper(E.E2E):
         self.calls = collections.Counter()
         self.fslog, self.handles, self.finds = [], {}, {}
         self.lasterr = 0
+        self.screen = {}                  # GetSystemMetrics' answers by index (none: 0, no screen)
         script = open(_truth.SCRIPT_XML, 'rb').read()
         # TextCodeTable.dat (GUI message strings; not supplied) is served EMPTY: the module init
         # requires it to open, and nothing in it reaches the engine.
@@ -224,6 +225,8 @@ class Wrapper(E.E2E):
         if name == 'GetProcAddress':
             if rdx < 0x10000: return ret(0)
             return ret(self.named_stub(self.rstr(rdx, False)))
+        if name == 'GetSystemMetrics':            # the virtual screen a host's machine has (docs/WINDOW_ZOOM.md)
+            return ret(self.screen.get(rcx & 0xFFFFFFFF, 0))
         if name == 'GetLastError': return ret(self.lasterr)
         if name == 'SetLastError': self.lasterr = rcx & 0xFFFFFFFF; return ret(0)
         if name in ('GetModuleFileNameA', 'GetModuleFileNameW'):

@@ -30,6 +30,7 @@ the control tree (slot +96 of each open control). A control in a closed panel do
 | 10 | log10 is the MSVC CRT's (rva 0x6D2660), statically linked, with an FMA3 path taken when the CRT's flag is set (a CPU with FMA3). The port uses the C library's. Every float next to each of the 998 dB steps lies at least 6.47e-9 from it (exact, 60 digits): any log10 within 1e-12 gives the same step | EXECUTED (the SSE2 path), PROVEN (the margin: part 1) | rva 0x6D2660 |
 | 11 | A meter draws (rva 0x31C210, horizontal): of the fill's width w, `n = min(control width - w, min(fade, w))` columns fade; the first `w - n` columns are one plain blit from the bitmap's left edge at the fill's corner, then column k at alpha `255 - 255 (k + 1) / fade` from the bitmap's column `w - n + k` | EXECUTED (part 1, a blitter whose slots record) | rva 0x31C210 |
 | 12 | Script.xml `direction` 1 is horizontal (the parser: byte = direction != 0, "must be 0 or 1"); a meter's object is zeroed at creation (state 0) | READ | rva 0x2C9E60, 0x34FA60 |
+| 13 | An LED shown or hidden runs its update (vt+0xB0 = rva 0x325070: the read, rule 4, and the frame, rule 8) -- not only at a tick. The editor's attach shows every open control (one read); at the model's notify (rva 0x2853C0) the panels whose open conditions read a value in the change list open or close (rva 0x2C4890: show vt+0xA0, hide vt+0xA8, both through rva 0x2C4B20), the controls in tree order: a TEMPO SYNC or panel-mode flip reads twice (the LED hidden, then the other shown). A patch load puts TEMPO SYNC in the change list even when its value is the same; a commit without a notify (initialize's load) leaves the panels as they were. The tick reads only a shown LED (rva 0x324FF0) | EXECUTED (the plugin's editor attached under emulation, 2026-10-09: the reads counted per call, `scratchpad` probes) | rva 0x2C4890, 0x2C4B20, 0x325070 |
 
 ## The port
 
@@ -38,9 +39,12 @@ the control tree (slot +96 of each open control). A control in a closed panel do
   render call (the identity's segment, the converter's request); the reads `juno_gui_lfo_led`,
   `juno_gui_peak`; the GUI's three calls: `juno_gui_lfo_led_frame`, `juno_gui_meter_tick`,
   `juno_gui_bar_draw` (the blits in order). Integer steps wrap as the plugin's 32-bit ones.
-- `gui/skin/skin.js`, `gui/win/juno60_win.c`: every UI-timer tick runs the three calls for the open
+- `gui/skin/skin.js`, `gui/win/juno60_win.c`: every UI-timer tick runs the three calls for the shown
   LED and both meters and draws what they return; nothing else is computed in the apps but the
-  pixels of a blit at an alpha (the renderer's, as for every other control).
+  pixels of a blit at an alpha (the renderer's, as for every other control). Rule 13: after each
+  notify the apps' model calls make (a commit's trio, a keyboard write, the patch manager's notify)
+  and at the editor's open (after IComponent::initialize's load), each LED whose visibility changed
+  runs `juno_gui_lfo_led_frame` (`led_shows` / `ledShows`; logged `ledshow NFRAMES FRAME`).
 
 ## Graded
 
@@ -58,7 +62,11 @@ DAW state can carry a count of 1 (the plugin takes it: the chain is bit-exact), 
 renders; the chain voices1 holds that case (playbook 122).
 `tools/verify/wasm_product_gate.py`: every tick after every render of the app's own flows,
 native vs the WASM. `tools/dist/exe_oracle_check.py`: JUNO-60.exe's logged ticks replayed in the
-plugin (its reads, frame, tick and draw), every value equal.
+plugin (its reads, frame, tick and draw), every value equal; since rule 13 the plugin's editor is
+attached there too (`editor` line), its own LED updates at its notifies are hooked (the frame stores
+rva 0x32510E / 0x325124 outside the replayed ticks) and each must equal the program's `ledshow`, in
+order, none left over (8 seeds: 16 shows EQUAL; tooth `EXE_TOOTH=1`, no update at a hide, bites on 3
+of 8 seeds). `tools/verify/skin_kb_check.mjs`: the page's `ledshow` lines equal the program's.
 
 ## Limits (stated)
 

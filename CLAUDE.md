@@ -149,7 +149,7 @@ mine is a hypothesis (playbook 80).
   gui/skin/ draws the plugin's own GUI from truth/Script.xml + truth/Script/*.png,
   local only, never published; CLAIMS C5, gui/skin/README.md). The web app's WASM is rebuilt
   with all of it (make webapp green: WASM == native, headless check; emcc from
-  /home/user/emsdk/emsdk_env.sh). Engine: PROVENANCE 34/34 PROVEN;
+  /home/user/emsdk/emsdk_env.sh). PROVENANCE 38/38 PROVEN (34 engine and host rows, 4 GUI rows: A37-A40);
   full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
   every reference rebuilt from the plugin; ARM golden OK in the same run), and
   of 84921859 -- the stack fix and the rebuilt web app -- GREEN (job
@@ -164,10 +164,15 @@ mine is a hypothesis (playbook 80).
   verify_18ea9bd2, EXIT 0, 105 sections, 44 gates, 0 failures, ARM golden OK,
   every reference rebuilt from the plugin; verify_a35 had died in a container
   restart). After that run: A37 (the LED and the meters: gui/juno_bridge.c,
-  both GUIs, a new gate; its full verify: job verify_3a5ee931) and A38 (the
-  CC menu and the skin's MIDI input: gui/juno_bridge.c juno_gui_host_param,
-  both GUIs, a new gate; make native + make webapp GREEN on 129a7bd3: jobs
-  final_a38, final_a38_web) -- a full verify of A38 is owed.
+  both GUIs, a new gate; its full verify GREEN: job verify_3a5ee931, EXIT 0,
+  108 sections), A38 (the CC menu and the skin's MIDI input; make native +
+  make webapp GREEN on 129a7bd3: jobs final_a38, final_a38_web), A39 (the
+  patch window = the plugin's patch manager: gui/juno_pm.c in both apps, the
+  web page's files.js; patch_manager_gate.py, exe_pm_check.py,
+  skin_pm_check.py; docs/PATCH_MANAGER.md) and A40 (a window's zoom fit to
+  the screen and the LED's show; zoom_fit_gate.py; the oracle now attaches
+  the plugin's editor; docs/WINDOW_ZOOM.md) -- a full verify of A38-A40 is
+  owed. Jobs run from tools/snap_tree.sh snapshots (playbook 178).
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up

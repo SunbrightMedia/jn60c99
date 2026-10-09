@@ -4,7 +4,8 @@
 # file), so edits in the main tree cannot reach it (CLAUDE.md freeze rule)
 # and work goes on while the job runs. The snapshot shares scratchpad/ and
 # bench/jobs/ with the main tree: its oracle pickles and its job registry are
-# the main ones, and tools/status.sh sees the job.
+# the main ones, and tools/status.sh sees the job. It records its content
+# tree id in <dir>/.snapshot_tree (compare with the commit's HEAD^{tree}).
 # usage: sh tools/snap_tree.sh <dir>
 #        sh <dir>/tools/run_job.sh <name> <command...>
 set -eu
@@ -21,6 +22,17 @@ for f in $( { git diff --name-only HEAD; git ls-files --others --exclude-standar
   if [ -e "$f" ]; then mkdir -p "$W/$(dirname "$f")"; cp -p "$f" "$W/$f"; else rm -f "$W/$f"; fi
   n=$((n + 1))
 done
+# the snapshot's content as a git tree id (a scratch index, the worktree's own untouched): after the
+# commit, `git rev-parse HEAD^{tree}` equal to it proves the job graded exactly the committed files
+I=$(mktemp); rm -f "$I"
+T=$(GIT_INDEX_FILE=$I git -C "$W" add -A && GIT_INDEX_FILE=$I git -C "$W" write-tree); rm -f "$I"
+echo "$T" > "$W/.snapshot_tree"
 rm -rf "$W/scratchpad"; ln -s "$R/scratchpad" "$W/scratchpad"
 mkdir -p "$W/bench"; rm -rf "$W/bench/jobs"; ln -s "$R/bench/jobs" "$W/bench/jobs"
-echo "snapshot $W = $(git rev-parse --short HEAD) + $n working files"
+# Node's ESM resolver ignores NODE_PATH: it looks for node_modules from the script's folder up. The
+# main tree finds the one in a parent folder; a snapshot elsewhere would not (playbook 178)
+d=$R; while [ "$d" != / ]; do
+  if [ -d "$d/node_modules" ]; then [ -e "$W/node_modules" ] || ln -s "$d/node_modules" "$W/node_modules"; break; fi
+  d=$(dirname "$d")
+done
+echo "snapshot $W = $(git rev-parse --short HEAD) + $n working files; content tree $T"

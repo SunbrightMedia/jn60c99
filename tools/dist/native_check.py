@@ -83,6 +83,7 @@ def load_lib():
     for n, a, r in [('juno_gui_create', [ctypes.c_float, ctypes.c_int], V),
                     ('juno_gui_plugin_init', [V], ctypes.c_int),
                     ('juno_gui_queue_patch', [V, ctypes.c_char_p, ctypes.c_int, ctypes.c_int], ctypes.c_int),
+                    ('juno_gui_queue_record', [V, ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_model_set', [V, ctypes.c_uint32, ctypes.c_int32], ctypes.c_int),
                     ('juno_gui_ui_tick', [V], None),
                     ('juno_gui_commit', [V], None),
@@ -139,6 +140,11 @@ def replay(lib, log, tooth):
     while i < len(lines):
         t = lines[i]
         i += 1
+        if t[0] == 'ledshow':                             # an LED shown runs its update: the read, the frame
+            got, want = lib.juno_gui_lfo_led_frame(c, int(t[1])), int(t[2])
+            if got != want:
+                errs.append('ledshow: the build %d, the program %d' % (got, want))
+            continue
         if t[0] in ('led', 'meter', 'bar'):             # the UI timer's LED and meter ticks (CLAIMS A37)
             if t[0] == 'led' and tooth == 'tick' and not skipped_led:
                 skipped_led = True                        # TOOTH: the build misses one LED read
@@ -164,6 +170,19 @@ def replay(lib, log, tooth):
             name = ' '.join(t[2:])
             b = banks.setdefault(name, bank_bytes(name))
             lib.juno_gui_queue_patch(c, b, len(b), int(t[1]))
+        elif t[0] == 'queue_record':                      # the patch manager's load of a record body
+            b = bytes.fromhex(t[1])
+            lib.juno_gui_queue_record(c, b, len(b))
+        elif t[0] == 'pm_set':                            # the patch window's model sets (CLAIMS A39)
+            lib.juno_gui_model_set(c, int(t[1]), int(t[2]))
+        elif t[0] == 'pm_commit':
+            lib.juno_gui_commit(c)
+        elif t[0] == 'pm_notify':
+            pass                                          # the model's notify: no engine call in the port
+        elif t[0] == 'editor':
+            pass                                          # the editor opens (its screen: exe_oracle_check's)
+        elif t[0] == 'zoomfit':                           # a window's zoom set to its fit (docs/WINDOW_ZOOM.md)
+            lib.juno_gui_model_set(c, 0x0FFFC016 if t[1] == '1' else 0x0FFFC008, int(t[2]))
         elif t[0] == 'model_set':
             if tooth == 'replay' and blk > 0 and not dropped:
                 dropped = True                            # TOOTH: the first panel edit is lost
@@ -258,7 +277,7 @@ def main():
         speed = [ln for ln in log.splitlines() if ln.startswith('# rendered')]
         ok = same and not errs and nz > ref.size // 4
         fails += not ok
-        name = [ln for ln in log.splitlines() if ln.startswith('queue_patch')][0].split(None, 2)[2]
+        name = [ln for ln in log.splitlines() if ln.startswith('# pm bank ')][0][10:].rsplit(' patch ', 1)[0]
         print('%s bank %d (%s) patch %2d: replay %s, glue %s, %d / %d samples non-zero, peak %.3f; %s' % (
             'ok  ' if ok else 'FAIL', bank, name, patch + 1, diff, 'ok' if not errs else '%d ERRORS' % len(errs),
             nz, ref.size, float(np.max(np.abs(ref))), speed[0][2:] if speed else ''))

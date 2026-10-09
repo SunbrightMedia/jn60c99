@@ -29,10 +29,12 @@
  * skin and requires the same calls).
  */
 #define WIN32_LEAN_AND_MEAN
+#define COBJMACROS                     /* the shell's COM interfaces in C (IFileOpenDialog_Show, ...) */
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0601
 #endif
 #include <windows.h>
+#include <wincrypt.h>         /* SHA-1 for --pm-script's hashes (CryptoAPI) */
 #include <windowsx.h>
 #include <mmsystem.h>
 #include <commdlg.h>
@@ -52,7 +54,9 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <math.h>
+#include <shobjidl.h>          /* the shell's file dialog (the plugin's own, for the patch window) */
 #include "assets.h"     /* generated: resource ids of Script.xml, the banks, the sprite sheets */
+#include "../juno_pm.h"        /* the plugin's patch manager, ported (CLAIMS A39) */
 
 /* ------------------------------------------------------------- the engine */
 typedef struct { int offset, type, channel, pitch; float velocity; } juno_host_note;
@@ -62,6 +66,9 @@ int juno_gui_plugin_init(void *c);
 int juno_gui_model_set(void *c, uint32_t id, int32_t v);
 int juno_gui_state_save(const void *c, unsigned char *out, int cap);
 int juno_gui_queue_patch(void *c, const unsigned char *bank, int len, int idx);
+int juno_gui_queue_record(void *c, const unsigned char *body, int len);
+int juno_gui_record(const void *c, unsigned char *out, int cap);
+int juno_gui_model_get(const void *c, uint32_t id);
 void juno_gui_ui_tick(void *c);
 void juno_gui_setup_processing(void *c, double host_rate);
 void juno_gui_set_active(void *c, int on);
@@ -74,6 +81,7 @@ int juno_gui_keybed_state(const void *c, int key);
 int juno_gui_lfo_led_frame(void *c, int nframes);
 int juno_gui_meter_tick(void *c, int ch, int decay, int state, const int *rect, int horiz, int *fill);
 int juno_gui_bar_draw(const int *rect, const int *fill, int horiz, int fade, int *out, int cap);
+int juno_gui_zoom_get(int value, int cx, int cy, int w, int h, int *cache);
 int juno_gui_cc_entry(uint32_t id);
 int juno_gui_cc_of(const void *c, uint32_t id);
 int juno_gui_cc_learn(void *c, uint32_t id);
@@ -540,6 +548,7 @@ typedef struct Ctl {
     int nkeys, rects[14][2][4];
     int bx, by, tx, ty, tw, th;
     int frame;                             /* lfoLed: the frame of its last tick (rva 0x325070) */
+    int shown;                             /* lfoLed: visible at the last notify (its show runs its update) */
     int horiz, decay, ch, fade, state, rect[4], blits[7 * BAR_BLITS], nblits;   /* barGraphX (rva 0x31C450) */
 } Ctl;
 typedef struct Panel Panel;
@@ -717,8 +726,13 @@ static Panel *build(const char *type, int ox, int oy)
 }
 
 /* ----------------------------------------------------------------- the model */
+#ifndef EXE_TOOTH
+#define EXE_TOOTH 0                         /* a check's tooth (make_native.py --define EXE_TOOTH=n): 1 a hidden LED not
+                                             * updated, 2 no zoom conversion at the patch window's open */
+#endif
 static void *g_eng;
 static CRITICAL_SECTION g_lock;            /* every engine call */
+static void led_shows(void);
 /* --render: every engine call that changes the engine, in order (floats and
  * doubles as their bits), for the replay through the proven build */
 static FILE *g_log;
@@ -731,13 +745,17 @@ static int E_model_set(uint32_t id, int32_t v)
 }
 static int E_keybed_write(int key, int value)
 {
+    int r;
     if (g_log) fprintf(g_log, "keybed %d %d\n", key, value);
-    return juno_gui_keybed_write(g_eng, key, value);
+    r = juno_gui_keybed_write(g_eng, key, value);
+    led_shows();                            /* its notifies (rva 0x2D47E0): a panel may open */
+    return r;
 }
 static void E_commit(void)
 {
     if (g_log) fprintf(g_log, "commit\n");
     juno_gui_commit(g_eng);
+    led_shows();                            /* the trio's notify (rva 0x2853C0): a panel may open */
 }
 static void E_cc_learn(uint32_t id)
 {
@@ -774,6 +792,9 @@ static struct { uint32_t id; int32_t v; } g_loc[256];
 static int g_nloc;
 static int g_dirty = 1;
 static Panel *g_tree, *g_patchwin;
+static int g_editor;                        /* the editor is open (its controls shown): from its attach */
+static juno_pm *g_pm;                       /* the patch window's manager */
+static int g_zoom;
 static int g_fbw = 1924, g_fbh = 740;
 
 static int eng_refresh(void)              /* the model as getState writes it; call under the lock */
@@ -795,10 +816,12 @@ static int eng_refresh(void)              /* the model as getState writes it; ca
     return changed;
 }
 
+static int pm_owns(uint32_t id) { return id == JPM_ID_PANEL || id == JPM_ID_MANAGER || id == JPM_ID_LIST_MAIN || id == JPM_ID_LIST_SUB; }
 static int val_get(const Leaf *L)
 {
     int i;
     if (!L) return 0;
+    if (g_pm && pm_owns(L->id)) return juno_pm_value(g_pm, L->id);
     for (i = 0; i < g_neng; ++i) if (g_eid[i] == L->id) return g_ev[i];
     for (i = 0; i < g_nloc; ++i) if (g_loc[i].id == L->id) return g_loc[i].v;
     return L->def;
@@ -808,6 +831,7 @@ static int get(const char *ref) { return val_get(resolve(ref)); }
 static double g_tempo = 128.0;
 static DWORD g_note_flash;
 static void zoom_apply(void);
+static int zoom_conv(int win);
 
 /* a value the engine's state list does not hold (the view's own): kept here */
 static void local_put(uint32_t id, int v)
@@ -824,10 +848,14 @@ static void val_set(const Leaf *L, int v)
     if (L->max > L->min) { if (v < L->min) v = L->min; if (v > L->max) v = L->max; }
     EnterCriticalSection(&g_lock);
     r = E_model_set(L->id, v);
+    LeaveCriticalSection(&g_lock);
+    if (g_pm && pm_owns(L->id)) juno_pm_set_value(g_pm, L->id, v);   /* the PATCH button opens the window */
+    EnterCriticalSection(&g_lock);
     E_commit();                       /* a panel control commits after its set (rva 0x2DD100) */
     if (r) eng_refresh();
     LeaveCriticalSection(&g_lock);
-    if (!r) local_put(L->id, v);
+    if (L->id == JPM_ID_PANEL && v == 1 && EXE_TOOTH != 2) { zoom_conv(0); zoom_conv(1); }   /* the window opens: both convert (TOOTH 2: not) */
+    if (!r && !(g_pm && pm_owns(L->id))) local_put(L->id, v);
     if (!strcmp(L->name, "fm.SYNTH.COM.TEMPO")) g_tempo = 40.0 + v / 10.0;     /* "40.0BPM" + 0.1 per step */
     if (!strcmp(L->name, "vm.vs.mainZoom")) zoom_apply();
     if (!strcmp(L->name, "fm.PATCH.CTRL.TEMPO SYNC")) g_note_flash = GetTickCount();
@@ -1183,27 +1211,26 @@ static void draw_panel(Panel *p)
 }
 
 /* ------------------------------------------------------- banks and patches */
-typedef struct { char name[64]; unsigned char *bytes; int len; } Bank;
-static Bank g_banks[32];
-static int g_nbanks, g_bank, g_patch, g_patchsel;
+/* The patch window is the plugin's patch manager, ported (gui/juno_pm.c, CLAIMS A39: graded against
+ * the plugin by tools/verify/patch_manager_gate.py): its banks, their histories, the clipboard, the
+ * files, its keys, mouse and buttons. This file gives it what the plugin's host gives the plugin:
+ * the folders (the data folder %APPDATA%\JUNO-60\Banks, where every bank is saved; the embedded
+ * banks as the plugin's own Patch folder, "res:/Patch", installed once), the file calls, the dialogs
+ * (an edit over the name, a popup menu, message boxes, the file dialogs) and the engine's calls. */
+typedef struct { char name[64]; unsigned char *bytes; int len; } Bank;   /* an embedded bank file */
+static Bank g_res[32];
+static int g_nres;
 #define HEADER 23
 #define STRIDE 20223
+#define RES_DIR "res:/Patch"
 
-static void bank_name(const Bank *b, int i, char *out)
+static int res_add(const char *name, unsigned char *bytes, int len)
 {
-    int k, n = 0;
-    const unsigned char *r = b->bytes + HEADER + (size_t)i * STRIDE;
-    for (k = 0; k < 16; ++k) out[n++] = (char)((r[k] >= 32 && r[k] < 127) ? r[k] : ' ');
-    while (n > 0 && out[n - 1] == ' ') --n;
-    out[n] = 0;
-}
-static int bank_add(const char *name, unsigned char *bytes, int len)
-{
-    if (g_nbanks >= 32 || len < HEADER + 64 * STRIDE || memcmp(bytes, "KoaBankFile00003", 16)) return -1;
-    snprintf(g_banks[g_nbanks].name, sizeof g_banks[0].name, "%s", name);
-    g_banks[g_nbanks].bytes = bytes;
-    g_banks[g_nbanks].len = len;
-    return g_nbanks++;
+    if (g_nres >= 32 || len < HEADER + 64 * STRIDE || memcmp(bytes, "KoaBankFile00003", 16)) return -1;
+    snprintf(g_res[g_nres].name, sizeof g_res[0].name, "%s", name);
+    g_res[g_nres].bytes = bytes;
+    g_res[g_nres].len = len;
+    return g_nres++;
 }
 /* the embedded banks: count, then per bank name, size and a zero-run code
  * (byte b != 0: itself; 0, lo, hi: that many zeros) */
@@ -1236,7 +1263,7 @@ static void banks_load(void)
             }
         }
         p += enc;
-        bank_add(name, b, (int)raw);
+        res_add(name, b, (int)raw);
     }
 }
 
@@ -1250,69 +1277,438 @@ static void status_set(const char *s)
     if (g_wnd) SetWindowTextA(g_wnd, t);
 }
 
-/* A patch load while the audio plays is landed by the audio thread (land_patch):
- * it first renders ahead -- the queue grows by the last load's measured block --
- * so the load's slow block cannot empty it, then queues the load at a block
- * boundary. The change lands some ms late; the audio never breaks (END_GOAL's
- * INVARIANT). The calls are the same as below: the patch browser's load, then the
- * view's patch id. */
-static volatile LONG g_preq = -1;      /* the load to land: bank * 64 + idx; -1 none */
-static volatile LONG g_landed;         /* 1: landed, the GUI shows it */
-static LONG g_landed_req, g_landed_ok;
+/* A record load while the audio plays is landed by the audio thread (land_patch): it first renders
+ * ahead -- the queue grows by the last load's measured block -- so the load's slow block cannot
+ * empty it, then queues the load at a block boundary. The window's thread waits for it, so the
+ * manager's next call sees the loaded patch; the change lands some ms late, the audio never breaks
+ * (END_GOAL's INVARIANT). */
+static unsigned char g_pend[JPM_BODY];
+static volatile LONG g_preq = -1;      /* 1: g_pend waits to land; -1 none */
+static HANDLE g_landev;                /* set when it landed */
 static double g_load_ms = 12.0;        /* the slowest recent load's block, measured on this computer */
-static const Leaf *g_patchid;          /* vm.vs.patchId */
 static volatile LONG g_audio_state;    /* 0 starting, 1 WASAPI, 2 waveOut, -1 no output device */
 static int audio_live(void) { return g_audio_state == 1 || g_audio_state == 2; }
 
 static void land_patch(void)            /* the audio thread, between two blocks */
 {
-    LONG r = InterlockedExchange(&g_preq, -1), commit;
-    int ok = 0;
-    if (r < 0) return;
-    commit = r & 0x40000000;
-    r &= 0x3FFFFFFF;
-    if (r / 64 >= g_nbanks) return;
+    if (InterlockedExchange(&g_preq, -1) < 0) return;
     EnterCriticalSection(&g_lock);
-    if (g_log) fprintf(g_log, "queue_patch %d %s\n", (int)(r % 64), g_banks[r / 64].name);
-    juno_gui_queue_patch(g_eng, g_banks[r / 64].bytes, g_banks[r / 64].len, (int)(r % 64));
-    if (g_patchid) ok = E_model_set(g_patchid->id, (int)(r % 64));
-    if (commit) E_commit();
+    juno_gui_queue_record(g_eng, g_pend, JPM_BODY);
     LeaveCriticalSection(&g_lock);
-    g_landed_req = r;
-    g_landed_ok = ok;
-    InterlockedExchange(&g_landed, 1);
+    SetEvent(g_landev);
 }
 
-/* A patch load: the plugin's load (rva 0x338090: the patch, then its set of the
- * patch number, no commit), then -- from the panel's ManagePatch buttons, whose
- * command handler ends with one (rva 0x322E60) -- the model's commit; a load
- * from the patch window's list does not commit (rva 0x3278C0, the window open) */
-static void load_patch(int idx, int commit)
+/* the window's status: the bank and the patch the view last read */
+static void pm_status(void)
 {
-    Bank *b;
-    char nm[32], s[128];
-    if (g_bank < 0 || g_bank >= g_nbanks) return;
-    b = &g_banks[g_bank];
-    if (audio_live() && !g_log) {
-        g_patch = g_patchsel = idx;
-        snprintf(s, sizeof s, "%s: %d ...", b->name, idx + 1);
-        status_set(s);
-        InterlockedExchange(&g_preq, (commit ? 0x40000000 : 0) | (g_bank * 64 + idx));
-        g_dirty = 1;
-        return;
+    char nm[32], s[160];
+    int b = 0, p = 0;
+    const char *bn;
+    juno_pm_view_values(g_pm, &b, &p, NULL);
+    bn = juno_pm_bank_name(g_pm, b);
+    patch_name(nm);
+    snprintf(s, sizeof s, "%s: %d %s", bn ? bn : "", p + 1, nm);
+    status_set(s);
+}
+
+/* --pm-script: the dialogs' answers and the log (the dialogs below, the run at the test modes) */
+static int g_scripted;
+static FILE *g_pmlog;
+static void sha16(const unsigned char *d, long n, char out[17]);
+static void hexstr(FILE *f, const char *s) { if (!s) { fprintf(f, "-"); return; } fputc('=', f); for (; *s; ++s) fprintf(f, "%02x", (unsigned char)*s); }
+
+/* ---- the manager's engine calls: the record image, a record's load, the model's calls */
+static int pm_record(void *u, unsigned char *out, int cap)
+{
+    int r;
+    (void)u;
+    EnterCriticalSection(&g_lock);
+    r = juno_gui_record(g_eng, out, cap);
+    LeaveCriticalSection(&g_lock);
+    return r;
+}
+static int pm_load(void *u, const unsigned char *body, int len)
+{
+    (void)u;
+    if (len != JPM_BODY) return 0;
+    if (g_scripted && g_pmlog) { char hx[17]; sha16(body, len, hx); fprintf(g_pmlog, "call load %s\n", hx); }
+    if (audio_live() && !g_log && g_landev) {
+        memcpy(g_pend, body, JPM_BODY);
+        ResetEvent(g_landev);
+        InterlockedExchange(&g_preq, 1);
+        if (WaitForSingleObject(g_landev, 2000) != WAIT_OBJECT_0 && InterlockedExchange(&g_preq, -1) >= 0) {
+            EnterCriticalSection(&g_lock);                  /* the audio thread stopped: land it here */
+            juno_gui_queue_record(g_eng, g_pend, JPM_BODY);
+            LeaveCriticalSection(&g_lock);
+        }
+    } else {
+        EnterCriticalSection(&g_lock);
+        if (g_log) {
+            int k;
+            fprintf(g_log, "queue_record ");
+            for (k = 0; k < len; ++k) fprintf(g_log, "%02x", body[k]);
+            fprintf(g_log, "\n");
+        }
+        juno_gui_queue_record(g_eng, body, len);            /* the patch browser's load, at the next block */
+        LeaveCriticalSection(&g_lock);
     }
     EnterCriticalSection(&g_lock);
-    if (g_log) fprintf(g_log, "queue_patch %d %s\n", idx, b->name);
-    juno_gui_queue_patch(g_eng, b->bytes, b->len, idx);     /* the patch browser's load, at the next block */
-    if (g_patchid && !E_model_set(g_patchid->id, idx)) local_put(g_patchid->id, idx);
-    if (commit) E_commit();
     eng_refresh();
     LeaveCriticalSection(&g_lock);
-    g_patch = g_patchsel = idx;
-    patch_name(nm);
-    snprintf(s, sizeof s, "%s: %d %s", b->name, idx + 1, nm);
-    status_set(s);
     g_dirty = 1;
+    return 1;
+}
+static int pm_model(void *u, int op, unsigned int id, int v, int flag)
+{
+    int r = 0;
+    (void)u;
+    EnterCriticalSection(&g_lock);
+    if (op == JPM_GET) r = juno_gui_model_get(g_eng, id);
+    else if (op == JPM_SET) {                               /* rva 0x283DB0 */
+        if (g_log) fprintf(g_log, "pm_set %u %d %d\n", id, v, flag);
+        if (g_scripted && g_pmlog) fprintf(g_pmlog, "call set %u %d %d\n", id, v, flag);
+        if ((r = juno_gui_model_set(g_eng, id, v))) eng_refresh();
+    } else if (op == JPM_NOTIFY) {                          /* rva 0x2853C0 */
+        if (g_log) fprintf(g_log, "pm_notify\n");
+        if (g_scripted && g_pmlog) fprintf(g_pmlog, "call notify\n");
+        led_shows();                                        /* a panel may open (a load changed its values) */
+    } else if (op == JPM_COMMIT) {                          /* rva 0x283120 */
+        if (g_log) fprintf(g_log, "pm_commit\n");
+        if (g_scripted && g_pmlog) fprintf(g_pmlog, "call commit\n");
+        juno_gui_commit(g_eng);
+    }
+    LeaveCriticalSection(&g_lock);
+    g_dirty = 1;
+    return r;
+}
+
+/* ---- the files: Win32's, and the embedded banks as a read-only folder RES_DIR */
+static int is_res(const char *p) { return !_strnicmp(p, RES_DIR, sizeof RES_DIR - 1) && (p[sizeof RES_DIR - 1] == '/' || !p[sizeof RES_DIR - 1]); }
+static const Bank *res_of(const char *path)
+{
+    const char *n = path + sizeof RES_DIR;                  /* past "res:/Patch/" */
+    size_t l;
+    int i;
+    if (strlen(path) < sizeof RES_DIR) return NULL;
+    l = strlen(n);
+    if (l < 4 || _stricmp(n + l - 4, ".bin")) return NULL;
+    for (i = 0; i < g_nres; ++i)
+        if (strlen(g_res[i].name) == l - 4 && !_strnicmp(g_res[i].name, n, l - 4)) return &g_res[i];
+    return NULL;
+}
+static unsigned char *pm_read(void *u, const char *path, long *len)
+{
+    HANDLE h;
+    LARGE_INTEGER sz;
+    unsigned char *b;
+    DWORD got = 0;
+    (void)u;
+    if (is_res(path)) {
+        const Bank *r = res_of(path);
+        if (!r || !(b = malloc((size_t)r->len))) return NULL;
+        memcpy(b, r->bytes, (size_t)r->len);
+        *len = r->len;
+        return b;
+    }
+    h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return NULL;
+    if (!GetFileSizeEx(h, &sz) || sz.QuadPart > (64 << 20) || !(b = malloc((size_t)sz.QuadPart + 1))) { CloseHandle(h); return NULL; }
+    if (sz.QuadPart && (!ReadFile(h, b, (DWORD)sz.QuadPart, &got, NULL) || got != (DWORD)sz.QuadPart)) { free(b); CloseHandle(h); return NULL; }
+    CloseHandle(h);
+    *len = (long)sz.QuadPart;
+    return b;
+}
+static int pm_write(void *u, const char *path, const unsigned char *d, long n)
+{
+    HANDLE h;
+    DWORD put = 0;
+    int ok;
+    (void)u;
+    if (g_scripted && g_pmlog) { fprintf(g_pmlog, "fw "); hexstr(g_pmlog, path); fprintf(g_pmlog, "\n"); }
+    if (is_res(path)) return 0;
+    h = CreateFileA(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    ok = WriteFile(h, d, (DWORD)n, &put, NULL) && put == (DWORD)n;
+    CloseHandle(h);
+    return ok;
+}
+static int pm_remove(void *u, const char *path)
+{
+    (void)u;
+    if (g_scripted && g_pmlog) { fprintf(g_pmlog, "fd "); hexstr(g_pmlog, path); fprintf(g_pmlog, "\n"); }
+    return !is_res(path) && DeleteFileA(path);
+}
+static int pm_move(void *u, const char *a, const char *b)
+{
+    (void)u;
+    if (g_scripted && g_pmlog) { fprintf(g_pmlog, "fm "); hexstr(g_pmlog, a); fprintf(g_pmlog, " "); hexstr(g_pmlog, b); fprintf(g_pmlog, "\n"); }
+    return !is_res(a) && !is_res(b) && MoveFileA(a, b);
+}
+static int pm_exists(void *u, const char *path)
+{
+    (void)u;
+    if (is_res(path)) return !path[sizeof RES_DIR - 1] || res_of(path) != NULL;
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+}
+/* a folder's names in NTFS's order: its directories list names by their upper case, ordinal (the
+ * OS's own table: CompareStringOrdinal ignoring case); FindFirstFile gives it on NTFS, the other
+ * file systems (and Wine) do not -- the order is the plugin's on the usual NTFS drive */
+static int ntfs_cmp(const void *a, const void *b)
+{
+    WCHAR x[MAX_PATH], y[MAX_PATH];
+    int r;
+    MultiByteToWideChar(CP_ACP, 0, *(char *const *)a, -1, x, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, *(char *const *)b, -1, y, MAX_PATH);
+    r = CompareStringOrdinal(x, -1, y, -1, TRUE);
+    return r == CSTR_LESS_THAN ? -1 : r == CSTR_GREATER_THAN ? 1 : 0;
+}
+static char **pm_list(void *u, const char *dir, int *n)
+{
+    char **out = NULL;
+    int k = 0, cap = 0, i;
+    (void)u;
+    *n = 0;
+    if (is_res(dir)) {
+        out = malloc(sizeof *out * (size_t)(g_nres ? g_nres : 1));
+        for (i = 0; out && i < g_nres; ++i) {
+            out[k] = malloc(strlen(g_res[i].name) + 5);
+            if (out[k]) { sprintf(out[k], "%s.bin", g_res[i].name); ++k; }
+        }
+    } else {
+        WIN32_FIND_DATAA fd;
+        char pat[MAX_PATH + 4];
+        HANDLE h;
+        snprintf(pat, sizeof pat, "%s/*", dir);
+        h = FindFirstFileA(pat, &fd);
+        if (h == INVALID_HANDLE_VALUE) return NULL;
+        do {
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            if (k == cap) {
+                char **m = realloc(out, sizeof *out * (size_t)(cap ? 2 * cap : 16));
+                if (!m) break;
+                out = m;
+                cap = cap ? 2 * cap : 16;
+            }
+            out[k] = malloc(strlen(fd.cFileName) + 1);
+            if (out[k]) strcpy(out[k++], fd.cFileName);
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    if (k > 1) qsort(out, (size_t)k, sizeof *out, ntfs_cmp);
+    *n = k;
+    return out;
+}
+
+/* ---- the dialogs. A test run (--pm-script) answers them from its script (g_ans); the window asks
+ * the user: the name's edit over the bank name or the selected cell, a popup menu, a message box,
+ * the shell's file dialogs. The message texts are this program's own (the plugin's text table,
+ * TextCodeTable.dat, is not in truth/); their box types are the plugin's (EXECUTED: 0x30, 0x31). */
+typedef struct { char kind; char *text; int num; char **files; int nfiles; } Ans;
+static Ans g_ans[16];
+static int g_nans;
+static const Ans *ans_take(char kind)
+{
+    int i;
+    for (i = 0; i < g_nans; ++i)
+        if (g_ans[i].kind == kind) {
+            static Ans a;
+            a = g_ans[i];
+            memmove(g_ans + i, g_ans + i + 1, sizeof g_ans[0] * (size_t)(g_nans - i - 1));
+            --g_nans;
+            return &a;
+        }
+    return NULL;
+}
+static Ctl *pw_find(int type)
+{
+    int i;
+    for (i = 0; g_patchwin && i < g_patchwin->n; ++i) {
+        Ctl *c = g_patchwin->items[i].c;
+        if (c && c->type == type) return c;
+    }
+    return NULL;
+}
+static WNDPROC g_edit_orig;
+static int g_edit_done;
+static LRESULT CALLBACK edit_proc(HWND h, UINT m, WPARAM wp, LPARAM lp)
+{
+    if (m == WM_KEYDOWN && wp == VK_RETURN) { g_edit_done = 1; return 0; }
+    if (m == WM_KEYDOWN && wp == VK_ESCAPE) { g_edit_done = -1; return 0; }
+    if (m == WM_CHAR && (wp == '\r' || wp == 27)) return 0;
+    if (m == WM_KILLFOCUS && !g_edit_done) g_edit_done = 1;           /* a click elsewhere: taken */
+    return CallWindowProcA(g_edit_orig, h, m, wp, lp);
+}
+/* the name's edit: modal, over the bank name's text (what 1) or the selected cell (what 0) */
+static int pm_text(void *u, int what, const char *offered, char *out, int cap)
+{
+    Ctl *c = pw_find(what == JPM_TEXT_BANK ? C_PATCHBANKNAME : C_PATCHLIST);
+    int x = 0, y = 0, w = 200, hgt = 24;
+    HWND e;
+    MSG m;
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('t');
+        if (g_pmlog) { fprintf(g_pmlog, "text "); hexstr(g_pmlog, offered); fprintf(g_pmlog, " "); hexstr(g_pmlog, a ? a->text : NULL); fprintf(g_pmlog, "\n"); }
+        if (!a || !a->text) return 0;
+        snprintf(out, (size_t)cap, "%s", a->text);
+        return 1;
+    }
+    if (!g_wnd) return 0;
+    if (c && what == JPM_TEXT_BANK) { x = c->tx; y = c->y; w = c->x + c->w - c->tx; hgt = c->h; }
+    else if (c) {
+        int s = juno_pm_sel(g_pm);
+        double cw = c->w / 4.0, rh = c->h / 16.0;
+        x = c->x + (int)((s / 16) * cw); y = c->y + (int)((s % 16) * rh); w = (int)cw; hgt = (int)rh;
+    }
+    e = CreateWindowExA(0, "EDIT", offered, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                        x * g_zoom / 100, y * g_zoom / 100, w * g_zoom / 100, hgt * g_zoom / 100, g_wnd, NULL,
+                        GetModuleHandleA(NULL), NULL);
+    if (!e) return 0;
+    SendMessageA(e, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+    SendMessageA(e, EM_SETSEL, 0, -1);
+    g_edit_orig = (WNDPROC)SetWindowLongPtrA(e, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+    g_edit_done = 0;
+    SetFocus(e);
+    while (!g_edit_done) {
+        BOOL r = GetMessageA(&m, NULL, 0, 0);
+        if (r <= 0) { g_edit_done = -1; if (r == 0) PostQuitMessage((int)m.wParam); break; }
+        if ((m.message == WM_LBUTTONDOWN || m.message == WM_RBUTTONDOWN || m.message == WM_LBUTTONDBLCLK) && m.hwnd != e) {
+            g_edit_done = 1;                                        /* a click elsewhere ends the edit */
+            break;
+        }
+        TranslateMessage(&m);
+        DispatchMessageA(&m);
+    }
+    GetWindowTextA(e, out, cap);
+    SetWindowLongPtrA(e, GWLP_WNDPROC, (LONG_PTR)g_edit_orig);
+    DestroyWindow(e);
+    SetFocus(g_wnd);
+    return g_edit_done > 0;
+}
+static int pm_menu(void *u, const char *const *items, const int *checked, int n)
+{
+    HMENU m;
+    POINT p;
+    int i, r;
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('m');
+        r = a && a->num >= 0 && n > 0 ? a->num % n : -1;            /* the user picks a shown item, or none */
+        if (g_pmlog) {
+            fprintf(g_pmlog, "menu %d", r);
+            for (i = 0; i < n; ++i) { fprintf(g_pmlog, " %d", checked[i] ? 1 : 0); hexstr(g_pmlog, items[i]); }
+            fprintf(g_pmlog, "\n");
+        }
+        return r;
+    }
+    if (!g_wnd || !(m = CreatePopupMenu())) return -1;
+    for (i = 0; i < n; ++i) {
+        char t[256];
+        int k = 0;
+        const char *s;
+        for (s = items[i]; *s && k < (int)sizeof t - 2; ++s) { if (*s == '&') t[k++] = '&'; t[k++] = *s; }   /* no mnemonics */
+        t[k] = 0;
+        AppendMenuA(m, MF_STRING | (checked[i] ? MF_CHECKED : 0), (UINT_PTR)(i + 1), t);
+    }
+    GetCursorPos(&p);
+    r = (int)TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY | TPM_LEFTALIGN | TPM_TOPALIGN, p.x, p.y, 0, g_wnd, NULL);
+    DestroyMenu(m);
+    return r > 0 ? r - 1 : -1;
+}
+static int pm_confirm(void *u, int msg)
+{
+    const char *t = msg == JPM_MSG_DELETE_BANK ? "Delete the current bank?"
+                  : msg == JPM_MSG_BANK_NAME ? "This name cannot be a bank's name: it is empty, starts with a period, has one of \" * / : < > ? \\ |, or another bank has it."
+                  : msg == JPM_MSG_IMPORT ? "A file could not be read as a JUNO-60 patch bank."
+                  : msg == JPM_MSG_EXPORT ? "The bank could not be written to the file." : "?";
+    UINT type = msg == JPM_MSG_DELETE_BANK ? 0x31u : 0x30u;       /* MB_ICONEXCLAMATION | MB_OKCANCEL / MB_OK */
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('b');
+        if (g_pmlog) { if (msg != JPM_MSG_DELETE_BANK) fprintf(g_pmlog, "message %d\n", msg); fprintf(g_pmlog, "box %u\n", type); }
+        return !a || a->num == 1;
+    }
+    return MessageBoxA(g_wnd, t, "JUNO-60", type) == IDOK;
+}
+/* the open dialog as the plugin reads it (rva 0x40B5D0, EXECUTED): the shell's file dialog, many
+ * files; the first item's file-system path, each other item's normal display name */
+static int pm_open(void *u, const char *title, const char *ext, char ***paths, int *n)
+{
+    IFileOpenDialog *d = NULL;
+    IShellItemArray *arr = NULL;
+    DWORD cnt = 0, i;
+    WCHAR wt[256];
+    int ok = 0;
+    COMDLG_FILTERSPEC spec[2] = {{L"JUNO-60 Patch Bank (*.bin)", L"*.bin"}, {L"All Files (*.*)", L"*.*"}};
+    (void)u; (void)ext;
+    if (g_scripted) {
+        const Ans *a = ans_take('f');
+        if (g_pmlog) {
+            fprintf(g_pmlog, "fdopen %d", a ? a->nfiles : -1);
+            for (i = 0; a && (int)i < a->nfiles; ++i) { fprintf(g_pmlog, " "); hexstr(g_pmlog, a->files[i]); }
+            fprintf(g_pmlog, "\n");
+        }
+        if (!a || a->nfiles <= 0) return 0;          /* "ans f -1": the dialog cancelled */
+        *paths = malloc(sizeof **paths * (size_t)a->nfiles);
+        if (!*paths) return 0;
+        for (i = 0; (int)i < a->nfiles; ++i) {             /* the first a path, the others their names */
+            const char *s = a->files[i], *b = i ? strrchr(s, '\\') : NULL;
+            (*paths)[i] = xstrdup(b ? b + 1 : s);
+        }
+        *n = a->nfiles;
+        return 1;
+    }
+    if (FAILED(CoCreateInstance(&CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, &IID_IFileOpenDialog, (void **)&d))) return 0;
+    IFileOpenDialog_SetOptions(d, FOS_ALLOWMULTISELECT | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM);   /* the plugin's 0xA40 */
+    IFileOpenDialog_SetFileTypes(d, 2, spec);
+    MultiByteToWideChar(CP_ACP, 0, title, -1, wt, 256);
+    IFileOpenDialog_SetTitle(d, wt);
+    if (SUCCEEDED(IFileOpenDialog_Show(d, g_wnd)) && SUCCEEDED(IFileOpenDialog_GetResults(d, &arr)) &&
+        SUCCEEDED(IShellItemArray_GetCount(arr, &cnt)) && cnt && (*paths = calloc(cnt, sizeof **paths))) {
+        for (i = 0; i < cnt; ++i) {
+            IShellItem *it = NULL;
+            LPWSTR s = NULL;
+            char b[MAX_PATH * 2] = "";
+            if (SUCCEEDED(IShellItemArray_GetItemAt(arr, i, &it)) &&
+                SUCCEEDED(IShellItem_GetDisplayName(it, i ? SIGDN_NORMALDISPLAY : SIGDN_FILESYSPATH, &s))) {
+                WideCharToMultiByte(CP_ACP, 0, s, -1, b, sizeof b, NULL, NULL);
+                CoTaskMemFree(s);
+            }
+            if (it) IShellItem_Release(it);
+            (*paths)[i] = xstrdup(b);
+        }
+        *n = (int)cnt;
+        ok = 1;
+    }
+    if (arr) IShellItemArray_Release(arr);
+    IFileOpenDialog_Release(d);
+    return ok;
+}
+static int pm_save(void *u, const char *title, const char *suggested, char *out, int cap)
+{
+    OPENFILENAMEA o;
+    char path[MAX_PATH];
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('f');
+        if (g_pmlog) { fprintf(g_pmlog, "fdsave "); hexstr(g_pmlog, a && a->nfiles > 0 ? a->files[0] : NULL); fprintf(g_pmlog, " "); hexstr(g_pmlog, suggested); fprintf(g_pmlog, "\n"); }
+        if (!a || a->nfiles <= 0) return 0;          /* "ans f -1": the dialog cancelled */
+        snprintf(out, (size_t)cap, "%s", a->files[0]);     /* the dialog's result: the first pick */
+        return 1;
+    }
+    snprintf(path, sizeof path, "%s", suggested);
+    memset(&o, 0, sizeof o);
+    o.lStructSize = sizeof o;
+    o.hwndOwner = g_wnd;
+    o.lpstrFilter = "JUNO-60 Patch Bank (*.bin)\0*.bin\0All Files (*.*)\0*.*\0";
+    o.lpstrFile = path;
+    o.nMaxFile = MAX_PATH;
+    o.lpstrDefExt = "bin";
+    o.lpstrTitle = title;
+    o.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    if (!GetSaveFileNameA(&o)) return 0;
+    snprintf(out, (size_t)cap, "%s", path);
+    return 1;
 }
 
 /* --------------------------------------------- MIDI and key events -> audio */
@@ -1377,6 +1773,12 @@ static void ini_gets(const char *sec, const char *key, char *out, int cap)
     if (g_ini[0]) GetPrivateProfileStringA(sec, key, "", out, (DWORD)cap, g_ini);
 }
 static void ini_puts(const char *sec, const char *key, const char *v) { if (g_ini[0]) WritePrivateProfileStringA(sec, key, v, g_ini); }
+static int ini_has(const char *sec, const char *key, char *out, int cap)   /* the setting's text; 0 when absent */
+{
+    if (!g_ini[0]) return 0;
+    GetPrivateProfileStringA(sec, key, "\x01", out, (DWORD)cap, g_ini);
+    return strcmp(out, "\x01") != 0;
+}
 
 /* ------------------------------------------------------------------- audio
  * WASAPI, shared mode, event-driven (Windows Vista and later). The engine renders
@@ -1779,6 +2181,49 @@ static int visible_list(Panel *p, Ctl **out, int n, int max)
     }
     return n;
 }
+/* An LFO LED shown or hidden runs its update (vt+0xB0 = rva 0x325070: the LED's read and its frame,
+ * as at a tick): the editor's attach shows every open control; at a model notify (rva 0x2853C0) the
+ * panels whose open conditions read a changed value open or close (rva 0x2C4890: vt+0xA0 show,
+ * vt+0xA8 hide, each through rva 0x2C4B20 -> vt+0xB0), the controls in tree order. EXECUTED
+ * (docs/LED_METER.md rule 11): the attach reads the shown LED once; a TEMPO SYNC or panel-mode flip
+ * reads twice (the LED hidden, the LED shown); a patch load marks TEMPO SYNC changed even when equal.
+ * Under g_lock, after each notify the program's model calls make. Logged "ledshow NFRAMES FRAME". */
+static Ctl *g_leds[8];
+static int g_nleds = -1;
+static void leds_find(Panel *p)
+{
+    int i;
+    for (i = 0; i < p->n; ++i) {
+        if (p->items[i].p) leds_find(p->items[i].p);
+        else if (p->items[i].c && p->items[i].c->type == C_LFOLED && p->items[i].c->pic && g_nleds < 8)
+            g_leds[g_nleds++] = p->items[i].c;
+    }
+}
+static void led_shows(void)
+{
+    Ctl *list[512];
+    int n, i, k;
+    if (!g_tree || !g_eng || !g_editor) return;
+    if (g_nleds < 0) { g_nleds = 0; leds_find(g_tree); }
+    eng_refresh();                                     /* the model's values the conditions read */
+    n = visible_list(g_tree, list, 0, 512);
+    for (k = 0; k < g_nleds; ++k) {
+        Ctl *c = g_leds[k];
+        int vis = 0;
+        for (i = 0; i < n && !vis; ++i) vis = list[i] == c;
+#if EXE_TOOTH == 1
+        if (vis && !c->shown) {                        /* TOOTH 1: a hidden LED not updated */
+#else
+        if (vis != c->shown) {                         /* shown or hidden: its update */
+#endif
+            c->frame = juno_gui_lfo_led_frame(g_eng, c->pic->n);
+            if (g_log) fprintf(g_log, "ledshow %d %d\n", c->pic->n, c->frame);
+            g_dirty = 1;
+        }
+        c->shown = vis;
+    }
+}
+
 /* the LED's and the meters' ticks of the plugin's 50 ms window timer (WM_TIMER -> each open
  * control's slot +96, CLAIMS A37): the LED of the open LFO panel, both meters; under g_lock.
  * Logged (the calls a GUI makes): led NFRAMES -> FRAME; meter CH DECAY STATE X0 Y0 X1 Y1 HORIZ
@@ -1787,14 +2232,19 @@ static int meters_tick(void)
 {
     Ctl *list[512];
     int n = visible_list(g_tree, list, 0, 512), i, j, moved = 0;
+    if (g_nleds < 0) { g_nleds = 0; leds_find(g_tree); }
+    for (i = 0; i < g_nleds; ++i) {               /* the LED: shown at the last notify (rva 0x324FF0) */
+        Ctl *c = g_leds[i];
+        int f;
+        if (!c->shown) continue;
+        f = juno_gui_lfo_led_frame(g_eng, c->pic->n);
+        if (g_log) fprintf(g_log, "led %d %d\n", c->pic->n, f);
+        moved |= f != c->frame;
+        c->frame = f;
+    }
     for (i = 0; i < n; ++i) {
         Ctl *c = list[i];
-        if (c->type == C_LFOLED && c->pic) {
-            int f = juno_gui_lfo_led_frame(g_eng, c->pic->n);
-            if (g_log) fprintf(g_log, "led %d %d\n", c->pic->n, f);
-            moved |= f != c->frame;
-            c->frame = f;
-        } else if (c->type == C_BARGRAPH) {
+        if (c->type == C_BARGRAPH) {
             int fill[4], b[7 * BAR_BLITS], nb, st = c->state;
             c->state = juno_gui_meter_tick(g_eng, c->ch, c->decay, st, c->rect, c->horiz, fill);
             nb = juno_gui_bar_draw(c->rect, fill, c->horiz, c->fade, b, BAR_BLITS);
@@ -2168,11 +2618,16 @@ static void mouse_dbl(int x, int y)
 }
 
 /* --------------------------------------------------------- the patch window */
+/* The list's cells as the plugin draws them (rva 0x326930, READ): 4 columns of 16; a cell's text the
+ * number, ": ", the 16-char name (juno_pm_cell_text) at (column * width + left + 3, row * height +
+ * top + 1); the selected cell in the second text writer (listC, rva 0x328550), the others in the
+ * first (listN). While a drag holds a target, the cells show the move: the target the source's
+ * record, the cells between shifted by one (rva 0x326B20). */
 static void draw_patchwin(void)
 {
     Panel *t = g_patchwin;
     int i;
-    char s[96], nm[32];
+    char s[96];
     fill(0, 0, g_fbw, g_fbh, 0, 0, 0, 140);
     if (t->bmp && t->bmp->px) blit(t->bmp, 0, 0, t->bmp->w, t->bmp->h, t->x, t->y);
     for (i = 0; i < t->n; ++i) {
@@ -2182,47 +2637,70 @@ static void draw_patchwin(void)
             if (c->args && (!strcmp(c->args, "sendUser") || !strcmp(c->args, "getUser"))) continue;
             draw_frame(c->bmp, is_pressed(c) ? 1 : 0, c->x, c->y);
         } else if (c->type == C_PATCHBANKNAME) {
+            const char *bn = juno_pm_bank_name(g_pm, juno_pm_cur_bank(g_pm));
             draw_frame(c->bmp, 0, c->bx, c->by);
-            if (c->nwr) draw_text(c->wr[0], g_nbanks ? g_banks[g_bank].name : "(no bank)", c->tx, c->ty, c->w - (c->tx - c->x), c->h - (c->ty - c->y));
-        } else if (c->type == C_PATCHLIST && g_nbanks) {
-            int k;
+            if (c->nwr) draw_text(c->wr[0], bn ? bn : "", c->tx, c->ty, c->w - (c->tx - c->x), c->h - (c->ty - c->y));
+        } else if (c->type == C_PATCHLIST) {
+            int k, b = juno_pm_cur_bank(g_pm), sel = juno_pm_sel(g_pm), src, tgt;
             double cw = c->w / 4.0, rh = c->h / 16.0;
+            juno_pm_drag(g_pm, &src, &tgt);
             for (k = 0; k < 64; ++k) {
-                int x = c->x + (int)((k / 16) * cw), y = c->y + (int)((k % 16) * rh);
-                Writer *w = k == g_patchsel && c->nwr > 1 ? c->wr[1] : c->wr[0];
-                bank_name(&g_banks[g_bank], k, nm);
-                snprintf(s, sizeof s, "%02d %s", k + 1, nm);
-                if (w) draw_text_wr(w, s, x + 8, y, (int)cw - 12, (int)rh, 1);
+                int x = c->x + (int)((k / 16) * cw) + 3, y = c->y + (int)((k % 16) * rh) + 1, r = k;
+                Writer *w = k == sel && c->nwr > 1 ? c->wr[1] : c->wr[0];
+                char num[24], nm[17];
+                if (tgt >= 0) r = k == tgt ? src : (src <= k && k < tgt) ? k + 1 : (tgt < k && k <= src) ? k - 1 : k;
+                if (!juno_pm_patch_name(g_pm, b, r, nm)) continue;
+                if (juno_pm_number(k, num, sizeof num) > 0) snprintf(s, sizeof s, "%s: %s", num, nm);
+                else snprintf(s, sizeof s, "%s", nm);
+                if (w) draw_text_wr(w, s, x, y, (int)cw - 4, (int)rh, 1);
             }
         }
     }
 }
 
+/* the window's two mouse controls on the manager (rva 0x327D70, 0x33F0A0): their rectangles */
+static int pw_rect(int type, int r[4])
+{
+    Ctl *c = pw_find(type);
+    if (!c) return 0;
+    r[0] = c->x; r[1] = c->y; r[2] = c->x + c->w; r[3] = c->y + c->h;
+    return 1;
+}
+static int pw_button(int r[4])             /* the bank name's button: its bitmap's frame at buttonPosition */
+{
+    Ctl *c = pw_find(C_PATCHBANKNAME);
+    int w = 0, h = 0;
+    if (!c || !c->bmp) return 0;
+    frame_size(c->bmp, &w, &h);
+    r[0] = c->bx; r[1] = c->by; r[2] = c->bx + w; r[3] = c->by + h;
+    return 1;
+}
+static int g_pmcap;                        /* the list holds the mouse (a press on it) */
+static void pm_after(void)
+{
+    pm_status();
+    g_dirty = 1;
+}
 static int patch_down(int x, int y, int dbl)
 {
     Panel *t = g_patchwin;
-    int i, w, h;
+    int i, w, h, r[4], b[4];
+    if (pw_rect(C_PATCHLIST, r) && juno_pm_mouse(g_pm, dbl ? 2 : 0, x, y, r)) { g_pmcap = 1; pm_after(); return 1; }
+    if (pw_rect(C_PATCHBANKNAME, r) && x >= r[0] && x < r[2] && y >= r[1] && y < r[3]) {
+        juno_pm_bank_mouse(g_pm, dbl ? 2 : 0, x, y, r, pw_button(b) ? b : NULL);
+        pm_after();
+        return 1;
+    }
     for (i = 0; i < t->n; ++i) {
         Ctl *c = t->items[i].c;
-        if (!c) continue;
-        if (c->type == C_PATCHLIST && x >= c->x && x < c->x + c->w && y >= c->y && y < c->y + c->h) {
-            int k = (int)((x - c->x) / (c->w / 4.0)) * 16 + (int)((y - c->y) / (c->h / 16.0));
-            if (k >= 0 && k < 64) {
-                g_patchsel = k;
-                if (dbl) load_patch(k, 0);
-            }
+        if (!c || c->type != C_UNLATCH || !c->bmp || !c->bmp->px) continue;
+        if (c->args && (!strcmp(c->args, "sendUser") || !strcmp(c->args, "getUser"))) continue;
+        frame_size(c->bmp, &w, &h);
+        if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h) {
+            press(c);
+            action(c->fn, c->args);
             g_dirty = 1;
             return 1;
-        }
-        if (c->type == C_UNLATCH && c->bmp && c->bmp->px) {
-            if (c->args && (!strcmp(c->args, "sendUser") || !strcmp(c->args, "getUser"))) continue;
-            frame_size(c->bmp, &w, &h);
-            if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h) {
-                press(c);
-                action(c->fn, c->args);
-                g_dirty = 1;
-                return 1;
-            }
         }
     }
     if (x < t->x || y < t->y || x >= t->x + t->w || y >= t->y + t->h) {
@@ -2231,71 +2709,58 @@ static int patch_down(int x, int y, int dbl)
     }
     return 1;
 }
+static int pm_mouse_move(int x, int y)
+{
+    int r[4];
+    if (!g_pmcap || !pw_rect(C_PATCHLIST, r)) return 0;
+    juno_pm_mouse(g_pm, 3, x, y, r);
+    pm_after();
+    return 1;
+}
+static int pm_mouse_up(int x, int y)
+{
+    int r[4];
+    if (!g_pmcap) return 0;
+    g_pmcap = 0;
+    if (pw_rect(C_PATCHLIST, r)) juno_pm_mouse(g_pm, 1, x, y, r);
+    pm_after();
+    return 1;
+}
+/* the list's keys (rva 0x3278C0): letters as their capitals, Space, the arrows, Enter, Esc, Delete;
+ * Shift bit 0, Ctrl bit 1 */
+static int pm_keycode(int vk)
+{
+    if (vk >= 'A' && vk <= 'Z') return vk;
+    switch (vk) {
+    case VK_SPACE: return JPM_KEY_SPACE;
+    case VK_UP: return JPM_KEY_UP;
+    case VK_DOWN: return JPM_KEY_DOWN;
+    case VK_LEFT: return JPM_KEY_LEFT;
+    case VK_RIGHT: return JPM_KEY_RIGHT;
+    case VK_RETURN: return JPM_KEY_ENTER;
+    case VK_ESCAPE: return JPM_KEY_ESC;
+    case VK_DELETE: return JPM_KEY_DELETE;
+    }
+    return -1;
+}
+static int pm_key(int vk, int shift, int ctrl)
+{
+    int code = pm_keycode(vk), close = 0, r;
+    if (code < 0) return 0;
+    r = juno_pm_key(g_pm, code, (shift ? JPM_SHIFT : 0) | (ctrl ? JPM_CTRL : 0), &close);
+    if (r) pm_after();
+    return r;
+}
 
 /* ------------------------------------------------------- functions, menus */
-static void bank_import(void)
-{
-    OPENFILENAMEA o;
-    char path[MAX_PATH] = "";
-    FILE *f;
-    long len;
-    unsigned char *b;
-    memset(&o, 0, sizeof o);
-    o.lStructSize = sizeof o;
-    o.hwndOwner = g_wnd;
-    o.lpstrFilter = "JUNO-60 bank (*.bin)\0*.bin\0All files\0*.*\0";
-    o.lpstrFile = path;
-    o.nMaxFile = MAX_PATH;
-    o.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-    if (!GetOpenFileNameA(&o) || !(f = fopen(path, "rb"))) return;
-    fseek(f, 0, SEEK_END);
-    len = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    b = xmalloc((size_t)len);
-    if (fread(b, 1, (size_t)len, f) == (size_t)len) {
-        char *nm = strrchr(path, '\\'), *dot;
-        nm = nm ? nm + 1 : path;
-        if ((dot = strrchr(nm, '.'))) *dot = 0;
-        if (bank_add(nm, b, (int)len) >= 0) { g_bank = g_nbanks - 1; status_set("bank loaded"); }
-        else { status_set("not a JUNO-60 bank file"); free(b); }
-    } else free(b);
-    fclose(f);
-    g_dirty = 1;
-}
-static void bank_export(void)
-{
-    OPENFILENAMEA o;
-    char path[MAX_PATH];
-    FILE *f;
-    if (!g_nbanks) return;
-    snprintf(path, sizeof path, "%s.bin", g_banks[g_bank].name);
-    memset(&o, 0, sizeof o);
-    o.lStructSize = sizeof o;
-    o.hwndOwner = g_wnd;
-    o.lpstrFilter = "JUNO-60 bank (*.bin)\0*.bin\0";
-    o.lpstrFile = path;
-    o.nMaxFile = MAX_PATH;
-    o.lpstrDefExt = "bin";
-    o.Flags = OFN_OVERWRITEPROMPT;
-    if (!GetSaveFileNameA(&o) || !(f = fopen(path, "wb"))) return;
-    fwrite(g_banks[g_bank].bytes, 1, (size_t)g_banks[g_bank].len, f);
-    fclose(f);
-    status_set("bank saved");
-}
-
 static void action(const char *fn, const char *args)
 {
     if (!fn) return;
-    if (!strcmp(fn, "ManagePatch") && args && (!strcmp(args, "inc") || !strcmp(args, "dec")))
-        load_patch((g_patch + (!strcmp(args, "inc") ? 1 : 63)) % 64, 1);
-    else if (!strcmp(fn, "ManagePatch") && args && !strcmp(args, "load"))
-        load_patch(g_patchsel, 1);
-    else if (!strcmp(fn, "ManagePatchBank") && args && (!strcmp(args, "inc") || !strcmp(args, "dec"))) {
-        if (g_nbanks) g_bank = (g_bank + (!strcmp(args, "inc") ? 1 : g_nbanks - 1)) % g_nbanks;
-        g_dirty = 1;
-    } else if (!strcmp(fn, "ManagePatchBank") && args && !strcmp(args, "import")) bank_import();
-    else if (!strcmp(fn, "ManagePatchBank") && args && !strcmp(args, "export")) bank_export();
-    else if (!strcmp(fn, "Help"))
+    if ((!strcmp(fn, "ManagePatch") || !strcmp(fn, "ManagePatchBank")) && args &&
+        strcmp(args, "sendTemp") && strcmp(args, "getTemp") && strcmp(args, "sendUser") && strcmp(args, "getUser")) {
+        juno_pm_func(g_pm, fn, args);         /* the patch manager's buttons (rva 0x322E60 / 0x323FD0) */
+        pm_after();
+    } else if (!strcmp(fn, "Help"))
         MessageBoxA(g_wnd, "Knobs and sliders: drag up or down (Shift: fine), wheel: one step, double-click: default.\n"
                     "Levers: click. Keys: lower on a key = louder.\nCHORUS I + II: hold Shift and click I or II, "
                     "or press I and slide onto II.\nPATCH: the patch window. OPTION: voices, engine rate, zoom. "
@@ -2382,8 +2847,9 @@ static int g_zoom = 75;
 static void render(void)
 {
     memset(g_fb, 0, (size_t)g_fbw * g_fbh * 4);
+    zoom_conv(0);                                  /* each draw converts (the plugin's getter) */
     draw_panel(g_tree);
-    if (get("vm.vs.panelPatch") == 1) draw_patchwin();
+    if (get("vm.vs.panelPatch") == 1) { zoom_conv(1); draw_patchwin(); }
     if (g_has_tip) {
         SIZE sz;
         int w, h = 26, x, y;
@@ -2409,11 +2875,37 @@ static void render(void)
     GdiFlush();
 }
 
+/* A window's zoom as its draws read it: the plugin's getter (rva 0x2AA590), which every coordinate
+ * conversion of an open window calls (a draw, an invalidation, a hit test): the zoom value, at most the
+ * window's fit to the virtual screen (rva 0x312750; the first positive fit kept), and the value set to
+ * that -- the value object's own set, no commit (juno_gui_zoom_get, docs/WINDOW_ZOOM.md). win 0: the main
+ * window (vm.vs.mainZoom), 1: the patch window (vm.vs.patchZoom). Logged "zoomfit WIN VALUE" when it
+ * sets (tools/dist/exe_oracle_check.py has the plugin's own getter convert there). */
+static int g_zfit[2];
+static int zoom_conv(int win)
+{
+    const Leaf *L = resolve(win ? "vm.vs.patchZoom" : "vm.vs.mainZoom");
+    int v, z, w = win ? (g_patchwin ? g_patchwin->w : 1690) : g_fbw, h = win ? (g_patchwin ? g_patchwin->h : 696) : g_fbh;
+    if (!L) return 0;
+    v = val_get(L);
+    z = juno_gui_zoom_get(v, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN), w, h, &g_zfit[win]);
+    if (z != v) {
+        EnterCriticalSection(&g_lock);
+        if (g_log) fprintf(g_log, "zoomfit %d %d\n", win, z);
+        if (juno_gui_model_set(g_eng, L->id, z)) eng_refresh();
+        else local_put(L->id, z);
+        LeaveCriticalSection(&g_lock);
+        g_dirty = 1;
+        v = val_get(L);
+    }
+    return v;
+}
+
 static void zoom_apply(void)
 {
     RECT r;
     DWORD st;
-    int z = get("vm.vs.mainZoom");
+    int z = zoom_conv(0);             /* the window converts at its new size: at most its fit */
     if (z < 25) z = 25;
     if (z > 200) z = 200;
     g_zoom = z;
@@ -2446,18 +2938,27 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
     case WM_LBUTTONDBLCLK:
         SetCapture(h);
         mouse_down(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom, (wp & MK_SHIFT) != 0, m == WM_LBUTTONDBLCLK);
-        if (m == WM_LBUTTONDBLCLK) mouse_dbl(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
+        if (m == WM_LBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL))   /* not through the patch window */
+            mouse_dbl(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
         InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_MOUSEMOVE:
         if (g_drag) { mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom, (wp & MK_SHIFT) != 0); InvalidateRect(h, NULL, FALSE); }
+        else if (pm_mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom)) InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
         ReleaseCapture();
+        pm_mouse_up(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
         mouse_up();
         InvalidateRect(h, NULL, FALSE);
         return 0;
+    case WM_KEYDOWN:                     /* the patch window's list takes the keys while it is open */
+        if (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL) && pm_key((int)wp, GetKeyState(VK_SHIFT) < 0, GetKeyState(VK_CONTROL) < 0)) {
+            InvalidateRect(h, NULL, FALSE);
+            return 0;
+        }
+        break;
     case WM_RBUTTONDOWN:
     case WM_RBUTTONDBLCLK: {
         int x = GET_X_LPARAM(lp) * 100 / g_zoom, y = GET_Y_LPARAM(lp) * 100 / g_zoom;
@@ -2468,7 +2969,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         /* any other right press goes on to the controls, which do not test the button */
         SetCapture(h);
         mouse_down(x, y, (wp & MK_SHIFT) != 0, m == WM_RBUTTONDBLCLK);
-        if (m == WM_RBUTTONDBLCLK) mouse_dbl(x, y);
+        if (m == WM_RBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(x, y);
         InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -2521,15 +3022,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         changed |= meters_tick();
         LeaveCriticalSection(&g_lock);
         if (changed) g_dirty = 1;
-        if (InterlockedExchange(&g_landed, 0)) {   /* the audio thread landed a patch load */
-            char nm[32], s[128];
-            LONG r = g_landed_req;
-            if (!g_landed_ok && g_patchid) local_put(g_patchid->id, (int)(r % 64));
-            patch_name(nm);
-            snprintf(s, sizeof s, "%s: %d %s", r / 64 < g_nbanks ? g_banks[r / 64].name : "", (int)(r % 64) + 1, nm);
-            status_set(s);
-            g_dirty = 1;
-        }
+        juno_pm_tick(g_pm);                        /* the manager's 50 ms timer (rva 0x32F280): autosave */
         if (g_dirty) InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -2659,6 +3152,184 @@ static Ctl *find_ref(Panel *p, const char *ref)
     return NULL;
 }
 
+/* the play test's patch changes: a patch button of the panel (inc / dec), or a double click on a cell
+ * of the window's list (the window opened first by its PATCH button and closed after by Esc, as a
+ * user does: the window is modal, and left open it would block every later press on the panel --
+ * the CC assign menu's among them), through the program's handlers */
+static void pm_play(int k, int how)
+{
+    int r[4], x, y;
+    if (how) { action("ManagePatch", (k & 1) ? "dec" : "inc"); return; }
+    if (!juno_pm_value(g_pm, JPM_ID_PANEL)) set("vm.vs.panelPatch", 1);
+    if (pw_rect(C_PATCHLIST, r)) {
+        x = r[0] + (int)(((k / 16) + 0.5) * (r[2] - r[0]) / 4.0);
+        y = r[1] + (int)(((k % 16) + 0.5) * (r[3] - r[1]) / 16.0);
+        mouse_down(x, y, 0, 0); pm_mouse_up(x, y); mouse_up();
+        mouse_down(x, y, 0, 1); pm_mouse_up(x, y); mouse_up();
+    }
+    pm_key(VK_ESCAPE, 0, 0);
+}
+/* a script's "patch IDX COMMIT" (the web skin's too, skin_kb_check.mjs): the selection, then the
+ * window's LOAD button (1) or the list's ctrl+O (0) */
+static void pm_scripted_patch(int idx, int commit)
+{
+    juno_pm_select(g_pm, idx < 0 ? 0 : idx > 63 ? 63 : idx);
+    if (commit) action("ManagePatch", "load");
+    else pm_key('O', 0, 1);
+}
+
+/* --pm-script FILE: the patch manager's gate run through this program's own handlers
+ * (tools/dist/exe_pm_check.py writes FILE from a reference of tools/verify/patch_manager_gate.py and
+ * compares FILE.log with the PLUGIN's run). The script: "dirs DATA PATCH OLD SCRIPT" (the manager's
+ * folders, real ones), then per command its answers ("ans t HEX|-", "ans m N", "ans b N",
+ * "ans f N PATH...") and the command: "key VK SHIFT CTRL", "func FN ARGS", "mouse T X Y ...",
+ * "bank T X Y ...", "set ID V", "save", "tick N"; "full 0|1" says whether to print every history
+ * state's records. Before each command the window is open (its PATCH button). After each: the
+ * dialogs asked, the files changed, the model calls, the manager's state (hashes: SHA-1, 16 hex). */
+static void sha16(const unsigned char *d, long n, char out[17])
+{
+    HCRYPTPROV p = 0;
+    HCRYPTHASH h = 0;
+    BYTE v[20];
+    DWORD k = 20, i;
+    out[0] = 0;
+    if (!CryptAcquireContextA(&p, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) return;
+    if (CryptCreateHash(p, CALG_SHA1, 0, 0, &h) && CryptHashData(h, d, (DWORD)n, 0) && CryptGetHashParam(h, HP_HASHVAL, v, &k, 0))
+        for (i = 0; i < 8; ++i) sprintf(out + 2 * i, "%02x", v[i]);
+    if (h) CryptDestroyHash(h);
+    CryptReleaseContext(p, 0);
+}
+int juno_pm_state_info(const juno_pm *pm, int b, int i, const char **name, int *view, const unsigned char **edit);
+const unsigned char *juno_pm_state_rec(const juno_pm *pm, int b, int i, int idx);
+static void pm_digest(FILE *f, int full, char dirs[][MAX_PATH], int ndirs)
+{
+    char hx[17];
+    unsigned char rec[JPM_BODY];
+    int b, i, k, nb = juno_pm_nbanks(g_pm), vb = 0, vp = 0, tk = 0;
+    juno_pm_view_values(g_pm, &vb, &vp, &tk);
+    sha16(juno_pm_clip(g_pm), JPM_BODY, hx);
+    fprintf(f, "cur %d %d sel %d clip %s fmt %d tick %d", juno_pm_cur_bank(g_pm), juno_pm_cur(g_pm, 1), juno_pm_sel(g_pm), hx, juno_pm_format(), tk);
+    pm_record(NULL, rec, JPM_BODY);
+    sha16(rec, JPM_BODY, hx);
+    fprintf(f, " view %s values %d %d win %d %d %d %d\n", hx, vb, vp, juno_pm_value(g_pm, JPM_ID_PANEL),
+            juno_pm_value(g_pm, JPM_ID_MANAGER), juno_pm_value(g_pm, JPM_ID_LIST_MAIN), juno_pm_value(g_pm, JPM_ID_LIST_SUB));
+    for (b = 0; b < nb; ++b) {
+        int cur = 0, n = juno_pm_hist(g_pm, b, &cur);
+        fprintf(f, "bank %d %d\n", cur, n);
+        for (i = 0; i < n; ++i) {
+            const char *nm = NULL;
+            const unsigned char *e = NULL;
+            int v = 0;
+            juno_pm_state_info(g_pm, b, i, &nm, &v, &e);
+            fprintf(f, "st ");
+            hexstr(f, nm);
+            sha16(e, JPM_BODY, hx);
+            fprintf(f, " %d %s", v, hx);
+            if (full || i == cur)
+                for (k = 0; k < JPM_NPATCH; ++k) { sha16(juno_pm_state_rec(g_pm, b, i, k), JPM_BODY, hx); fprintf(f, " %s", hx); }
+            fprintf(f, "\n");
+        }
+    }
+    for (i = 0; i < ndirs; ++i) {                     /* every file of the folders */
+        int n = 0;
+        char **names = pm_list(NULL, dirs[i], &n), p[MAX_PATH * 2];
+        for (k = 0; k < n; ++k) {
+            long len = 0;
+            unsigned char *d;
+            snprintf(p, sizeof p, "%s/%s", dirs[i], names[k]);
+            if ((d = pm_read(NULL, p, &len))) {
+                sha16(d, len, hx);
+                fprintf(f, "file %d ", i);
+                hexstr(f, names[k]);
+                fprintf(f, " %s\n", hx);
+                free(d);
+            }
+            free(names[k]);
+        }
+        free(names);
+    }
+    fprintf(f, "end\n");
+}
+/* the scripted run: the commands through the program's handlers (keys: WM_KEYDOWN's; mouse: the list's
+ * and the bank name's, as patch_down routes them; buttons: action()) */
+static int pm_script(const char *path, char dirs[][MAX_PATH], int ndirs)
+{
+    FILE *in = fopen(path, "r");
+    char *line = malloc(1 << 16), a[64], b[256];
+    int full = 0, x, y, t, k, n, off;
+    if (!in || !line) return 2;
+    fprintf(g_pmlog, "boot\n");
+    pm_digest(g_pmlog, 1, dirs, ndirs);
+    while (fgets(line, 1 << 16, in)) {
+        int r[4], bt[4];
+        if (!strncmp(line, "ans ", 4)) {
+            Ans *s;
+            if (g_nans >= 16) continue;
+            s = &g_ans[g_nans++];
+            memset(s, 0, sizeof *s);
+            s->kind = line[4];
+            if (s->kind == 't') {
+                char *h = line + 6;
+                if (*h == '=') ++h;                         /* "=HEX": a text; "-": a cancel */
+                else if (*h == '-') h = NULL;
+                if (!h) s->text = NULL;
+                else {
+                    int l = 0;
+                    s->text = xmalloc(strlen(h) / 2 + 2);
+                    while (isxdigit((unsigned char)h[0]) && isxdigit((unsigned char)h[1])) { unsigned v; sscanf(h, "%2x", &v); s->text[l++] = (char)v; h += 2; }
+                    s->text[l] = 0;
+                }
+            } else if (s->kind == 'f') {
+                char *q = line + 6, *e;
+                s->nfiles = (int)strtol(q, &e, 10);
+                s->files = s->nfiles > 0 ? xmalloc(sizeof *s->files * (size_t)s->nfiles) : NULL;
+                for (k = 0; k < s->nfiles; ++k) {                    /* tab-separated paths */
+                    char *tab;
+                    q = e + 1;
+                    tab = strpbrk(q, "\t\r\n");
+                    s->files[k] = xstrndup(q, tab ? (size_t)(tab - q) : strlen(q));
+                    e = tab ? tab : q + strlen(q);
+                }
+            } else s->num = atoi(line + 6);
+            continue;
+        }
+        if (sscanf(line, "full %d", &full) == 1) continue;
+        if (!strncmp(line, "dirs ", 5) || line[0] == '\n' || line[0] == '\r' || !line[0]) continue;
+        if (!juno_pm_value(g_pm, JPM_ID_PANEL)) set("vm.vs.panelPatch", 1);    /* the PATCH button */
+        fprintf(g_pmlog, "op\n");
+        if (sscanf(line, "key %d %d %d", &k, &x, &y) == 3) pm_key(k, x, y);
+        else if (sscanf(line, "func %63s %255s", a, b) == 2) action(a, b);
+        else if (!strncmp(line, "mouse ", 6) && pw_rect(C_PATCHLIST, r)) {
+            const char *q = line + 6;
+            while (sscanf(q, "%d %d %d%n", &t, &x, &y, &off) == 3) {
+                q += off;
+                x += g_patchwin->x; y += g_patchwin->y;         /* the plugin panel's point in this frame */
+                if (t == 0 || t == 2) { if (juno_pm_mouse(g_pm, t, x, y, r)) g_pmcap = 1; }
+                else if (t == 3) pm_mouse_move(x, y);
+                else if (t == 1) pm_mouse_up(x, y);
+            }
+        } else if (!strncmp(line, "bank ", 5) && pw_rect(C_PATCHBANKNAME, r)) {
+            const char *q = line + 5;
+            int hb = pw_button(bt);
+            while (sscanf(q, "%d %d %d%n", &t, &x, &y, &off) == 3) {
+                q += off;
+                juno_pm_bank_mouse(g_pm, t, x + g_patchwin->x, y + g_patchwin->y, r, hb ? bt : NULL);
+            }
+        } else if (sscanf(line, "set %d %d", &k, &x) == 2) {
+            EnterCriticalSection(&g_lock);
+            juno_gui_model_set(g_eng, (uint32_t)k, x);         /* a model set, no commit (the gate's) */
+            LeaveCriticalSection(&g_lock);
+        } else if (!strncmp(line, "save", 4)) juno_pm_save_all(g_pm);
+        else if (sscanf(line, "tick %d", &n) == 1) while (n-- > 0) juno_pm_tick(g_pm);
+        fprintf(g_pmlog, "state\n");
+        pm_digest(g_pmlog, full, dirs, ndirs);
+        while (g_nans > 0) { --g_nans; }                        /* the unused answers go */
+    }
+    fclose(in);
+    free(line);
+    return 0;
+}
+
 static int render_test(const char *path)
 {
     FILE *f = fopen(path, "wb");
@@ -2683,7 +3354,7 @@ static int render_test(const char *path)
                 kb_press(kb, kb_note(n), vel, 0);
                 held = n;
             } else if (st->kind == 'K' && held >= 0) { g_kb_drag = 0; kb_release(1); held = -1; }
-            else if (st->kind == 'p') load_patch((g_patch + 1) % 64, 1);
+            else if (st->kind == 'p') action("ManagePatch", "inc");     /* the panel's patch button */
             else if (st->kind == 'c') {                                  /* a right press on the control's middle */
                 Ctl *c = find_ref(g_tree, st->ref);
                 int bb[4];
@@ -2772,7 +3443,10 @@ static int play_test(const char *path, int change_patch)
             }
             if (rnd() % 1000 < 5) set("fm.PATCH.NAME1.KEY HOLD", !get("fm.PATCH.NAME1.KEY HOLD"));
             if (rnd() % 1000 < 3) set("fm.PATCH.NAME1.OCTAVE SHIFT", (int)(rnd() % 7) - 3);
-            if (b == change_at || rnd() % 1000 < 3) load_patch((int)(rnd() % 64), (int)(rnd() & 1));   /* buttons / list */
+            if (b == change_at || rnd() % 1000 < 3) {                    /* the patch buttons, the window's list */
+                int k = (int)(rnd() % 64);
+                pm_play(k, (int)(rnd() & 1));
+            }
             if (!down && rnd2() % 1000 < 25) {                            /* the CC assign menu: a right press, an item */
                 Ctl *vis[512];
                 int nv = visible_list(g_tree, vis, 0, 512), x, y, ch, bb[4];
@@ -2862,7 +3536,7 @@ static int kb_script(const char *path)
         else if (!strncmp(line, "up", 2)) mouse_up();
         else if (sscanf(line, "wheel %d %d %d", &a, &b, &c) == 3) mouse_wheel(a, b, c);
         else if (sscanf(line, "set %d %127[^\r\n]", &a, ref) == 2) set(ref, a);
-        else if (sscanf(line, "patch %d %d", &a, &b) == 2) load_patch(a, b);
+        else if (sscanf(line, "patch %d %d", &a, &b) == 2) pm_scripted_patch(a, b);
         else if (sscanf(line, "note %d %d", &a, &b) == 2) midi_in(0x90u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
         else if (sscanf(line, "off %d", &a) == 1) midi_in(0x80u | ((uint32_t)a << 8) | (64u << 16), 0);
         else if (!strncmp(line, "block", 5)) render_block(L, R);
@@ -2887,7 +3561,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     const unsigned char *x;
     char *xs, *dump = NULL, *shot = NULL, *rend = NULL;
     int argc, i, shot_patch = 0, bank0 = 0, lat_arg = -1, seed = -1, fp_oracle = 0;
-    char *play = NULL, *kbs = NULL;
+    char *play = NULL, *kbs = NULL, *pms = NULL;
+    char pmdirs[5][MAX_PATH] = {"", "", "", "", ""};
     LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
     BITMAPINFO bi;
     void *bits;
@@ -2905,6 +3580,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         else if (!strcmp(a, "--latency") && i + 1 < argc) { char b[32]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); lat_arg = atoi(b); }
         else if (!strcmp(a, "--render") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); rend = xstrdup(b); }
         else if (!strcmp(a, "--kbscript") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); kbs = rend = xstrdup(b); }
+        else if (!strcmp(a, "--pm-script") && i + 1 < argc) { char b[MAX_PATH]; WideCharToMultiByte(CP_ACP, 0, argvw[++i], -1, b, sizeof b, NULL, NULL); pms = xstrdup(b); }
     }
     if (play) {
         rend = play;                                   /* the render test's plumbing: the log, no device */
@@ -2912,6 +3588,25 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         if (!g_rnd) g_rnd = 1;
         g_rnd2 = 0x9E3779B9u ^ (uint32_t)(seed < 0 ? 1 : seed) * 2246822519u;   /* the CC menu's own stream */
         if (!g_rnd2) g_rnd2 = 1;
+    }
+    if (pms) {                                         /* the manager's folders and its log */
+        char lp[MAX_PATH + 8], first[5 * MAX_PATH + 16];
+        FILE *f = fopen(pms, "r");
+        if (!f || !fgets(first, sizeof first, f)) return 2;
+        fclose(f);
+        {
+            char *q = first + 5, *tab;                     /* "dirs " then five tab-separated folders: */
+            for (i = 0; i < 5 && q; ++i) {                 /* the manager's four, a desktop to watch */
+                tab = strpbrk(q, "\t\r\n");
+                snprintf(pmdirs[i], MAX_PATH, "%.*s", tab ? (int)(tab - q) : (int)strlen(q), q);
+                q = tab && *tab == '\t' ? tab + 1 : NULL;
+            }
+        }
+        snprintf(lp, sizeof lp, "%s.log", pms);
+        if (!(g_pmlog = fopen(lp, "w"))) return 2;
+        g_scripted = 1;
+        snprintf(lp, sizeof lp, "%s.eng", pms);
+        rend = xstrdup(lp);
     }
     if (rend) {
         char lp[MAX_PATH + 8];
@@ -2946,7 +3641,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         if (mp && ints(xtext(mp, "size"), v, 2) == 2) { g_fbw = v[0]; g_fbh = v[1]; }
     }
     g_tree = build("main", 0, 0);
-    g_patchid = resolve("vm.vs.patchId");
     {
         XN *pp = paneltype("patch");
         int v[2] = {1690, 696};
@@ -2987,16 +3681,53 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     if (g_log) fprintf(g_log, "create %d 0\nplugin_init\n", g_rate);
     if (!g_eng || !juno_gui_plugin_init(g_eng)) { MessageBoxA(NULL, "engine start failed", "JUNO-60", MB_OK); return 1; }
     banks_load();
-    if (bank0 >= 0 && bank0 < g_nbanks) g_bank = bank0;
-    if (play) {                                        /* the seed picks the bank and the patch */
-        g_bank = (int)(rnd() % (unsigned)g_nbanks);
-        shot_patch = (int)(rnd() % 64);
+    g_landev = CreateEventA(NULL, TRUE, FALSE, NULL);
+    {
+        juno_pm_io io;
+        char data[MAX_PATH] = "", t[256];
+        memset(&io, 0, sizeof io);
+        io.read = pm_read; io.write = pm_write; io.remove = pm_remove; io.move = pm_move;
+        io.exists = pm_exists; io.list = pm_list;
+        io.text = pm_text; io.menu = pm_menu; io.confirm = pm_confirm; io.open_files = pm_open; io.save_file = pm_save;
+        io.record = pm_record; io.load = pm_load; io.model = pm_model;
+        if (!dump && !shot && !rend) {                 /* the window: the user's banks and settings */
+            ini_init();
+            if (g_ini[0]) {
+                char *sl;
+                snprintf(data, sizeof data, "%s", g_ini);
+                if ((sl = strrchr(data, '\\'))) snprintf(sl, sizeof data - (size_t)(sl - data), "\\Banks");
+                CreateDirectoryA(data, NULL);
+            }
+        }
+        if (pms) g_pm = juno_pm_create(g_eng, &io, pmdirs[0], pmdirs[1], pmdirs[2], pmdirs[3]);
+        else g_pm = juno_pm_create(g_eng, &io, data, RES_DIR, "", "");
+        if (pms) ;
+        else if (!dump && !shot && !rend) {
+            if (ini_has("PatchManager", "BankName", t, sizeof t)) juno_pm_set_pref(g_pm, t);
+            juno_pm_load_format(ini_has("Patch", "Format", t, sizeof t) ? t : NULL);   /* rva 0x332D30 */
+        } else if (g_nres) {                           /* a test: its bank (the seed's), its patch */
+            int k = bank0 >= 0 && bank0 < g_nres ? bank0 : 0;
+            if (play) { k = (int)(rnd() % (unsigned)g_nres); shot_patch = (int)(rnd() % 64); }
+            juno_pm_set_pref(g_pm, g_res[k].name);
+        }
     }
     EnterCriticalSection(&g_lock);
     eng_refresh();
     LeaveCriticalSection(&g_lock);
     g_tempo = 40.0 + get("fm.SYNTH.COM.TEMPO") / 10.0;
-    if (g_nbanks) load_patch((shot || rend) ? shot_patch : 0, 0);
+    juno_pm_attach(g_pm);                              /* the editor's first open (rva 0x32FD50): the banks */
+    if (shot || rend) juno_pm_select(g_pm, shot_patch);
+    juno_pm_initialize(g_pm);                          /* IComponent::initialize's load (rva 0x320643) */
+    if (g_log) fprintf(g_log, "# pm bank %s patch %d\n", juno_pm_bank_name(g_pm, juno_pm_cur_bank(g_pm)), juno_pm_sel(g_pm));
+    /* then the host opens the editor (IPlugView::attached): its window lays out at the screen's fit
+     * (docs/WINDOW_ZOOM.md) and shows every open control -- an LFO LED's show reads it */
+    if (g_log) fprintf(g_log, "editor %d %d\n", GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+    g_editor = 1;
+    zoom_conv(0);
+    EnterCriticalSection(&g_lock);
+    led_shows();
+    LeaveCriticalSection(&g_lock);
+    pm_status();
     if (shot) {
         render();
         return save_bmp(shot) ? 0 : 2;
@@ -3022,6 +3753,13 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         int r;
         if (play) r = play_test(play, (int)(rnd() & 1));
         else if (kbs) r = kb_script(kbs);
+        else if (pms) {                                 /* the folders it watches: data, Patch, old, desktop */
+            char watch[4][MAX_PATH];
+            memcpy(watch[0], pmdirs[0], MAX_PATH); memcpy(watch[1], pmdirs[1], MAX_PATH);
+            memcpy(watch[2], pmdirs[2], MAX_PATH); memcpy(watch[3], pmdirs[4], MAX_PATH);
+            r = pm_script(pms, watch, 4);
+            fclose(g_pmlog);
+        }
         else {
             if (!fp_oracle) juno_enable_hw_ftz();      /* as the audio thread */
             r = render_test(rend);
@@ -3047,13 +3785,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         AdjustWindowRect(&r, st, FALSE);
         g_wnd = CreateWindowA("JUNO60", "JUNO-60", st, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top,
                               NULL, NULL, inst, NULL);
-        status_set(g_status);
-        {
-            char nm[32], s[96];
-            patch_name(nm);
-            snprintf(s, sizeof s, "%s: 1 %s", g_nbanks ? g_banks[0].name : "", nm);
-            status_set(s);
-        }
+        pm_status();
         ShowWindow(g_wnd, show);
         SetTimer(g_wnd, 1, 50, NULL);
         {
@@ -3073,6 +3805,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         InterlockedExchange(&g_run, 0);
         if (g_audio_thread) WaitForSingleObject(g_audio_thread, 2000);
         midi_open(-1);
+        juno_pm_detach(g_pm);                          /* the editor's last close (rva 0x32EEC0): every bank saved */
+        if (juno_pm_pref(g_pm)) ini_puts("PatchManager", "BankName", juno_pm_pref(g_pm));
+        ini_put("Patch", "Format", juno_pm_format());  /* the module's exit (rva 0x338220) */
     }
     return 0;
 }

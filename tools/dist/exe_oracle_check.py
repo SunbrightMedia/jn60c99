@@ -80,6 +80,9 @@ def oracle(args):
     PL, PR = [], []
     skipped, toothed, ktoothed, ctoothed = [], False, False, False
     meters = [0, 0, None]                                    # ticks, differing ticks, the first difference
+    zoom = [0, 0, None]                                      # window conversions, differing, the first difference
+    led, shows = [0, 0, None], []                            # LED shows, differing, the first; the plugin's frames
+    sizes = H.panel_sizes()
     cc = [0, 0, None, 0]                                     # learns, forgets, the end state equal (None: none
     boot = None                                              # logged), CC map entries moved from the boot's
     rect = fill = None
@@ -102,20 +105,59 @@ def oracle(args):
                 pid = h.call(H.IB + 0x319C50, rcx=h.core + 24, rdx=k) & 0xFFFFFFFF
                 index[pid] = q(vb + 24 * k)
                 kidx[pid] = k                                # the CC map's record index of the parameter
+            vo = h.call(H.IB + 0x34E170, rcx=model)          # the view's values (model+0x80): bank, patch,
+            slot = lambda k: h.call(q(q(vo) + k), rcx=vo)    # patchManager, patchListMain, patchListSub; the
+            vsobj = {0x0FFFC010: slot(0x50), 0x0FFFC014: slot(0x58), 0x0FFFC004: slot(0x60),
+                     0x0FFFC005: slot(0x68), 0x0FFFC006: slot(0x70)}
+            vsbase = q(vsobj[0x0FFFC010] + 0x18) - 0x10      # value objects lie in vs order: panelPatch
+            vsobj[0x0FFFC002] = vsobj[0x0FFFC004] - 2 * 0x28   # two before patchManager (checked)
+            assert q(vsobj[0x0FFFC002] + 0x18) == vsbase + 2
         elif t[0] == 'plugin_init':
             pass                                             # HostProcess.start is the plugin's boot
+        elif t[0] == 'editor':                               # the program's editor opens on its screen: the
+            from unicorn import UC_HOOK_CODE                 # plugin's createView + attached, the same screen.
+            from unicorn.x86_const import UC_X86_REG_RDI, UC_X86_REG_RAX
+
+            def on_frame(uc_, addr, size, ud):               # an LED control's update stores its frame (rva
+                if uc_.reg_read(UC_X86_REG_RDI) != h.rig.root:   # 0x32510E / 0x325124); the rig's tick aside
+                    v = uc_.reg_read(UC_X86_REG_RAX) & 0xFFFFFFFF
+                    shows.append(0 if addr == H.IB + 0x32510E else v - (1 << 32) if v >= 1 << 31 else v)
+            for a in (0x32510E, 0x325124):
+                h.uc.hook_add(UC_HOOK_CODE, on_frame, begin=H.IB + a, end=H.IB + a)
+            h.attach_editor(int(t[1]), int(t[2]))
+        elif t[0] == 'ledshow':                              # the program's LED shown (its update): the
+            led[0] += 1                                      # plugin's own show, in order, the same frame
+            got = shows.pop(0) if shows else None
+            if got != int(t[2]):
+                led[1] += 1
+                if led[2] is None:
+                    led[2] = 'ledshow %d: plugin %s, program %s' % (led[0], got, t[2])
+        elif t[0] == 'zoomfit':                              # a window of the program converts and sets its
+            got = h.window_conv(sizes[int(t[1])])            # zoom: the plugin's own getter on its window
+            zoom[0] += 1
+            if got != int(t[2]):
+                zoom[1] += 1
+                if zoom[2] is None:
+                    zoom[2] = 'zoomfit %s: plugin %d, program %s' % (t[1], got, t[2])
         elif t[0] == 'queue_patch':
             name = ' '.join(t[2:])
             if name not in banks:
                 banks[name] = open(bank_file(name), 'rb').read()
             b, p = banks[name], int(t[1])
             h.load_patch(b[HEADER + p * STRIDE + NAME: HEADER + (p + 1) * STRIDE])
-        elif t[0] == 'model_set':
-            pid, v = int(t[1]), int(t[2])
-            if pid in index:
-                h.call(H.IB + 0x283DB0, rcx=q(q(h.core + 8)), rdx=index[pid], r8=v & 0xFFFFFFFF, r9=1)
+        elif t[0] in ('model_set', 'pm_set'):                # a panel control's set (r9 1) / the patch
+            pid, v = int(t[1]), int(t[2])                    # window's (its own flag, CLAIMS A39)
+            obj = index.get(pid, vsobj.get(pid))
+            if obj is not None:
+                h.call(H.IB + 0x283DB0, rcx=model, rdx=obj, r8=v & 0xFFFFFFFF, r9=1 if t[0] == 'model_set' else int(t[3]))
             else:
                 skipped.append(pid)
+        elif t[0] == 'queue_record':                         # the patch manager's load: the plugin's
+            h.load_patch(bytes.fromhex(t[1]))                # patch browser load of the same record body
+        elif t[0] == 'pm_notify':
+            h.call(H.IB + 0x2853C0, rcx=model, count=500_000_000)
+        elif t[0] == 'pm_commit':
+            h.call(H.IB + 0x283120, rcx=model, count=500_000_000)
         elif t[0] == 'ui_tick':
             h.call(H.IB + 0x320120, rcx=h.core, count=2_000_000_000)
         elif t[0] == 'commit':                               # a panel control's notifies and commit
@@ -184,9 +226,13 @@ def oracle(args):
             PR += r
         else:
             raise SystemExit('log: unknown call %r' % (t,))
+    if shows:                                                # a show of the plugin's the program did not make
+        led[1] += len(shows)
+        if led[2] is None:
+            led[2] = 'the plugin showed an LED %d more times (frames %s)' % (len(shows), shows[:4])
     del h
     gc.collect()                                             # Unicorn's native memory (playbook 161)
-    return PL, PR, sorted(set(skipped)), meters, cc
+    return PL, PR, sorted(set(skipped)), meters, cc, zoom, led
 
 
 def ccmap(state):
@@ -238,7 +284,8 @@ def main():
         refs = pool.map(oracle, [(runs[s][0][1], tooth) for s in seeds], chunksize=1)
     fails = 0
     ccsum = [0, 0, 0]                                        # learns, forgets, CC map records moved at the end
-    for s, (PL, PR, skipped, meters, cc) in zip(seeds, refs):
+    nzoom = 0                                                # window conversions that set a zoom (REACH)
+    for s, (PL, PR, skipped, meters, cc, zoom, led) in zip(seeds, refs):
         (ex, log), (prod, _) = runs[s]
         ref = np.empty(2 * len(PL), np.uint32)
         ref[0::2] = PL
@@ -250,37 +297,45 @@ def main():
         spec_same = all(np.array_equal(a, b) for a, b in zip(sa, sb))
         dbmax = max(float(np.max(np.abs(20 * np.log10(a + 1e-12) - 20 * np.log10(b + 1e-12)))) for a, b in zip(sa, sb))
         prod_same = np.array_equal(prod.view(np.uint32), exb)
-        name = [ln for ln in log.splitlines() if ln.startswith('queue_patch')][0].split(None, 2)
+        bk, pt = [ln for ln in log.splitlines() if ln.startswith('# pm bank ')][0][10:].rsplit(' patch ', 1)
+        name = [None, int(pt), bk]
         nkeys = sum(1 for ln in log.splitlines() if ln.startswith('ev ') and ln.split()[2] == '0')
         kbw = [ln.split() for ln in log.splitlines() if ln.startswith('keybed ')]
         npress = sum(1 for t in kbw if int(t[2]) > 0)
         nhold = sum(1 for ln in log.splitlines() if ln.startswith('model_set %d ' % 0x00600138))
-        nload = sum(1 for ln in log.splitlines() if ln.startswith('queue_patch')) - 1
+        nload = sum(1 for ln in log.splitlines() if ln.startswith('queue_record')) - 1
         ndrain = sum(1 for ln in log.splitlines() if ln == 'ui_tick')
         leds = [int(ln.split()[2]) for ln in log.splitlines() if ln.startswith('led ')]
         lit = sum(1 for ln in log.splitlines() if ln.startswith('meter ') and int(ln.split()[9]) > 0)
         mreach = len(set(leds)) >= 2 and lit > 0              # REACH: the LED moves, a bar lights
         moved = cc[3]
+        nzoom += zoom[0]
         ccsum[0] += cc[0]
         ccsum[1] += cc[1]
         ccsum[2] += moved
         ok = (same and spec_same and exb.size > 0 and float(np.max(np.abs(ex))) > 0.01 and not meters[1] and mreach
-              and cc[2] is True)
+              and cc[2] is True and not zoom[1] and not led[1])
         fails += not ok
         print('%s seed %d: %s patch %d, %d host notes, %d keybed writes (%d presses), %d KEY HOLD sets, %d patch '
               'changes, %d drains, %d samples: %s; spectra %s (max %.3g dB); production FP mode %s; LED and meter '
               'ticks %s (%d, LED frames %d, bar lit %d); CC menu %d learns, %d forgets, %d CC map records moved, '
-              'end state %s%s' % (
+              'LED shows %s, window zoom %s, end state %s%s' % (
             'ok  ' if ok else 'FAIL', s, name[2], int(name[1]) + 1, nkeys, len(kbw), npress, nhold, nload, ndrain, ex.size // 2,
             'BIT-EXACT' if same else 'DIFFER from sample %d' % (first // 2), 'IDENTICAL' if spec_same else 'DIFFER',
             dbmax, 'equal' if prod_same else 'differs (denormals: FTZ)',
             'EQUAL' if not meters[1] else '%d DIFFER, first %s' % (meters[1], meters[2]), meters[0], len(set(leds)), lit,
-            cc[0], cc[1], moved, {True: 'EQUAL', False: 'DIFFERS', None: 'NOT LOGGED'}[cc[2]],
+            cc[0], cc[1], moved,
+            ('%d EQUAL' % led[0]) if not led[1] else ('%d DIFFER, first %s' % (led[1], led[2])),
+            ('%d conversions EQUAL' % zoom[0]) if not zoom[1] else ('%d of %d DIFFER, first %s' % (zoom[1], zoom[0], zoom[2])),
+            {True: 'EQUAL', False: 'DIFFERS', None: 'NOT LOGGED'}[cc[2]],
             ('; model ids not in the plugin\'s record list: %s' % skipped) if skipped else ''))
     shutil.rmtree(work)
     if not tooth and not (ccsum[0] and ccsum[1] and ccsum[2]):
         fails += 1                            # REACH: a learn, a forget and a moved CC map in the run
         print('FAIL reach: the CC menu made %d learns, %d forgets, %d moved records over the seeds' % tuple(ccsum))
+    if not tooth and not nzoom:
+        fails += 1                            # REACH: a window's zoom set by its fit (the program's screen)
+        print('FAIL reach: no window converted to its fit over the seeds (the program\'s screen fits every zoom)')
     if tooth:                                 # the tooth must bite on every seed
         print('exe_oracle_check --tooth: %s (%d of %d seeds FAIL)' % (
             'BITES' if fails == len(seeds) else 'DID NOT BITE', fails, len(seeds)))

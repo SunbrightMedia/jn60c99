@@ -3084,3 +3084,85 @@ A job script that sources a toolchain environment runs under bash (`bash script.
 tool right after (`command -v emcc || exit 1`), so a broken setup fails in the first second, not an
 hour in. Write every pass/fail test in a job script from the gate's own exit convention -- read it
 in the gate's source -- never from memory.
+
+## 174. AN ORACLE WITHOUT ITS EDITOR HIDES THE GUI'S OWN STATE -- ATTACH IT, AND ANSWER ITS OS QUERIES FROM THE APP UNDER TEST
+Paid 2026-10-09 (JUNO A40, found by exe_oracle_check.py's end-state compare). With the patch window
+opened, the plugin's DAW state held patchZoom 65519 where JUNO-60.exe held 62. The plugin's window
+getter clamps a zoom to the screen's fit, and the emulator answered GetSystemMetrics with 0: the fit
+became -17 (stored as 65519). Neither side was the truth: the plugin clamps to the REAL screen, the
+program did not clamp at all. Fixed both ways: the program ports the getter and the fit
+(docs/WINDOW_ZOOM.md), the oracle answers GetSystemMetrics with the program's own screen (its log's
+`editor CX CY`) and attaches the plugin's editor (createView, IPlugView::attached) as a host does.
+The attach then exposed a second unported rule at once: a LED shown or hidden reads the LED store
+(docs/LED_METER.md rule 13) -- the editorless oracle had never run the show path.
+### The rule
+Run the oracle with every object the real host creates (the editor view attached, not only the
+processor), and answer every OS query from the environment of the app under test. An emulator's
+default answer (0, NULL, an empty list) is a fake value that can hide a rule or invent a difference:
+list the OS calls the oracle answers and give each one the app's real value.
+
+## 175. A SCRIPTED DIALOG ANSWERS ONLY WHAT THE REAL DIALOG CAN -- AND THE APP MUST SURVIVE EVERY CANCEL
+Paid 2026-10-09 twice (JUNO A39). (a) The patch manager gate's random menu pick could point past the
+last item; the plugin and the port then disagreed on an answer no user can give (seeds 1 and 2 RED):
+a harness defect. A pick is now a real item or a cancel. (b) JUNO-60.exe crashed on the script's
+cancel of the open dialog: the cancel's count (-1) was read as one file (files[0] NULL); 4 of 9 seeds
+stopped (job pm_final1). Fixed (`nfiles <= 0`), then 9 of 9 equal.
+### The rule
+Draw a script's dialog answers only from what the real dialog can return, and include the cancel
+in every dialog's answers. Play the same script through every app, not only the port: the app's own
+dialog code is where a cancel crashes.
+
+## 176. A FAKE OS SERVICE ANSWERS EACH CALL VARIANT AS THE REAL ONE -- READ THE FLAGS AT THE CALL SITE
+Paid 2026-10-09 (JUNO A39, the import). The plugin asks the open dialog's first item for its
+file-system path (SIGDN_FILESYSPATH) and every other item for its normal display name
+(SIGDN_NORMALDISPLAY), and joins those names to the first item's folder. A fake that gave every item
+its full path made a different file list. The same day: a folder's listing order is the file
+system's (FindFirstFile on NTFS: upper case, ordinal), and the plugin's bank order at boot follows it.
+Both are graded now (tooth 17: the second name read as a path; files.js and the program list in
+NTFS's order).
+### The rule
+A fake OS service answers per call variant (its flags, its item index) and in the real order of
+enumeration. Read the arguments at each call site before writing the fake, and put a tooth on each
+variant the plugin uses.
+
+## 177. A PAGE UNDER TEST HAS ITS OWN CLOCK, RATE AND EVENT MODEL -- THE CHECK SETS THEM, OR READS THEM FROM THE REFERENCE
+Paid 2026-10-09 (gui/skin, skin_kb_check.mjs and skin_pm_check.py). (a) The page's own 50 ms timer
+ticked the patch manager (its autosave counter) and the meters between scripted commands. (b) The
+page's audio context ran at 44100 where JUNO-60.exe ran at 48000: the engine rate differed. (c) A
+pointerdown event carries detail 0 -- the click count lives on mousedown: no double click reached the
+list. Fixed: ?pmsetup holds the manager's timer (the check ticks it), ?rate= sets the engine rate,
+the page takes the click count from mousedown.
+### The rule
+In a browser check, every source of time and every platform default (the sample rate, the click
+count, the screen) is set by the check or read from the reference run. Read the event's
+specification before trusting a field of it.
+
+## 178. A SNAPSHOT IS A NEW PLACE ON DISK -- THE FREEZE, MODULE RESOLUTION AND TOOLCHAINS MUST HOLD THERE
+Paid 2026-10-09 (jobs pm_refs5, web_final1_env). (a) The freeze was broken again: the gate and the
+port were edited in the main tree while pm_refs5 graded from it; the verdicts of seeds 7 and 100
+were discarded and every seed re-graded in a clean job. A job that runs from a snapshot
+(tools/snap_tree.sh, playbook 110) cannot be tainted: the freeze holds by construction. (b) A web
+job on a snapshot in /tmp died at once: Node's ESM resolver ignores NODE_PATH and looks for
+node_modules from the script's folder up -- the main tree found /home/user/node_modules, the
+snapshot none; and emcc was not on the PATH of its WASM tooth (playbook 173). tools/snap_tree.sh now
+links the node_modules the main tree resolves and records the snapshot's content as a git tree id
+(<dir>/.snapshot_tree): `git rev-parse HEAD^{tree}` equal to it after the commit proves the job
+graded exactly the committed files.
+### The rule
+Run every job from a snapshot. Its first lines prove its environment (the driver imports, `command
+-v emcc`), and the evidence names the snapshot's tree id, so a verdict is tied to exact content.
+
+## 179. A TOOTH ON A PATH NO SCRIPT TAKES CANNOT BITE -- AND A TOOTH THAT STOPS BITING ON ONE SEED IS A REACH LOSS
+Paid 2026-10-09 twice. (a) patch_manager_gate tooth 13, "a close of a closed window", did not bite
+on any seed: every command runs with the window open, so no close reaches a closed window. Replaced
+by a reachable defect (the window never closes: Enter, Esc, LOAD leave it open) -- bites on seed 9.
+Unlike 172 (a property the input space cannot observe), here the path never runs. (b)
+exe_oracle_check's CC tooth bit on 3 of 3 seeds for A38 and on 2 of 3 after the patch window was
+ported: the seeded performance now opened the (modal) window and left it open, and every later CC
+menu press was blocked -- seed 1 had no learn left. Both sides agreed (the plugin's window is modal
+too), so only the tooth saw the lost reach. Fixed: the performance closes the window (Esc) after its
+double click, as a user does.
+### The rule
+Put a tooth only on a path the gate's REACH output shows executed. A tooth must bite on EVERY seed it
+is given; when it stops biting on one, find what the run no longer reaches before anything else --
+a change elsewhere (here a modal window) can silently remove coverage from a green check.

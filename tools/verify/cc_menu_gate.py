@@ -418,20 +418,39 @@ def oracle(log):
             note_value = h.vcall(q(model + 128), 6)
             kbuf = h.alloc_com(16)
             boot_map = ccmap(h.get_state())
+            vo = h.call(H.IB + 0x34E170, rcx=model)          # the view's values (as exe_oracle_check.py)
+            slot = lambda k: h.call(q(q(vo) + k), rcx=vo)
+            vsobj = {0x0FFFC010: slot(0x50), 0x0FFFC014: slot(0x58), 0x0FFFC004: slot(0x60),
+                     0x0FFFC005: slot(0x68), 0x0FFFC006: slot(0x70)}
+            vsobj[0x0FFFC002] = vsobj[0x0FFFC004] - 2 * 0x28
+            assert q(vsobj[0x0FFFC002] + 0x18) == q(vsobj[0x0FFFC010] + 0x18) - 0x10 + 2
         elif t[0] == 'plugin_init':
             pass
+        elif t[0] == 'editor':                               # the program's editor opens on its screen
+            h.attach_editor(int(t[1]), int(t[2]))
+        elif t[0] == 'zoomfit':                              # a window converts and sets its zoom (WINDOW_ZOOM.md)
+            got = h.window_conv(H.panel_sizes()[int(t[1])])
+            if got != int(t[2]):
+                fail('zoomfit %s: the plugin %d, the program %s' % (t[1], got, t[2]))
         elif t[0] == 'queue_patch':
             name = ' '.join(t[2:])
             if name not in banks:
                 banks[name] = open(bank_file(name), 'rb').read()
             b, p = banks[name], int(t[1])
             h.load_patch(b[HEADER + p * STRIDE + NAME: HEADER + (p + 1) * STRIDE])
-        elif t[0] == 'model_set':
+        elif t[0] in ('model_set', 'pm_set'):
             pid, v = int(t[1]), int(t[2])
-            if pid in g.kidx:
-                h.call(H.IB + 0x283DB0, rcx=model, rdx=g.rec_obj[g.kidx[pid]], r8=v & 0xFFFFFFFF, r9=1)
+            obj = g.rec_obj[g.kidx[pid]] if pid in g.kidx else vsobj.get(pid)
+            if obj is not None:
+                h.call(H.IB + 0x283DB0, rcx=model, rdx=obj, r8=v & 0xFFFFFFFF, r9=1 if t[0] == 'model_set' else int(t[3]))
             else:
                 res['notes'].append('model_set %d: not in the plugin\'s record list' % pid)
+        elif t[0] == 'queue_record':                         # the patch manager's load (CLAIMS A39)
+            h.load_patch(bytes.fromhex(t[1]))
+        elif t[0] == 'pm_notify':
+            h.call(H.IB + 0x2853C0, rcx=model, count=500_000_000)
+        elif t[0] == 'pm_commit':
+            h.call(H.IB + 0x283120, rcx=model, count=500_000_000)
         elif t[0] == 'ui_tick':
             h.call(H.IB + 0x320120, rcx=h.core, count=2_000_000_000)
         elif t[0] == 'commit':
@@ -442,7 +461,7 @@ def oracle(log):
             h.call(H.IB + 0x2838C0, rcx=model, rdx=note_value, r8=kbuf, count=500_000_000)
             for rva in (0x285320, 0x2853C0, 0x283120):
                 h.call(H.IB + rva, rcx=model, count=500_000_000)
-        elif t[0] in ('midi', 'led', 'meter', 'bar'):
+        elif t[0] in ('midi', 'led', 'meter', 'bar', 'ledshow'):
             pass                                # the program's input log; the UI timer's LED / meters
         elif t[0] == 'process':
             n, tempo, nev, npar = int(t[1]), f64(t[2]), int(t[3]), int(t[4])

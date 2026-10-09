@@ -88,8 +88,8 @@ function exeCalls(log) {
   for (const ln of lines.slice(at + 1)) {
     const t = ln.split(" ");
     if (t[0] === "keybed" || t[0] === "model_set") out.push(`${t[0]} ${t[1]} ${t[2]}`);
-    else if (t[0] === "commit" || t[0] === "ui_tick") out.push(t[0]);
-    else if (t[0] === "queue_patch") out.push(`patch ${t[1]}`);
+    else if (t[0] === "commit" || t[0] === "ui_tick" || t[0] === "pm_notify" || t[0] === "pm_commit") out.push(t[0]);
+    else if (t[0] === "queue_record" || t[0] === "pm_set" || t[0] === "zoomfit" || t[0] === "ledshow") out.push(ln);
     else if (t[0] === "cc_learn" || t[0] === "cc_forget") out.push(`${t[0]} ${t[1]}`);
     else if (t[0] === "state") out.push(ln);
     else if (ln.startsWith("# ccpick ") || ln.startsWith("# ccmenu ")) out.push(ln.slice(2));
@@ -140,13 +140,34 @@ const port = srv.address().port;
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
 const work = await mkdtemp(join(tmpdir(), "skin_kb_"));
 await copyFile(EXE, join(work, "JUNO-60.exe"));
+// the program's screen (its log's "editor CX CY": the virtual screen its windows fit, docs/WINDOW_ZOOM.md):
+// the page gets the same one, so both windows convert to the same zooms
+await writeFile(join(work, "probe.txt"), "tick\n");
+execFileSync(WINE, [join(work, "JUNO-60.exe"), "--kbscript", join(work, "probe.txt")], { cwd: work, env: { ...process.env, WINEDEBUG: "-all" }, timeout: 300000 });
+const ed = readFileSync(join(work, "probe.txt.log"), "utf8").split(/\r?\n/).find(l => l.startsWith("editor "));
+if (!ed) throw new Error("the program's log has no editor line");
+const SCREEN = { width: +ed.split(" ")[1], height: +ed.split(" ")[2] };
+const cr = readFileSync(join(work, "probe.txt.log"), "utf8").split(/\r?\n/).find(l => l.startsWith("create "));
+const RATE = cr ? +cr.split(" ")[1] : 48000;       // the program's engine rate: the page's too (?rate=)
+console.log(`the program's screen: ${SCREEN.width} x ${SCREEN.height}, its rate ${RATE} (the page's too)`);
+// the program's banks (make_native.py: the factory bank, then scratchpad/userbanks/*.bin, each named by its
+// file) for the page's Patch folder, through its ?banks= manifest; the program's test runs keep the
+// factory bank current (its setting PatchManager/BankName), the page gets the same setting
+const { readdirSync } = await import("node:fs");
+const udir = join(ROOT, "scratchpad", "userbanks");
+const manifest = (() => { try { return readdirSync(udir); } catch { return []; } })().filter(f => f.toLowerCase().endsWith(".bin")).sort()
+  .map(f => ({ name: f.replace(/\.bin$/i, "").replace(/^~+/, "").trim(), file: "userbanks/" + encodeURIComponent(f) }));
+await writeFile(join(ROOT, "scratchpad", "skin_kb_banks.json"), JSON.stringify(manifest));
+const PAGE = `/gui/skin/?zoom=100&fresh&rate=${RATE}&banks=${encodeURIComponent("/scratchpad/skin_kb_banks.json")}`;
+const setting = () => localStorage.setItem("juno60.PatchManager/BankName", "Factory");
 
 let fails = 0;
 for (const seed of SEEDS) {
-  const page = await browser.newPage({ viewport: { width: 2000, height: 820 } });
+  const page = await browser.newPage({ viewport: { width: 2000, height: 820 }, screen: SCREEN });
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
-  await page.goto(`http://127.0.0.1:${port}/gui/skin/?zoom=100`);
+  await page.addInitScript(setting);
+  await page.goto(`http://127.0.0.1:${port}${PAGE}`);
   await page.waitForFunction(() => window.__skin && window.__skin.skin, null, { timeout: 60000 });
   // plumbing only: the calls logged as the exe logs them, the page's own UI timer held,
   // no audio device; the product code is not changed
@@ -157,12 +178,17 @@ for (const seed of SEEDS) {
     wrap("keybedWrite", (k, v) => `keybed ${k} ${v}`);
     wrap("commit", () => "commit");
     wrap("set", (id, v) => `model_set ${id >>> 0} ${v | 0}`);
-    wrap("loadPatch", (b, i) => `patch ${i}`);
+    skin.trace = log;                              // the page's own: zoomfit, ledshow, the patch manager's calls
     const tick = E.uiTick.bind(E);
     window.__kbAllow = false;
     E.uiTick = () => { if (window.__kbAllow) { log.push("ui_tick"); tick(); } };
-    window.__kbTick = () => { window.__kbAllow = true; E.uiTick(); window.__kbAllow = false; skin.M.refresh(); };
+    const mtick = skin.meterTick.bind(skin), ptick = skin.pm.tick.bind(skin.pm);
+    skin.meterTick = () => (window.__kbAllow ? mtick() : false);      // the page's own timer held: its
+    skin.pm.tick = () => {};                                          // LED and meter reads come from the script
+    window.__kbTick = () => { window.__kbAllow = true; E.uiTick(); skin.M.refresh(); skin.meterTick(); window.__kbAllow = false; };
     E.start = () => {};
+    const blk = E.M._malloc(8 * 128);
+    window.__kbBlock = () => E.fn.render(E.ctx, blk, 128);              // the exe's audio block
     window.__kbPort = { name: "test", onmidimessage: null };
     skin.listen(window.__kbPort);
     const k = skin.visible(skin.tree).find(x => x.type === "keyboardX");
@@ -187,10 +213,11 @@ for (const seed of SEEDS) {
     else if (t[0] === "up") { await setShift(false); await page.mouse.up(); }
     else if (t[0] === "wheel") { await setShift(false); await page.mouse.move(cx(+t[1]), cy(+t[2])); await page.mouse.wheel(0, t[3] === "1" ? -100 : 100); }
     else if (t[0] === "set") await page.evaluate(([v, ref]) => window.__skin.skin.M.set(ref, v), [+t[1], t.slice(2).join(" ")]);
-    else if (t[0] === "patch") await page.evaluate(([i, c]) => window.__skin.skin.loadPatch(i, c), [+t[1], t[2] === "1"]);
+    else if (t[0] === "patch") await page.evaluate(([i, c]) => window.__skin.skin.scriptedPatch(i, c), [+t[1], t[2] === "1"]);
     else if (t[0] === "note") await page.evaluate(([n, v]) => window.__kbPort.onmidimessage({ data: [0x90, n, v] }), [+t[1], +t[2]]);
     else if (t[0] === "off") await page.evaluate(n => window.__kbPort.onmidimessage({ data: [0x80, n, 64] }), +t[1]);
     else if (t[0] === "tick") await page.evaluate(() => window.__kbTick());
+    else if (t[0] === "block") await page.evaluate(() => window.__kbBlock());
   }
   const web = await page.evaluate(() => window.__kblog);
   await page.close();
@@ -210,10 +237,11 @@ for (const seed of SEEDS) {
 // ---------------------------------------------------------------- the CC assign menu
 let ccFails = 0;
 for (const seed of SEEDS) {
-  const page = await browser.newPage({ viewport: { width: 2400, height: 1100 } });   // room for a menu at the edge
+  const page = await browser.newPage({ viewport: { width: 2400, height: 1100 }, screen: SCREEN });   // room for a menu at the edge
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
-  await page.goto(`http://127.0.0.1:${port}/gui/skin/?zoom=100`);
+  await page.addInitScript(setting);
+  await page.goto(`http://127.0.0.1:${port}${PAGE}`);
   await page.waitForFunction(() => window.__skin && window.__skin.skin, null, { timeout: 60000 });
   const geo = await page.evaluate(dump => {
     const { E, skin } = window.__skin;
@@ -222,7 +250,7 @@ for (const seed of SEEDS) {
     wrap("keybedWrite", (k, v) => `keybed ${k} ${v}`);
     wrap("commit", () => "commit");
     wrap("set", (id, v) => `model_set ${id >>> 0} ${v | 0}`);
-    wrap("loadPatch", (b, i) => `patch ${i}`);
+    skin.trace = log;
     wrap("ccLearn", id => `cc_learn ${id >>> 0}`);
     wrap("ccForget", id => `cc_forget ${id >>> 0}`);
     window.__dbg = [];
@@ -242,7 +270,10 @@ for (const seed of SEEDS) {
     const tick = E.uiTick.bind(E);
     window.__kbAllow = false;
     E.uiTick = () => { if (window.__kbAllow) { log.push("ui_tick"); tick(); } };
-    window.__kbTick = () => { window.__kbAllow = true; E.uiTick(); window.__kbAllow = false; skin.M.refresh(); };
+    const mtick = skin.meterTick.bind(skin), ptick = skin.pm.tick.bind(skin.pm);
+    skin.meterTick = () => (window.__kbAllow ? mtick() : false);      // the page's own timer held: its
+    skin.pm.tick = () => {};                                          // LED and meter reads come from the script
+    window.__kbTick = () => { window.__kbAllow = true; E.uiTick(); skin.M.refresh(); skin.meterTick(); window.__kbAllow = false; };
     E.start = () => {};
     const blk = E.M._malloc(8 * 128), sb = E.M._malloc(4 + 8 * 256);
     window.__kbBlock = () => E.fn.render(E.ctx, blk, 128);              // the exe's audio block

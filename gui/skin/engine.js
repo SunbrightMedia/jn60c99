@@ -38,6 +38,14 @@
 //   peaks() -> [l, r]       the page's output peak since the last call, after the
 //                           monitor fader (the checks' witness that the page sounds;
 //                           not the plugin's meters, which meterTick reads)
+//   zoomGet(win, value, cx, cy, w, h) -> zoom
+//                           a window's coordinate conversion (rva 0x2AA590): its zoom value,
+//                           at most the window's fit to the screen cx x cy (rva 0x312750, the
+//                           first positive fit kept per window); the caller sets the value
+//                           to the result when it differs (docs/WINDOW_ZOOM.md)
+//   modelGet(id)            the model's value of a state entry (getState's)
+//   patchManager(io, dirs)  the plugin's patch manager (CLAIMS A39, docs/PATCH_MANAGER.md) on
+//                           this engine: its files and dialogs from `io` (PatchManager below)
 //
 // WasmEngine: the C99 port compiled to WebAssembly (gui/web/juno.js + juno.wasm,
 // the same build `make webapp` gates WASM == native).
@@ -58,7 +66,8 @@ export class WasmEngine {
     this.bankKey = null;
   }
 
-  async init() {
+  // rate: the engine's rate when given (a check runs the page at its program's), else the output's
+  async init(rate = 0) {
     const { default: JunoModule } = await import(this.base + "juno.js");
     const M = (this.M = await JunoModule({ locateFile: p => this.base + p }));
     const f = (n, r, a) => M.cwrap(n, r, a);
@@ -86,6 +95,10 @@ export class WasmEngine {
       ccForget: f("juno_gui_cc_forget", "number", ["number", "number"]),
       hostParam: f("juno_gui_host_param", null, ["number", "number", "number", "number"]),
       midiBase: f("juno_gui_midi_base", "number", []),
+      zoomGet: f("juno_gui_zoom_get", "number", ["number", "number", "number", "number", "number", "number"]),
+      modelGet: f("juno_gui_model_get", "number", ["number", "number"]),
+      record: f("juno_gui_record", "number", ["number", "number", "number"]),
+      queueRecord: f("juno_gui_queue_record", "number", ["number", "number", "number"]),
     };
     // the engine is built for the output device's own rate: nothing resamples
     try {
@@ -93,7 +106,7 @@ export class WasmEngine {
     } catch (e) {
       this.audio = null;
     }
-    const sr = this.audio && this.audio.sampleRate > 0 ? this.audio.sampleRate | 0 : 48000;
+    const sr = rate > 0 ? rate | 0 : this.audio && this.audio.sampleRate > 0 ? this.audio.sampleRate | 0 : 48000;
     this.ctx = this.fn.create(sr, 0);
     if (!this.ctx) throw new Error("engine alloc failed");
     if (!this.fn.pluginInit(this.ctx)) throw new Error("engine init failed");
@@ -102,8 +115,16 @@ export class WasmEngine {
     this.statePtr = M._malloc(this.stateCap);
     this.BLITS = 256;                            // a bar draws 1 + fade blits (Script.xml: fade 10)
     this.rectPtr = M._malloc(4 * (8 + 7 * this.BLITS));   // rect[4], fill[4], blits[7 x BLITS]
+    this.zfit = M._malloc(8);                    // each window's kept fit (main, patch)
+    M.HEAP32.set([0, 0], this.zfit >> 2);
     return this;
   }
+
+  zoomGet(win, value, cx, cy, w, h) {
+    return this.fn.zoomGet(value | 0, cx | 0, cy | 0, w | 0, h | 0, this.zfit + 4 * (win ? 1 : 0));
+  }
+  modelGet(id) { return this.fn.modelGet(this.ctx, id >>> 0); }
+  patchManager(io, dirs) { return new PatchManager(this, io, dirs); }
 
   values() {
     const M = this.M, out = new Map();
@@ -200,5 +221,250 @@ export class WasmEngine {
     const p = this.peak;
     this.peak = [0, 0];
     return p;
+  }
+}
+
+// ------------------------------------------------------------------ the patch manager
+// The plugin's patch manager (gui/juno_pm.c, CLAIMS A39), compiled into the same module: the
+// page gives it its files and dialogs (`io`, synchronous; a page that must ask the user first
+// asks before the call and answers from what it got), the engine gives it the model -- the
+// record image (rva 0x335990), a record's load (the patch browser's, rva 0x335850), the model's
+// set / notify / commit. Strings cross as bytes (Latin-1), as the plugin's ANSI calls take them.
+//   io.read(path) -> Uint8Array | null          io.write(path, bytes) -> bool
+//   io.remove(path) -> bool   io.move(from, to) -> bool   io.exists(path) -> bool
+//   io.list(dir) -> [names] | null (the folder's order: NTFS's)
+//   io.text(what, offered) -> string | null (0 a patch's name, 1 a bank's)
+//   io.menu(items, checked) -> index | -1      io.confirm(msg) -> bool (2, 3, 37, 38)
+//   io.openFiles(title, ext) -> [first path, then names] | null
+//   io.saveFile(title, suggested) -> path | null
+//   io.onCall(kind, ...) (optional): every model call ("set", id, v, flag), ("notify"),
+//   ("commit"), ("load", body) -- the checks' log; the page's notify hook (LED shows)
+export class PatchManager {
+  constructor(E, io, dirs) {
+    const M = (this.M = E.M);
+    this.E = E;
+    this.io = io;
+    const f = (n, r, a) => M.cwrap(n, r, a);
+    const P = "number";
+    this.fn = {
+      create: f("juno_pm_create", P, [P, P, P, P, P, P]),
+      attach: f("juno_pm_attach", P, [P]),
+      initialize: f("juno_pm_initialize", null, [P]),
+      pref: f("juno_pm_pref", P, [P]),
+      setPref: f("juno_pm_set_pref", null, [P, P]),
+      detach: f("juno_pm_detach", null, [P]),
+      tick: f("juno_pm_tick", null, [P]),
+      saveAll: f("juno_pm_save_all", P, [P]),
+      key: f("juno_pm_key", P, [P, P, P, P]),
+      func: f("juno_pm_func", P, [P, P, P]),
+      select: f("juno_pm_select", P, [P, P]),
+      mouse: f("juno_pm_mouse", P, [P, P, P, P, P]),
+      bankMouse: f("juno_pm_bank_mouse", P, [P, P, P, P, P, P]),
+      drag: f("juno_pm_drag", null, [P, P, P]),
+      viewValues: f("juno_pm_view_values", null, [P, P, P, P]),
+      nbanks: f("juno_pm_nbanks", P, [P]),
+      curBank: f("juno_pm_cur_bank", P, [P]),
+      cur: f("juno_pm_cur", P, [P, P]),
+      sel: f("juno_pm_sel", P, [P]),
+      value: f("juno_pm_value", P, [P, P]),
+      setValue: f("juno_pm_set_value", null, [P, P, P]),
+      bankName: f("juno_pm_bank_name", P, [P, P]),
+      patchName: f("juno_pm_patch_name", P, [P, P, P, P]),
+      number: f("juno_pm_number", P, [P, P, P]),
+      format: f("juno_pm_format", P, []),
+      loadFormat: f("juno_pm_load_format", null, [P]),
+      body: f("juno_pm_body", P, [P, P, P]),
+      hist: f("juno_pm_hist", P, [P, P, P]),
+      clip: f("juno_pm_clip", P, [P]),
+      stateInfo: f("juno_pm_state_info", P, [P, P, P, P, P, P]),
+      stateRec: f("juno_pm_state_rec", P, [P, P, P, P]),
+    };
+    this.scratch = M._malloc(64);
+    this.text = M._malloc(1024);
+    const cb = (fn, sig) => M.addFunction(fn, sig);
+    const cs = p => this.cstr(p);
+    const fns = [
+      0,                                                         // u
+      cb((u, path, lenp) => {                                    // read
+        const d = io.read(cs(path));
+        if (!d) return 0;
+        const p = M._malloc(d.length + 1);
+        M.HEAPU8.set(d, p);
+        M.HEAP32[lenp >> 2] = d.length;
+        return p;
+      }, "iiii"),
+      cb((u, path, data, n) => (io.write(cs(path), M.HEAPU8.slice(data, data + n)) ? 1 : 0), "iiiii"),
+      cb((u, path) => (io.remove(cs(path)) ? 1 : 0), "iii"),
+      cb((u, a, b) => (io.move(cs(a), cs(b)) ? 1 : 0), "iiii"),
+      cb((u, path) => (io.exists(cs(path)) ? 1 : 0), "iii"),
+      cb((u, dir, np) => {                                       // list
+        const names = io.list(cs(dir));
+        M.HEAP32[np >> 2] = 0;
+        if (!names) return 0;
+        const arr = M._malloc(4 * Math.max(1, names.length));
+        names.forEach((nm, k) => { M.HEAP32[(arr >> 2) + k] = this.allocStr(nm); });
+        M.HEAP32[np >> 2] = names.length;
+        return arr;
+      }, "iiii"),
+      cb((u, what, offered, out, cap) => {                       // text
+        const t = io.text(what, cs(offered));
+        if (t === null || t === undefined) return 0;
+        this.writeStr(t, out, cap);
+        return 1;
+      }, "iiiiii"),
+      cb((u, items, checked, n) => {                             // menu
+        const it = [], ck = [];
+        for (let k = 0; k < n; k++) {
+          it.push(cs(M.HEAP32[(items >> 2) + k]));
+          ck.push(M.HEAP32[(checked >> 2) + k] !== 0);
+        }
+        const r = io.menu(it, ck);
+        return r === null || r === undefined || r < 0 || r >= n ? -1 : r | 0;
+      }, "iiiii"),
+      cb((u, msg) => (io.confirm(msg) ? 1 : 0), "iii"),
+      cb((u, title, ext, pathsp, np) => {                        // open_files
+        const ps = io.openFiles(cs(title), cs(ext));
+        if (!ps || !ps.length) return 0;
+        const arr = M._malloc(4 * ps.length);
+        ps.forEach((x, k) => { M.HEAP32[(arr >> 2) + k] = this.allocStr(x); });
+        M.HEAP32[pathsp >> 2] = arr;
+        M.HEAP32[np >> 2] = ps.length;
+        return 1;
+      }, "iiiiii"),
+      cb((u, title, sug, out, cap) => {                          // save_file
+        const t = io.saveFile(cs(title), cs(sug));
+        if (t === null || t === undefined) return 0;
+        this.writeStr(t, out, cap);
+        return 1;
+      }, "iiiiii"),
+      cb((u, out, cap) => E.fn.record(E.ctx, out, cap), "iiii"), // record (rva 0x335990)
+      cb((u, body, n) => {                                       // load (rva 0x335850)
+        if (io.onCall) io.onCall("load", M.HEAPU8.slice(body, body + n));
+        E.fn.queueRecord(E.ctx, body, n);
+        return 1;
+      }, "iiii"),
+      cb((u, op, id, v, flag) => {                               // model: get, set, notify, commit
+        id >>>= 0;
+        if (op === 0) return E.fn.modelGet(E.ctx, id);
+        if (op === 1) {
+          if (io.onCall) io.onCall("set", id, v, flag);
+          return E.fn.modelSet(E.ctx, id, v);
+        }
+        if (op === 2) { if (io.onCall) io.onCall("notify"); return 0; }
+        if (io.onCall) io.onCall("commit");
+        E.fn.commit(E.ctx);
+        return 0;
+      }, "iiiiii"),
+    ];
+    const iop = M._malloc(4 * fns.length);
+    M.HEAP32.set(fns, iop >> 2);
+    const d = dirs || {};
+    const a = [d.data, d.patch, d.old, d.script].map(x => this.allocStr(x || ""));
+    this.pm = this.fn.create(E.ctx, iop, a[0], a[1], a[2], a[3]);
+    a.forEach(p => M._free(p));
+    M._free(iop);
+    if (!this.pm) throw new Error("patch manager alloc failed");
+  }
+
+  // strings as bytes (Latin-1): the plugin's names and paths are its ANSI code page's
+  cstr(p) {
+    if (!p) return null;
+    const H = this.M.HEAPU8;
+    let e = p;
+    while (H[e]) e++;
+    let s = "";
+    for (let k = p; k < e; k++) s += String.fromCharCode(H[k]);
+    return s;
+  }
+  allocStr(s) {
+    const p = this.M._malloc(s.length + 1);
+    this.writeStr(s, p, s.length + 1);
+    return p;
+  }
+  writeStr(s, p, cap) {
+    const H = this.M.HEAPU8;
+    const n = Math.min(s.length, cap - 1);
+    for (let k = 0; k < n; k++) { const c = s.charCodeAt(k); H[p + k] = c < 256 ? c : 0x3f; }
+    H[p + n] = 0;
+  }
+  bytes(p, n) { return p ? this.M.HEAPU8.slice(p, p + n) : null; }
+
+  attach() { return this.fn.attach(this.pm); }
+  initialize() { this.fn.initialize(this.pm); }
+  detach() { this.fn.detach(this.pm); }
+  tick() { this.fn.tick(this.pm); }
+  saveAll() { return this.fn.saveAll(this.pm); }
+  pref() { return this.cstr(this.fn.pref(this.pm)); }
+  setPref(name) {
+    if (name === null || name === undefined) { this.fn.setPref(this.pm, 0); return; }
+    const p = this.allocStr(name);
+    this.fn.setPref(this.pm, p);
+    this.M._free(p);
+  }
+  loadFormat(text) {
+    if (text === null || text === undefined) { this.fn.loadFormat(0); return; }
+    const p = this.allocStr(text);
+    this.fn.loadFormat(p);
+    this.M._free(p);
+  }
+  format() { return this.fn.format(); }
+  // the list's key (rva 0x3278C0): {handled, close}
+  key(code, flags) {
+    const r = this.fn.key(this.pm, code, flags, this.scratch);
+    return { handled: r !== 0, close: this.M.HEAP32[this.scratch >> 2] !== 0 };
+  }
+  func(fn, args) {
+    const a = this.allocStr(fn), b = this.allocStr(args);
+    const r = this.fn.func(this.pm, a, b);
+    this.M._free(a); this.M._free(b);
+    return r;
+  }
+  select(i) { return this.fn.select(this.pm, i); }
+  mouse(type, x, y, rect) {
+    this.M.HEAP32.set(rect, this.scratch >> 2);
+    return this.fn.mouse(this.pm, type, x, y, this.scratch);
+  }
+  bankMouse(type, x, y, rect, button) {
+    this.M.HEAP32.set(rect, this.scratch >> 2);
+    if (button) this.M.HEAP32.set(button, (this.scratch >> 2) + 4);
+    return this.fn.bankMouse(this.pm, type, x, y, this.scratch, button ? this.scratch + 16 : 0);
+  }
+  drag() {
+    this.fn.drag(this.pm, this.scratch, this.scratch + 4);
+    return [this.M.HEAP32[this.scratch >> 2], this.M.HEAP32[(this.scratch >> 2) + 1]];
+  }
+  viewValues() {
+    this.fn.viewValues(this.pm, this.scratch, this.scratch + 4, this.scratch + 8);
+    const H = this.M.HEAP32, k = this.scratch >> 2;
+    return [H[k], H[k + 1], H[k + 2]];
+  }
+  nbanks() { return this.fn.nbanks(this.pm); }
+  curBank() { return this.fn.curBank(this.pm); }
+  cur(sub) { return this.fn.cur(this.pm, sub ? 1 : 0); }
+  sel() { return this.fn.sel(this.pm); }
+  value(id) { return this.fn.value(this.pm, id >>> 0); }
+  setValue(id, v) { this.fn.setValue(this.pm, id >>> 0, v | 0); }
+  bankName(b) { return this.cstr(this.fn.bankName(this.pm, b)); }
+  patchName(b, i) { return this.fn.patchName(this.pm, b, i, this.text) ? this.cstr(this.text) : null; }
+  number(i) { return this.fn.number(i, this.text, 64) > 0 ? this.cstr(this.text) : ""; }
+  body(b, i) { return this.bytes(this.fn.body(this.pm, b, i), 20207); }
+  hist(b) {
+    const n = this.fn.hist(this.pm, b, this.scratch);
+    return [n, this.M.HEAP32[this.scratch >> 2]];
+  }
+  clip() { return this.bytes(this.fn.clip(this.pm), 20207); }
+  stateInfo(b, i) {
+    if (!this.fn.stateInfo(this.pm, b, i, this.scratch, this.scratch + 4, this.scratch + 8)) return null;
+    const H = this.M.HEAP32, k = this.scratch >> 2;
+    return { name: this.cstr(H[k]), view: H[k + 1], edit: this.bytes(H[k + 2], 20207) };
+  }
+  stateRec(b, i, k) { return this.bytes(this.fn.stateRec(this.pm, b, i, k), 20207); }
+  // the view's record image (the serializer, rva 0x335990)
+  record() {
+    const p = this.M._malloc(20207);
+    const n = this.E.fn.record(this.E.ctx, p, 20207);
+    const r = this.M.HEAPU8.slice(p, p + Math.max(n, 0));
+    this.M._free(p);
+    return r;
   }
 }

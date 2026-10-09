@@ -18,8 +18,12 @@ python3 -m http.server 8000
 ```
 
 Open `http://localhost:8000/gui/skin/`. Audio starts on the first click.
-URL options: `?zoom=75` (the plugin's zoom, 25..200; default 62),
-`?skin=<url of a Script folder>/`, `?xml=<url of a Script.xml>`, `?bank=<url of a .bin>`.
+URL options: `?zoom=75` (the plugin's zoom, 25..200; default 62, at most the screen's fit:
+docs/WINDOW_ZOOM.md), `?skin=<url of a Script folder>/`, `?xml=<url of a Script.xml>`,
+`?bank=<url of a .bin>` (the Patch folder's factory bank), `?banks=<url of a manifest>`
+(`[{name, file}]`: more banks in the Patch folder), `?fresh` (the data folder starts empty and
+nothing persists). For the checks only: `?rate=<Hz>` (the engine at that rate, no audio),
+`?pmsetup=<url of a json>` (the patch manager gate's folders, no settings, no timer).
 
 ## What comes from where
 
@@ -37,8 +41,20 @@ URL options: `?zoom=75` (the plugin's zoom, 25..200; default 62),
 | A patch load | the patch browser's load and its set of the patch number; the INC / DEC / LOAD buttons commit after it (rva 0x322E60), a load from the patch window's list does not (rva 0x3278C0) |
 | The LFO LED and the two level meters | the plugin's code, EXECUTED (docs/LED_METER.md, CLAIMS A37): at each 50 ms tick the open LED's frame (`juno_gui_lfo_led_frame`: the engine's LED store read, rva 0x3C7180, then rva 0x325070) and each meter's state, fill and blits (`juno_gui_meter_tick`, rva 0x31C450; `juno_gui_bar_draw`, rva 0x31C210: a plain blit, then the fade columns at their alphas); the skin only blits what they return |
 
-The patch window's 4 x 16 list sits in the grid `panelPatch.png` draws (the list's
-rectangle is in `Script.xml`; the columns are read off the artwork).
+The patch window is the plugin's patch manager, ported (CLAIMS A39, docs/PATCH_MANAGER.md): the
+banks, the 4 x 16 list (its rectangle from `Script.xml`, the cells as the plugin draws them), the
+keys, the buttons, the bank name, drags, undo / redo, copy / cut / paste / insert, write, rename,
+new / delete patch and bank, import / export, the number format, autosave. `gui/juno_pm.c` runs in
+the WASM (`engine.js PatchManager`); the page gives it the files and the dialogs:
+
+| What | In the page |
+|---|---|
+| The folders | `files.js`: the plugin's Windows paths, in memory; the data folder (the user's banks) kept in IndexedDB; the Patch folder the banks the page was given (read only); an export a browser download; a folder's names in NTFS's order |
+| The text edit, the message boxes | the browser's modal prompt / confirm / alert |
+| The bank menu, the file picker | they cannot block a page: the commands that open them first (ctrl+B, the bank menu button, a press on the bank name outside its button; ctrl+I, the import button) ask BEFORE the call, and the manager gets the answer |
+| A double click | the click count of mousedown (a pointerdown has none): every second press of a series, as Windows gives it |
+| The settings (PatchManager/BankName, Patch/Format) | localStorage |
+| The editor's last close (every bank saved) | the page's pagehide; a hidden page saves too |
 
 ## The engine interface (the plug-and-play test API)
 
@@ -55,6 +71,8 @@ rectangle is in `Script.xml`; the columns are read off the artwork).
 | `commit()` | the model's commit a panel control makes after its set |
 | `setTempo(bpm)` | the clock when no host runs one |
 | `uiTick()` | the 50 ms UI-timer drain (rva 0x320120) |
+| `patchManager(io, dirs)` | the plugin's patch manager (rva 0x330D10), its file and dialog calls given by `io` |
+| `zoomGet(win, value, cx, cy, w, h)` | a window's zoom getter (rva 0x2AA590): the value, at most the screen's fit (rva 0x312750) |
 | `start()`, `peaks()` | the audio output (display only) |
 
 `WasmEngine` runs the port in the browser. A bare-metal board needs one class with
@@ -100,10 +118,19 @@ and states; teeth `ccedge`, `ccmods`. Found by it: an old menu's outside-press l
 by a late timer, closed the next menu on its own item's press -- each listener now acts only for
 its own menu.
 
+The patch window (CLAIMS A39): `tools/verify/skin_pm_check.py` (+ `skin_pm_run.mjs`, in `make
+webapp`) plays the patch manager gate's references -- the plugin's own runs of seeded command
+scripts -- into the page: its key, button and mouse handlers, its files, its dialog logic; after
+every command the dialogs asked, the file changes, the model calls, the manager's whole state and
+every file must equal the plugin's. 9 seeds; teeth on the page's own code (`keys`: up / down
+exchanged, `capture`: a drag's moves lost, `button`: the bank name's button unknown) bite.
+`skin_kb_check.mjs` also holds the window's patch loads (LOAD, ctrl+O) and the window zoom
+(`zoomfit`) equal to JUNO-60.exe's. The LFO LED's show rule (docs/LED_METER.md rule 13): a LED
+read when its panel shows or hides, as the plugin's show does.
+
 ## Not ported (drawn idle or left out)
 
 | Item | Why |
 |---|---|
-| The patch window's WRITE / RENAME / NEW / DELETE | writing a record into a bank is not in the port's API yet |
-| SEND / GET, SEND ALL / GET ALL, PLUG-OUT | the SYSTEM-8 link: not needed (the user's decision) |
+| SEND / GET, SEND ALL / GET ALL, PLUG-OUT (ctrl+U / ctrl+G) | the SYSTEM-8 link: not needed (the user's decision) |
 | Activation and login panels | licensing; not part of the synth |

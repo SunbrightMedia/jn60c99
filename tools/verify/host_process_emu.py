@@ -48,6 +48,9 @@ K_PLAYING, K_PPQ, K_TEMPO, K_CYCLE = 0x2, 0x200, 0x400, 0x1000
 MAXBLOCK = 4096
 
 
+from pm_common import panel_sizes                          # noqa: E402,F401  (the windows' sizes)
+
+
 class HostProcess(W.Wrapper):
     def __init__(self):
         super().__init__()
@@ -89,6 +92,38 @@ class HostProcess(W.Wrapper):
             uc.mem_write(q(req['a4']), struct.pack('<%dI' % n, *L))
             uc.mem_write(q(req['a4'] + 8), struct.pack('<%dI' % n, *R))
         self.renders.append(n)
+
+    # ------------------------------------------------------------ the editor (docs/WINDOW_ZOOM.md)
+    def attach_editor(self, cx, cy):
+        """the host opens the plugin's editor on a machine whose virtual screen is cx x cy
+        (GetSystemMetrics 78 / 79): IEditController::createView("editor"), IPlugView::attached on a
+        parent window. Each panel window is found by its fit's calls (rva 0x312750) as it appears:
+        self.windows[(w, h)] = the window (w x h: its panel's Script.xml size)."""
+        uc = self.uc
+        self.screen = {0x4E: cx, 0x4F: cy}
+        if not hasattr(self, 'windows'):
+            self.windows = {}
+
+            def on_fit(uc_, addr, size, ud):
+                this = uc_.reg_read(UC_X86_REG_RCX)
+                r = struct.unpack('<4i', uc_.mem_read(this + 0x18, 16))
+                self.windows[(r[2] - r[0], r[3] - r[1])] = this
+            uc.hook_add(UC_HOOK_CODE, on_fit, begin=IB + 0x312750, end=IB + 0x312750)
+        name, t = self.alloc_com(16), self.alloc_com(16)
+        uc.mem_write(name, b'editor\0')
+        uc.mem_write(t, b'HWND\0')
+        view = self.vcall(self.ctrl, 17, name, count=4_000_000_000)      # IEditController::createView
+        if not view:
+            raise RuntimeError('createView("editor") gave no view')
+        self.vcall(view, 4, 0x10010, t, count=4_000_000_000)               # IPlugView::attached
+        self.view = view
+        return view
+
+    def window_conv(self, size):
+        """a coordinate conversion of the panel window of that size (a draw, an invalidation, a hit
+        test): its own zoom getter (rva 0x2AA590); returns the zoom it read (int)"""
+        z = self.call(IB + 0x2AA590, rcx=self.windows[size], count=500_000_000) & 0xFFFFFFFF
+        return z - (1 << 32) if z >= 1 << 31 else z
 
     def _top(self):
         return self._nested_top if self._nested_top is not None else (E.STACK_BASE + E.STACK_SIZE - 0x10000) & ~0xF
