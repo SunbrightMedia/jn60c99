@@ -89,8 +89,9 @@ the targets) -- both must fail, and `make static` checks that they do.
 ## Not reproducible here (stated)
 
 - The derivation of the transcribed sources (src/voice_render.c, master_render.c, juno_init.c,
-  chorus_init.c: first passes by tools/translate_*.py from decompile dumps not in the repository,
-  then finished by hand). They are not regenerated; every value they compute is graded against the
+  chorus_init.c: first passes by tools/translate_*.py from per-function decompile dumps not in the
+  repository, then finished by hand; refs/allcode_decomp.tgz holds a later decompile of the same four
+  functions -- other names, another image base -- which the translators do not read). They are not regenerated; every value they compute is graded against the
   plugin by the gates above. Likewise tests/test_apply_golden.c (a self-consistency guard).
 - tools/oracle/gen_voice_prepare.py, gen_master_prepare.py, gen_prepare_full.py printed C that was
   merged into src/juno_prepare.c by hand, from /tmp dumps that are gone; the prepare values are graded
