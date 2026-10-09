@@ -68,7 +68,7 @@ needed). Engine-B gates: `tools/engineb/` (`o2_gates.sh`, `o3_gates.sh`, …).
 | `archive/` | Retired device targets: the Daisy Seed and Teensy builds (history) |
 | `docs/` | All findings -- start at `docs/INDEX.md`; the user's older charters `docs/GOAL.md`, `docs/AIRTIGHT_PLAN.md` |
 | `bench/` | The job registry (`tools/run_job.sh`, `tools/status.sh`) |
-| root files | `CLAUDE.md` (agent rules), `END_GOAL.md` (the goal), `FINAL_GUIDE.md` (the status page), `PROVENANCE.tsv` + `COVERAGE.tsv` (the proof ledgers the gates read), `Makefile`, `juno.dll` (the prebuilt Windows library the GUIs load), `package.json` + `package-lock.json` (the Node packages of the browser checks) |
+| root files | `CLAUDE.md` (agent rules), `END_GOAL.md` (the goal), `FINAL_GUIDE.md` (the status page), `PROVENANCE.tsv` + `COVERAGE.tsv` (the proof ledgers the gates read), `Makefile`, `juno.dll` (the prebuilt Windows library the GUIs load), `package.json` + `package-lock.json` (the Node packages of the browser checks); `.gitmodules` (the Pi's Circle submodule), `.gitignore`, `.claude/` (the agent's project settings; its `workflows/` are retired -- CLAUDE.md forbids multi-agent workflows) |
 
 Agent rules, hard covenants (captures are forbidden), and the live state all
 live in [`CLAUDE.md`](CLAUDE.md).
