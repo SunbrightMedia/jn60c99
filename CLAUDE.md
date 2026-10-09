@@ -152,9 +152,11 @@ mine is a hypothesis (playbook 80).
   keyboard's note value and KEY HOLD: every patch change releases the keys the
   UI timer has seen -- found by the .exe's seeded check against the plugin,
   docs/KEY_HOLD.md, keyhold_gate.py) and one init for create and reinit
-  (reinit_check.py, playbook 164) changed gui/juno_bridge.c: their full verify
-  is the open item (job name in FINAL_GUIDE.md's A line; verify_a35 DIED in a
-  container restart, no EXIT).
+  (reinit_check.py, playbook 164) changed gui/juno_bridge.c: the full verify of
+  18ea9bd2 (all of them, the exe and web keyboard checks, refio) is GREEN (job
+  verify_18ea9bd2, EXIT 0, 105 sections, 44 gates, 0 failures, ARM golden OK,
+  every reference rebuilt from the plugin; verify_a35 had died in a container
+  restart). Later commits are docs only.
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
   closed (B12: a fresh plugin plays the key's own velocity, A23). The PRODUCT paths are the plugin's own: juno_gui_plugin_init (six voices, 960-sample start-up
