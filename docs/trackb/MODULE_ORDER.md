@@ -229,7 +229,7 @@ risk every gate in this project carries; it is bounded by the scenario set, and
 the scenario set is the thing to extend, not the verdict to soften.
 
 **Third: this proof is about `src/voice_render.c`, deliberately.** `deadstore.py`
-removes the `native/` shadow before building, because `native/voice_render.c`
+removes the `tools/trackb/native/` shadow before building, because `tools/trackb/native/voice_render.c`
 carries a 31-line header and its line numbers are offset from `src/`'s by 31.
 Mutating "line 974" of the file that really compiles would have corrupted a
 different statement than the one reported — a precise, confident, wrong answer.

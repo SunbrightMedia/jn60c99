@@ -42,7 +42,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 FW = os.path.join(REPO, "esp32s3", "main")
-HDR = os.path.join(REPO, "event", "juno_event.h")
+HDR = os.path.join(REPO, "engine_b", "event", "juno_event.h")
 
 # The engine entry points that MUST sit behind the queue. Extend this when a
 # new one appears; that is cheaper than rediscovering why a note vanished.

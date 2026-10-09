@@ -6,7 +6,7 @@
 > the GOAL FROM THE START"
 > "we obviously need B. but it has to be accurate to all hell"
 
-Correct, and the record agrees: `GOAL.md` has said "portable to a Teensy 4.1
+Correct, and the record agrees: `docs/GOAL.md` has said "portable to a Teensy 4.1
 later" since the beginning. Hardware was never a stretch goal. **"Ship the
 browser version and stop" is struck and is not to be offered again.**
 

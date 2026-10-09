@@ -84,14 +84,14 @@ set(APP_REQ esp_driver_i2s esp_driver_uart esp_driver_gpio driver esp_timer
             esp_hw_support esp_adc tinyusb)
 
 # O1: the internal event boundary. ONE small portable file, compiled into the
-# firmware exactly as the host gate compiles it (event/teeth.sh) -- a boundary
+# firmware exactly as the host gate compiles it (engine_b/event/teeth.sh) -- a boundary
 # proven on a workstation and a different boundary shipped is two boundaries.
-set(EVENT_SRCS ${CMAKE_CURRENT_LIST_DIR}/../../event/juno_event.c)
+set(EVENT_SRCS ${CMAKE_CURRENT_LIST_DIR}/../../engine_b/event/juno_event.c)
 
 idf_component_register(
     SRCS ${APP_SRC} ${EB_SRCS} ${RECALL_SRCS} ${EVENT_SRCS}
     INCLUDE_DIRS "." "../../engine_b" "../../engine_b/dev" "../../src"
-                 "../../event"
+                 "../../engine_b/event"
                  "../../tools/engineb/devboot" "../../tools/engineb/qemu"
     EMBED_FILES ${APP_EMBED}
     LDFRAGMENTS "linker.lf"

@@ -50,7 +50,7 @@ The table spans **[−6, 4]** — that span with about 1.8 of headroom each side
 Any argument outside it **falls back to the exact tail**. It is not clamped.
 Clamping would silently change the answer for a user preset the scenario set
 never reached, which is the "this byte is 0 in every factory patch" mistake
-`GOAL.md` forbids.
+`docs/GOAL.md` forbids.
 
 ## The size is measured
 

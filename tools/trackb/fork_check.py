@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """fork_check.py — has the sealed original moved out from under the fork?
 
-native/<x>.c starts as a verbatim copy of src/<x>.c and is then rewritten. src/
+tools/trackb/native/<x>.c starts as a verbatim copy of src/<x>.c and is then rewritten. src/
 stays a party to the bit-exact seal `make verify` proves against the plugin
-binary; native/ is the SUBJECT of the weaker sonic-identity claim. The moment
+binary; tools/trackb/native/ is the SUBJECT of the weaker sonic-identity claim. The moment
 someone fixes a real bug in src/voice_render.c, the fork silently stops
 containing that fix -- and the null A/B may not notice, because a fix that no
 null_ab scenario exercises produces no residual. That is a false green with a
@@ -16,7 +16,7 @@ header:
     *   forked from : src/voice_render.c
     *   at sha256   : <64 hex>
 
-This tool checks every native/*.c header against the current src/ file and fails
+This tool checks every tools/trackb/native/*.c header against the current src/ file and fails
 if they disagree. When they do, the fix is NOT to edit the SHA: re-read the
 upstream diff, port whatever it changed into the fork by hand, re-run the full
 acceptance gate (`null_ab.py --cand ... --all`), and only then record the new
@@ -40,9 +40,9 @@ def sha(path):
 
 def main():
     update = "--update" in sys.argv
-    forks = sorted(glob.glob(os.path.join(REPO, "native", "*.c")))
+    forks = sorted(glob.glob(os.path.join(REPO, "tools", "trackb", "native", "*.c")))
     if not forks:
-        print("no native/*.c -- nothing forked, nothing to check")
+        print("no tools/trackb/native/*.c -- nothing forked, nothing to check")
         return 0
     bad = 0
     for f in forks:

@@ -17,7 +17,7 @@ from the candidate build, per scenario, restricted to the lines the rewrite
 touches.
 
 USAGE
-    coverage_probe.py                    coverage of native/*.c, per scenario
+    coverage_probe.py                    coverage of tools/trackb/native/*.c, per scenario
     coverage_probe.py --lines A-B[,C-D]  require these line ranges to be covered
                                          (the range you actually rewrote); exits
                                          non-zero naming any scenario that misses
@@ -57,9 +57,9 @@ null_ab.render(lib, bank, patch, script)
 
 
 def build(dst_dir):
-    """Compile the candidate (native/*.c substituted) with coverage into dst_dir."""
+    """Compile the candidate (tools/trackb/native/*.c substituted) with coverage into dst_dir."""
     srcs = sorted(glob.glob(os.path.join(REPO, "src", "*.c")))
-    native = sorted(glob.glob(os.path.join(REPO, "native", "*.c")))
+    native = sorted(glob.glob(os.path.join(REPO, "tools", "trackb", "native", "*.c")))
     shadowed = {os.path.join(REPO, "src", os.path.basename(n)) for n in native}
     srcs = [s for s in srcs if s not in shadowed] + native
     srcs.append(os.path.join(REPO, "gui", "juno_bridge.c"))
@@ -131,9 +131,9 @@ def main():
     ranges = parse_ranges(argv[argv.index("--lines") + 1]) if "--lines" in argv else None
     json_out = argv[argv.index("--json") + 1] if "--json" in argv else None
 
-    native = sorted(glob.glob(os.path.join(REPO, "native", "*.c")))
+    native = sorted(glob.glob(os.path.join(REPO, "tools", "trackb", "native", "*.c")))
     if not native:
-        print("no native/*.c -- nothing under test (the candidate is the sealed "
+        print("no tools/trackb/native/*.c -- nothing under test (the candidate is the sealed "
               "engine itself, whose coverage is not the question)")
         return 0
     want = {os.path.basename(n) for n in native}

@@ -65,7 +65,7 @@ i.e. the host NOTE/VELOCITY LIFECYCLE, consistent with #124's framing.
   it — an engine-reachable recall gap for any preset with tap != 50.
 - **INFERRED:** record byte = 3056 (blob 3040, int1x7 raw&0x7F), anchored by
   validated neighbors 3057/3059/3060/3068. All 64 factory + 64 Chillwave
-  patches decode tap=50 (identity), so no factory render changes — but GOAL.md
+  patches decode tap=50 (identity), so no factory render changes — but docs/GOAL.md
   requires correct recall for ANY value. BS Solid is DELAY TYPE 0 → ruled out
   for the user bug.
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "JX-3P per-synth config (E4/S0 form). KNOWN values are filled; DERIVED-IN-S2 values are null until the oracle + IDA dump land, and must not be guessed. The JUNO's are in synth/juno60.json.",
+  "_comment": "JX-3P per-synth config (E4/S0 form). KNOWN values are filled; DERIVED-IN-S2 values are null until the oracle + IDA dump land, and must not be guessed. The JUNO's are in tools/engineb/synth/juno60.json.",
   "name": "jx3p",
   "truth_bank": "jx3p/truth/preset_bank_1.bin",
   "rates": [

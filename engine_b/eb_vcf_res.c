@@ -112,7 +112,7 @@ static float ebr_wrap24(float x)
  * argument outside it falls back
  * to the exact tail rather than being clamped -- clamping would silently
  * change the answer for a user preset the scenario set never reached, which
- * is the "this byte is 0 in every factory patch" mistake GOAL.md forbids.
+ * is the "this byte is 0 in every factory patch" mistake docs/GOAL.md forbids.
  *
  * THE TABLE IS PER VOICE. CONDITION scatter makes the ~20 coefficients below
  * voice-distinct, so one shared table would be wrong on seven voices out of

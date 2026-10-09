@@ -25,8 +25,8 @@ gui/crash.log
 presets/
 
 # Large raw memory dumps (compressed .gz kept as provenance)
-state_dump/*.bin
-state_dump/.dspreads.txt
+refs/state_dump/*.bin
+refs/state_dump/.dspreads.txt
 tests/validate_state
 
 # Full-plugin dump: keep the compressed reference in refs/, ignore the raw extract

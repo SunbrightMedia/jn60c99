@@ -45,7 +45,7 @@ static void zc_rep(void){ int i; FILE*f=fopen("/tmp/zc_probe.log","a"); if(!f)re
 
 /* ---------------------------------------------------- EB_ZEROCOEF (step 3)
  * DELETING COEFFICIENTS THAT ARE ZERO FOR EVERY PRESET, NOT MERELY EVERY
- * FACTORY PATCH. GOAL.md forbids the second and this is evidenced for the
+ * FACTORY PATCH. docs/GOAL.md forbids the second and this is evidenced for the
  * first: tools/engineb/zero_proof.c holds each of these at 0.0 through 64
  * factory patches, 31,744 single-parameter sweeps over the BINDINGS table,
  * 49,632 sweeps of every host RECORD parameter over its whole semantic range,

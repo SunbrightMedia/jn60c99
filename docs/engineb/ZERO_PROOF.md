@@ -6,7 +6,7 @@ PLAN_REALTIME.md item 2 records "audit found 39 candidates". The list itself
 was never written down, and the scan behind it (`/tmp/zeroscan.c`) read the
 FIRMWARE's coefficient blob -- ONE patch, across notes, gates and voices. One
 patch cannot separate a slot that is zero BY CONSTRUCTION from one that is
-zero because that patch does not use it, and GOAL.md forbids settling that
+zero because that patch does not use it, and docs/GOAL.md forbids settling that
 question with a bank measurement.
 
 ## The sweep, five stages, with a non-vacuity witness

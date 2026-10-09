@@ -180,7 +180,7 @@ void juno_event_reset(void);          /* clears the queue AND the counters */
  *
  * ⚠ THIS ARGUMENT IS INFERRED (READ from the ISA and the memory map), NOT
  * PROVEN BY EXECUTION. The host gate is single-threaded and CANNOT reach it,
- * so no tooth in event/teeth.sh covers it. What DOES watch it at runtime is
+ * so no tooth in engine_b/event/teeth.sh covers it. What DOES watch it at runtime is
  * the drain-side validity check: submit rejects an out-of-range kind or
  * source, so a drained event carrying one can only be a torn publish, and that
  * is counted and reported. A port on a chip with a write-back data cache

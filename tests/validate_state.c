@@ -1,6 +1,6 @@
 /* validate_state.c — per-stage validation against the live plugin's engine state.
  * Initialises our engine (chorus_init + engine_init + captured runtime coeffs) and
- * compares it to the memory-scanned plugin state (state_dump/), over the offsets the
+ * compares it to the memory-scanned plugin state (refs/state_dump/), over the offsets the
  * DSP actually reads. A "stable gap" (offset stable across t0/t1 but != our value)
  * is a real transcription/coefficient error; dynamic state (t0!=t1) is expected to
  * differ. Passes iff zero stable gaps.

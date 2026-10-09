@@ -18,7 +18,7 @@ TWO THINGS THIS GENERATOR MUST GET RIGHT, and both are load-bearing:
 2. THE PER-VOICE SCATTER IS TWELVE CELLS, NOT FIVE. The five the first design
    carried are the RECALL-time per-voice cells. The NOTE PATH writes seven
    more -- the full per-cell derivation notes live beside the values in
-   synth/juno60.json (E4/S0); are
+   tools/engineb/synth/juno60.json (E4/S0); are
    read back per voice by eb_render_coefs_build. With a shared tile every
    sounding voice takes the LAST note's pitch and velocity, and cell 320 --
    the ADSR gate, read every sample at engine_b/eb_render.c:484 -- is not
@@ -53,9 +53,9 @@ DATA = os.path.join(REPO, 'docs', 'engineb', 'data', 'devrecall')
 OUT = os.path.join(REPO, 'engine_b', 'dev')
 
 import json as _json
-_SYN = _json.load(open(os.path.join(REPO, 'synth',
+_SYN = _json.load(open(os.path.join(REPO, 'tools', 'engineb', 'synth',
                                     os.environ.get('SYNTH', 'juno60') + '.json')))
-VOICE_STRIDE = _SYN['voice_stride']   # per-synth (E4/S0): synth/<name>.json
+VOICE_STRIDE = _SYN['voice_stride']   # per-synth (E4/S0): tools/engineb/synth/<name>.json
 VOICE_LO = _SYN['voice_lo']
 VOICE_HI = _SYN['voice_hi']
 VTILE = _SYN['vtile']

@@ -15,7 +15,7 @@
 #      even need to be held -- the state exists as soon as the plugin initialised).
 #   2. IDA attached to the host (Local Windows debugger).
 #   3. File -> Script file... -> dump_full_state.py
-#   4. It suspends, scans, finds the state, dumps state_dump/. Zip & upload.
+#   4. It suspends, scans, finds the state, dumps refs/state_dump/. Zip & upload.
 
 import os, struct
 import idc, ida_dbg
@@ -132,7 +132,7 @@ def main():
         fh.write("state_base=0x%X\nsize=0x%X\nsample_rate_bits=0x%08X\n"
                  % (base, DUMP_SIZE, sr or 0))
         fh.write("# fill in: patch name, chorus mode, MIDI note (if any)\n")
-    log("DONE. Zip state_dump/ and upload it.")
+    log("DONE. Zip refs/state_dump/ and upload it.")
 
 if __name__ == "__main__":
     main()

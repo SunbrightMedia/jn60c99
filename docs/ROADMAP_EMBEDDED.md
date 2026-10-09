@@ -89,8 +89,8 @@ Nothing below invalidates any of this. The port itself is the product:
   bare-metal Cortex-M7 compile (373 KB), libm parity proven (expf glibc==newlib
   over 32,000,423 inputs), 32-bit pointer bug found & fixed, stack 584 B.
 - **Working webapp** (WASM==native gate), **Daisy firmware that builds and
-  links** (`daisy/`, self-playing, E1–E5 instrumentation), Teensy firmware
-  written (`teensy/`, never compiled against Teensyduino).
+  links** (`archive/daisy/`, self-playing, E1–E5 instrumentation), Teensy firmware
+  written (`archive/teensy/`, never compiled against Teensyduino).
 - **Memory truth:** a voice = 10,512 B + 164 B shared noise. 8 voices = 86 KB.
   Full-FX hot set ≈ 1.14 MB inside a 10.5 MB span (delay lines at 2.2/4.3/6.4 MB
   offsets, reverb ~10.7 MB). Chorus lives entirely in the low ~102 KB block
@@ -187,16 +187,16 @@ the JU-06A Roland sells today is 4-voice.
 6. ✅ CLAUDE.md truth-up (done with this document).
 
 Also landed alongside P0: `make juno_cand.so` — the Track B candidate engine,
-where `native/<x>.c` replaces `src/<x>.c` by filename. With `native/` empty it
+where `tools/trackb/native/<x>.c` replaces `src/<x>.c` by filename. With `tools/trackb/native/` empty it
 is a byte-identical twin of the sealed engine and `tools/trackb/null_ab.py
 --cand` reports **EXACTLY 0** on all five scenarios, which is the comparator's
 own passthrough proof.
 
 ### P1 — MEASURE (needs the ~$41 board; one afternoon)
-Flash `daisy/` (bootloader ≥v6.0 first: `make program-boot`). Read three things:
+Flash `archive/daisy/` (bootloader ≥v6.0 first: `make program-boot`). Read three things:
 - **E1:** golden corpus on silicon. 8/8 = the engine is bit-exact on the
   target. (Everything pre-verified off-device; failure checklist is in
-  `daisy/README.md` — do not tune anything.)
+  `archive/daisy/README.md` — do not tune anything.)
 - **E2:** DWT cycles at 0/1/2/4/8 voices → **V** (cycles/voice) and **F**
   (floor: master+triangle+overhead). These two numbers replace every estimate
   in this repo.

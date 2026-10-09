@@ -2,7 +2,7 @@
  * on x86-64. Purpose: an apples-to-apples x86 cycles/sample number to divide the
  * SILICON M7 number by, plus a callgrind-countable dynamic instruction stream.
  *
- * Driving copied verbatim from daisy/juno60_daisy.cpp measure_cost():
+ * Driving copied verbatim from archive/daisy/juno60_daisy.cpp measure_cost():
  *   patch = tg_scenarios[0], rate 44100, warmup 1 s, half a second per point,
  *   BLOCK = 48, voice counts 0/1/2/4/8, notes 36 + 5v vel 100.
  */

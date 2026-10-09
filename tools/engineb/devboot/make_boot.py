@@ -115,10 +115,10 @@ def main():
                          'The firmware carries a compile-time assert on '
                          'DEVCRC_RC_SZ that catches exactly this.')
     ap.add_argument('--no-copy', action='store_true')
-    _syn = __import__('json').load(open(os.path.join(REPO, 'synth',
+    _syn = __import__('json').load(open(os.path.join(REPO, 'tools', 'engineb', 'synth',
                     os.environ.get('SYNTH', 'juno60') + '.json')))
     ap.add_argument('--bank', default=os.path.join(REPO, _syn['truth_bank']),
-                    help='preset bank (default: from synth/<name>.json)')
+                    help='preset bank (default: from tools/engineb/synth/<name>.json)')
     a = ap.parse_args()
     os.makedirs(BUILD, exist_ok=True)
     bank = a.bank

@@ -17,14 +17,14 @@ runtime-scratch cells that the plugin's prepareToPlay/activate stage sets AFTER
 the constructor snapshot the Unicorn reference captures. Those are classified and
 proven inert/correct here, not swept under the rug:
   - never read by the render (voice_render/master_render)   -> audio-inert, OR
-  - equal to the LIVE plugin state dump (state_dump/state_t0.bin) -> the port is
+  - equal to the LIVE plugin state dump (refs/state_dump/state_t0.bin) -> the port is
     right and the reference snapshot is merely pre-activation.
 
 Inputs (all plugin-derived; two-process rule respected -- pure pickle here):
   scratchpad/plugin_recall_ref.pkl   plugin build+recall reference (Unicorn)
   scratchpad/port_state.pkl          port cold post-recall state (libjuno)
   scratchpad/index_cell_map.pkl      plugin dispatch index -> cells (Unicorn)
-  state_dump/state_t0.bin(.gz)       live plugin engine state (for classification)
+  refs/state_dump/state_t0.bin(.gz)       live plugin engine state (for classification)
 
 NEVER reads user_patch5_ableton.json or captured_coeffs.json.
 """

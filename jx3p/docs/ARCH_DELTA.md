@@ -13,7 +13,7 @@ genuinely DIFFERENT, so S3 transcription meets no surprises.
 
 Consequence for the port: the JX voice has a second oscillator and a cross-mod
 path the JUNO never had. Expect `CDSPJx3pOscVoice` to render two DCOs, and the
-voice STATE to be larger than the JUNO's — the `voice_stride` in synth/jx3p.json
+voice STATE to be larger than the JUNO's — the `voice_stride` in tools/engineb/synth/jx3p.json
 stays null until the IDA dump gives the real number. **Do not copy the JUNO
 stride.**
 

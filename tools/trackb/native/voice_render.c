@@ -1,7 +1,7 @@
-/* native/voice_render.c — TRACK B fork of src/voice_render.c.
+/* tools/trackb/native/voice_render.c — TRACK B fork of src/voice_render.c.
  *
  * WHAT THIS FILE IS. `make juno_cand.so` builds the engine with every
- * native/<x>.c substituted for src/<x>.c of the same name. This file starts as a
+ * tools/trackb/native/<x>.c substituted for src/<x>.c of the same name. This file starts as a
  * VERBATIM copy of the sealed transcription and is then rewritten subsystem by
  * subsystem into native code, with tools/trackb/null_ab.py run after every step:
  *
@@ -15,7 +15,7 @@
  * seal: `make verify` proves it byte-identical to the plugin's own render under
  * Unicorn. That proof must stay intact and untouched. This file is the SUBJECT
  * of a different, weaker claim -- sonic identity at <= -90 dB residual -- and the
- * two must never be confused. src/ stays the reference; native/ is measured
+ * two must never be confused. src/ stays the reference; tools/trackb/native/ is measured
  * against it.
  *
  * FORK PROVENANCE (checked by tools/trackb/fork_check.py, which fails if the

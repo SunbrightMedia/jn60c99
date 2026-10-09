@@ -4,7 +4,7 @@
 #
 # The plants are applied to a COPY of the tree (a cheap one: three files), and
 # the checker is pointed at it by REPO override. Nothing under esp32s3/main or
-# event/ is edited.
+# engine_b/event/ is edited.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(dirname "$(dirname "$HERE")")
@@ -51,7 +51,7 @@ tooth 2 esp32s3/main/s3_usbmidi.c \
     'a parser that reaches input and never submits'
 
 # 3. the boundary header growing an instrument constant.
-tooth 3 event/juno_event.h \
+tooth 3 engine_b/event/juno_event.h \
     's/^#define JUNO_EVENT_H$/#define JUNO_EVENT_H\n#define JUNO_VCF_CUTOFF_PARAM 12/' \
     'a JUNO parameter added to the portable header'
 

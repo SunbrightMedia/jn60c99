@@ -21,7 +21,7 @@
 #   in neither, that an in-scope JUNO-60 effect owns, is a GAP; SYSTEM-8
 #   params (OSC2, mod matrix, the PROGRAMMABLE PAT2_MFX — distinct from
 #   EFFECT TYPE 5's fixed chorus that effect_modes.c handles) + GUI + seq
-#   are INERT (out of JUNO-60 scope, GOAL.md).
+#   are INERT (out of JUNO-60 scope, docs/GOAL.md).
 # REMAINING HONESTY CAVEATS: (a) the PAT2_MFX=SYSTEM-8 scope call is the one
 #   judgment the engine oracle can't fully self-verify -> confirm via the
 #   controller path (Pillar 2); (b) the EFFECT/DELAY TYPE router GAP rows

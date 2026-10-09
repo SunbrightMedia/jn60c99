@@ -83,5 +83,5 @@ Why this and nothing else first:
 ## 5. Standing blockers
 
 - **M1b (noise SVF) is behind a blind gate.** 15 of 18 assignments unobservable by the current scenario set (canary, MEASURED). No rewrite permitted until scenarios reach it.
-- **FMA is forbidden in `src/`** and permitted only in `native/`. Any cycle count that assumes `vfma.f32` is a Track-B-only number and must never be quoted as a `src/` figure.
+- **FMA is forbidden in `src/`** and permitted only in `tools/trackb/native/`. Any cycle count that assumes `vfma.f32` is a Track-B-only number and must never be quoted as a `src/` figure.
 - **`src/` stays frozen and bit-exact.** Every reduction in §1 except #1, #5, #6 breaks bit-exactness and belongs to the sonic-identity claim, not the bit-exact one. The two must never be conflated in a report.

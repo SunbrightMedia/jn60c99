@@ -64,7 +64,7 @@ time reads deeper. Before any ring is shortened in shipping code, the bound
 must come from the **parameter maximum**, derived by executing the recall
 setter over all 256 byte values, the way every other law in this project is
 derived. Sizing from a scenario maximum is exactly the "this byte is 0 in
-every factory patch" mistake `GOAL.md` forbids.
+every factory patch" mistake `docs/GOAL.md` forbids.
 
 The number above is enough to decide that row 1 is worth building. It is not
 enough to choose the shipping ring lengths.

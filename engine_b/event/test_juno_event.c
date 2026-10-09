@@ -197,7 +197,7 @@ int main(void)
     return fails ? 1 : 0;
 }
 
-/* THE TEETH (event/teeth.sh runs them; each must be CAUGHT)
+/* THE TEETH (engine_b/event/teeth.sh runs them; each must be CAUGHT)
  *   1  drain ignores `max`                       -> check 3 goes red
  *   2  full queue overwrites instead of refusing -> check 4 goes red
  *   3  the source tag is not stored              -> check 2 goes red

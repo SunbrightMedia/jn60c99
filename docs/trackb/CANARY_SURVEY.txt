@@ -304,6 +304,6 @@ THE FOUR RESIDUALS, CLASSIFIED WITH EVIDENCE (none are "closed")
   column.
 
 NON-REGRESSION
-  `null_ab.py --cand juno_cand.so` (native/voice_render.c = verbatim fork):
+  `null_ab.py --cand juno_cand.so` (tools/trackb/native/voice_render.c = verbatim fork):
   9/9 PASS, residual EXACTLY 0 on every scenario including the new one
   (sig -13.1 dBFS, the loudest scenario in the set -- non-vacuous).

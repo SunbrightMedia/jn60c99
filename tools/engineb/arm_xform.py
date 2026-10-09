@@ -54,12 +54,12 @@ RINGS = [(6429408, 6429412, 6396640)]
 # the PREVIOUS ring's data, so the index cell of a ring is nowhere near its own
 # base -- read the write expression to pair them, never the addresses.
 # THE RING TABLES ARE THE SYNTH'S, NOT THE TOOL'S (E4/S0). They are read from
-# synth/<name>.json -- the per-synth input this tool consumes. The JUNO tables
-# that used to sit here verbatim now live in synth/juno60.json, and the move is
+# tools/engineb/synth/<name>.json -- the per-synth input this tool consumes. The JUNO tables
+# that used to sit here verbatim now live in tools/engineb/synth/juno60.json, and the move is
 # verified by the regenerated modules not changing by a byte. A new synth
 # supplies its own file and this tool changes not at all (SYNTH=<name> env).
 import json as _json
-_SYN = _json.load(open(os.path.join(REPO, 'synth',
+_SYN = _json.load(open(os.path.join(REPO, 'tools', 'engineb', 'synth',
                                     os.environ.get('SYNTH', 'juno60') + '.json')))
 def _rings(k):
     return [tuple(t) for t in _SYN['rings'].get(k, [])]

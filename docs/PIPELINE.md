@@ -139,7 +139,7 @@ numbers; a budget for work that cannot fit (playbook 63).
 
 The invariant: **audio never breaks, for any input; changes may land late.**
 
-* O1 — one event boundary (`event/juno_event.h`, synth-agnostic by audit).
+* O1 — one event boundary (`engine_b/event/juno_event.h`, synth-agnostic by audit).
   Inside the box nothing speaks MIDI.
 * O2 — chunk the recall burst behind a shadow/publish contract: `step()`
   returns 0 to ASK, advances only on `published()`. Three state machines

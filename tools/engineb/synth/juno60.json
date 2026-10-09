@@ -1,5 +1,5 @@
 {
-  "_comment": "PER-SYNTH CONFIG (E4/E5). Every number an item-7 tool needs about THIS synth lives here, not in the tool. The JX-3P gets synth/jx3p.json with its own values; the tools change not at all. Provenance of each value: derived in this repo, cited beside it.",
+  "_comment": "PER-SYNTH CONFIG (E4/E5). Every number an item-7 tool needs about THIS synth lives here, not in the tool. The JX-3P gets tools/engineb/synth/jx3p.json with its own values; the tools change not at all. Provenance of each value: derived in this repo, cited beside it.",
   "name": "juno60",
   "truth_bank": "truth/presetbankog1.bin",
   "rates": [44100, 48000, 96000],

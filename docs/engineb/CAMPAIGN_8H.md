@@ -43,7 +43,7 @@ LOG (appended as work completes):
 
 A general scanner (/tmp/zeroscan.c) found 60+ float coefficient slots that are
 0.0 in all 128 factory (note,gate,voice) sets, across modcv, vcf_cv, vca, dco,
-lfo, glide and others. THEY MUST NOT BE BLINDLY DELETED. GOAL.md is binding:
+lfo, glide and others. THEY MUST NOT BE BLINDLY DELETED. docs/GOAL.md is binding:
 "this byte is 0 in every factory patch is not an excuse to skip it" -- recall
 must be correct for ANY preset. A factory-bank zero is only deletable if it is
 STRUCTURALLY zero (zero for every possible preset by construction, like the

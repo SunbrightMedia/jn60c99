@@ -122,10 +122,10 @@ def parse_store(path, lineno):
 
 
 def _strip_native(tmp):
-    """Remove the native/ shadow so src/<file> is what actually compiles.
+    """Remove the tools/trackb/native/ shadow so src/<file> is what actually compiles.
 
     THIS IS LOAD-BEARING. null_ab.build() reproduces `make juno_cand.so`, in
-    which native/voice_render.c SHADOWS src/voice_render.c. That fork is
+    which tools/trackb/native/voice_render.c SHADOWS src/voice_render.c. That fork is
     functionally identical today but is not textually identical -- it carries a
     31-line header, so its line numbers are offset from src/'s by 31. Mutating
     "line 974" of the file that really compiles would therefore corrupt a

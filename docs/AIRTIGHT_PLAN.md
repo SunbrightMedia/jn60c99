@@ -1,7 +1,7 @@
-# AIRTIGHT_PLAN.md — the binding verification charter (user mandate, 2026-07-21)
+# docs/AIRTIGHT_PLAN.md — the binding verification charter (user mandate, 2026-07-21)
 
 **This document supersedes every previous notion of "done" in this project.**
-Read it with GOAL.md before doing ANY work. CLAUDE.md points here. The mandate,
+Read it with docs/GOAL.md before doing ANY work. CLAUDE.md points here. The mandate,
 in the user's words: bugs must be **structurally impossible**; the project is
 finished **for good** only when the standard below is met. No stage may be
 reported "done" on any weaker standard.
@@ -271,7 +271,7 @@ residual would be a named, bounded, visible-red item — never a silent green.
     - **Only DELAY had non-default factory values (18 patches) — DONE (B1).** Every
       other fine-FX (chorus/reverb/flanger) is DEFAULT in all 64 factory patches,
       so wiring them changes ZERO factory renders (proven: chorus/reverb probes
-      diffs=0 at default). They are required for ANY-preset correctness (GOAL.md)
+      diffs=0 at default). They are required for ANY-preset correctness (docs/GOAL.md)
       but are NOT the #124 bounce darkness. The Stage-2 "fine-FX cause the
       darkness" hypothesis is DISPROVEN except for delay.
     - **Engine-dispatchable & render-READ (wire like delay, airtight via engine

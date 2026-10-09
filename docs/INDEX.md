@@ -211,7 +211,7 @@ gui/skin/README.md — the plugin's own GUI on the port, from its Script.xml and
 gui/win/README.md — JUNO-60.exe, the port and that panel as one Windows program: build (tools/dist/make_native.py, local only), what each part stands for in the plugin, its test modes and gates (tools/dist/native_check.py; CLAIMS C6).
 tb303/docs/S3_STATUS.md — TB-303 intake + executed cost recon (not a port yet; the harness must be rebuilt).
 jp8/docs/ — the JUPITER-8 port's own docs; S3_STATUS.md rules its state (read its RESUME HERE block; drive2 = the plugin's own construction; lift gates on drive2; SHIPPING_DESIGN.md = the engine design + the skeptic's 12 items; SWEEP_44100_DRIVE2.md the drive2 listen sweep); abi_ledger.md is its entry-point ledger; PORT_LESSONS.md the traps the JP8 added (LIVING); SWEEP_44100.md the 64-patch listen sweep record (REFERENCE, one row per patch, log per row).
-docs is indexed; AIRTIGHT_PLAN.md, GOAL.md, END_GOAL.md, FINAL_GUIDE.md,
+docs is indexed; docs/AIRTIGHT_PLAN.md, docs/GOAL.md, END_GOAL.md, FINAL_GUIDE.md,
 COVERAGE.tsv, PROVENANCE.tsv live at repo root and outrank this index.
 
 ## Fresh-eyes test (phase 6, 2026-09-02) — PASSED

@@ -106,7 +106,7 @@ treat Track B as a per-synth upgrade you buy deliberately, not the default.**
 ```
 ssx-common/                  # extracted from this repo, synth-agnostic
   oracle/                    # e2e_emu + differential gates + fuzz + ledger linter
-  daisy/                     # bring-up, memory map, FTZ, golden runner, profiler
+  archive/daisy/                     # bring-up, memory map, FTZ, golden runner, profiler
   toleranceab/               # Track B comparator (|err| < eps + module ledger)
 juno60/  config.h + src/     # the 16 anchors + the transcribed DSP
 jx3p/    config.h + src/     # ditto
@@ -119,7 +119,7 @@ anchors (hours), the DSP transcription (the real work), and two measurements.
 
 1. Find the 16 anchors → oracle runs → recall gates green.
 2. Transcribe the DSP → render A/B bit-exact. *(the long pole)*
-3. Drop in `daisy/` → run the golden corpus on device → profile → apply the
+3. Drop in `archive/daisy/` → run the golden corpus on device → profile → apply the
    safe-cut ledger → ship 4–6 voices bit-exact.
 4. Only if that specific instrument demands 8 voices, open Track B with the
    tolerance harness.

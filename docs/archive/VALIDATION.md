@@ -4,7 +4,7 @@
 
 The handoff's definition of "correct" is agreement with the actual plugin, not an
 RMS score. We now have that: a full memory‑scanned snapshot of the live plugin's
-engine state (`state_dump/`, preset *PD The Juno Pad*, chorus II, **96 kHz**),
+engine state (`refs/state_dump/`, preset *PD The Juno Pad*, chorus II, **96 kHz**),
 used as ground truth.
 
 ## Method
@@ -53,5 +53,5 @@ coefficients, all nonzero — now in `src/runtime_coeffs_data.c`.
 ```
 make validate
 ```
-(Decompresses `state_dump/state_t0.bin.gz`/`t1`, builds `tests/validate_state.c`,
+(Decompresses `refs/state_dump/state_t0.bin.gz`/`t1`, builds `tests/validate_state.c`,
 runs the comparison.)

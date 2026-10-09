@@ -2,7 +2,7 @@
  *
  * A coefficient that is always 0.0 costs a load and a multiply-add on every
  * sample of every voice, and deleting it is free. The catch is the standard
- * GOAL.md forbids taking the easy road on: "this byte is 0 in every factory
+ * docs/GOAL.md forbids taking the easy road on: "this byte is 0 in every factory
  * patch is not an excuse to skip it" -- recall must be correct for ANY
  * preset. So a bank measurement is a NECESSARY condition and nothing more.
  *

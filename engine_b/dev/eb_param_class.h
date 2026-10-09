@@ -25,7 +25,7 @@
  *
  * ⚠ ITEM-7. `rec` is a RECORD OFFSET, which is this synth's business; the
  * INDEX into this table is the portable `param_id` the event API carries
- * (event/juno_event.h: "param_id is an INDEX INTO A PER-SYNTH TABLE, never a
+ * (engine_b/event/juno_event.h: "param_id is an INDEX INTO A PER-SYNTH TABLE, never a
  * JUNO constant"). A port swaps this file and keeps everything else.
  */
 #ifndef EB_PARAM_CLASS_H

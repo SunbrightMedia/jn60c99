@@ -28,7 +28,7 @@ run() {
 }
 
 # O1's boundary -- O2 lives behind it, so a break here invalidates O2's inputs.
-run "O1 event queue (7 teeth)"   sh   "$HERE/../../event/teeth.sh"
+run "O1 event queue (7 teeth)"   sh   "$HERE/../../engine_b/event/teeth.sh"
 run "O1 boundary   (3 teeth)"    sh   "$HERE/boundary_teeth.sh"
 # O2 proper.
 run "O2 chunk+split (11 teeth)"  sh   "$HERE/chunk_teeth.sh"

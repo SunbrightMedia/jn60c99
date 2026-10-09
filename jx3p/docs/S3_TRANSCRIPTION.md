@@ -53,7 +53,7 @@ against a JX oracle. The oracle (S2's execution half) is therefore the next
 build, not the transcription itself:
 
 1. **JX oracle harness** — port tools/verify/e2e_emu.py to JX. Entry points
-   resolved so far (synth/jx3p.json `entries`): DISPATCH, proc vtable, both
+   resolved so far (tools/engineb/synth/jx3p.json `entries`): DISPATCH, proc vtable, both
    render wrappers + drivers, the 8 voice variants, master render. Still to
    resolve (construction/host path, largely OUTSIDE the DSP band — may need a
    targeted follow-up): BUILD, NOTEON/NOTEOFF, SETSR, the assigner notify, and

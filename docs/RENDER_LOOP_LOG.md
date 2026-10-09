@@ -136,7 +136,7 @@ out-of-range value is `OCTAVE SHIFT` (disp 836, declared range **[-3,3]**,
 i.e. SIGNED) decoding to **254** on Chillwave patch 53 — 254 is −2 as a signed
 byte. Our decode returns unsigned 0..255, so signed-range leaves are mis-fed.
 BS Solid's OCTAVE SHIFT is 0 (identity), so this does not explain the user's
-report, but GOAL.md requires correct recall for ANY value → fix owed.
+report, but docs/GOAL.md requires correct recall for ANY value → fix owed.
 
 **The port's hand-written BINDINGS table — AUDITED CLEAN.**
 `probes/render_loop/bindings_audit.py` cross-checks every row of
@@ -352,7 +352,7 @@ Two REAL defects were nonetheless found and dealt with while executing the scope
 2. **DELAY TAP TIME (1178) — documented, not wired.** DELAY-TYPE-1-gated, writes
    cell 4297792 = `f32(trunc(255*byte/100)/255)`; the port freezes tap=50. Every
    patch in both known banks decodes tap=50, so it is identity today, but
-   GOAL.md requires correctness for ANY value. Tracked; BS Solid is TYPE 0 so it
+   docs/GOAL.md requires correctness for ANY value. Tracked; BS Solid is TYPE 0 so it
    is not a factor here.
 
 ## STEP 5 — Freeze the blind-spot closure — **DONE**

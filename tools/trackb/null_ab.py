@@ -472,7 +472,7 @@ def gate_fuzz(ref_lib, cand_lib, bank, nseeds, verbose=False):
 def _mut_target(tmp, name):
     """Path of the file that will ACTUALLY be compiled for src/<name>.
 
-    If native/<name> shadows it, the mutation has to go there -- otherwise the
+    If tools/trackb/native/<name> shadows it, the mutation has to go there -- otherwise the
     battery patches a file the candidate build never sees, every mutant comes out
     identical to the reference, and --teeth reports the gate as blind when in
     fact the experiment never happened. Mutating the compiled file also means the
@@ -483,14 +483,14 @@ def _mut_target(tmp, name):
 
 
 def build(dst, mutate=None):
-    """Build a candidate .so the way `make juno_cand.so` does (native/ shadows
+    """Build a candidate .so the way `make juno_cand.so` does (tools/trackb/native/ shadows
     src/ by filename), optionally with a named mutation applied to whichever
     copy of the file is really compiled."""
     tmp = tempfile.mkdtemp(prefix="trackb_")
     for d in ("src", "gui"):
         shutil.copytree(os.path.join(REPO, d), os.path.join(tmp, d))
-    if os.path.isdir(os.path.join(REPO, "native")):
-        shutil.copytree(os.path.join(REPO, "native"), os.path.join(tmp, "native"))
+    if os.path.isdir(os.path.join(REPO, "tools", "trackb", "native")):
+        shutil.copytree(os.path.join(REPO, "tools", "trackb", "native"), os.path.join(tmp, "native"))
     if callable(mutate):
         # Programmatic mutation (tools/trackb/deadstore.py). Receives the temp
         # tree root and must edit whichever file _mut_target() resolves to; it is

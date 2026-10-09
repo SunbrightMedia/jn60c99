@@ -24,7 +24,7 @@ It explains **E3**, which the data hypothesis strains to explain:
 * It also explains E3's unreconciled 3× absolute discrepancy (287k vs 93k) — a
   measurement whose code is being re-fetched in a different cache state.
 
-`daisy/juno60_daisy.cpp` is `APP_TYPE = BOOT_QSPI`, so the firmware **executes
+`archive/daisy/juno60_daisy.cpp` is `APP_TYPE = BOOT_QSPI`, so the firmware **executes
 from external QSPI flash**. This has been true for every number we have.
 
 ## Why it matters more than either verdict

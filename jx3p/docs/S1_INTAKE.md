@@ -85,7 +85,7 @@ different data in the same container, not a renamed copy.
 
 The JX bank is exactly 1,294,295 bytes = `23 + 20223 * 64` — the JUNO's header,
 stride and patch count to the byte — and its names decode with the JUNO's own
-`juno_bank_patch_name`. So the bank-geometry half of `synth/jx3p.json` is
+`juno_bank_patch_name`. So the bank-geometry half of `tools/engineb/synth/jx3p.json` is
 already known: header 23, stride 20223, 64 patches. The per-patch BYTE LAYOUT
 (which offset is DELAY TYPE, etc.) is NOT assumed from this — it is derived in
 S2 by perturb-and-diff, because a shared container can still reorder fields.

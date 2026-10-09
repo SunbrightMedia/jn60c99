@@ -56,14 +56,19 @@ needed). Engine-B gates: `tools/engineb/` (`o2_gates.sh`, `o3_gates.sh`, …).
 |---|---|
 | `truth/` | The plugin + Script.xml + factory bank, checksummed. Paths ONLY via `tools/verify/truth.py` |
 | `src/` | The FROZEN bit-exact port (C99). Do not touch except through a gate |
-| `tools/verify/` | The canonical gates + the Unicorn oracle (`e2e_emu.py`) |
-| `engine_b/` | The restructured fast engine (trunk = bit-exact; fork = S3 flags) |
-| `esp32s3/`, `daisy/`, `teensy/` | Device firmware (S3 is the live target) |
-| `gui/` | Web app (WASM) + Tk test GUI |
-| `docs/` | All findings — start at `docs/INDEX.md` |
+| `tests/` | The unit battery (`make test`) |
+| `tools/` | The gates and the Unicorn oracle (`tools/verify/`), the one-command reproduction (`tools/repro/`), the engine B tools and the per-synth configs (`tools/engineb/`, `tools/engineb/synth/`), the parked Track B and its native kernels (`tools/trackb/`) |
 | `probes/` | Executed evidence per investigation (each dir has a README) |
-| `jx3p/` | The second port — proof the method repeats |
-| `refs/` | The decompile archive (provenance for READ claims) |
+| `gui/` | The web app (WASM), the plugin's own skin, the JUNO-60.exe sources, the Tk test GUI |
+| `engine_b/` | The fast engine (trunk = bit-exact; fork = S3 flags) and its input boundary (`engine_b/event/`) |
+| `esp32s3/` | ESP32-S3 firmware (the live device target) and its images |
+| `pi/` | The bare-metal Raspberry Pi build (Circle submodule) |
+| `jx3p/`, `jp8/`, `tb303/` | The next synths' ports -- proof the method repeats |
+| `refs/` | The decompile archive (provenance for READ claims) and a June live-plugin memory dump (`refs/state_dump/`, diagnostic only) |
+| `archive/` | Retired device targets: the Daisy Seed and Teensy builds (history) |
+| `docs/` | All findings -- start at `docs/INDEX.md`; the user's older charters `docs/GOAL.md`, `docs/AIRTIGHT_PLAN.md` |
+| `bench/` | The job registry (`tools/run_job.sh`, `tools/status.sh`) |
+| root files | `CLAUDE.md` (agent rules), `END_GOAL.md` (the goal), `FINAL_GUIDE.md` (the status page), `PROVENANCE.tsv` + `COVERAGE.tsv` (the proof ledgers the gates read), `Makefile`, `juno.dll` (the prebuilt Windows library the GUIs load), `package.json` + `package-lock.json` (the Node packages of the browser checks) |
 
 Agent rules, hard covenants (captures are forbidden), and the live state all
 live in [`CLAUDE.md`](CLAUDE.md).

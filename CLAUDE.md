@@ -98,18 +98,25 @@ mine is a hypothesis (playbook 80).
 - `src/` — the FROZEN bit-exact port. Transcribed DSP + derived recall.
   `make verify` is its finish line and is green.
 - `engine_b/` — the trunk (bit-exact, null EXACTLY 0, all 64 patches) and the
-  S3 fork (build flags; sonic gate). Trunk never approximates.
+  S3 fork (build flags; sonic gate). Trunk never approximates. Its input
+  boundary (the event queue) is `engine_b/event/`.
 - `esp32s3/` — device firmware. Playable now: console keyboard, b/n patch
   step, 2 voices+FX real time (un=0, gap=block period). MIDI: UART GPIO 18
   proven path; USB MIDI does not enumerate yet (core alive, GSNPSID OK).
 - `tools/verify/` — canonical gates. `tools/engineb/` — fork gates + device
-  recall. `truth.py`, `e2e_emu.py` (oracle), `recall_gate.py`,
+  recall (per-synth configs in `tools/engineb/synth/`). `tools/repro/` — the
+  one-command reproduction. `tools/trackb/` — the parked Track B (its native
+  kernels in `tools/trackb/native/`). `truth.py`, `e2e_emu.py` (oracle), `recall_gate.py`,
   `recall_render_ab.py` (arp set now DERIVED per bank via `juno_bank_arp` —
   never hardcode data properties), `userbank_parity.py`, `approx_audit.py`.
 - `jx3p/`, `jp8/`, `tb303/` — the next-synth ports, each with `truth/`
   (checksummed), `tools/`, `docs/S3_STATUS.md` (its only status page).
   `pi/` — the bare-metal Raspberry Pi track (Circle). `docs/hardware/` —
   boards, BOM, ordering, the user's board snapshots.
+- `refs/` — the decompile archive and a June live-plugin memory dump
+  (`refs/state_dump/`, diagnostic only). `archive/` — retired device targets
+  (Daisy Seed, Teensy). `bench/` — the job registry. README.md lists every
+  root entry and why it is there.
 - Costs/levers/history: `docs/` + `docs/engineb/data/` — cite, do not restate.
 
 # LIVE STATE (update in place, no dated blocks here, EVER; detail lives in

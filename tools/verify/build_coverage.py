@@ -184,7 +184,7 @@ for disp in sorted(cellmap):
         # Not in the proven recall set, writes no port cell, not an FX-controller
         # param. Remaining leaves are non-audio for the JUNO-60 scope:
         # SYSTEM-8 plug-out params (2nd oscillator, cross-mod/ring/sync, mod
-        # matrix, selectable LFO wave / filter type — GOAL.md: JUNO-60 mode, a
+        # matrix, selectable LFO wave / filter type — docs/GOAL.md: JUNO-60 mode, a
         # documented non-goal) + GUI/editor state ('vs'/'ks') + sequencer/chord
         # performance features + reserve/system. All wrote NO render-read cell in
         # 12 contexts including full pre-activation (leaf_cellmap_activated.py).
@@ -234,7 +234,7 @@ with open(OUT, 'w') as f:
     f.write("#   in neither, that an in-scope JUNO-60 effect owns, is a GAP; SYSTEM-8\n")
     f.write("#   params (OSC2, mod matrix, the PROGRAMMABLE PAT2_MFX — distinct from\n")
     f.write("#   EFFECT TYPE 5's fixed chorus that effect_modes.c handles) + GUI + seq\n")
-    f.write("#   are INERT (out of JUNO-60 scope, GOAL.md).\n")
+    f.write("#   are INERT (out of JUNO-60 scope, docs/GOAL.md).\n")
     f.write("# REMAINING HONESTY CAVEATS: (a) the PAT2_MFX=SYSTEM-8 scope call is the one\n")
     f.write("#   judgment the engine oracle can't fully self-verify -> confirm via the\n")
     f.write("#   controller path (Pillar 2); (b) the EFFECT/DELAY TYPE router GAP rows\n")

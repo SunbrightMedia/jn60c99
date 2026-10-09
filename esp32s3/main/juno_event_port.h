@@ -1,4 +1,4 @@
-/* juno_event_port.h -- the ESP32-S3's settings for event/juno_event.h.
+/* juno_event_port.h -- the ESP32-S3's settings for engine_b/event/juno_event.h.
  *
  * The boundary is portable; the LOCK is not. This file is the whole of what
  * the S3 has to say about it, and it is deliberately tiny -- if a port needs

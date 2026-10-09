@@ -5,7 +5,7 @@
 > * "the processor's IComponent::setState is a bare-ret no-op" — false; the real
 >   `IComponent::setState` is 0x34aaa0 and is a full IBStream implementation.
 > * "process() spins in the thread-pool drain loop" — false; `process()` = 0x34A380
->   does the whole event/parameter intake on the calling thread and never calls
+>   does the whole engine_b/event/parameter intake on the calling thread and never calls
 >   0x3C7400. The pool is only under the DSP render.
 >
 > Also superseded: the "Consequence for #124/preset-load" inference, which was built

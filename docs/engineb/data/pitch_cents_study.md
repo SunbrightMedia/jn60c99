@@ -74,5 +74,5 @@ an argued bound, not yet a measured one.
 
 Even with everything, the S3 lands marginal — silicon's cycles-per-
 instruction decides. For comparison, on a part with a DOUBLE FPU (Teensy 4.1,
-named in GOAL.md) the pitch problem does not exist, no standard is relaxed,
+named in docs/GOAL.md) the pitch problem does not exist, no standard is relaxed,
 and the same ladder lands under budget with margin.

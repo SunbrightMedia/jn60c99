@@ -3,7 +3,7 @@
 
 THE QUESTION coverage_probe.py CANNOT ANSWER
 --------------------------------------------
-Line coverage of native/voice_render.c is ~98% in every null_ab scenario, yet
+Line coverage of tools/trackb/native/voice_render.c is ~98% in every null_ab scenario, yet
 the first mutation planted in the fork -- a 0.1% error in the noise generator's
 2^-24 output scale (src/voice_render.c:640) -- changed the output of exactly ONE
 of the five. The other four did not report a small residual, they reported
@@ -18,7 +18,7 @@ is what this tool measures, per scenario, by execution.
 
 METHOD
   Build a throwaway probe library: the candidate sources plus
-  tools/trackb/perturb_rt.c, with -DTRACKB_PERTURB_CELLS. native/voice_render.c
+  tools/trackb/perturb_rt.c, with -DTRACKB_PERTURB_CELLS. tools/trackb/native/voice_render.c
   carries an #ifdef-guarded hook at the tail of the render that multiplies each
   selected per-voice cell by 1.00000012f (~2 ULP) after the sample is complete.
   The cell list is a RUNTIME global, so a full sweep costs one build.
@@ -37,7 +37,7 @@ METHOD
 
 IT IS ALSO AN EXECUTED CARRIAGE CLASSIFIER
   --each perturbs the listed cells ONE AT A TIME; --sweep does every cell
-  native/voice_render.c writes. Because the hook fires AFTER the sample, a cell
+  tools/trackb/native/voice_render.c writes. Because the hook fires AFTER the sample, a cell
   no scenario can see does not survive the sample boundary. NOT-CARRIED does not
   mean unused -- a cell consumed within the same sample, or rewritten every
   sample by the note path, is correctly NOT-CARRIED and still load-bearing. It
@@ -63,7 +63,7 @@ USAGE
         output were wrong, would anything notice" -- the question a rewrite
         needs. They differ: M1's 27 outputs are seen by 2 of 7 scenarios at
         site 0 because most of them are consumed within the same sample.
-        Sites are declared by TB_HOOK(N) calls in native/voice_render.c.
+        Sites are declared by TB_HOOK(N) calls in tools/trackb/native/voice_render.c.
 Offsets are per-voice cell offsets as used by JF(a1, N) -- take them from the
 subsystem's "cells owned" table in docs/trackb/*.md.
 """
@@ -79,11 +79,11 @@ GATE_DB = -90.0           # the threshold the null A/B enforces, for margin repo
 
 
 def build(dst=PROBE):
-    native = sorted(glob.glob(os.path.join(REPO, "native", "*.c")))
+    native = sorted(glob.glob(os.path.join(REPO, "tools", "trackb", "native", "*.c")))
     if not native:
-        raise SystemExit("ABORT: native/ is empty -- nothing forked to probe.")
+        raise SystemExit("ABORT: tools/trackb/native/ is empty -- nothing forked to probe.")
     if not any("TRACKB_PERTURB_CELLS" in open(n).read() for n in native):
-        raise SystemExit("ABORT: no native/*.c carries the observability hook; the "
+        raise SystemExit("ABORT: no tools/trackb/native/*.c carries the observability hook; the "
                          "build would be unperturbed and every cell would report "
                          "invisible for the WRONG reason.")
     shadow = {os.path.join(REPO, "src", os.path.basename(n)) for n in native}
@@ -164,7 +164,7 @@ def main():
     print("probe self-check: empty cell list reproduces the reference EXACTLY")
 
     if "--sweep" in argv:
-        cells = written_cells(os.path.join(REPO, "native", "voice_render.c"))
+        cells = written_cells(os.path.join(REPO, "tools", "trackb", "native", "voice_render.c"))
         out_path = argv[argv.index("--out") + 1] if "--out" in argv else None
         print("=== TRACK B CARRIAGE SWEEP: %d written per-voice cells ===" % len(cells))
         print("  CARRIED  = a ~2 ULP nudge after the sample changes later output")

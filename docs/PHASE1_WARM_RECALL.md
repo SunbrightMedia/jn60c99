@@ -121,7 +121,7 @@ genuine bugs:
 **Oracle-bounded limit (honest).** Full warm-recall = idle → recall → play. The
 idle voice-DSP is now bit-exact, but WHICH voice unit is active during idle and
 which is allocated on the note is governed by the plugin's threaded `process()` +
-CAssignJu60 event/assigner path — the same intractable layer as the arp (Phase 4).
+CAssignJu60 engine_b/event/assigner path — the same intractable layer as the arp (Phase 4).
 The leaf-driven oracle can verify the DSP but not the assigner-managed voice
 lifecycle across the idle→play boundary, so the warm note's exact voice ALLOCATION
 (and its per-voice CONDITION scatter) cannot be bit-verified with the available

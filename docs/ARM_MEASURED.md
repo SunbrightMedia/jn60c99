@@ -233,7 +233,7 @@ Ordered by value per hour:
 2. ✅ **Done:** the two `_QWORD` pointer chases in `master_render.c` (§1) now read
    at pointer width. `make test` 29/29, `arm_golden.sh` 8/8 on both legs with
    hashes unchanged, clean `-Wall -Wextra` on x86 and Cortex-M7.
-3. ⏳ **Needs a board — firmware is written, in `teensy/`.** `juno60_teensy.cpp`
+3. ⏳ **Needs a board — firmware is written, in `archive/teensy/`.** `juno60_teensy.cpp`
    + `platformio.ini` + `README.md`: PSRAM via `-Wl,--wrap=calloc`, `FPSCR.FZ`
    set, and it runs `tests/test_teensy_golden.c` itself (via
    `-Dmain=juno_golden_main`) so the device executes the same code as the host
@@ -244,7 +244,7 @@ Ordered by value per hour:
 
 Step 3 is one session once a board is in hand. Nothing here is weeks.
 
-**Status of `teensy/`, stated plainly: written, never executed.** No board has
+**Status of `archive/teensy/`, stated plainly: written, never executed.** No board has
 been attached, and `juno60_teensy.cpp` has never been compiled against
 Teensyduino — expect to fix small integration details (header paths,
 `printf`-to-Serial routing, `extmem_malloc` on your core version) on first

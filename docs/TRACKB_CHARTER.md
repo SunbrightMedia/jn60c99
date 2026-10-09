@@ -26,7 +26,7 @@ scenario reaches at all.
 ### Gate #3 — `tools/trackb/observability.py` — would a wrong answer be NOTICED?
 Coverage is necessary and not sufficient, as the noise-gain mutation proves.
 This tool multiplies chosen per-voice cells by 1.000 000 12 f (~2 ULP) *after*
-the render, through an `#ifdef`-guarded hook in `native/voice_render.c` that
+the render, through an `#ifdef`-guarded hook in `tools/trackb/native/voice_render.c` that
 emits no code unless `-DTRACKB_PERTURB_CELLS` is passed, and reports which
 scenarios see it. Both directions demonstrated on the first run: the voice
 output (3520) is observed by 5/5 at −129 dB; cells 432/528/4928 by 0/5.

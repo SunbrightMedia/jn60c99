@@ -10,7 +10,7 @@ the resume note for `docs/trackb/PLAN.md`.*
 in. WASM rebuilt and republished, 8/8 bit-exact vs native — the published artifact
 had predated the MONO retrigger fix.
 
-**Track B: harness complete, ZERO voice code rewritten.** `native/voice_render.c`
+**Track B: harness complete, ZERO voice code rewritten.** `tools/trackb/native/voice_render.c`
 is still a verbatim fork; the passthrough null is EXACTLY 0. Four gates exist
 (`tools/trackb/`, see its README) and the EQUIVALENCE ledger has one row: M0, the
 harness itself.

@@ -53,7 +53,7 @@ Two claims must never be mixed:
 
 * **BIT-EXACT** — `src/` against the plugin binary. Proven by `make verify`.
   `sxgate` never touches it.
-* **SONICALLY EQUIVALENT** — `native/` against `src/`. Proven by `sxgate`.
+* **SONICALLY EQUIVALENT** — `tools/trackb/native/` against `src/`. Proven by `sxgate`.
 
 ---
 
@@ -183,7 +183,7 @@ libs      = ["-lm"]
 includes  = ["src"]
 sources   = ["src/*.c"]
 extra_tus = ["gui/sx_shim.c"]              # compiled into BOTH sides, identically
-shadow    = { dir = "native", rule = "manifest", file = "native/OVERRIDES" }
+shadow    = { dir = "native", rule = "manifest", file = "tools/trackb/native/OVERRIDES" }
 reference = { mode = "recipe" }            # "recipe" preferred; "artifact" is a
                                            # DOCUMENTED WEAKENING and is printed
                                            # as such in every gate header
@@ -206,14 +206,14 @@ model = "manifest"             # "manifest" (general) | "regex" (decomp ports)
 cells = "docs/trackb/CELLS.tsv"
 # model = "regex":
 #   regex = '\bJ[FI]\(\s*a1\s*,\s*(\d+)\s*\)\s*(?:[-+*/]?=)(?!=)'
-#   files = ["native/voice_render.c"]
+#   files = ["tools/trackb/native/voice_render.c"]
 # model = "dwarf" is NOT IMPLEMENTED and is rejected by config.py.
 
 [[sites]]
-id = 0; file = "native/voice_render.c"; marker = "SX_HOOK(0)"; note = "render tail"
+id = 0; file = "tools/trackb/native/voice_render.c"; marker = "SX_HOOK(0)"; note = "render tail"
 
 [[modules]]
-id = "M1b"; file = "native/voice_render.c"; ref_lines = "1129-1149"; site = 0
+id = "M1b"; file = "tools/trackb/native/voice_render.c"; ref_lines = "1129-1149"; site = 0
 min_observable = 0.75          # REQUIRED. fraction of assignments the canary
                                # must see. accept/null REFUSE below it.  [FIX-3]
 known_blind = ["1132","1143"]  # each entry needs a why= row in modules_notes
@@ -435,7 +435,7 @@ rates 44100/48000, channels 2, the `-ffp-contract=off` cflag set, `src/*.c` plus
 `gui/sx_shim.c`, `truth/presetbankog1.bin` AND its sha256 (the framework never
 imports `truth.py`), preset range 0..64 with the 7 arp exclusions.
 
-**M3. Shadow manifest.** Create `native/OVERRIDES` listing `voice_render.c`
+**M3. Shadow manifest.** Create `tools/trackb/native/OVERRIDES` listing `voice_render.c`
 explicitly. Basename matching is dropped — a typo must fail loudly, not resolve
 to an empty shadow set.
 
@@ -470,7 +470,7 @@ passthrough null EXACTLY 0 over 8 scenarios + 384 bank + 24 fuzz; carriage
 
 **M9. Delete `tools/trackb/*.py`,** leaving a README stub that points at
 `tools/sxgate/`. Rename `TB_HOOK`→`SX_HOOK` and `juno_tb_`→`sx_tb_` in
-`native/voice_render.c`. The rename is proved inert by the passthrough null
+`tools/trackb/native/voice_render.c`. The rename is proved inert by the passthrough null
 staying EXACTLY 0 across it.
 
 **M10. Fuzz decoupling.** Lift `gen_script` into `events.py` as a generic

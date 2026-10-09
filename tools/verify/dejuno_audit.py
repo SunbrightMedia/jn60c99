@@ -41,7 +41,7 @@ MANIFEST = [
     "tools/engineb/gen_devcells.py",
     # the boundary that explicitly promises synth-agnosticism
     "tools/engineb/boundary_check.py",
-    "event/juno_event.h",
+    "engine_b/event/juno_event.h",
     # the generic optimiser
     "tools/opt/regcache.py",
     # the RTTI seed finder -- travels to any MSVC-built synth

@@ -2,7 +2,7 @@
 """ifootprint.py — the audio path's INSTRUCTION footprint per audio sample, in
 32-byte Cortex-M7 I-cache lines, for M7 and for x86-64.
 
-The measured Daisy firmware is APP_TYPE = BOOT_QSPI (daisy/Makefile:11), i.e.
+The measured Daisy firmware is APP_TYPE = BOOT_QSPI (archive/daisy/Makefile:11), i.e.
 .text is executed in place from QSPI NOR flash at 0x90040000 through a 16 KB,
 2-way, 32-byte-line instruction cache. If the per-sample hot footprint exceeds
 16 KB the loop cannot be resident and every sample re-streams it.

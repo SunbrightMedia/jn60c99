@@ -37,7 +37,7 @@ CROSS MOD (hence the octave), DCO1 LEVEL read 0 on all 64 patches, DCO2
 WAVEFORM (0..5) read up to 249. The recall gate stayed 64/64 EXACTLY 0
 because it compared the C recall with the plugin dispatching the same wrong
 values. Corrected to `2*pool − 8` in jx_emu.pool_value, jx_recall.c, every
-tool, and synth/jx3p.json. TOOTH: `jx3p/tools/jx_bank_census.py` — every
+tool, and tools/engineb/synth/jx3p.json. TOOTH: `jx3p/tools/jx_bank_census.py` — every
 decoded value of all 64 patches inside the binary's own ENGINE DB range,
 no level pool silent bank-wide; GREEN under −8, FAIL (316 violations, 2
 silent pools) under +8. Every derived artifact (template, recall aux, A/B
@@ -296,7 +296,7 @@ Non-circular, name-proven (the JUNO's validation method):
   ATTACK/DECAY/SUSTAIN/RELEASE, VCA LEVEL, etc.).
 - Decoded patch-0 values are musically sensible (VCA LEVEL 116, ENV2 SUSTAIN 255,
   EFFECT LEVEL 255, BEND RANGE 11...).
-Recorded in synth/jx3p.json (blob_pos_formula, dispatch_idx_formula).
+Recorded in tools/engineb/synth/jx3p.json (blob_pos_formula, dispatch_idx_formula).
 
 So the recall is now fully specified end to end: blob byte -> (2*pool+8 decode) ->
 param value -> (pool+740 dispatch idx) -> coefficient (44 LUTs + {796,797,803}

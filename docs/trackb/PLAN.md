@@ -22,7 +22,7 @@ Existing (all READ, verified this session):
 | piece | where | state |
 |---|---|---|
 | the transcribed reference | `src/*.c` | sealed bit-exact vs the plugin under Unicorn (`make verify`) |
-| the candidate substrate | `native/<x>.c` shadows `src/<x>.c` by filename, `Makefile:139-144` | `native/voice_render.c` is a VERBATIM fork + one `#ifdef`-guarded hook; passthrough null is EXACTLY 0 |
+| the candidate substrate | `tools/trackb/native/<x>.c` shadows `src/<x>.c` by filename, `Makefile:139-144` | `tools/trackb/native/voice_render.c` is a VERBATIM fork + one `#ifdef`-guarded hook; passthrough null is EXACTLY 0 |
 | gate #1 — identity | `tools/trackb/null_ab.py` | 7 scenarios (`SCEN`, :68-83), `--full` 384 bank comparisons, `--fuzz` 24 seeded sequences with live param edits, `--teeth` mutation battery |
 | gate #2 — reached | `tools/trackb/coverage_probe.py` | gcov line counts per scenario, `--lines A-B` |
 | gate #3 — noticed | `tools/trackb/observability.py` + `perturb_rt.c` | ~2 ULP post-sample cell nudge; also the executed carriage classifier |
@@ -47,7 +47,7 @@ threshold (charter §"Gate #3"), so the gate tolerates roughly 200 ULP
 Two consequences run through the whole plan:
 
 1. **−90 dB is a weaker claim than the seal, deliberately.** `src/` must stay
-   untouched and stay bit-exact; `native/` is the subject of the weaker claim.
+   untouched and stay bit-exact; `tools/trackb/native/` is the subject of the weaker claim.
    The two must never be conflated in a commit, a gate, or a ledger row.
 2. **RMS is not perception.** A metric that averages a whole render can hide an
    error that is loud for 30 samples. That is F3/F4 in §6 and it is a required
@@ -96,16 +96,16 @@ later module's evidence is produced by these tools.
 
 ### M0-1 `tools/trackb/fork_check.py` — it is referenced and does not exist
 
-`native/voice_render.c:21` says the fork provenance is "checked by
+`tools/trackb/native/voice_render.c:21` says the fork provenance is "checked by
 `tools/trackb/fork_check.py`". **PROVEN (executed `ls` + repo-wide grep this
 session): that file does not exist; the string appears in exactly one place, the
 comment that claims it runs.** So the fork's recorded upstream sha256
 (`aba0925a…6017355`) is currently checked by nothing.
 
 Write it. It must fail, by name, on each of:
-- `sha256(src/<x>.c) != ` the SHA recorded in `native/<x>.c`'s header (upstream
+- `sha256(src/<x>.c) != ` the SHA recorded in `tools/trackb/native/<x>.c`'s header (upstream
   moved under the fork);
-- a `native/*.c` with no `src/*.c` counterpart (a filename typo means the file is
+- a `tools/trackb/native/*.c` with no `src/*.c` counterpart (a filename typo means the file is
   **added**, not substituted — see F2);
 - a built `juno_cand.so` that does not export the native marker symbol (below).
 
@@ -119,7 +119,7 @@ currently detects this — `null_ab.py --teeth`'s `build()` copies only `src` an
 own self-test.
 
 Two counter-measures, both cheap:
-- a marker symbol (`juno_tb_native_marker`) defined in every `native/*.c` and
+- a marker symbol (`juno_tb_native_marker`) defined in every `tools/trackb/native/*.c` and
   asserted present by `fork_check.py` after the build;
 - a **procedural canary**: before accepting any module's green, plant a
   deliberate ~1 % error inside that module's own lines, rebuild, and require the
@@ -128,7 +128,7 @@ Two counter-measures, both cheap:
 
 ### M0-3 `tools/trackb/celltrace.c` — turn the null into a bisector
 
-Add a second `#ifdef`-guarded hook to `native/voice_render.c`, modelled exactly
+Add a second `#ifdef`-guarded hook to `tools/trackb/native/voice_render.c`, modelled exactly
 on the existing perturb hook (same "emits no code unless `-D` is passed"
 discipline): with `-DTRACKB_CELLTRACE`, append a chosen set of per-voice cells to
 a file once per voice-sample. Build ref-side and cand-side traces of the module's
@@ -402,7 +402,7 @@ shared noise LFSR (:595-653), and the mod-CV/LFO-rate ladder's saturating arms
 ```
 0.  fork_check.py                       fork provenance + native marker + no orphan file
 1.  observability.py --cells <outputs>  ≥1 scenario must OBSERVE them   (else: add a scenario, §5)
-2.  edit native/<x>.c                   one module, one commit
+2.  edit tools/trackb/native/<x>.c                   one module, one commit
 3.  make juno_cand.so                   fresh; never trust a pre-existing .so
 4.  coverage_probe.py --lines A-B       every scenario must REACH the rewritten range
 5.  <module>_iso                        the isolation test of §3 (celltrace / offline sweep)
@@ -424,7 +424,7 @@ re-accepted module gets a new row (the history is the audit trail).
 | column | content | why it is in the ledger |
 |---|---|---|
 | `module` | `M4-MOD` | the unit of revert |
-| `file` | `native/voice_render.c` | which substitution |
+| `file` | `tools/trackb/native/voice_render.c` | which substitution |
 | `lines_ref` | `682-735,724-963,1076-1128` | the replaced range in `src/voice_render.c` **at `src_sha`** |
 | `cells_out` | `1472,1792,1808,1824,752,3776,3808` | what the module produces; the argument of steps 1 and 5 |
 | `date` | ISO | — |
@@ -552,7 +552,7 @@ sits.
   entirely (given a flat state pointer and a place for the hook); `celltrace`
   (M0-3); `fork_check.py` (M0-1); `null_ab.py`'s comparator, thresholds,
   non-vacuity floor, `--full`/`--fuzz` structure and the teeth discipline;
-- the `native/<x>.c` shadowing rule in the `Makefile`;
+- the `tools/trackb/native/<x>.c` shadowing rule in the `Makefile`;
 - the STOP rule shape of §8 (measure the ceiling before paying for the win).
 
 **JUNO-specific — a new synth must supply:**

@@ -15,8 +15,8 @@ stay intact — it is the reference this harness measures against.
 ## The loop
 
 ```
-edit native/voice_render.c              # the fork; see "Substrate" below
-make juno_cand.so                       # native/<x>.c replaces src/<x>.c by name
+edit tools/trackb/native/voice_render.c              # the fork; see "Substrate" below
+make juno_cand.so                       # tools/trackb/native/<x>.c replaces src/<x>.c by name
 python3 tools/trackb/coverage_probe.py --lines A-B      # was it REACHED?
 python3 tools/trackb/observability.py  --cells ...      # would it be NOTICED?
 python3 tools/trackb/null_ab.py --cand ./juno_cand.so --all   # is it IDENTICAL?
@@ -73,7 +73,7 @@ scenarios*, plus a clean control that must be EXACTLY 0:
 | `tailquiet` | 0.1 % gain error **only while the gate is released** | all 7 |
 
 Mutations are planted in the file that is **actually compiled** — if
-`native/<x>.c` shadows `src/<x>.c`, the mutation goes into the fork, so the
+`tools/trackb/native/<x>.c` shadows `src/<x>.c`, the mutation goes into the fork, so the
 battery exercises the same substitution path a real candidate uses. A battery
 that patched a file the candidate build never sees would report the gate as
 blind when in truth the experiment never happened.
@@ -126,7 +126,7 @@ which is what licenses register promotion. Module admissibility is decided by
 `canary.py` below.
 
 Multiplies chosen per-voice cells by ~2 ULP **after** the sample, via an
-`#ifdef`-guarded hook in `native/voice_render.c` that emits no code unless
+`#ifdef`-guarded hook in `tools/trackb/native/voice_render.c` that emits no code unless
 `-DTRACKB_PERTURB_CELLS` is passed, and reports which scenarios see it.
 
 ```
@@ -149,8 +149,8 @@ engine, not by static argument.
 
 ## Substrate
 
-`native/<name>.c` replaces `src/<name>.c` by filename in `make juno_cand.so`.
-`native/voice_render.c` began as a verbatim copy of the sealed transcription, so
+`tools/trackb/native/<name>.c` replaces `src/<name>.c` by filename in `make juno_cand.so`.
+`tools/trackb/native/voice_render.c` began as a verbatim copy of the sealed transcription, so
 with no rewrite applied the candidate is a byte-identical twin and the null is
 EXACTLY 0 — the harness's own passthrough proof. Keep that proof honest: after
 any change to the harness, re-run it before trusting a non-zero result.
@@ -185,7 +185,7 @@ JUNO-specific references: `coverage_probe.py` 2, `fork_check.py` 2 (both in pros
 all the coupling, and it is of exactly three kinds:
 
 1. **API names** — the eight `juno_gui_*` entry points in `load()`.
-2. **Paths** — `libjuno.so`, `src/voice_render.c`, `native/voice_render.c`,
+2. **Paths** — `libjuno.so`, `src/voice_render.c`, `tools/trackb/native/voice_render.c`,
    `truth.BANK`.
 3. **Content** — the scenario set, the five mutation anchors (each is a literal
    string from this engine's source), the `JF(a1, N)` cell syntax, and the blob
@@ -206,7 +206,7 @@ Reusable as-is — the method, and the logic of most of the code:
   render function with a flat state pointer and somewhere to put the hook;
 * `null_ab.py`'s comparator, thresholds, non-vacuity floor, `--full`/`--fuzz`
   structure and the teeth discipline;
-* the `native/<x>.c` shadowing rule in the Makefile;
+* the `tools/trackb/native/<x>.c` shadowing rule in the Makefile;
 * every lesson in the section above.
 
 JUNO-specific, and what a new synth must supply:

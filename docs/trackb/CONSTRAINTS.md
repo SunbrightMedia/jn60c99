@@ -81,7 +81,7 @@ the highest-value next experiment.
 ## Standing rules that Track B does not get to relax
 
 * Never validate by ear; never ask the user to A/B. Gates decide.
-* `src/` stays frozen and bit-exact. Track B lives in `native/`. The two claims
+* `src/` stays frozen and bit-exact. Track B lives in `tools/trackb/native/`. The two claims
   are never conflated.
 * No module may be rewritten behind a blind gate (charter gate #4).
 * Label every number SILICON / MEASURED / MODELED / STATIC / INFERRED.

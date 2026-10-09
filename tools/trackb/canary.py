@@ -26,7 +26,7 @@ run it BEFORE writing the module, on the transcription, to learn how much of the
 module the scenarios can see at all.
 
 METHOD
-  For each assignment statement in the given line range of native/<file>, build a
+  For each assignment statement in the given line range of tools/trackb/native/<file>, build a
   candidate with that statement's right-hand side scaled by --factor (default
   1.001 = 0.1%), and run the 7-scenario null. Report, per line, how many
   scenarios catch it. Lines caught by 0 scenarios are places where the gate is
@@ -54,7 +54,7 @@ WHY --add EXISTS (measured on M2/M3, the DCO oscillators, 2026-08-01)
   scenario set -- it is a different perturbation, not a weaker gate, and the
   default behaviour is unchanged.
 Line numbers are in src/voice_render.c (the blueprints' numbering); they are
-mapped onto native/voice_render.c by matching the statement text, so the fork's
+mapped onto tools/trackb/native/voice_render.c by matching the statement text, so the fork's
 header offset does not have to be tracked by hand.
 """
 import sys, os, re, glob, shutil, tempfile, subprocess
@@ -89,7 +89,7 @@ def candidates(src_path, lo, hi):
 
 def build_with(mutated_text, orig_text, dst):
     tmp = tempfile.mkdtemp(prefix="canary_")
-    shutil.copytree(os.path.join(REPO, "native"), os.path.join(tmp, "native"))
+    shutil.copytree(os.path.join(REPO, "tools", "trackb", "native"), os.path.join(tmp, "native"))
     p = os.path.join(tmp, "native", "voice_render.c")
     s = open(p).read()
     if s.count(orig_text) != 1:

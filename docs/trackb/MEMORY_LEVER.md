@@ -34,7 +34,7 @@ SILICON per-access costs. No silicon confirmation of the lever itself yet.
 
 ## 0. The number the whole report depends on is not safe yet
 
-The 93,288 cyc/sample figure (SILICON, E2, 2026-08-01) is **understated by a DWT 32-bit wrap**. The corrected firmware is already in `daisy/juno60_daisy.cpp` (block-at-a-time timing, uint64 accumulation, independent `System::GetNow()` millisecond cross-check, `!! CLOCKS DISAGREE` flag). It has not been flashed.
+The 93,288 cyc/sample figure (SILICON, E2, 2026-08-01) is **understated by a DWT 32-bit wrap**. The corrected firmware is already in `archive/daisy/juno60_daisy.cpp` (block-at-a-time timing, uint64 accumulation, independent `System::GetNow()` millisecond cross-check, `!! CLOCKS DISAGREE` flag). It has not been flashed.
 
 - If (k_E2,k_E3) = (1,0): true cost ≈ **287,680 cyc/sample**, required factor **≈34.5x**, not 11.19x.
 - If (3,1): ≈676,700, required factor ≈81x.
@@ -100,7 +100,7 @@ Consequences, and they matter:
 
 - **The test is exact zero, not −90 dB.** `tools/trackb/null_ab.py` must report EXACTLY 0 differing samples. Anything else means the relocation is wrong. That is a far stronger gate than the sonic-identity machinery.
 - **The Track B sonic gates are not needed for this change,** and neither is the STANDING WARNING about the 15 BLIND Chamberlin SVF assignments. Blindness only matters when arithmetic changes. No module is rewritten.
-- **It would be admissible in `src/` under the project's own rule.** Land it in `native/` behind `JUNO_SPLIT_POOL` anyway: the risk here is aliasing, lifetime and linker sections, not numerics, and `src/`'s value is that it is frozen. With the symbol undefined the macro is the textual identity, so host/x86/WASM builds produce the same object code they do today.
+- **It would be admissible in `src/` under the project's own rule.** Land it in `tools/trackb/native/` behind `JUNO_SPLIT_POOL` anyway: the risk here is aliasing, lifetime and linker sections, not numerics, and `src/`'s value is that it is frozen. With the symbol undefined the macro is the textual identity, so host/x86/WASM builds produce the same object code they do today.
 - **Cost of that: the host gates never exercise the split path.** Only ARM `null_ab` and E1 golden-on-silicon can prove it. Re-run `tools/embed/arm_golden.sh` and E1 **with the split active**.
 
 **What is NOT bit-exact-preserving, and is therefore not in this report's scope:** cell compaction (packing 620 cells to 4-byte stride, ~21 KB total) does not change arithmetic either, but it does change every offset, so it needs the offset-remap tooling and a full re-derivation. The instruction-count reduction that §4 requires — scratch-cell elimination, triangle LUT, block hoisting — *does* change arithmetic, and those need the sonic gates and the blind-scenario work first.
@@ -124,7 +124,7 @@ The measured arithmetic levers do not add up: block hoisting 2.8% (ceiling 17.4%
 
 **Polyphony is dead as a lever and 6 voices does not help.** The idle floor is 85,137 of 93,288 = 91% (SILICON), and under the wrap correction it becomes ~97%. 4 voices is 9% cheaper than 8. The permitted 6-voice fallback buys ~5%. It changes nothing about the gap and must not be treated as a plan.
 
-**What this means, stated plainly.** The 11.19x target requires cutting ~29,700 instructions/sample to under ~2,700 *and* making memory free. That is not an optimization programme; it is a different engine. Track B's premise — sonic identity instead of bit-exactness, rewriting modules in `native/` — is the only path that could produce those numbers, and its own STOP rule S1 does not fire, so it stays alive. But the honest position today is: **the Daisy Seed at 400 MHz has not been shown to be capable of 8 voices plus all FX at 48 kHz, and the measured levers do not reach it.** P2 is a real decision.
+**What this means, stated plainly.** The 11.19x target requires cutting ~29,700 instructions/sample to under ~2,700 *and* making memory free. That is not an optimization programme; it is a different engine. Track B's premise — sonic identity instead of bit-exactness, rewriting modules in `tools/trackb/native/` — is the only path that could produce those numbers, and its own STOP rule S1 does not fire, so it stays alive. But the honest position today is: **the Daisy Seed at 400 MHz has not been shown to be capable of 8 voices plus all FX at 48 kHz, and the measured levers do not reach it.** P2 is a real decision.
 
 The corrected E2 could make this worse by 3x. Flash it before anything else.
 
@@ -141,7 +141,7 @@ Replay the MEASURED offset trace (`scratchpad/memtrace/acc.txt`, 9,850 rows) as 
 Generate the trace table first (offsets under 102,800 only; the rest stay SDRAM either way):
 
 ```sh
-python3 - <<'EOF' > daisy/memtrace_table.h
+python3 - <<'EOF' > archive/daisy/memtrace_table.h
 rows = [l.split() for l in open('scratchpad/memtrace/acc.txt')]
 rows = [(int(o), int(s)) for o, s in rows]
 print("/* MEASURED per-sample access trace, host instrumentation. */")
@@ -153,7 +153,7 @@ print("static const uint8_t  mt_st [MT_N] = {%s};" %
 EOF
 ```
 
-Add to `daisy/juno60_daisy.cpp`:
+Add to `archive/daisy/juno60_daisy.cpp`:
 
 ```c
 /* ================= E6: how much of the cost is memory? ==================
@@ -223,7 +223,7 @@ Call it after `e3_...()` in `main()`, so `g_e2_8v` is populated.
 
 ### E7 — the relocation itself, one pointer
 
-If E6 shows the lever is real, do the smallest possible real version before writing `native/master_render.c`:
+If E6 shows the lever is real, do the smallest possible real version before writing `tools/trackb/native/master_render.c`:
 
 ```c
 /* E7: the 8 voice blocks in AXI SRAM, everything else unchanged.
@@ -232,13 +232,13 @@ If E6 shows the lever is real, do the smallest possible real version before writ
 static uint8_t g_vblk[8 * 10512] __attribute__((aligned(32)));   /* 82 KB, AXI */
 ```
 
-`juno_voice_render` takes three bases in `native/` (main block, shared noise at 84272, aux latch at 101504+32v), and the 8 master taps at `10672 + v*10512` are written back — 8 float stores per sample, negligible. Then re-run E2 on the same flash and compare against the same-flash baseline, not against a previous run.
+`juno_voice_render` takes three bases in `tools/trackb/native/` (main block, shared noise at 84272, aux latch at 101504+32v), and the 8 master taps at `10672 + v*10512` are written back — 8 float stores per sample, negligible. Then re-run E2 on the same flash and compare against the same-flash baseline, not against a previous run.
 
 **Required proof set for E7:**
 - `python3 tools/trackb/null_ab.py --exact` → exactly 0 differing samples
 - `bash tools/embed/arm_golden.sh` → 8/8 under qemu, with the relocation on
 - E1 on the board → 8/8 BIT-EXACT, with the relocation on
-- `grep -rn 'st *-\|base *-' src/ native/` → pointer-difference audit
+- `grep -rn 'st *-\|base *-' src/ tools/trackb/native/` → pointer-difference audit
 
 ---
 

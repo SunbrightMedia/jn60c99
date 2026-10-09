@@ -37,7 +37,7 @@ leak into the new port silently.
 1. **One config file per synth** — `synth.cfg` (bank geometry, state stride,
    scatter cell list, ring tables, rates, patch count). `arm_xform.py`,
    `gen_devcells.py`, `make_boot.py` read it; the JUNO's values move into
-   `synth/juno60.cfg` and `make verify` must stay green after the move —
+   `tools/engineb/synth/juno60.cfg` and `make verify` must stay green after the move —
    proof the parameterisation is faithful.
 2. **Repo layout decided now, not mid-port:** the JX-3P lives in this repo
    (the tools and gates are the shared asset) under `jx3p/{src,truth,docs}`,

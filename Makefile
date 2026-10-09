@@ -283,7 +283,7 @@ verify: test libjuno.so
 provenance:
 	python3 tools/verify/provenance_check.py
 
-# PILLAR 1 completeness gate (AIRTIGHT_PLAN.md). Regenerates the value-tree leaf
+# PILLAR 1 completeness gate (docs/AIRTIGHT_PLAN.md). Regenerates the value-tree leaf
 # enumeration from truth/Script.xml and checks COVERAGE.tsv: RED on any ledger
 # drift, any UNRESOLVED/SILENT row, or any GAP (a parameter the port does not
 # apply). Standalone for now; folds into `verify` at the Seal (Stage D), once
@@ -352,18 +352,18 @@ libjuno.so: gui/juno_bridge.c gui/juno_pm.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(FRAME_GUARD) -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
 
 # TRACK B candidate engine: the sealed engine with hand-written NATIVE kernels
-# substituted for their transcribed counterparts (native/*.c shadow src/*.c by
+# substituted for their transcribed counterparts (tools/trackb/native/*.c shadow src/*.c by
 # filename). Never shipped by `make verify` -- it is the SUBJECT of the Track B
 # null A/B, not a party to the bit-exact seal:
 #   make juno_cand.so && python3 tools/trackb/null_ab.py --cand ./juno_cand.so
-# With native/ empty this builds a byte-identical twin of libjuno.so, whose
+# With tools/trackb/native/ empty this builds a byte-identical twin of libjuno.so, whose
 # residual must be EXACTLY 0 -- the comparator's own passthrough proof.
-NATIVE     := $(wildcard native/*.c)
-NATIVE_OUT := $(patsubst native/%.c,src/%.c,$(NATIVE))
+NATIVE     := $(wildcard tools/trackb/native/*.c)
+NATIVE_OUT := $(patsubst tools/trackb/native/%.c,src/%.c,$(NATIVE))
 CAND_SRC   := $(filter-out $(NATIVE_OUT),$(SRC)) $(NATIVE)
 .PHONY: cand
 cand: juno_cand.so
-juno_cand.so: gui/juno_bridge.c $(CAND_SRC) $(HDR) $(wildcard native/*.h)
+juno_cand.so: gui/juno_bridge.c $(CAND_SRC) $(HDR) $(wildcard tools/trackb/native/*.h)
 	@echo "candidate = $(words $(NATIVE)) native kernel(s) replacing: $(NATIVE_OUT)"
 	$(CC) $(CFLAGS) -Isrc -shared -fPIC -o $@ $(filter %.c,$^) $(LDLIBS)
 
@@ -461,16 +461,16 @@ clean:
 	rm -f $(OBJ) tests/test_helpers tests/test_voice_smoke tests/test_master_smoke \
 	      tests/test_apply_golden tests/test_poly_consistency tests/test_delay_recall tests/test_reverb_recall tests/test_denormal tests/test_note_path tests/test_prepare_rate tests/test_arp_onset tests/test_recall_rate tests/test_arp_release tests/test_bend_mod_sens tests/test_condition_scatter tests/test_arp_pattern
 
-# Validate the port's init against the live-plugin state dump (state_dump/).
+# Validate the port's init against the live-plugin state dump (refs/state_dump/).
 validate: tests/validate_state.c $(SRC)
-	gunzip -kf state_dump/state_t0.bin.gz state_dump/state_t1.bin.gz
+	gunzip -kf refs/state_dump/state_t0.bin.gz refs/state_dump/state_t1.bin.gz
 	@python3 -c "import re;\
 r=set();\
 [r.update(int(m) for m in re.findall(r'a1, ?(\d+)\)',open(f).read())) for f in ('src/voice_render.c','src/master_render.c')];\
 [r.update(int(m) for m in re.findall(r'a1 \+ (\d+)\b',open(f).read())) for f in ('src/voice_render.c','src/master_render.c')];\
-print('\n'.join(str(o) for o in sorted(o for o in r if 0<o<=12058620)))" > state_dump/.dspreads.txt
+print('\n'.join(str(o) for o in sorted(o for o in r if 0<o<=12058620)))" > refs/state_dump/.dspreads.txt
 	$(CC) $(CFLAGS) -o tests/validate_state tests/validate_state.c $(SRC) $(LDLIBS)
-	./tests/validate_state state_dump/state_t0.bin state_dump/state_t1.bin state_dump/.dspreads.txt
+	./tests/validate_state refs/state_dump/state_t0.bin refs/state_dump/state_t1.bin refs/state_dump/.dspreads.txt
 
 tests/test_denormal: tests/test_denormal.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.c,$^) $(LDLIBS)

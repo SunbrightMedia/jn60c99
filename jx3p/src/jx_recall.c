@@ -11,7 +11,7 @@
  * PROVEN: jx3p/tools/jx_recall_gate.sh -- port block == oracle recall reference
  * bit-for-bit, all 64 factory patches (recall_ref_emu.py).
  *
- * blob_pos = 2*pool + 8, dispatch_idx = pool + 740 (name-proven, synth/jx3p.json).
+ * blob_pos = 2*pool + 8, dispatch_idx = pool + 740 (name-proven, tools/engineb/synth/jx3p.json).
  */
 #include <stdint.h>
 #include <string.h>

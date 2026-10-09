@@ -43,6 +43,6 @@ parallelism is INSIDE wall clock -- it does not double this number).
      re-derive this table from the real number.
   2. Structurally-zero coefficient proofs (audit found 39 candidates; the
      verify pass was cut off by usage limits; each needs a structural --
-     any-preset -- proof before deletion, per GOAL.md).
+     any-preset -- proof before deletion, per docs/GOAL.md).
   3. A second 8 MB-PSRAM S3 at 240 MHz is the known-good fallback the user
      has ruled out; it stays ruled out unless the user says otherwise.
