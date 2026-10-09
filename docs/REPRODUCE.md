@@ -12,7 +12,14 @@ CLAUDE.md.
 ```
 sh tools/run_job.sh repro bash tools/repro/reproduce.sh [COMMIT] [DIR]     # about 10 hours on 4 cores
 sh tools/status.sh                                                         # the job; DIR.logs/REPORT
+sh tools/run_job.sh repro_r bash tools/repro/reproduce.sh --resume [COMMIT] [DIR]   # after a container restart
 ```
+
+A container restart kills every job (repro2, the first proof run, died so at its verify stage).
+`--resume` continues in the same clone, which must be at COMMIT: a stage that passed is kept, every
+other stage runs again from its start, inputs and doctor run again (the container may have changed),
+and REPORT records each resume. Tested: it refuses a missing run and a wrong commit; it keeps the
+passed stages, re-runs a failed one, and survives a second resume.
 
 COMMIT defaults to HEAD, DIR to `juno60_repro` next to this tree (its logs in `DIR.logs/`; next to
 the tree so Node finds the same node_modules). Long jobs only through `tools/run_job.sh` (CLAUDE.md).

@@ -3274,3 +3274,15 @@ component's CMake, normal builds unchanged) and takes the commit as its version 
 ### The rule
 Build the image twice from two copies of the tree at two paths, not twice in one place; every byte
 that differs names a leak (path, time, version, environment) to remove.
+
+## 189. A PROOF THAT TAKES TEN HOURS MUST SURVIVE A RESTART -- KEEP WHAT PASSED, RE-RUN THE REST
+Paid 2026-10-09 (task #62). A container restart (a host move: the kernel changed under the session)
+killed the first proof run of reproduce.sh at its verify stage and the full verify of A38-A40 beside
+it; both had no EXIT, so neither proved anything, and the one-shot script could only start again
+from its clone. reproduce.sh --resume now continues in the same clone at the same commit: a stage
+that passed is kept, every other stage runs again from its start, inputs and doctor always run again
+(the container may have changed), and REPORT records each resume. Tested before use: it refuses a
+missing run and a wrong commit, re-runs a failed stage, survives a second resume.
+### The rule
+A pipeline longer than the environment's quiet life is staged, each stage's verdict on disk, and
+resumable at a stage boundary. A stage is the unit of proof: kept whole or run again whole.

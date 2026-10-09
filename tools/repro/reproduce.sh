@@ -22,20 +22,42 @@
 #   tree         no committed file changed by any stage above
 # Exit 0 only when every stage passed (a skipped optional stage is reported, not failed).
 #
+# reproduce.sh --resume [COMMIT] [DIR] -- continue a run that died (a container restart kills every
+# job: verify_a35 and repro2 died so): the same clone, which must be at COMMIT (default: the clone's
+# own); a stage that passed is kept, every other stage runs again; inputs and doctor always run again
+# (the container may have changed); REPORT says when the run resumed.
+#
 # Long: about 10 hours on 4 cores. Run it as a job: sh tools/run_job.sh repro bash tools/repro/reproduce.sh
 set -u
+RESUME=0
+[ "${1:-}" = "--resume" ] && { RESUME=1; shift; }
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
-COMMIT=${1:-$(git -C "$SRC" rev-parse HEAD)}
 DIR=${2:-$(dirname "$SRC")/juno60_repro}
 BANKS=${JUNO_USERBANKS:-$SRC/scratchpad/userbanks}
-rm -rf "$DIR"
-mkdir -p "$DIR.logs" || exit 2
 LOGS="$DIR.logs"; REPORT="$LOGS/REPORT"
-: > "$REPORT"
+if [ $RESUME = 1 ]; then
+  [ -d "$DIR/.git" ] && [ -f "$REPORT" ] || { echo "resume: no earlier run in $DIR (or no $REPORT)"; exit 2; }
+  COMMIT=$(git -C "$DIR" rev-parse HEAD)
+  if [ -n "${1:-}" ] && [ "$(git -C "$SRC" rev-parse "$1^{commit}" 2>/dev/null)" != "$COMMIT" ]; then
+    echo "resume: $DIR is at $COMMIT, not $1"; exit 2
+  fi
+  grep -E '^([a-z0-9]+ +exit 0 |resumed )' "$REPORT" | grep -vE '^(inputs|doctor) ' > "$REPORT.kept"
+  mv "$REPORT.kept" "$REPORT"
+  echo "resumed      $(date -u +%FT%TZ) at $COMMIT: $(grep -c ' exit 0 ' "$REPORT") stage(s) kept" | tee -a "$REPORT"
+else
+  COMMIT=${1:-$(git -C "$SRC" rev-parse HEAD)}
+  rm -rf "$DIR"
+  mkdir -p "$LOGS" || exit 2
+  : > "$REPORT"
+fi
 fail=0
 
 stage() {   # stage NAME CMD... : run, log, record
   local name=$1; shift
+  if [ $RESUME = 1 ] && [ "$name" != inputs ] && [ "$name" != doctor ] && grep -qE "^$name +exit 0 " "$REPORT"; then
+    echo "=== STAGE $name: passed before the resume (kept)"
+    return 0
+  fi
   local t0=$(date +%s)
   echo "=== STAGE $name ($(date -u +%FT%TZ))"
   ( "$@" ) > "$LOGS/$name.log" 2>&1
@@ -46,7 +68,10 @@ stage() {   # stage NAME CMD... : run, log, record
   [ $r = 0 ] || fail=1
   return $r
 }
-skip() { printf '%-12s SKIPPED     (%s)\n' "$1" "$2" | tee -a "$REPORT"; }
+skip() {   # skip NAME WHY (a stage that passed before a resume stays kept)
+  if [ $RESUME = 1 ] && grep -qE "^$1 +exit 0 " "$REPORT"; then echo "=== STAGE $1: passed before the resume (kept)"; return 0; fi
+  printf '%-12s SKIPPED     (%s)\n' "$1" "$2" | tee -a "$REPORT"
+}
 
 stage clone sh -c "git clone -q '$SRC' '$DIR' && cd '$DIR' && git checkout -q --detach '$COMMIT' || exit 1; \
   if [ -e '$SRC/pi/circle/.git' ]; then git config submodule.pi/circle.url '$SRC/pi/circle'; fi; \
@@ -54,7 +79,7 @@ stage clone sh -c "git clone -q '$SRC' '$DIR' && cd '$DIR' && git checkout -q --
   echo commit \$(git rev-parse HEAD) tree \$(git rev-parse HEAD^{tree}) \
        circle \$([ -f pi/circle/Rules.mk ] && git -C pi/circle rev-parse --short HEAD || echo absent)" || { cat "$REPORT"; exit 1; }
 cd "$DIR" || exit 1
-mkdir -p scratchpad && ln -s "$BANKS" scratchpad/userbanks
+mkdir -p scratchpad && ln -sfn "$BANKS" scratchpad/userbanks
 [ -f /home/user/emsdk/emsdk_env.sh ] && source /home/user/emsdk/emsdk_env.sh > /dev/null 2>&1
 node -e "import('playwright-core').then(()=>process.exit(0),()=>process.exit(1))" --input-type=module 2>/dev/null || npm ci --ignore-scripts > "$LOGS/npm.log" 2>&1
 
