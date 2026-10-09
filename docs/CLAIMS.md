@@ -141,7 +141,7 @@ plugin's own process(), the render driver, the 96 kHz engine and its converter, 
 switches, host-rate changes, the start-up; the MIDI intake -- notes, velocity, bend, mod,
 expression, sustain, all notes off, the CC map and its DAW state; the preset paths (initialize,
 setState with its stream framing, the patch browser); the state save; the UI timer's drain and
-MIDI learn; the calls that render nothing. Every host call and its evidence:
+MIDI learn; the panel keyboard's note value and KEY HOLD (A36); the calls that render nothing. Every host call and its evidence:
 docs/HOST_CALL_CENSUS.md. Not ported: the SYSTEM-8 hardware link (the plugin's own OS MIDI ports
 to Roland hardware) and the plugin's GUI graphics (the port's apps have their own). A green gate
 grades only what it reaches: completeness is governed by docs/PORT_COMPLETENESS_CHARTER.md.
@@ -150,7 +150,7 @@ The text that stood here before (FX render 12/15, a CAPTURED delay constant, the
 transcription only, init/prepare constants checked against a capture, host rates falling back to
 the 96 kHz arm) described 2026-09; every item is closed (A8, A13 / A14, A24; the whole cold state
 at 18 rates, live gate 6; PROVENANCE rows "FX render" and "arpeggiator"). The last full verify:
-commit 5d0c2b8a, job verify_5d0c2b8a, EXIT 0 (2026-10-08, every reference rebuilt from the plugin, 43 gates, the whole-bank product gate A34 among them; the WARN lines identical to the run before). The user's 11 banks, 704 patches, through recall, the recall-model render and the product path: every gate bit-exact (docs/USER_BANKS.md).
+commit 18ea9bd2, job verify_18ea9bd2, EXIT 0 (2026-10-09, every reference rebuilt from the plugin, 105 sections, 44 gates, 0 failures, the KEY HOLD gate A36 and the reinit check among them, ARM golden OK; the 11 WARN lines -- comment mentions of the word capture -- identical to the run before). The user's 11 banks, 704 patches, through recall, the recall-model render and the product path: every gate bit-exact (docs/USER_BANKS.md).
 
 Earlier phase docs that assert unqualified "recall complete" / FX completeness (e.g.
 docs/RECALL_COMPLETE.md, docs/COLDLOAD_AB.md) predate this ledger and are superseded by
