@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """jx_wasm_check.py -- the DELIVERED JX-3P web engine (jx3p/gui/web/jx3p.{js,wasm}) against a native
-build of the same sources, on the page's own calls (JX-10: jx3p_init on the 96 kHz guest image, jx3p_recall,
-jx3p_product_open(host rate), jx3p_product_block per 256-sample block with that block's events at their
-offsets; jx3p/tools/jx_wasm_run.mjs runs the WASM in node). The native product path is the one
+build of the same sources, on the page's own calls (JX-10; JX-15b: jx3p_product_init on the 96 kHz guest image
+at the host rate -- initialize's records queued --, jx3p_product_load_patch, jx3p_product_block per 256-sample
+block with that block's events at their offsets; jx3p/tools/jx_wasm_run.mjs runs the WASM in node). The native product path is the one
 jx_product_gate.py grades against the plugin's own process().
 
 The plan, per host rate (44100, 48000: the page's rates; 96000): idle past the 0.5 s start mute, a chord
@@ -20,10 +20,12 @@ with FTZ OFF (the same arithmetic as the WASM).
                                                   must differ (exit 0 = bites)
 Two-process rule: no Unicorn here; node runs the WASM.
 """
+import atexit
 import ctypes
 import gzip
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -70,21 +72,21 @@ def native(so, patches, ftz, planfile):
     pl = json.load(open(planfile))
     img = guest96(os.path.dirname(planfile))
     lib.jx3p_lift_error.restype = ctypes.c_char_p
+    lib.jx3p_product_init.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
     out = {}
     L, R = (ctypes.c_float * N)(), (ctypes.c_float * N)()
     for p in patches:
-        if not lib.jx3p_init(img.encode(), os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin').encode(), None):
-            raise SystemExit('native jx3p_init failed')
-        lib.jx3p_recall(p)
-        if lib.jx3p_lift_error():
-            raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
-        if lib.jx3p_product_open(pl['rate']) < 0:
-            raise SystemExit('native jx3p_product_open failed')
+        if lib.jx3p_product_init(img.encode(), os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin').encode(),
+                                 pl['rate']) < 0:
+            raise SystemExit('native jx3p_product_init failed')
+        lib.jx3p_product_load_patch(p)
         hs = []
         for evs in pl['blocks']:
             arr = (ctypes.c_int * max(1, 4 * len(evs)))(*[x for e in evs for x in e])
             lib.jx3p_product_block(L, R, N, arr, len(evs))
             hs.append(fnv(bytes(L)) + fnv(bytes(R)))
+        if lib.jx3p_lift_error():
+            raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
         out[str(p)] = hs
     return out
 
@@ -121,6 +123,7 @@ def main():
     patches = [int(x) for x in opt('--patches', '0,5,20,34,49,61').split(',')]
     rates = [int(x) for x in opt('--rates', '44100,48000,96000').split(',')]
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = build(os.path.join(tmp, 'libjx3p.so'))
     if '--tooth' in args:
         pf = os.path.join(tmp, 'plan.json')

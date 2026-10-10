@@ -33,8 +33,7 @@
 # What this does NOT yet cover, stated so "green" is not read wider than it is
 # (jx3p/docs/SCOPE_AUDIT.md is the full table, its open rows the list): a host
 # tempo (the ProcessContext; JX-8), the engine-rate settings other than the
-# default, host block sizes other than 512 through process(), FX tails past
-# 2.4 s, the DAW state (getState / setState, MIDI learn), user banks through
+# default, MIDI learn and the UI timer's model updates, user banks through
 # the patch browser, the editor (no JX GUI is ported).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -128,6 +127,14 @@ python3 "$HERE/jx_product_gate.py" --tooth-law --rates 48000 --patches 0 --on 0.
 python3 "$HERE/jx_product_gate.py" --rates 48000,96000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
 python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 61,34 --poly 2 --ctl 2 --on 0.55 --secs 2.4
 python3 "$HERE/jx_product_gate.py" --tooth-ctl --rates 48000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
+# HOST BLOCK SIZES (JX-13): the JUNO's set -- 64, 600, 128 and single-sample blocks -- through process()
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --block 64 --poly 1 --on 0.55 --secs 1.6
+python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 61 --block 600 --poly 2 --ctl 2 --on 0.55 --secs 1.6
+python3 "$HERE/jx_product_gate.py" --rates 96000 --patches 61 --block 128 --poly 1 --on 0.55 --secs 1.2
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 34 --block 1 --exact --on 0.5213 --off 0.6007 --secs 0.65
+# LONG RENDERS (JX-14): 6 s through process() -- effect tails after a short note, a long note
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 5,49 --on 0.55 --off 1.0 --secs 6.0
+python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 40 --on 0.55 --off 5.0 --secs 6.0
 # THE NOTE MODES (JX-12b): legato (no factory patch sets it), the assign modes, portamento and the arpeggiator set
 # at the start through process(), with seeded polyphony and controllers -- the plugin's own note path, lifted
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 3 --ctl 3 --on 0.55 --secs 2.4 \

@@ -19,10 +19,12 @@ engine HOST record (the voice count, the output gain stage, the engine rate).
   --tooth: the port reads patch k+1's data for patch k (one off) -- must be seen (exit 0 = bites)
 exit 0 = every window of every patch equal.
 """
+import atexit
 import ctypes
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -120,6 +122,7 @@ def main():
     patches = [int(x) for x in a[a.index('--patches') + 1].split(',')] if '--patches' in a else list(range(64))
     tooth = '--tooth' in a
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)

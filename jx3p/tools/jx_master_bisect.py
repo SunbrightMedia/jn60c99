@@ -22,10 +22,12 @@ differing sample are listed with their values.
   --tooth: the port built with JX_MASTER_TOOTH (the four effect-LFO sites' argument 0.0, the defect
   fixed 2026-10-10) -- every variant that reaches a site must differ.
 """
+import atexit
 import ctypes
 import hashlib
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -210,6 +212,7 @@ def main():
     k = int(a[0]) if a else 0
     n = int(a[1]) if len(a) > 1 else 12000
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = os.path.join(tmp, 'libjx3p.so')
     tooth = ['-DJX_MASTER_TOOTH=1'] if os.environ.get('JX_BISECT_TOOTH') == '1' else []
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] + tooth +

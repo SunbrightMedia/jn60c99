@@ -1,7 +1,7 @@
 // jx_wasm_run.mjs -- the DELIVERED JX-3P web engine (jx3p/gui/web/jx3p.js + jx3p.wasm) on the page's own
-// calls, in node: jx3p_init on the 96 kHz guest image, jx3p_recall, jx3p_product_open(host rate), then
-// jx3p_product_block per 256-sample block with that block's events (the page's ScriptProcessor and its
-// queue; JX-10). Prints JSON: per patch, the FNV-1a-64 of every block's L and R float bits.
+// calls, in node: jx3p_product_init on the 96 kHz guest image at the host rate (initialize's records queued:
+// JX-15b), jx3p_product_load_patch, then jx3p_product_block per 256-sample block with that block's events (the
+// page's ScriptProcessor and its queue; JX-10). Prints JSON: per patch, the FNV-1a-64 of every block's L and R float bits.
 // jx3p/tools/jx_wasm_check.py builds the plan (--plan FILE: {"rate": R, "blocks": [[[off, type, key, vel],
 // ...], ...]}) and runs the same calls through a native build.
 //   node jx3p/tools/jx_wasm_run.mjs --plan FILE [--dir DIR] [--patches 0,5,20,49]
@@ -27,7 +27,7 @@ const M = await Jx3pModule({
     cb(inst); return inst.exports;
   },
 });
-// the page's own data file: the 96 kHz guest image (the plugin's heap after its boot), as the page fetches it (.gz)
+// the page's own data file: the 96 kHz guest image (the plugin's heap as setActive leaves it), as the page fetches it (.gz)
 const gz = (f) => zlib.gunzipSync(fs.readFileSync(path.join(REPO, 'jx3p/gen', f)));
 M.FS.writeFile('/jx_guest.bin', gz('jx_guest_96k.bin.gz'));
 M.FS.writeFile('/bank.bin', fs.readFileSync(path.join(REPO, 'jx3p/truth/preset_bank_1.bin')));
@@ -41,12 +41,9 @@ function fnv(u8) {
 const pL = M._malloc(N * 4), pR = M._malloc(N * 4), pEv = M._malloc(QMAX * 16);
 const out = {};
 for (const p of PATCHES) {
-  if (!M.ccall('jx3p_init', 'number', ['string', 'string', 'string'],
-               ['/jx_guest.bin', '/bank.bin', ''])) { console.error('init failed'); process.exit(2); }
-  M.ccall('jx3p_recall', null, ['number'], [p]);
-  const err = M.ccall('jx3p_lift_error', 'string', [], []);
-  if (err) { console.error('the lifted parameter system trapped: ' + err); process.exit(2); }
-  if (M.ccall('jx3p_product_open', 'number', ['number'], [PLAN.rate]) < 0) { console.error('open failed'); process.exit(2); }
+  if (M.ccall('jx3p_product_init', 'number', ['string', 'string', 'number'],
+              ['/jx_guest.bin', '/bank.bin', PLAN.rate]) < 0) { console.error('init failed'); process.exit(2); }
+  M.ccall('jx3p_product_load_patch', null, ['number'], [p]);
   const hs = [];
   for (const evs of PLAN.blocks) {
     const v = new Int32Array(M.HEAPF32.buffer, pEv, QMAX * 4);   // the page's build exports HEAPF32 only
@@ -56,6 +53,8 @@ for (const p of PATCHES) {
     const mem = M.HEAPF32.buffer;
     hs.push(fnv(new Uint8Array(mem, pL, 4 * N)) + fnv(new Uint8Array(mem, pR, 4 * N)));
   }
+  const err = M.ccall('jx3p_lift_error', 'string', [], []);
+  if (err) { console.error('the lifted parameter system trapped: ' + err); process.exit(2); }
   out[p] = hs;
 }
 process.stdout.write(JSON.stringify(out));

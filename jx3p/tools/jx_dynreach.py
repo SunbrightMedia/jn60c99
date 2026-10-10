@@ -11,12 +11,17 @@ Recorded: every executed instruction address, and at every indirect call/jmp sit
 import stub reached (the parameter system calls none: EXECUTED 2026-10-10).
 
   python3 jx3p/tools/jx_dynreach.py OUT.json [--base A] [--patches 0-63] [--no-sweep]
-                                     [--ctl | --notes | --tick | --tempo | --rate]
+                                     [--ctl | --notes | --tick | --tempo | --rate | --boot NAME]
 
 --notes / --tick (JX-12b): the note entries under every assign mode, legato, portamento and arpeggiator setting,
 and the engine's clock tick under every step mode (notes_script / tick_script). --tempo (JX-8): the engine's
 tempo entry under every effect mode of the base patch (tempo_script). --rate (JX-15): the engine's setSampleRate
 to every rate of the setting table on the running engine (rate_script).
+--boot NAME (JX-15b): a FRESH instance's first block -- the engine as the plugin holds it after setActive (BUILD,
+setSampleRate(96000): the port's guest image), then what the first process() applies, in the plugin's order
+(EXECUTED, 2026-10-10: setSampleRate before every record when the rate setting asks for another rate): the
+switch (BOOT_RUNS), initialize's 83 records through the host entry, its all-sound-off record (CC 120) through the
+CC entry, the base patch's load, a key (boot_script).
 --ctl: instead of the loads and the sweep, the render driver's KIND-0 targets on the running engine (JX-12):
 the engine's CC entry (vt+0x88, 0x34AD50: 1 mod, 10, 11 expression, 64 sustain, 123 all notes off, and CCs it
 ignores), its bend entry (vt+0x98, 0x3F91B0), the three empty entries (vt+0x90 / +0xA0 / +0xA8), with keys
@@ -132,6 +137,34 @@ def rate_script(base=0):
     return out + [('off', 60, 0)]
 
 
+# the fresh-instance runs (--boot NAME): (the engine's rate at setActive, the rate the first block switches to or None)
+# -- the 96 kHz engine of the default setting under each rate of the setting table, one of the table's bytes past
+# its five rates (index 6: 31), and an engine built at 44100 (the 44 kHz guest image)
+BOOT_RUNS = {'boot': (96000.0, None), 'boot48': (96000.0, 48000.0), 'boot44': (96000.0, 44100.0),
+             'boot88': (96000.0, 88200.0), 'boot32': (96000.0, 32000.0), 'boot31': (96000.0, 31.0),
+             'bootat44': (44100.0, None)}
+
+
+def boot_engine(name):
+    """the engine a fresh instance holds before its first block: static init, BUILD, FTZ, setSampleRate(rate) --
+    no record applied (jx_emu.boot without product: initialize's records only QUEUE)"""
+    return J.JX().boot(BOOT_RUNS[name][0], snap=False, static_init=True)
+
+
+def boot_script(name, base=0):
+    """--boot NAME: the first block of a fresh instance, in the plugin's order: the rate switch (if the run has
+    one), initialize's records (jx3p/gen/jx_patch_records.json 'boot': 82 defaults and writePatch = 1, then the
+    all-sound-off message: CC 120 through the CC entry, as the render driver dispatches a kind-0 record), the base
+    patch's load, a key pressed and released around a clock tick"""
+    rec = J.JX.records()
+    sw = BOOT_RUNS[name][1]
+    out = [('setsr', sw)] if sw is not None else []
+    for kind, pid, val in rec['boot']:
+        out.append(('host', pid, val) if kind == 2 else ('cc', 120, 0))
+    out += [('host', pid, val) for kind, pid, val in rec['patches'][base] if kind == 2]
+    return out + [('on', 60, 100), ('tick',), ('off', 60, 0)]
+
+
 def ctl_call(jx, c):
     """one script call through the plugin's own entry; returns the calls it made, [(rva, rcx, rdx, r8, rax, x1)] --
     one, or nine for a 'setmode' (the setter on every unit's note store); x1: xmm1's low 32 bits when the entry
@@ -206,16 +239,21 @@ def main():
             prev[0] = e[1]
 
     t0 = time.time()
-    jx = J.JX().boot(44100.0, snap=False, product=True, patch=base)
-    jx.note_on(60, 100)
-    jx.render(2048, 256)
+    bootrun = opt('--boot', None)
+    if bootrun is not None:
+        jx = boot_engine(bootrun)
+    else:
+        jx = J.JX().boot(44100.0, snap=False, product=True, patch=base)
+        jx.note_on(60, 100)
+        jx.render(2048, 256)
     uc = jx.uc
     uc.ctl_flush_tb()
     uc.hook_add(UC_HOOK_BLOCK, block)
     recs = J.JX.records()['patches']
-    ctl = any(k in a for k in ('--ctl', '--notes', '--tick', '--tempo', '--rate'))
+    ctl = any(k in a for k in ('--ctl', '--notes', '--tick', '--tempo', '--rate', '--boot'))
     if ctl:
-        script = (ctl_script() if '--ctl' in a else notes_script() if '--notes' in a else tick_script() if '--tick' in a
+        script = (boot_script(bootrun, base) if bootrun is not None else
+                  ctl_script() if '--ctl' in a else notes_script() if '--notes' in a else tick_script() if '--tick' in a
                   else tempo_script(base) if '--tempo' in a else rate_script(base))
         for c in script:
             ctl_call(jx, c)

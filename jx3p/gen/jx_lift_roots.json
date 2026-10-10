@@ -1,5 +1,5 @@
 {
-"note": "jx_lift_roots.py: the slot-family closure of the reached virtual targets over the classes live in the plugin's heap after its boot (the code pointers the heap stores are listed, not roots), the control classes in full, the render driver's kind-0 targets and tick (the engine's vtable slots 0x78..0xB8) and the note store's 19 step functions (its mode setter's jump table)",
+"note": "jx_lift_roots.py: the slot-family closure of the reached virtual targets over the classes live in the plugin's heap after its boot (the code pointers the heap stores are listed, not roots), the control classes in full, the render driver's kind-0 targets, tick, tempo and rate entries (the engine's vtable slots 0x18, 0x78..0xB8) and the note store's 19 step functions (its mode setter's jump table)",
 "classes": [
 {
 "vtable": "9a1198",
@@ -549,6 +549,7 @@
 "365130",
 "365240",
 "3653b0",
+"3653c0",
 "3653d0",
 "365490",
 "365520",
@@ -575,6 +576,8 @@
 "366300",
 "366790",
 "3667c0",
+"377210",
+"389fa0",
 "399d00",
 "3deea0",
 "3deeb0",
@@ -947,9 +950,11 @@
 "3f90f0",
 "3f9150",
 "3f91b0",
+"3f9970",
 "3f9c60",
 "3f9c90",
 "3f9ce0",
-"3f9d30"
+"3f9d30",
+"3f9dd0"
 ]
 }

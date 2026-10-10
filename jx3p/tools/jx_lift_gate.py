@@ -33,6 +33,10 @@ heap after the calls (byte for byte), the stack (reported).
   --loads notes: the note entries under every assign mode, legato, portamento and ARPEGGIO setting, the sustain
   and all notes off and clock ticks among them (notes_script); --loads tick: the clock tick under all 19 step
   modes, each put into every unit's note store by the plugin's own setter (tick_script) -- JX-12b.
+  --loads boot | boot48 | boot44 | boot88 | boot32 | boot31 | bootat44 (JX-15b): a FRESH instance -- the engine as
+  setActive leaves it (BUILD, setSampleRate at 96000; bootat44: 44100), nothing applied -- and its first block in
+  the plugin's order: the rate switch the run names, initialize's 83 records and its CC 120, the base patch's load,
+  a key (jx_dynreach.py boot_script).
   --census OUT: no grading but a CENSUS (jx_lift_census.c): the same replay with every region's pages armed --
   which 4 KB pages of the heap, the image and the stack the lifted calls read and write; the replay must end
   EXACT or nothing is written.
@@ -67,9 +71,20 @@ REACH = (('dynreach_loads.json', ['--no-sweep']), ('dynreach_sweep.json', []),
          # the note entries under every assign mode, legato, portamento and ARPEGGIO, and the clock tick under every
          # step mode (JX-12b: the port runs the plugin's own note path and tick)
          ('dynreach_notes.json', ['--notes']), ('dynreach_notes_b34.json', ['--base', '34', '--notes']),
-         ('dynreach_tick.json', ['--base', '34', '--tick']))
+         ('dynreach_tick.json', ['--base', '34', '--tick']),
+         # the tempo entry under every effect mode (JX-8) and setSampleRate on the running engine (JX-15)
+         ('dynreach_tempo.json', ['--tempo']), ('dynreach_tempo_b34.json', ['--base', '34', '--tempo']),
+         ('dynreach_rate.json', ['--rate']), ('dynreach_rate_b34.json', ['--base', '34', '--rate']),
+         # a FRESH instance's first block (JX-15b): the engine after setActive, the rate switch, initialize's
+         # records and the patch load, in the plugin's order (jx_dynreach.py BOOT_RUNS)
+         ('dynreach_boot.json', ['--boot', 'boot']), ('dynreach_boot48_b34.json', ['--base', '34', '--boot', 'boot48']),
+         ('dynreach_boot44.json', ['--boot', 'boot44']), ('dynreach_boot88.json', ['--boot', 'boot88']),
+         ('dynreach_boot32_b34.json', ['--base', '34', '--boot', 'boot32']), ('dynreach_boot31.json', ['--boot', 'boot31']),
+         ('dynreach_bootat44.json', ['--boot', 'bootat44']))
 SCRIPTS = {'ctl': 'ctl_script', 'notes': 'notes_script', 'tick': 'tick_script',      # jx_dynreach.py's scripts
            'tempo': 'tempo_script', 'rate': 'rate_script'}
+BOOTS = ('boot', 'boot48', 'boot44', 'boot88', 'boot32', 'boot31', 'bootat44')      # jx_dynreach.py BOOT_RUNS
+SCRIPTS.update((b, 'boot_script') for b in BOOTS)
 XMM1_OFF = 16 * 8 + 16                     # jp8_cpu.h CPU: r[16], then x[16] of 16 bytes -- xmm1
 RET = 0x100000 + 0x5000                    # jx_emu.call's return sentinel (SCRATCH + 0x5000)
 CPU_SZ, RSP_OFF, RAX_OFF, MX_OFF = 512, 4 * 8, 0, 16 * 8 + 16 * 16 + 5 * 4     # jp8_cpu.h CPU
@@ -86,9 +101,14 @@ def lift_source(dst, extra=()):
 def oracle(ref, base, loads):
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     import jx_emu as J
-    jx = J.JX().boot(44100.0, snap=False, product=True, patch=base)
-    jx.note_on(60, 100)
-    jx.render(2048, 256)
+    if loads[0] in BOOTS:                      # a fresh instance before its first block (JX-15b)
+        sys.path.insert(0, HERE)
+        import jx_dynreach as D
+        jx = D.boot_engine(loads[0])
+    else:
+        jx = J.JX().boot(44100.0, snap=False, product=True, patch=base)
+        jx.note_on(60, 100)
+        jx.render(2048, 256)
     uc = jx.uc
     os.makedirs(ref, exist_ok=True)
     w = lambda name, a, n: open(os.path.join(ref, name), 'wb').write(bytes(uc.mem_read(a, n)))
@@ -145,7 +165,8 @@ def oracle(ref, base, loads):
         sys.path.insert(0, HERE)
         import jx_dynreach as D
         script = getattr(D, SCRIPTS[loads[0]])
-        for n, c in enumerate(script(base) if loads[0] in ('tempo', 'rate') else script()):
+        for n, c in enumerate(script(loads[0], base) if loads[0] in BOOTS else
+                              script(base) if loads[0] in ('tempo', 'rate') else script()):
             for fn, rcx, rdx, r8, rax, x1 in D.ctl_call(jx, c):
                 calls.append(dict(fn=fn, rcx=rcx, rdx=rdx, r8=r8, r9=0, mx=mx, rax=rax, **({} if x1 is None else {'x1': x1})))
             calls.append(dict(check=hashlib.sha256(bytes(uc.mem_read(J.HEAP_BASE, heap_end - J.HEAP_BASE))).hexdigest(),
@@ -313,25 +334,29 @@ def census(ref, so, out):
 
 
 CENSUS = ((0, 'all'), (34, 'all'), (0, 'sweep'), (34, 'sweep'), (0, 'ctl'), (34, 'ctl'), (0, 'notes'), (34, 'notes'),
-          (34, 'tick'))
+          (34, 'tick'), (0, 'tempo'), (34, 'tempo'), (0, 'rate'), (34, 'rate'),
+          (0, 'boot'), (34, 'boot48'), (0, 'boot44'), (0, 'boot88'), (34, 'boot32'), (0, 'boot31'), (0, 'bootat44'))
 
 
 def pages(outs):
     """the census runs merged: jx3p/gen/jx_lift_pages.json"""
-    img, stack, rows = set(), set(), []
+    img, stack, rows, p0 = set(), set(), [], set()
     for o in outs:
         c = json.load(open(o))
         img.update(r for r, f in c['pages']['image'])
         stack.update(a - c['rsp'] for a, f in c['pages']['stack'])
-        if c['pages']['page0']:
-            raise SystemExit('census %s: page 0 touched -- the guest image carries no page 0' % o)
+        # page 0: READ only -- the CRT's stack probe reads gs:[0x10] (the oracle's GS base is 0, its page 0 zero;
+        # the port maps a zero page 0) -- and never written
+        if any(f & 2 for _, f in c['pages']['page0']) or any(a >= 0x1000 for a, _ in c['pages']['page0']):
+            raise SystemExit('census %s: page 0 written, or touched past its first 4 KB -- the port maps 4 KB of zeros' % o)
+        p0.update(a for a, _ in c['pages']['page0'])
         rows.append(dict(base=c['base'], loads=c['loads'][0] if c['loads'][0] in ('sweep',) + tuple(SCRIPTS) else 'all', calls=c['calls'],
                          heap=len(c['pages']['heap']), heap_written=sum(1 for _, f in c['pages']['heap'] if f & 2),
                          image=len(c['pages']['image'])))
     dst = os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_pages.json')
     json.dump(dict(note='jx_lift_gate.py --pages: the pages the lifted parameter system touches (image: rvas; '
                         'stack: offsets from the calls\' rsp), the union of the census runs',
-                   image=sorted(img), stack=sorted(stack), runs=rows), open(dst, 'w'), indent=1)
+                   image=sorted(img), stack=sorted(stack), page0=sorted(p0), runs=rows), open(dst, 'w'), indent=1)
     print('jx_lift_pages.json: %d image pages, stack pages %s; %s' % (
         len(img), ' '.join('%+#x' % s for s in sorted(stack)), '; '.join(
             'base %d %s: heap %d (%d written), image %d' % (r['base'], r['loads'], r['heap'], r['heap_written'],
@@ -432,6 +457,10 @@ def main():
         base, 'the controller and note calls through the lifted engine entries' if loads == 'ctl' else
         'the note entries under every note mode through the lifted engine entries' if loads == 'notes' else
         'the clock tick under every step mode through the lifted engine entries' if loads == 'tick' else
+        'the tempo entry under every effect mode through the lifted engine entry' if loads == 'tempo' else
+        'setSampleRate on the running engine through the lifted engine entry' if loads == 'rate' else
+        'a fresh instance\'s first block (%s: the rate switch, initialize\'s records, the patch load) through the '
+        'lifted entries' % loads if loads in BOOTS else
         'warm loads %s through the lifted host entry' % loads,
         'EXACTLY 0 -- every return value and heap byte' if not r.returncode else 'RED'))
     return r.returncode

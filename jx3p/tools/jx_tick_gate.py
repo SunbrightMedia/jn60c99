@@ -39,11 +39,13 @@ exit 0 = every object equal after every event, every state equal at every checkp
 should play played, and the graded modes cover REACHABLE (product runs), ENTRY (with the SCATTER
 variants) and all 19 (the setter).
 """
+import atexit
 import ctypes
 import hashlib
 import json
 import os
 import random
+import shutil
 import struct
 import subprocess
 import sys
@@ -270,6 +272,7 @@ def main():
     seed, tooth = int(opt('--seed', '1')), '--tooth' in a
     full = not any(k in a for k in ('--patches', '--variants', '--no-variants', '--setmode', '--no-setmode'))
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = os.path.join(tmp, 'libjx3p.so')
     extra = []
     if tooth:                                 # the lifted source with the step clock's increment dropped

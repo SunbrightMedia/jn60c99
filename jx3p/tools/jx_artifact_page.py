@@ -124,9 +124,9 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
   const [t,b]=await Promise.all([gunzip(b64bytes(B64.guest)), gunzip(b64bytes(B64.bank))]);
   mod.FS.writeFile('/g.bin',t);
   mod.FS.writeFile('/b.bin',b);
-  if(!mod.ccall('jx3p_init','number',['string','string','string'],
-                ['/g.bin','/b.bin',''])){ lcd('ENGINE INIT FAILED'); return; }
-  const recall=i=>{ mod.ccall('jx3p_recall',null,['number'],[i]);
+  let ctx=null;
+  /* the plugin's patch browser: the patch's records queued for the next block (JX-15b) */
+  const recall=i=>{ if(ctx) mod.ccall('jx3p_product_load_patch',null,['number'],[i]);
     lcd('PATCH '+String(i+1).padStart(2,'0')+'  -  READY');
     document.querySelectorAll('.patchbtn').forEach((el,k)=>
       el.classList.toggle('sel',k===i));
@@ -142,12 +142,14 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
     d.onclick=()=>recall(i); strip.appendChild(d); }
   recall(0);
   const N=256, pL=mod._malloc(N*4), pR=mod._malloc(N*4), QMAX=128, pEv=mod._malloc(QMAX*16), queue=[];
-  let ctx=null;
   const power=document.getElementById('power');
   power.disabled=false;
   power.onclick=()=>{ if(ctx) return;
     ctx=new AudioContext({sampleRate:44100});
-    if(mod.ccall('jx3p_product_open','number',['number'],[ctx.sampleRate])<0){ lcd('RENDER OBJECT FAILED'); return; }
+    /* a fresh instance at the host rate: initialize's records queued for the first block, then the patch's */
+    if(mod.ccall('jx3p_product_init','number',['string','string','number'],['/g.bin','/b.bin',ctx.sampleRate])<0){
+      lcd('ENGINE INIT FAILED'); return; }
+    mod.ccall('jx3p_product_load_patch',null,['number'],[sel.value|0]);
     const node=ctx.createScriptProcessor(N,0,2);
     node.onaudioprocess=e=>{
       const n=Math.min(queue.length,QMAX), v=new Int32Array(mod.HEAPF32.buffer,pEv,QMAX*4);

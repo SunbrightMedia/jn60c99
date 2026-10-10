@@ -165,6 +165,14 @@ static int jxg_call(uint64_t rva, uint64_t rcx, uint64_t rdx, uint64_t r8, uint6
     return 0;
 }
 
+/* one call whose float argument is in xmm1 (setSampleRate: engine vt+0x18), the rest as jxg_call */
+static int jxg_call_f1(uint64_t rva, uint64_t rcx, float f)
+{
+    memset(&G.cpu.x[1], 0, sizeof G.cpu.x[1]);
+    G.cpu.x[1].f[0] = f;
+    return jxg_call(rva, rcx, 0, 0, 0, NULL);
+}
+
 /* ---- the engine HOST's cells (jx3p/docs/HOST_LAYER.md 3: the render 0x3F9220 reads them) ---- */
 #define H_NVOICES 0x38
 #define H_GAIN    0x860
@@ -230,7 +238,7 @@ static int guest_load(const char *path)
 #define NEED(k) do { if (o + (k) > len - 4) return 0; } while (0)
     if (!b) return 0;
     G.file = b;
-    if (len < 96 || memcmp(b, "JXG1", 4) || gi(b + 4) != 1) return 0;
+    if (len < 96 || memcmp(b, "JXG1", 4) || gi(b + 4) != 2) return 0;   /* 2: before initialize's records */
     memcpy(&crc, b + len - 4, 4);
     if (crc32_le(b, len - 4) != crc) return 0;
     memcpy(&G.hb, b + o, 8); memcpy(&G.hlen, b + o + 8, 8); memcpy(&G.hostg, b + o + 16, 8);
@@ -238,6 +246,11 @@ static int guest_load(const char *path)
     memcpy(&G.rsp, b + o + 48, 8); o += 56;
     memcpy(&G.mx, b + o, 4); memcpy(&G.rate0, b + o + 4, 4); o += 8;
     if (jp8_map(G.hb, G.hlen) || jp8_map(G.slo, G.slen)) return 0;
+    /* PAGE 0, zero (JX-15): the CRT's stack probe (__chkstk, rva 0x6AC420, under setSampleRate's big frames) reads
+     * the thread block's stack limit gs:[0x10]; the oracle's GS base is 0 and its page 0 is zero, so the limit is
+     * 0 and nothing is probed. The lift reads gs:[d] at d: the port maps the same zeros (the census refuses any
+     * write to page 0: jx_lift_gate.py --pages) */
+    if (jp8_map(0, 0x1000)) return 0;
     jx_g2h_delta = (unsigned long long)(uintptr_t)jp8_host(G.hb) - G.hb;
     NEED(4); memcpy(&n, b + o, 4); o += 4;
     for (uint32_t i = 0; i < n; ++i) {                      /* the heap's nonzero runs */
@@ -320,20 +333,33 @@ static int guest_link(void)
     return 1;
 }
 
-/* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): what a previous
- * call held is freed. image_path: the guest image (jx3p/gen/jx_guest_44k.bin.gz or _96k, inflated: jx3p/tools/jx_guest.py); bank_path: the bank
- * file; the third argument is unused (it named the old recall data). */
+/* a FRESH instance: what a previous one held is freed; the guest image (JXG1 version 2, jx_guest_export.py: the
+ * engine as setActive leaves it -- BUILD, setSampleRate at the image's rate --, no record applied), the model's
+ * state at its boot, the bank file */
+static void jx_state_boot(void);
+static int jx_boot_apply(void);
+static int jx_open(const char *image_path, const char *bank_path)
+{
+    size_t bl;
+    uint8_t *bk;
+    jx_release();
+    if (!guest_load(image_path) || !guest_link()) { jx_release(); return 0; }
+    jx_state_boot();
+    if (!(bk = read_file(bank_path, &bl))) { jx_release(); return 0; }
+    G.bank = bk; G.bank_len = bl;
+    return 1;
+}
+/* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch), with initialize's
+ * records applied at once through the lifted host entry: the engine of the oracle's boot(product=True)
+ * (tools/verify/jx_emu.py product_boot), for the gates that drive the engine directly (jx3p_recall, jx3p_render).
+ * The product path queues those records for its first block instead, as the plugin does (jx3p_product_init).
+ * image_path: the guest image (jx3p/gen/jx_guest_44k.bin.gz or _96k, inflated: jx3p/tools/jx_guest.py); bank_path:
+ * the bank file; the third argument is unused (it named the old recall data). Returns 0 on a failure -- a trap in
+ * the records too (jx3p_lift_error says which). */
 int jx3p_init(const char *image_path, const char *bank_path, const char *unused)
 {
     (void)unused;
-    jx_release();
-    if (!guest_load(image_path) || !guest_link()) { jx_release(); return 0; }
-    {   size_t bl;
-        uint8_t *bk = read_file(bank_path, &bl);
-        if (!bk) { jx_release(); return 0; }
-        G.bank = bk; G.bank_len = bl;
-    }
-    return 1;
+    return jx_open(image_path, bank_path) && jx_boot_apply();
 }
 
 /* the last lifted call's trap (an access outside the blocks, an indirect target not lifted, an unsupported
@@ -652,7 +678,7 @@ long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS && G.kt[u]) ? (long
  * gives zeros. */
 #include "../../src/juno_conv.c"
 /* the render driver's state (jx3p_product_block below) */
-#define JX_DRV_QMAX 256
+#define JX_DRV_QMAX 4096           /* the plugin's queue is a vector: past this the port reports a trap */
 typedef struct { int off, st, note, vel, kind; } jx_drv_rec;   /* kind 0 a MIDI message (st its status byte, note
                                                                 * and vel its data bytes), 1 a host parameter
                                                                 * record (note the id, vel the float value's bits),
@@ -661,8 +687,29 @@ typedef struct { int off, st, note, vel, kind; } jx_drv_rec;   /* kind 0 a MIDI 
 static jx_drv_rec g_drv_carry[JX_DRV_QMAX]; static int g_drv_ncarry;
 static jx_drv_rec g_drv_pend[JX_DRV_QMAX]; static int g_drv_npend;     /* jx3p_product_param's points */
 static long long g_drv_ph; static int g_drv_notes, g_drv_rate;
+/* THE HOST TEMPO (JX-8): process()'s ProcessContext tempo for the next blocks and whether the host marks it
+ * valid (kTempoValid); the tempo x 10 last given to the engine (core+580, -1 at the boot) */
+static double g_drv_tempo = 120.0; static int g_drv_tempo_valid, g_drv_tempo_last = -1;
 
 static juno_ro g_ro; static int g_ro_on;
+/* THE ENGINE-RATE SETTING (JX-15): the rate the next block switches the engine to (core+0x24C) -- the setting
+ * listener (rva 0x3221D0 = the JUNO's 0x3222F0) sets it from vm.vs.sampleRate & 0x7F: JX_SRATE[v] (0..4: 96000,
+ * 88200, 48000, 44100, 32000; 6..127 the image's bytes past the table, rates no render object holds: silence),
+ * 5 the automatic setting -- the engine's current rate, rounded (rva 0x34B120) */
+#include "../src/jx_srate.h"
+static int g_eng_req;
+#define JX_SETSR 0x3F9970          /* the engine's setSampleRate, vt+0x18 (the rate a float in xmm1), LIFTED */
+static int jx_engine_rate_now(void)
+{
+    double r = (double)jxg_rate();
+    r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+    return !(r >= -2147483647.0) ? (int)0x80000001u : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
+}
+static void jx_setting_listener(int32_t v)
+{
+    v &= 0x7F;
+    g_eng_req = v == 5 ? jx_engine_rate_now() : JX_SRATE[v];
+}
 static void jx_ro_engine(void *user, float *const *ptrs, int nch, int count)
 {
     (void)user; (void)nch;
@@ -677,6 +724,8 @@ int jx3p_product_open(int host_rate)
     juno_ro_init(&g_ro, (int)jxg_rate(), host_rate);
     g_ro_on = 1;
     g_drv_rate = host_rate; g_drv_ph = 0; g_drv_notes = 0; g_drv_ncarry = 0;   /* the driver at instance start */
+    g_eng_req = (int)jxg_rate();              /* the setting's default (0: 96000) is the image's engine rate */
+    g_drv_tempo = 120.0; g_drv_tempo_valid = 0; g_drv_tempo_last = -1;
     g_drv_npend = 0;
     G.host_stage_off = 0;
     if (juno_ro_lookup(&g_ro) < 0) return -1;
@@ -737,8 +786,9 @@ static int32_t jx_midi_record_value(int e, float v)
  * every other CC nothing), 0xE0 bend (vt+0x98, 0x3F91B0) with data1 + ((data2 - 64) << 7) as 16 bits -- all four
  * LIFTED (jx_lift_roots.py CONTROL_SLOTS; JX-12, JX-12b) --;
  * 0xA0 (vt+0xA0), 0xC0 (vt+0x90), 0xD0 (vt+0xA8): `ret 0` (READ) */
-#define JX_CC_ENTRY   0x34AD50
-#define JX_BEND_ENTRY 0x3F91B0
+#define JX_CC_ENTRY    0x34AD50
+#define JX_BEND_ENTRY  0x3F91B0
+#define JX_TEMPO_ENTRY 0x3F9DD0     /* vt+0xB0: T in 400..3000 -> every unit's dispatch 375 (READ); LIFTED (JX-8) */
 static void drv_apply(const jx_drv_rec *r)
 {
     if (r->kind == 2) { jx3p_param(r->note, r->vel); return; }   /* the engine's host entry (JX-11) */
@@ -798,25 +848,380 @@ static float jx_midi_cc_value(int e, int cc)
 static void drv_pend(int kind, int off, int st, int a, int b)
 {
     jx_drv_rec *r;
-    if (g_drv_npend >= JX_DRV_QMAX) return;
+    if (g_drv_npend >= JX_DRV_QMAX) {          /* never a silent drop: the port is no longer the plugin */
+        if (!G.lift_err) { G.lift_err = 1; snprintf(G.lift_msg, sizeof G.lift_msg, "the driver's queue is full (%d)", JX_DRV_QMAX); }
+        return;
+    }
     r = &g_drv_pend[g_drv_npend++];
     r->off = off; r->kind = kind; r->st = st; r->note = a; r->vel = b;
 }
-/* the push (rva 0x31F3C0): a CC the boot's map assigns (no MIDI learn slot open: the port has no learn) first
- * queues its parameter's record (kind 1, the CC value law); then every message its own record, after the
- * wrapper's rules (the model's records the push also makes -- the UI timer's -- are not ported: no model) */
+/* ---- THE DAW STATE (JX-17): the model's parameter store and the core's CC map, as getState writes them and
+ * setState reads them -- the JUNO-60's wrapper code (jx3p/tools/fw_map.py: getState 0x349EA0, setState 0x34AAA0,
+ * its deserializer, the CC map 0x31A4F0 / 0x31A6A0 / 0x319A60 / 0x319B90 -- the JUNO port's gui/juno_bridge.c and
+ * src/juno_midi.c, CLAIMS A31 / A32) on the JX's tables: jx3p/src/jx_state_tables.h (EXECUTED through the
+ * plugin's own getState / setState, jx_state_census.py) and jx_midi_tables.h ---- */
+#include "../src/jx_state_tables.h"
+#ifndef JX_KS_TOOTH      /* MUTANT (jx_state_gate.py --mutants): 1 KEY HOLD at 0 releases nothing */
+#define JX_KS_TOOTH 0
+#endif
+#ifndef JX_STATE_TOOTH   /* MUTANTS (jx_state_gate.py --mutants): 1 no float link, 2 the limit from the state list, */
+#define JX_STATE_TOOTH 0 /* 3 the store unmasked -- each must make the gate RED */
+#endif
+static int32_t g_store[JX_STATE_N];                 /* the model's value of each state parameter */
+/* the CC map (core+24): the record CC n drives (an entry of JX_MIDI_PARAM, -1 none), each record's own CC, the
+ * record a MIDI learn waits for (-1 none) */
+static struct { int8_t map[128]; int8_t rec[JX_MIDI_PARAM_N]; int learn; } g_cc;
+typedef char jx_cc_rec_fits[(JX_MIDI_PARAM_N <= 127) ? 1 : -1];
+/* rva 0x31A4F0 (-1): the map emptied, every record's CC -1 (a waiting learn is kept) */
+static void jx_cc_clear(void) { memset(g_cc.map, 0xFF, sizeof g_cc.map); memset(g_cc.rec, 0xFF, sizeof g_cc.rec); }
+/* the instance as the plugin creates it: the store at initialize's defaults, the boot's CC assignment, no learn */
+static void jx_ks_boot(void);
+static void jx_state_boot(void)
+{
+    jx_ks_boot();
+    for (int k = 0; k < JX_STATE_N; ++k) g_store[k] = JX_STATE_ENT[k].dflt;
+    jx_cc_clear();
+    for (int cc = 0; cc < 128; ++cc)
+        if (JX_CC_MAP[cc] >= 0) { g_cc.map[cc] = (int8_t)JX_CC_MAP[cc]; g_cc.rec[JX_CC_MAP[cc]] = (int8_t)cc; }
+    g_cc.learn = -1;
+}
+/* ---- INITIALIZE (JX-15b): IComponent::initialize QUEUES, for the first block, the 82 state parameters' defaults in
+ * list order, writePatch (0x0FFFC01D) = 1 and the all-sound-off message (CC 120) -- EXECUTED (jx_state_census.py;
+ * jx3p/gen/jx_patch_records.json 'boot' holds the same 83 kind-2 records: jx_gen_state_tables.py checks it).
+ * setActive has set the engine's rate (setSampleRate 96000, the guest image) and applies none of them. The first
+ * process() switches the engine's rate when the rate setting asks for another, THEN applies the queue (EXECUTED
+ * 2026-10-10: setSampleRate before every record) -- so a setState holding the rate setting before the first block
+ * gives an engine whose defaults were set at the new rate ---- */
+static int jx_boot_apply(void)            /* the records at once, on the engine (jx3p_init) */
+{
+    for (int k = 0; k < JX_STATE_N; ++k)
+        if (jxg_call(HOSTPARAM, G.hostg, JX_STATE_ENT[k].id, (uint64_t)(uint32_t)JX_STATE_ENT[k].dflt, 0, NULL)) return 0;
+    return !jxg_call(HOSTPARAM, G.hostg, JX_STATE_WRITEPATCH, 1, 0, NULL);
+}
+static void jx_boot_queue(void)           /* the records queued for the first block (jx3p_product_init) */
+{
+    for (int k = 0; k < JX_STATE_N; ++k) drv_pend(2, 0, 0, (int)JX_STATE_ENT[k].id, JX_STATE_ENT[k].dflt);
+    drv_pend(2, 0, 0, (int)JX_STATE_WRITEPATCH, 1);
+    drv_pend(0, 0, JX_STATE_BOOT_MIDI0, JX_STATE_BOOT_MIDI1, JX_STATE_BOOT_MIDI2);
+}
+/* A FRESH INSTANCE ON THE PRODUCT PATH (JX-15b) -- createInstance, initialize, setupProcessing(host_rate), setActive:
+ * the guest image as setActive leaves the engine, the render object for (the engine's rate, host_rate), and
+ * initialize's records queued for the first block; a patch load (jx3p_product_load_patch), a setState
+ * (jx3p_state_load) and the first block's events queue after them, as the plugin's do. Returns the render object's
+ * kind (jx3p_product_open: 0 identity, 1 converter, 2 silence), -1 on a failure. */
+int jx3p_product_init(const char *image_path, const char *bank_path, int host_rate)
+{
+    int kind;
+    if (!jx_open(image_path, bank_path) || (kind = jx3p_product_open(host_rate)) < 0) return -1;
+    jx_boot_queue();
+    return kind;
+}
+/* rva 0x319A60: the record CC `cc` drives, -1 when none or while a learn waits */
+static int jx_cc_lookup(int cc)
+{
+    if (g_cc.learn >= 0 || cc < 0 || cc > 127) return -1;
+    return g_cc.map[cc];
+}
+/* rva 0x31A6A0, one state entry: 0 when `id` is not 0x10000000 + 0..127; else 1, and a value >= 0 the id map
+ * knows assigns CC n to that record (a negative or unknown value: CC n stays free) */
+static int jx_cc_state_entry(uint32_t id, int32_t v)
+{
+    uint32_t cc = id - JX_STATE_CC_BASE;
+    int e;
+    if (cc > 0x7Fu) return 0;
+    if (v < 0) return 1;
+    e = jx_midi_entry((uint32_t)v);
+    if (e < 0) return 1;
+    g_cc.map[cc] = (int8_t)e;
+    g_cc.rec[e] = (int8_t)cc;
+    return 1;
+}
+static int jx_state_index(uint32_t id)
+{
+    for (int k = 0; k < JX_STATE_N; ++k) if (JX_STATE_ENT[k].id == id) return k;
+    return -1;
+}
+/* the model's set of state entry k: the LFO RATE (0x00600004) and VCF CUTOFF (0x0060003A) bytes also set their
+ * host-only float (0x00A00000 / 0x00A02802) to byte x (1 / 255) in single precision -- the JUNO-60's model law
+ * (gui/juno_bridge.c store_put), the same ids in the JX (EXECUTED: jx_state_gate.py, a byte set alone) */
+static void jx_store_put(int k, int32_t v)
+{
+    uint32_t id = JX_STATE_ENT[k].id;
+    g_store[k] = v;
+    if (id == 0x0FFFC015u) jx_setting_listener(v);       /* vm.vs.sampleRate: the core's listener, at once */
+    if (JX_STATE_TOOTH != 1 && (id == 0x00600004u || id == 0x0060003Au)) {
+        float h = (float)v * (1.0f / 255.0f);
+        int kh = jx_state_index(id == 0x00600004u ? 0x00A00000u : 0x00A02802u);
+        if (kh >= 0) memcpy(&g_store[kh], &h, 4);
+    }
+}
+/* ---- THE UI TIMER'S QUEUE AND THE KEYBOARD'S NOTE VALUE (JX-17b): the JUNO-60's code (CLAIMS A32 / A36,
+ * gui/juno_bridge.c ui_push / ui_push_midi / ks_* / juno_gui_ui_tick; the JX's UI timer handler 0x320000, the
+ * push's store record 0x3220D0, the learn 0x31A920 / 0x319B70 / 0x3191C0 == the JUNO's, fw_map --pair) ----
+ * The push queues, besides the engine's records, a second queue the UI timer drains every 50 ms on the plugin's
+ * UI thread: a mapped CC's parameter value (only its last one stays; KEY HOLD's in order) and every note. The
+ * drain sets the store from it, the notes into the keyboard's note value (ms.ch[0].note: per key the last
+ * velocity, minus a note-off's), the first CC below 120 to a waiting MIDI learn. KEY HOLD = 0 -- in a setState
+ * entry, a patch load, the drain -- releases every key above 0: a note-off record per key into the engine's
+ * queue (the note value's listener 0x321A10, the wrapper's rules). */
+#define JX_KEY_HOLD 0x00600138u
+#define KS_NONE (-2147483647 - 1)
+static struct { uint32_t id; float f; } g_ui_q[JX_STATE_N];
+static int g_ui_nq, g_ui_cc;
+static int g_ks_note[128], g_ks_pend[128];
+static struct { int32_t v; int w0; } g_ks_kh[64];
+static unsigned char g_ks_wkey[1024]; static int g_ks_wval[1024];
+static int g_ks_nkh, g_ks_nw;
+static unsigned char g_ks_lkey[1024]; static int g_ks_lval[1024]; static int g_ks_ln;
+static void jx_wrapper_midi(unsigned char m[3]);
+static void jx_ks_boot(void)
+{
+    g_ui_nq = 0; g_ui_cc = -1; g_ks_nkh = g_ks_nw = g_ks_ln = 0;
+    for (int k = 0; k < 128; ++k) { g_ks_note[k] = 0; g_ks_pend[k] = KS_NONE; }
+}
+static void jx_unported(const char *what)
+{
+    if (!G.lift_err) { G.lift_err = 1; snprintf(G.lift_msg, sizeof G.lift_msg, "past a bound of the port: %s", what); }
+}
+/* the push's store record (rva 0x3220D0): KEY HOLD's go in order with their value (the record law); any other
+ * parameter's earlier record leaves the queue and this one goes last */
+static void jx_ui_push(uint32_t id, float f)
+{
+    int i;
+    if (id == JX_KEY_HOLD) {
+        int e = jx_midi_entry(id);
+        if (g_ks_nkh >= 64) { jx_unported("KEY HOLD records"); return; }
+        g_ks_kh[g_ks_nkh].v = e >= 0 ? jx_midi_record_value(e, f) : 0;
+        g_ks_kh[g_ks_nkh].w0 = g_ks_nw;
+        ++g_ks_nkh;
+        return;
+    }
+    for (i = 0; i < g_ui_nq && g_ui_q[i].id != id; ++i) ;
+    if (i < g_ui_nq) { memmove(&g_ui_q[i], &g_ui_q[i + 1], (size_t)(g_ui_nq - i - 1) * sizeof g_ui_q[0]); --g_ui_nq; }
+    if (g_ui_nq < JX_STATE_N) { g_ui_q[g_ui_nq].id = id; g_ui_q[g_ui_nq].f = f; ++g_ui_nq; }
+}
+/* the push's own MIDI record into the second queue: a note is a write the drain will make (on -> velocity, off ->
+ * -velocity, whatever the channel) */
+static void jx_ui_push_midi(const unsigned char m[3])
+{
+    int st = m[0] & 0xF0, key = m[1] & 0x7F, v = st == 0x90 ? (int)m[2] : -(int)m[2], i;
+    if (st != 0x90 && st != 0x80) return;
+    if (!g_ks_nkh) { g_ks_pend[key] = v; return; }
+    for (i = g_ks_kh[g_ks_nkh - 1].w0; i < g_ks_nw && g_ks_wkey[i] != key; ++i) ;
+    if (i == g_ks_nw) {
+        if (g_ks_nw >= (int)sizeof g_ks_wkey) { jx_unported("note writes"); return; }
+        g_ks_wkey[g_ks_nw++] = (unsigned char)key;
+    }
+    g_ks_wval[i] = v;
+}
+/* the note value's listener (rva 0x321A10): one MIDI record per change, kind 0 at offset 0 -- above 0 a note-on at
+ * that velocity, else a note-off at minus the value (its low byte) -- through the wrapper's rules, for the engine */
+static void jx_ks_queue(int key, int value)
+{
+    unsigned char m[3];
+    m[0] = value > 0 ? 0x90 : 0x80;
+    m[1] = (unsigned char)key;
+    m[2] = value > 0 ? (unsigned char)value : (unsigned char)(-(signed char)value);
+    jx_wrapper_midi(m);
+    drv_pend(0, 0, m[0], m[1], m[2]);
+}
+static void jx_ks_append(int key, int value)
+{
+    if (g_ks_ln >= (int)sizeof g_ks_lkey) { jx_unported("the note value's change list"); return; }
+    g_ks_lkey[g_ks_ln] = (unsigned char)key; g_ks_lval[g_ks_ln] = value; ++g_ks_ln;
+}
+static void jx_ks_listen(void) { for (int i = 0; i < g_ks_ln; ++i) jx_ks_queue(g_ks_lkey[i], g_ks_lval[i]); }
+static void jx_ks_commit(void) { g_ks_ln = 0; }
+/* KEY HOLD at 0 (the core's model handler): every key above 0 released (key order, each to 0, each an entry of the
+ * change list), then the listener queues the whole change list */
+static void jx_ks_release(void)
+{
+#if JX_KS_TOOTH != 1
+    for (int k = 0; k < 128; ++k)
+        if (g_ks_note[k] > 0) { g_ks_note[k] = 0; jx_ks_append(k, 0); }
+    jx_ks_listen();
+#endif
+}
+/* THE UI TIMER'S HANDLER (the core's slot 1, rva 0x320000; the plugin runs it every 50 ms on its UI thread, the
+ * port when the app calls this): the notes into the note value, the store records into the store (KEY HOLD at 0
+ * releases there), the first CC to a waiting MIDI learn; the model's commit at its end */
+static int jx_cc_learn_done(int cc);
+void jx3p_ui_tick(void)
+{
+    int i, j, kh = jx_state_index(JX_KEY_HOLD);
+    for (i = 0; i < 128; ++i)
+        if (g_ks_pend[i] != KS_NONE) { g_ks_note[i] = g_ks_pend[i]; g_ks_pend[i] = KS_NONE; }
+    for (j = 0; j < g_ks_nkh; ++j) {
+        int end = j + 1 < g_ks_nkh ? g_ks_kh[j + 1].w0 : g_ks_nw;
+        if (kh >= 0) jx_store_put(kh, g_ks_kh[j].v);
+        if (kh >= 0 && g_store[kh] == 0) jx_ks_release();
+        for (i = g_ks_kh[j].w0; i < end; ++i) g_ks_note[g_ks_wkey[i]] = g_ks_wval[i];
+    }
+    g_ks_nkh = g_ks_nw = 0;
+    for (i = 0; i < g_ui_nq; ++i) {
+        int e = jx_midi_entry(g_ui_q[i].id), k = jx_state_index(g_ui_q[i].id);
+        if (e >= 0 && k >= 0) {
+            int32_t v = jx_midi_record_value(e, g_ui_q[i].f);
+            if (JX_STATE_ENT[k].mask) v = (int32_t)((uint32_t)v & JX_STATE_ENT[k].mask);
+            jx_store_put(k, v);
+        }
+    }
+    jx_ks_commit();
+    g_ui_nq = 0;
+    if (g_ui_cc >= 0) jx_cc_learn_done(g_ui_cc);
+    g_ui_cc = -1;
+}
+/* the keyboard's note value of `key` (what a panel keyboard draws: down above 0) */
+int jx3p_keybed_state(int key) { return key >= 0 && key < 128 ? g_ks_note[key] : 0; }
+/* MIDI LEARN (the GUI's menu): arm for the parameter `id` (rva 0x31A920) -- the next drain gives it the first CC
+ * below 120 queued since the last drain; while it waits no CC drives a parameter -- or forget its CC (rva
+ * 0x3191C0). 0 for an id the CC map has no record of. */
+int jx3p_cc_learn(uint32_t id)
+{
+    int e = jx_midi_entry(id);
+    if (e < 0) return 0;
+    g_cc.learn = e;
+    return 1;
+}
+int jx3p_cc_forget(uint32_t id)
+{
+    int e = jx_midi_entry(id), old;
+    if (e < 0) return 0;
+    old = g_cc.rec[e];
+    if (old >= 0) g_cc.map[old] = -1;
+    g_cc.rec[e] = -1;
+    return 1;
+}
+/* rva 0x319B70, a CC message the drain reads: none waits or cc >= 120 -> 0; else the waiting record's old CC
+ * leaves the map, the CC's old record loses its CC, CC `cc` drives the waiting record, none waits */
+static int jx_cc_learn_done(int cc)
+{
+    int r = g_cc.learn, old;
+    if (r < 0 || r >= JX_MIDI_PARAM_N || cc >= 120 || cc < 0) return 0;
+    old = g_cc.rec[r];
+    if (old >= 0) g_cc.map[old] = -1;
+    if (g_cc.map[cc] >= 0) g_cc.rec[g_cc.map[cc]] = -1;
+    g_cc.map[cc] = (int8_t)r;
+    g_cc.rec[r] = (int8_t)cc;
+    g_cc.learn = -1;
+    return 1;
+}
+static void put_be32(unsigned char *p, uint32_t v)
+{ p[0] = (unsigned char)(v >> 24); p[1] = (unsigned char)(v >> 16); p[2] = (unsigned char)(v >> 8); p[3] = (unsigned char)v; }
+static uint32_t be_at(const unsigned char *p, uint32_t len, uint32_t off, uint32_t n)
+{
+    uint32_t v = 0, i;
+    for (i = 0; i < n; ++i) v = (v << 8) | (off + i < len ? p[off + i] : 0u);    /* the low 32 bits are kept */
+    return v;
+}
+static void drv_pend(int kind, int off, int st, int a, int b);
+/* IComponent::getState: the count, then (id, value) big-endian -- the parameter list's store, then the CC map's
+ * 128 entries (the id of the record CC n drives, -1 none). Returns the bytes written, -1 when `cap` is short. */
+int jx3p_state_save(unsigned char *out, int cap)
+{
+    int k, n = 4 + 8 * (JX_STATE_N + 128);
+    unsigned char *p = out + 4;
+    if (!out || cap < n) return -1;
+    put_be32(out, (uint32_t)(n - 4));
+    for (k = 0; k < JX_STATE_N; ++k, p += 8) { put_be32(p, JX_STATE_ENT[k].id); put_be32(p + 4, (uint32_t)g_store[k]); }
+    for (k = 0; k < 128; ++k, p += 8) {
+        put_be32(p, JX_STATE_CC_BASE + (uint32_t)k);
+        put_be32(p + 4, (uint32_t)(g_cc.map[k] < 0 ? -1 : (int32_t)JX_MIDI_PARAM[g_cc.map[k]].id));
+    }
+    return n;
+}
+/* IComponent::setState (the JUNO's rva 0x34AAA0 path): `data` the stream, `len` its length. The count's width is 8
+ * bytes when the stream is longer than (83 + 128) x 64 / 5 = 2700 bytes, else 4 (rva 0x322210: 83 the CC map's
+ * records, 0x319B00 -- the JUNO's 95 gave 2854); its low 32 bits as an int are the payload's byte count: <= 0 ->
+ * kResultFalse, nothing set or queued (-1). Past the stream's end the payload reads zeros. Entries are (id, value)
+ * with fields of 8 bytes when the count exceeds 2700, else 4 (the low 32 bits kept). The CC map is emptied and the entries 0x10000000 + n refill it; each parameter entry takes value & its
+ * storage law into the store and is queued for the engine in PAYLOAD order, between writePatch = 126 and 127
+ * (EXECUTED: jx_state_census.py). Returns the parameter entries applied, -1 for kResultFalse. */
+int jx3p_state_load(const unsigned char *data, int len)
+{
+    const uint32_t lim = (uint32_t)((((JX_STATE_TOOTH == 2 ? JX_STATE_N : JX_MIDI_PARAM_N) + 128) << 6) / 5);
+                                                                           /* rva 0x322210: the CC map's records */
+    uint32_t hw, n, avail, off, w;
+    int32_t cnt;
+    int k, applied = 0;
+    if (!data || len < 0) return -1;
+    hw = lim < (uint32_t)len ? 8 : 4;
+    cnt = (int32_t)be_at(data, (uint32_t)len, 0, hw);
+    if (cnt <= 0) return -1;
+    n = (uint32_t)cnt;
+    avail = (uint32_t)len > hw ? (uint32_t)len - hw : 0;
+    data += (uint32_t)len > hw ? hw : (uint32_t)len;
+    w = lim < n ? 8 : 4;
+    jx_cc_clear();
+    drv_pend(2, 0, 0, (int)JX_STATE_WRITEPATCH, 126);
+    for (off = 0; off + 2 * w <= n && off < avail; off += 2 * w) {    /* past the data: zeros, id 0 */
+        uint32_t id = be_at(data, avail, off, w);
+        int32_t v = (int32_t)be_at(data, avail, off + w, w);
+        if (jx_cc_state_entry(id, v)) continue;
+        if ((k = jx_state_index(id)) < 0) continue;
+        if (JX_STATE_ENT[k].mask && JX_STATE_TOOTH != 3) v = (int32_t)((uint32_t)v & JX_STATE_ENT[k].mask);
+        jx_store_put(k, v);
+        if (id == JX_KEY_HOLD && v == 0) jx_ks_release();     /* each entry its own set: before its record */
+        drv_pend(2, 0, 0, (int)id, v);
+        ++applied;
+    }
+    drv_pend(2, 0, 0, (int)JX_STATE_WRITEPATCH, 127);
+    jx_ks_commit();                                          /* setState commits the model */
+    return applied;
+}
+/* GATE ACCESS: the records queued for the next block (setState, the patch browser's loads, process()'s pushes),
+ * 5 ints each (kind, offset, status, id or data1, value or data2); returns the count */
+int jx3p_product_pending(int *out, int cap)
+{
+    int i;
+    for (i = 0; i < g_drv_npend && 5 * (i + 1) <= cap; ++i) {
+        out[5 * i] = g_drv_pend[i].kind; out[5 * i + 1] = g_drv_pend[i].off; out[5 * i + 2] = g_drv_pend[i].st;
+        out[5 * i + 3] = g_drv_pend[i].note; out[5 * i + 4] = g_drv_pend[i].vel;
+    }
+    return g_drv_npend;
+}
+/* THE PATCH BROWSER'S LOAD of factory patch `idx` (rva 0x335730) for the next block: its records queued (kind 2,
+ * in order), and the store takes each record's value for the ids the state lists */
+void jx3p_product_load_patch(int idx)
+{
+    uint32_t hold = 1;
+    if (idx < 0 || (uint32_t)idx >= G.npatch) return;
+    for (uint32_t r = 0; r < G.nrec[idx]; ++r) {
+        uint32_t id;
+        memcpy(&id, G.prec[idx] + 8 * r, 4);
+        if (id == JX_KEY_HOLD) memcpy(&hold, G.prec[idx] + 8 * r + 4, 4);
+    }
+    for (uint32_t r = 0; r < G.nrec[idx]; ++r) {
+        uint32_t id, v;
+        int k;
+        memcpy(&id, G.prec[idx] + 8 * r, 4); memcpy(&v, G.prec[idx] + 8 * r + 4, 4);
+        /* the tree's sets reach the model's handler node by node, each node's records after it; KEY HOLD's node
+         * begins with ARPEGGIO (0x00600108): KEY HOLD at 0 releases the keys there (EXECUTED: the note-offs come
+         * just before 0x00600108's record, jx_keyhold_census.py; the JUNO's rule). No commit: the next drain does */
+        if (id == 0x00600108u && hold == 0) jx_ks_release();
+        if ((k = jx_state_index(id)) >= 0) jx_store_put(k, (int32_t)v);
+        drv_pend(2, 0, 0, (int)id, (int)v);
+    }
+}
+
+/* the push (rva 0x31F3C0): a CC the core's CC map assigns (none while a MIDI learn waits) first queues its
+ * parameter's record (kind 1, the CC value law); then every message its own record, after the wrapper's rules
+ * (the model's records the push also makes -- the UI timer's -- are not ported yet) */
 static void jx_push(unsigned char m[3], int offset)
 {
     if ((m[0] & 0xF0) == 0xB0) {
-        int e = m[1] < 128 ? JX_CC_MAP[m[1]] : -1;
+        int e = jx_cc_lookup(m[1]);
         if (e >= 0) {
             float f = jx_midi_cc_value(e, m[2]);
             int bits;
             memcpy(&bits, &f, 4);
+            jx_ui_push(JX_MIDI_PARAM[e].id, f);              /* the UI timer's store record (JX-17b) */
             drv_pend(1, offset, 0, (int)JX_MIDI_PARAM[e].id, bits);
         }
+        if (g_ui_cc < 0 && m[1] < 120) g_ui_cc = m[1];       /* the message's own record (core+512) */
     }
     jx_wrapper_midi(m);
+    jx_ui_push_midi(m);
     drv_pend(0, offset, m[0], m[1], m[2]);
 }
 /* One host note event for the next block, as process() takes it (the event list, before the parameter queues):
@@ -875,12 +1280,45 @@ int jx3p_product_param(unsigned int id, int offset, double value)
  * note-off (a key), 2 an engine parameter record (a the model id, b the 32-bit value) -- what the plugin's
  * patch browser and editor queue, in queue order: a patch load's records come before the block's keys; then
  * the host parameter points jx3p_product_param queued */
+/* The host's tempo for the next blocks, as process() reads its ProcessContext (JX-8): valid when the host sets
+ * kTempoValid -- else the driver keeps 120 for its clock and tells the engine nothing */
+void jx3p_product_tempo(int valid, double tempo)
+{
+    g_drv_tempo_valid = valid != 0;
+    g_drv_tempo = valid ? tempo : 120.0;
+}
+static jx_drv_rec g_drv_work[2 * JX_DRV_QMAX];   /* one block's records (static: the WASM stack is 64 KB) */
 int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
 {
-    jx_drv_rec rec[2 * JX_DRV_QMAX];
+    jx_drv_rec *rec = g_drv_work;
     int nrec = 0, i, k, t, cut, s0;
-    long long P = (60000000000LL * (long long)g_drv_rate / 1200) / 24, ph;
+    long long P, ph;
+    int T;
     if (n <= 0) return 0;
+    /* the engine rate (the JX's rva 0x320A82 = the JUNO's 0x320BA2): a requested rate (the setting listener's)
+     * other than the render object's switches the engine -- vt+0x18 setSampleRate((float)rate), LIFTED (JX-15) --
+     * and looks the object up for it; found, the tick phase and the note count start again. Before the tempo and
+     * before the block's records, as the plugin's driver does. */
+    if (g_ro_on && g_ro.engine != g_eng_req) {
+        jxg_call_f1(JX_SETSR, G.hostg, (float)g_eng_req);
+        g_ro.engine = g_eng_req;
+        if (juno_ro_lookup(&g_ro) > 0) { g_drv_ph = 0; g_drv_notes = 0; }
+    }
+    /* the tempo (the JX's rva 0x320AE4 = the JUNO's 0x320C04, fw_map): round(tempo x 10.0), half away from
+     * zero (rva 0x428460), clamped to an int; given to the engine (vt+0xB0, LIFTED) only when the host's tempo
+     * is valid and T changed (core+580); the tick period (60e9 x host rate / T) / 24 in 1e-8 host samples --
+     * T <= 0 never ticks (no host sends it) */
+    {
+        double r = g_drv_tempo * 10.0;
+        r = r >= 0.0 ? floor(r + 0.5) : ceil(r - 0.5);
+        T = !(r >= -2147483647.0) ? -2147483647 : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
+    }
+    if (T != g_drv_tempo_last && g_drv_tempo_valid) {
+        g_drv_tempo_last = T;
+        jxg_call(JX_TEMPO_ENTRY, G.hostg, (uint64_t)(uint32_t)T, 0, 0, NULL);
+    }
+    P = T > 0 ? (60000000000LL * (long long)g_drv_rate / T) / 24 : (long long)1 << 62;
+    if (P <= 0) P = (long long)1 << 62;
     for (i = 0; i < g_drv_ncarry; ++i) rec[nrec++] = g_drv_carry[i];
     for (i = 0; i < nev && nrec < 2 * JX_DRV_QMAX; ++i) {
         rec[nrec].off = ev[4 * i];

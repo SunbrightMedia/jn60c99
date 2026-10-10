@@ -61,13 +61,8 @@ const [guest, bankGz] = await Promise.all([
   fetchGz('jx_guest_96k.bin.gz'), fetchGz('bank.bin.gz')]);
 mod.FS.writeFile('/jx_guest.bin', guest);
 mod.FS.writeFile('/bank.bin', bankGz);
-const ok = mod.ccall('jx3p_init', 'number',
-  ['string','string','string'],
-  ['/jx_guest.bin', '/bank.bin', '']);
-if (!ok) { document.getElementById('status').textContent =
-  'ENGINE INIT FAILED'; throw new Error('init'); }
 document.getElementById('status').textContent =
-  'engine ready — press Start audio';
+  'engine data loaded — press Start audio';
 
 const sel = document.getElementById('patch');
 for (let i = 0; i < 64; i++) {
@@ -75,9 +70,8 @@ for (let i = 0; i < 64; i++) {
   o.value = i; o.textContent = 'Patch ' + (i + 1);
   sel.appendChild(o);
 }
-mod.ccall('jx3p_recall', null, ['number'], [0]);
-sel.onchange = () => mod.ccall('jx3p_recall', null, ['number'],
-                               [sel.value | 0]);
+/* the plugin's patch browser: the patch's records queued for the next block (jx3p_product_load_patch) */
+sel.onchange = () => { if (ctx) mod.ccall('jx3p_product_load_patch', null, ['number'], [sel.value | 0]); };
 
 let ctx = null, node = null, octave = 4;
 const N = 256;
@@ -91,8 +85,12 @@ document.getElementById('power').onclick = async () => {
   if (ctx) return;
   ctx = new AudioContext();
   if (!RATES.includes(ctx.sampleRate)) { await ctx.close(); ctx = new AudioContext({ sampleRate: 48000 }); }
-  const kind = mod.ccall('jx3p_product_open', 'number', ['number'], [ctx.sampleRate]);
-  if (kind < 0) { document.getElementById('status').textContent = 'RENDER OBJECT FAILED'; return; }
+  /* a fresh instance at the host rate, as a DAW makes one: initialize's records queued for the first block, then
+   * the selected patch's (jx3p_product_init, JX-15b) */
+  const kind = mod.ccall('jx3p_product_init', 'number', ['string','string','number'],
+                         ['/jx_guest.bin', '/bank.bin', ctx.sampleRate]);
+  if (kind < 0) { document.getElementById('status').textContent = 'ENGINE INIT FAILED'; return; }
+  mod.ccall('jx3p_product_load_patch', null, ['number'], [sel.value | 0]);
   node = ctx.createScriptProcessor(N, 0, 2);
   node.onaudioprocess = (e) => {
     const n = Math.min(queue.length, QMAX);

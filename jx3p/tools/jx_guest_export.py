@@ -5,16 +5,18 @@ The port holds the plugin's heap in the plugin's own layout, at the plugin's own
 JX_GUEST): the lifted parameter system (jx3p/src/jx_lift.c, the plugin's host entry 0x3F9A30 and its reach) and the
 transcribed DSP work on the same bytes. This file is what that memory starts from:
 
-  the oracle (tools/verify/jx_emu.py boot(96000, product=True): the plugin's factory HOST, BUILD, SETSR at the
-  engine's rate, initialize's records through its own host entry -- the engine a fresh instance holds before its
-  first block) -> the WHOLE heap, sparse (nonzero runs); the image pages the lifted code reads (image_pages: the
+  the oracle (tools/verify/jx_emu.py boot(96000, static_init=True): the plugin's static initializers, its factory
+  HOST, BUILD, SETSR at the engine's rate -- the engine as setActive leaves a fresh instance, before its first
+  block: initialize's records are still in the queue (version 2, JX-15b; the port applies them, jx3p_init, or
+  queues them for its first block, jx3p_product_init, after the rate switch the first block may make, as the
+  plugin does)) -> the WHOLE heap, sparse (nonzero runs); the image pages the lifted code reads (image_pages: the
   dynamic census jx3p/gen/jx_lift_pages.json and a static one of the lifted source); the guest stack the lifted
   calls run on; the HOST's
   address (every other object is found by following the plugin's own pointers from it); the MXCSR the plugin runs
   at; and the factory bank's patch records (jx3p/gen/jx_patch_records.json: what the plugin's patch browser queues
   for each patch, kind 2 = engine parameter records).
 
-  'JXG1' u32 version
+  'JXG1' u32 version (2: the heap before initialize's records)
   u64 heap_base, heap_len, host, image_base, stack_lo, stack_len, rsp
   u32 mxcsr, f32 engine_rate
   u32 nrun; nrun x { u32 heap offset, u32 len, bytes }
@@ -190,13 +192,13 @@ def main():
     rate = float(opt('--rate', '96000'))
     out = opt('--out', os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_%dk.bin' % int(rate // 1000)))
     img_pages = image_pages()
-    jx = J.JX().boot(rate, snap=False, product=True)
+    jx = J.JX().boot(rate, snap=False, static_init=True)
     uc = jx.uc
     heap_len = ((jx.heap + 0xFFF) & ~0xFFF) - J.HEAP_BASE
     heap = bytes(uc.mem_read(J.HEAP_BASE, heap_len))
     rsp = (J.STACK_BASE + J.STACK_SIZE - 0x10000) & ~0xF
     mx = getattr(jx, '_mxcsr', 0x1F80)
-    body = b'JXG1' + struct.pack('<I', 1)
+    body = b'JXG1' + struct.pack('<I', 2)
     body += struct.pack('<7Q', J.HEAP_BASE, heap_len, jx.HOST, J.IB, rsp - STACK_BELOW, STACK_BELOW + STACK_ABOVE, rsp)
     body += struct.pack('<If', mx, rate)
     hr = runs(heap)

@@ -7,11 +7,12 @@ ORACLE  jx3p/tools/jx_host_emu.py: createInstance, initialize, setupProcessing(r
         initialize's records and the patch's), then process() per host block -- the render driver, the
         render object (the 96 kHz engine and the rate converter at hosts 44100 / 48000, the engine itself
         at 96000), the engine render with its voice-count sync and output gain stage, all its own code.
-PORT    jx3p/gui/jx_bridge.c: jx3p_init on the 96 kHz guest image (jx3p/gen/jx_guest_96k.bin.gz: the plugin's
-        heap after its boot at its engine's rate), jx3p_recall(k) (the patch's records through the plugin's own
-        parameter system, lifted -- JX-11),
-        jx3p_product_open(rate) (src/juno_conv.c, the JUNO-60's render object: table and vectors equal),
-        jx3p_product_process per block.
+PORT    jx3p/gui/jx_bridge.c: jx3p_product_init(image, bank, rate) on the 96 kHz guest image (jx3p/gen/
+        jx_guest_96k.bin.gz: the plugin's heap as setActive leaves it, at its engine's rate) -- the render object
+        (src/juno_conv.c, the JUNO-60's: table and vectors equal) and initialize's records QUEUED for the first
+        block (JX-15b) --, jx3p_product_load_patch(k) (the patch browser's records queued after them; the
+        plugin's own parameter system, lifted, applies both at the first block -- JX-11), then
+        jx3p_product_block per block.
 
 The events: a note-on at --on seconds (velocity as process() converts it, (int)(float)(v x 127.0) &
 0x7F), its note-off at --off seconds, --secs in all: the defaults play the note after the 0.5 s start
@@ -58,6 +59,14 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   --tooth-ctl: the port gets no controller points -- every --ctl run must differ.
   --ctl-only N,...: only those MIDI-mapping numbers of the --ctl sequence (1 mod, 11 expression, 64 sustain,
   123 all notes off, 128 aftertouch, 129 bend, any CC) -- to bisect a difference.
+  --tempo 'BPM@T,...;...' (JX-8): per ';' group a run whose host gives process() a ProcessContext with that
+  tempo (kTempoValid) from the block at or after T seconds ('x@T': no valid tempo from T; before the first
+  point no context) -- the render driver's clock and the engine's tempo entry (vt+0xB0, lifted).
+  --tooth-tempo: the port never hears the tempo -- every --tempo run must differ.
+  --state 'SEED@T,...;...' (JX-17): per ';' group a run whose host calls IComponent::setState between two blocks
+  with seeded payloads (state_loads: parameters across and past their ranges, an unknown id, CC map entries; 'rV'
+  for SEED: the engine-rate setting alone, vm.vs.sampleRate = V -- JX-15);
+  the port: jx3p_state_load. --tooth-state: the port misses the setState -- every run must differ.
   --set 'ID=V,...;ID=V,...' (JX-12b): per ';' group a run whose first block starts with those host parameter
   points (VST3 ids in hex, values 0..1) -- the note modes no factory patch sets: LEGATO 600062 (no patch sets
   it), ASSIGN MODE 600064, PORTAMENTO 600060, ARPEGGIO 600108 -- with the plan's notes, edits and controllers.
@@ -65,9 +74,11 @@ The notes reach the port as process() takes them (jx3p_product_note: the float v
 rules); the patch loads' records as the patch browser queues them (jx3p_product_block's type-2 events).
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
+import atexit
 import ctypes
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -218,6 +229,7 @@ def points(nblk, blk, on, off, es):
     --ctl with --ctl-only (only those MIDI-mapping numbers kept: a bisection of a difference); a '|ID=V,...' tail
     (--set): those points first, at offset 0 of block 0"""
     es, _, sets = es.partition('|')
+    sets = sets.split('|')[0]
     start = on if on >= 0 else off
     if es.startswith('e'):
         sched = edit_schedule(nblk, blk, start, int(es[1:]))
@@ -232,6 +244,50 @@ def points(nblk, blk, on, off, es):
     if sets:
         sched[0] = [(int(k, 16), 0, float(v)) for k, v in (x.split('=') for x in sets.split(','))] + sched[0]
     return sched
+
+
+def tempo_blocks(spec, rate, blk, nblk):
+    """--tempo group 'BPM@T,...' -> per block (valid, bpm): from the block that starts at or after T seconds the host's
+    ProcessContext carries that tempo with kTempoValid ('x@T': a context without a valid tempo from T); before the
+    first point no context. A host gives one context per process() call."""
+    out = [(0, 120.0)] * nblk
+    for item in filter(None, spec.split(',')):
+        v, _, t = item.partition('@')
+        b0 = -(-int(float(t or 0) * rate) // blk)
+        for b in range(b0, nblk):
+            out[b] = (0, 120.0) if v == 'x' else (1, float(v))
+    return out
+
+
+def field(es, i):
+    """field i of the run's spec 'code|sets|tempo|state' ('' when absent)"""
+    f = es.split('|')
+    return f[i] if len(f) > i else ''
+
+
+def state_loads(spec, rate, blk, nblk):
+    """--state 'SEED@T,...' (JX-17) -> {block: payload bytes}: at the block that starts at or after T seconds the host
+    calls IComponent::setState with a seeded payload -- 24 of the state parameters at values across and past their
+    ranges, an unknown id, CC map entries (assigned, freed) -- in a seeded order (jx3p/src/jx_state_tables.h)"""
+    import random
+    import re
+    src = open(os.path.join(REPO, 'jx3p', 'src', 'jx_state_tables.h')).read()
+    ids = [int(x, 16) for x in re.findall(r'\{ 0x([0-9A-F]{8})u, 0x[0-9A-F]+u, -?\d+ \}', src)]
+    out = {}
+    for item in filter(None, spec.split(',')):
+        sd, _, t = item.partition('@')
+        if sd.startswith('r'):               # 'rV@T': the engine-rate setting alone (vm.vs.sampleRate = V, JX-15)
+            pl = struct.pack('>Ii', 0x0FFFC015, int(sd[1:]))
+            out[-(-int(float(t or 0) * rate) // blk)] = struct.pack('>I', len(pl)) + pl
+            continue
+        r = random.Random(7307 * int(sd) + 11)
+        ent = [(pid, r.choice((0, 1, 64, 127, 128, 200, 255, 256, 300, -1, r.randrange(256))))
+               for pid in r.sample(ids, 24)]
+        ent += [(0x7777, 5), (0x10000000 + 3, 0x0060003E), (0x10000000 + 9, -1), (0x10000000 + 116, 0x00600062)]
+        r.shuffle(ent)
+        pl = b''.join(struct.pack('>Ii', a, v) for a, v in ent)
+        out[-(-int(float(t or 0) * rate) // blk)] = struct.pack('>I', len(pl)) + pl
+    return out
 
 
 def queues(points):
@@ -258,11 +314,17 @@ def oracle(rate, patch, nblk, blk, on, off, recalls='', edits='-1'):
     out = []
     rmap = recall_map(recalls, rate, blk)
     par = points(nblk, blk, on, off, edits)
+    tmp = tempo_blocks(field(edits, 2), rate, blk, nblk)
+    sts = state_loads(field(edits, 3), rate, blk, nblk)
     for b, ev in enumerate(schedule(nblk, blk, on, off)):
+        if b in sts:                          # the host's setState between two blocks (JX-17)
+            if h.set_state(sts[b]) not in (0, 1):
+                raise SystemExit('setState refused')
         if b in rmap:                         # the plugin's patch browser, between two blocks (WARM: JX-11)
             p = rmap[b]
             h.load_patch(bank[B.BANK_HEADER + p * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (p + 1) * B.BANK_STRIDE])
-        L, R = h.process(blk, events=ev, params=par[b])
+        valid, bpm = tmp[b]                   # the ProcessContext: a valid tempo, or none (JX-8)
+        L, R = h.process(blk, events=ev, params=par[b], ctx={'tempo': bpm} if valid else None)
         out.append([list(L), list(R)])
     return out
 
@@ -281,21 +343,26 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
     sys.path.insert(0, HERE)
     import jx_guest
-    if not lib.jx3p_init(jx_guest.path(44).encode() if tooth else img96.encode(), g('truth/preset_bank_1.bin'), None):
-        raise SystemExit('jx3p_init failed')
-    lib.jx3p_recall(patch)
+    if tooth:                                 # the old path: the 44.1 kHz engine booted and the patch applied at once
+        if not lib.jx3p_init(jx_guest.path(44).encode(), g('truth/preset_bank_1.bin'), None):
+            raise SystemExit('jx3p_init failed: %s' % lib.jx3p_lift_error().decode())
+        lib.jx3p_recall(patch)
+        lib.jx3p_host_stage(1)
+    else:                                     # a fresh instance (JX-15b): initialize's records and the patch browser's
+        lib.jx3p_product_init.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]     # load QUEUED, as
+        kind = lib.jx3p_product_init(img96.encode(), g('truth/preset_bank_1.bin'), rate)     # the oracle's are
+        if kind < 0:
+            raise SystemExit('jx3p_product_init(%d) -> %d' % (rate, kind))
+        lib.jx3p_product_load_patch(patch)
     if lib.jx3p_lift_error():
         raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
-    if tooth:
-        lib.jx3p_host_stage(1)
-    else:
-        kind = lib.jx3p_product_open(rate)
-        if kind < 0:
-            raise SystemExit('jx3p_product_open(%d) -> %d' % (rate, kind))
     out = []
     rmap = recall_map(recalls, rate, blk)
     par = points(nblk, blk, on, off, edits)
+    tmp = tempo_blocks(field(edits, 2), rate, blk, nblk)
+    sts = state_loads(field(edits, 3), rate, blk, nblk)
     lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
+    lib.jx3p_product_tempo.argtypes = [ctypes.c_int, ctypes.c_double]
     lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
     sys.path.insert(0, HERE)
     import jx_records
@@ -310,6 +377,9 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
                     lib.jx3p_note_off(e[3])
             lib.jx3p_render(Lb, Rb, blk)
         else:                                 # the render driver: the records at their offsets, the clock
+            if b in sts and os.environ.get('JX_STATE_TOOTH_RUN') != '1':     # TOOTH: the port misses the setState
+                d = sts[b]
+                lib.jx3p_state_load((ctypes.c_ubyte * len(d)).from_buffer_copy(d), len(d))
             recs, nev = [], 0
             if b in rmap:                     # the patch load's records, queued before process() runs
                 q = rmap[b] + (1 if os.environ.get('JX_RECALL_TOOTH') == '1' else 0)     # TOOTH: the wrong patch
@@ -324,6 +394,8 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
                     if lib.jx3p_product_param(pid, off, v) != 0:
                         raise SystemExit('jx3p_product_param(0x%x) refused' % pid)
             arr = (ctypes.c_int * max(1, len(recs)))(*recs)
+            if os.environ.get('JX_TEMPO_TOOTH') != '1':        # TOOTH: the port never hears the host tempo
+                lib.jx3p_product_tempo(*tmp[b])
             lib.jx3p_product_block(Lb, Rb, blk, arr, nev)
         out.append([list(struct.unpack('<%dI' % blk, bytes(Lb))), list(struct.unpack('<%dI' % blk, bytes(Rb)))])
     if lib.jx3p_lift_error():                 # a trap in a mid-run record list: never a silent pass
@@ -359,7 +431,15 @@ def main():
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     recalls = opt('--recall', '')               # 'P@T,...': warm patch loads (the plugin's patch browser)
     sets = [x for x in opt('--set', '').split(';') if x]     # host parameter points at the start, one run per group
+    tempos = [x for x in opt('--tempo', '').split(';') if x]   # the host's tempo per block, one run per group (JX-8)
+    states = [x for x in opt('--state', '').split(';') if x]   # setState loads, one run per group (JX-17)
+    if '--tooth-state' in a:
+        os.environ['JX_STATE_TOOTH_RUN'] = '1'
+    ttempo = '--tooth-tempo' in a
+    if ttempo:
+        os.environ['JX_TEMPO_TOOTH'] = '1'
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    (['-DJX_DRV_TOOTH=1'] if tclock else []) + (['-DJX_VC_TOOTH=1'] if tvc else []) +
@@ -380,6 +460,11 @@ def main():
             plans = [(pon, poff, es) for (pon, poff, _) in plans for es in eseeds]
         if sets:                              # the note modes set at the start: each group on every plan
             plans = [(pon, poff, es + '|' + st) for (pon, poff, es) in plans for st in sets]
+        if tempos:                            # the host tempo: each group on every plan
+            plans = [(pon, poff, es + ('' if '|' in es else '|') + '|' + tg) for (pon, poff, es) in plans for tg in tempos]
+        if states:                            # setState loads: each group on every plan
+            plans = [(pon, poff, '|'.join((es.split('|') + ['', '', ''])[:3]) + '|' + sg)
+                     for (pon, poff, es) in plans for sg in states]
         for patch, (on, off, es) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
             o = subprocess.run([sys.executable, __file__, '--oracle'] + args + [recalls, str(es)], capture_output=True,
@@ -398,7 +483,7 @@ def main():
             if on < 0:
                 nev = sum(len(e) for e in schedule(nblk, blk, on, off))
                 what += ' (%d events)' % nev
-            code, _, st = es.partition('|')
+            code, st, tg, sg = field(es, 0), field(es, 1), field(es, 2), field(es, 3)
             if code != '-1':
                 sched = points(nblk, blk, on, off, code)
                 what += ' %s seed %s (%d points, %d records)' % ('edits' if code[0] == 'e' else 'controllers', code[1:],
@@ -406,6 +491,10 @@ def main():
                                                                    sum(len(queues(x)) for x in sched))
             if st:
                 what += ' set %s' % st
+            if tg:
+                what += ' tempo %s' % tg
+            if sg:
+                what += ' setState %s' % sg
             if first is None:
                 print('  host %d %s: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
                     rate, what, nblk, blk, loud), flush=True)
@@ -420,7 +509,16 @@ def main():
                     print('  REFUSE: --expect-silent, but the plugin sounds at host %d' % rate); bad += 1
             elif not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
-    n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds)) * max(1, len(sets))
+    n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds)) * max(1, len(sets)) * max(1, len(tempos)) \
+        * max(1, len(states))
+    if '--tooth-state' in a:
+        print('jx_product_gate --tooth-state: %s' % ('BITES (%d of %d differ)' % (bad, n) if bad == n else
+                                                       'DID NOT BITE on %d of %d' % (n - bad, n)))
+        return 0 if bad == n else 1
+    if ttempo:
+        print('jx_product_gate --tooth-tempo: %s' % ('BITES (%d of %d differ)' % (bad, n) if bad == n else
+                                                       'DID NOT BITE on %d of %d' % (n - bad, n)))
+        return 0 if bad == n else 1
     if tooth or tclock or tvc or trec or tedit or tlaw:
         print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices'
                                           if tvc else '--tooth-recall' if trec else ('--tooth-ctl' if '--tooth-ctl' in a

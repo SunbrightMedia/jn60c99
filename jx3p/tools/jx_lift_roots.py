@@ -11,7 +11,8 @@ base class (MSVC RTTI: the class hierarchy descriptor's base class array); and e
 a class adds slot k of every related live class; the control classes (the parameter object, the assigner, the
 keyboard arpeggiator) add every slot (FULL_CLASSES); the engine's vtable slots the render driver calls for a MIDI
 message (CONTROL_SLOTS: notes, the CC entry, bend, three empty entries) and for the clock (+0xB8, the tick) are
-roots too (JX-12, JX-12b), and so are the note store's 19 step functions, read from its mode setter's own jump table
+roots too (JX-12, JX-12b), and so are the tempo entry (+0xB0, JX-8) and setSampleRate (+0x18, JX-15), and
+the note store's 19 step functions, read from its mode setter's own jump table
 (0x3F1910, table 0x3F1A50: each case a lea of the function; the tick calls the one the store holds). The code
 pointers the heap stores outside any vtable (a step function of the note store, 0x3F0C20 -- a root through the
 setter's table --; the render worker's entry 0x3F8C60; a runtime-library routine 0x6B6B20) are listed. The result
@@ -37,7 +38,7 @@ FULL_CLASSES = ('.?AVCPrmDSPJx3pPlugin@@', '.?AVCAssignB@@', '.?AVCKbdArp@@')
 # message -- note off / on (+0x78 / +0x80), the CC entry (+0x88), bend (+0x98), the three empty ones (+0x90 /
 # +0xA0 / +0xA8) -- roots of their own: the port calls them through the lift (jx_bridge.c)
 ENGINE_VT = 0xA15B88
-CONTROL_SLOTS = (0x78, 0x80, 0x88, 0x90, 0x98, 0xA0, 0xA8, 0xB8)
+CONTROL_SLOTS = (0x18, 0x78, 0x80, 0x88, 0x90, 0x98, 0xA0, 0xA8, 0xB0, 0xB8)
 # THE NOTE STORE'S STEP FUNCTIONS (JX-12b; READ): the mode setter 0x3F1910 stores one of 19 (its jump table
 # 0x3F1A50, each case `lea rax, [rip+d]`); the tick 0x3F84A0 calls the stored one
 SETTER_TABLE, STEP_MODES = 0x3F1A50, 19
@@ -125,8 +126,9 @@ def main():
     roots = sorted(add - {0x3F9A30})
     res = dict(note='jx_lift_roots.py: the slot-family closure of the reached virtual targets over the classes '
                     'live in the plugin\'s heap after its boot (the code pointers the heap stores are listed, not roots), '
-                    'the control classes in full, the render driver\'s kind-0 targets and tick (the engine\'s vtable '
-                    'slots 0x78..0xB8) and the note store\'s 19 step functions (its mode setter\'s jump table)',
+                    'the control classes in full, the render driver\'s kind-0 targets, tick, tempo and rate entries '
+                    '(the engine\'s vtable slots 0x18, 0x78..0xB8) and the note store\'s 19 step functions (its mode '
+                    'setter\'s jump table)',
                classes=[dict(vtable='%x' % v, cls=names[v][0], slots=len(ent[v])) for v in vts],
                code_pointers=['%x' % f for f in sorted(fptrs)],
                roots=['%x' % r for r in roots])

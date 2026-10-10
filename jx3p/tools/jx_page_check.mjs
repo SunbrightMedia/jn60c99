@@ -1,6 +1,6 @@
 // jx_page_check.mjs -- the DELIVERED JX-3P page (jx3p/gui/web/index.html with its jx3p.js / .wasm and data) in
-// headless Chromium: it boots ('engine ready'), Start audio opens the product path (jx3p_product_open at the
-// AudioContext's rate), a held key sounds (the page's peak > 0), patch 35 (factory 34: the arpeggiator) plays
+// headless Chromium: it loads its data ('engine data loaded'), Start audio boots a fresh instance on the product path
+// (jx3p_product_init at the AudioContext's rate), a held key sounds (the page's peak > 0), patch 35 (factory 34: the arpeggiator) plays
 // with a key held, and nothing reaches the console as an error. jx_wasm_check.py grades the engine's samples;
 // this grades the page's wiring around it (fetch + inflate, the event queue, the block call).
 //   node jx3p/tools/jx_page_check.mjs [--dir jx3p/gui/web]      exit 0 = every check passed
@@ -45,7 +45,7 @@ const LOUD = 1e-2;
 const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) fails.push(what); };
 try {
   await page.goto('http://127.0.0.1:8937/');
-  await page.waitForFunction(() => /engine ready/.test(document.getElementById('status').textContent), null, { timeout: 60000 });
+  await page.waitForFunction(() => /engine data loaded/.test(document.getElementById('status').textContent), null, { timeout: 60000 });
   check(true, 'boot: ' + (await page.textContent('#status')).trim());
   await page.click('#power');
   await page.waitForFunction(() => /audio running/.test(document.getElementById('status').textContent), null, { timeout: 20000 });
