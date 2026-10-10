@@ -12,15 +12,18 @@ PORT    jx3p/gui/jx_bridge.c: jx3p_init on the 96 kHz data (jx3p/gen/jx_template
         jx3p_product_open(rate) (src/juno_conv.c, the JUNO-60's render object: table and vectors equal),
         jx3p_product_process per block.
 
-The events reach both sides at offset 0 of a block (the render driver's split of a block at record
-offsets is not ported yet): a note-on at the first block from --on seconds (velocity as process()
-converts it, (int)(float)(v x 127.0) & 0x7F), its note-off from --off seconds, --secs in all: the
-defaults play the note after the 0.5 s start mute (engine samples; the same time at every host rate).
+The events: a note-on at --on seconds (velocity as process() converts it, (int)(float)(v x 127.0) &
+0x7F), its note-off at --off seconds, --secs in all: the defaults play the note after the 0.5 s start
+mute (engine samples; the same time at every host rate). By default each event reaches both sides at
+offset 0 of the first block from its time; --exact puts it at its own sample, inside its block (the
+render driver's split of the block at the record: jx3p_product_block, JX-7).
 
     python3 jx3p/tools/jx_product_gate.py [--rates 44100,48000,96000] [--patches 0,34] [--block 512]
-                                          [--on 0.6] [--off 1.2] [--secs 1.5] [--tooth]
+                                          [--on 0.6] [--off 1.2] [--secs 1.5] [--exact] [--tooth | --tooth-clock]
   --tooth: the port runs the 44.1 kHz data with no render object (the engine at the host rate, the web
   app's path before JX-4) -- every rate must differ.
+  --tooth-clock: the port built with JX_DRV_TOOTH (the render driver's first key does not restart the
+  clock) -- every run must differ; give it the patches that play on the clock (34, 61).
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import ctypes
@@ -46,9 +49,13 @@ def vel7(v):
     return int(f) & 0x7F
 
 
-def schedule(nblk, on, off):
-    return [[('on', 0, 0, NOTE, VEL)] if b == on else [('off', 0, 0, NOTE, 0.0)] if b == off else []
-            for b in range(nblk)]
+def schedule(nblk, blk, on, off):
+    """on / off: host samples; per block its events at their offsets"""
+    out = [[] for _ in range(nblk)]
+    for s, e in ((on, ('on', NOTE, VEL)), (off, ('off', NOTE, 0.0))):
+        if s // blk < nblk:
+            out[s // blk].append((e[0], s % blk, 0, e[1], e[2]))
+    return out
 
 
 def oracle(rate, patch, nblk, blk, on, off):
@@ -62,7 +69,7 @@ def oracle(rate, patch, nblk, blk, on, off):
     tail = bank[B.BANK_HEADER + patch * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (patch + 1) * B.BANK_STRIDE]
     h.load_patch(tail)
     out = []
-    for ev in schedule(nblk, on, off):
+    for ev in schedule(nblk, blk, on, off):
         L, R = h.process(blk, events=ev)
         out.append([list(L), list(R)])
     return out
@@ -99,16 +106,18 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, tmpl96, aux96):
             raise SystemExit('jx3p_product_open(%d) -> %d' % (rate, kind))
     out = []
     Lb = (ctypes.c_float * blk)(); Rb = (ctypes.c_float * blk)()
-    for b, ev in enumerate(schedule(nblk, on, off)):
-        for e in ev:
-            if e[0] == 'on':
-                lib.jx3p_note_on(e[3], vel7(e[4]))
-            else:
-                lib.jx3p_note_off(e[3])
+    for b, ev in enumerate(schedule(nblk, blk, on, off)):
         if tooth:
+            for e in ev:
+                if e[0] == 'on':
+                    lib.jx3p_note_on(e[3], vel7(e[4]))
+                else:
+                    lib.jx3p_note_off(e[3])
             lib.jx3p_render(Lb, Rb, blk)
-        else:
-            lib.jx3p_product_process(Lb, Rb, blk)
+        else:                                 # the render driver: the records at their offsets, the clock
+            recs = [x for e in ev for x in (e[1], 0 if e[0] == 'on' else 1, e[3], vel7(e[4]))]
+            arr = (ctypes.c_int * max(1, len(recs)))(*recs)
+            lib.jx3p_product_block(Lb, Rb, blk, arr, len(ev))
         out.append([list(struct.unpack('<%dI' % blk, bytes(Lb))), list(struct.unpack('<%dI' % blk, bytes(Rb)))])
     return out
 
@@ -126,15 +135,20 @@ def main():
     patches = [int(x) for x in opt('--patches', '0,34').split(',')]
     blk = int(opt('--block', '512'))
     t_on, t_off, secs = float(opt('--on', '0.6')), float(opt('--off', '1.2')), float(opt('--secs', '1.5'))
-    tooth = '--tooth' in a
+    tooth, tclock, exact = '--tooth' in a, '--tooth-clock' in a, '--exact' in a
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
-                   [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
+                   (['-DJX_DRV_TOOTH=1'] if tclock else []) + [os.path.join(REPO, s) for s in SRCS] + ['-lm'],
+                   check=True)
     tmpl96, aux96 = data96(tmp)
     bad = 0
     for rate in rates:
-        nblk, on, off = (-(-int(t * rate) // blk) for t in (secs, t_on, t_off))
+        nblk = -(-int(secs * rate) // blk)
+        if exact:                             # the event's own sample
+            on, off = int(t_on * rate), int(t_off * rate)
+        else:                                 # offset 0 of the first block from it
+            on, off = (-(-int(t * rate) // blk) * blk for t in (t_on, t_off))
         for patch in patches:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
             o = subprocess.run([sys.executable, __file__, '--oracle'] + args, capture_output=True, text=True)
@@ -160,9 +174,9 @@ def main():
             if not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
     n = len(rates) * len(patches)
-    if tooth:
-        print('jx_product_gate --tooth: %s' % ('BITES (%d of %d differ)' % (bad, n) if bad == n else
-                                                 'DID NOT BITE on %d of %d' % (n - bad, n)))
+    if tooth or tclock:
+        print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock', 'BITES (%d of %d differ)' % (
+            bad, n) if bad == n else 'DID NOT BITE on %d of %d' % (n - bad, n)))
         return 0 if bad == n else 1
     print('jx_product_gate: %d of %d (host rate, patch) runs equal to the plugin\'s process(): %s' % (
         n - bad, n, 'GREEN' if not bad else 'RED'))

@@ -29,6 +29,8 @@
 #include "../src/jx_ktrack.c"
 #include "../src/jx_dispatch_note.c"
 #include "../src/jx_gc.c"
+#include "../src/jx_seq.c"
+#define JX_NS_SZ 0xFF0             /* the note store's allocation (4080 bytes, EXECUTED 2026-10-10) */
 #include "../src/jx_param_get.h"
 
 int  jx_bank_apply(unsigned char *blk, const unsigned char *bank, int idx);
@@ -64,7 +66,7 @@ typedef struct {
     uint8_t *mstate;
     uint8_t *proc[NUNITS];
     jx_alloc mgr;
-    uint8_t  ns[NUNITS][0xDB0];
+    uint8_t  ns[NUNITS][JX_NS_SZ];   /* the note store's whole allocation (0xFF0); templates before 2026-10-10 hold 0xDB0 */
     uint8_t  kt[NUNITS][0xB0];
     /* re-linked C++ object headers (pointer cells live HERE, never in the
      * template): voice obj 256B + two 4B cells; master obj + 4B + 256B */
@@ -99,6 +101,7 @@ static uint8_t *g_tmpl_links[24];
 static uint32_t g_tmpl_linksz[24];
 static int g_nreg, g_nlink, g_tmpl_v4;
 
+static void ns_load(int i);
 static int tmpl_load(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -166,6 +169,15 @@ static void jx_release(void)
     memset(&G, 0, sizeof G);
 }
 
+/* unit i's note store from its template region: its whole allocation (0xFF0) or, from a template before
+ * 2026-10-10, its first 0xDB0 bytes and zeros after */
+static void ns_load(int i)
+{
+    uint32_t n = g_tmpl_rawsz[9 + 3 * i] < JX_NS_SZ ? g_tmpl_rawsz[9 + 3 * i] : JX_NS_SZ;
+    memset(G.ns[i], 0, JX_NS_SZ);
+    memcpy(G.ns[i], g_tmpl_regions[9 + 3 * i], n);
+}
+
 int jx3p_init(const char *template_path, const char *bank_path,
               const char *master_recall_path)
 {
@@ -202,7 +214,7 @@ int jx3p_init(const char *template_path, const char *bank_path,
     }
     for (int i = 0; i < NUNITS; ++i) {
         memcpy(G.mgr.u[i], g_tmpl_regions[8 + 3 * i], JXA_UNIT_SZ);
-        memcpy(G.ns[i],    g_tmpl_regions[9 + 3 * i], 0xDB0);
+        ns_load(i);
         memcpy(G.kt[i],    g_tmpl_regions[10 + 3 * i], 0xB0);
         G.proc[i] = malloc(PROC_SZ);
         memcpy(G.proc[i], g_tmpl_regions[35 + i], PROC_SZ);
@@ -300,14 +312,32 @@ static int unit_get50(void *u, int what, int pid, int32_t *out)
 /* the assigner's time read (vtable +0x70, 0x357EF0): its clock [asg+0xB0] / 96, signed, truncating */
 static uint32_t unit_get70(void *u)
 { return (uint32_t)(G.ktclock[(int)(intptr_t)u] / 96); }
+/* THE NOTE STORE'S OUTPUTS (2026-10-10, jx3p/src/jx_seq.c): its vtable +0 / +8 play into the unit's
+ * assigner (+0xFD8: vtable +0x18 note-on, +0x10 note-off), and its drain seam (the tail jump to 0x3EF210
+ * at a full drain) releases its 16 playing columns. Before, the seam was a stub "as in every proof". */
+static void seq_kt_on(void *user, int unit, int note, int vel)
+{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)unit };
+    (void)user; jx_ktrack_on(G.kt[unit], &c, note, vel); }
+static void seq_kt_off(void *user, int unit, int note, int vel)
+{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)unit };
+    (void)user; (void)vel; jx_ktrack_off_full(G.kt[unit], &c, note); }
+static uint64_t g_bad_hook;          /* a step-choice function jx_seq.c does not hold: the first one seen */
+static void seq_bad_hook(void *user, uint64_t h) { (void)user; if (!g_bad_hook) g_bad_hook = h ? h : 1; }
+static jx_seq_cbs seq_cbs(int unit)
+{   jx_seq_cbs c = { seq_kt_on, seq_kt_off, seq_bad_hook, NULL, unit }; return c; }
 static void ns_drain(void *u, int kind, int a, int b2)
-{ (void)u; (void)kind; (void)a; (void)b2; }  /* stubbed as in every proof */
+{
+    int unit = (int)(intptr_t)u;
+    jx_seq_cbs c = seq_cbs(unit);
+    (void)kind; (void)a; (void)b2;
+    jxs_3EF210(G.ns[unit], &c);                  /* the only seam kind: JXN_CB_EF210 */
+}
 
 static void sink518_on(void *u, int unit, int note, int vel)
-{   jx_nstore_cbs c = { ns_drain, NULL };
+{   jx_nstore_cbs c = { ns_drain, (void *)(intptr_t)unit };
     (void)u; jx_nstore_on5100(G.ns[unit], &c, note, vel); }
 static void sink518_off(void *u, int unit, int note, int vel)
-{   jx_nstore_cbs c = { ns_drain, NULL };
+{   jx_nstore_cbs c = { ns_drain, (void *)(intptr_t)unit };
     (void)u; jx_nstore_off(G.ns[unit], &c, note, vel); }
 static void sink520_on(void *u, int unit, int note, int vel)
 {   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70,
@@ -368,7 +398,7 @@ void jx3p_recall(int idx)
     if (g_mrec_v4)
         for (int i = 0; i < NUNITS; ++i) {
             memcpy(G.mgr.u[i], g_tmpl_regions[8 + 3 * i], JXA_UNIT_SZ);
-            memcpy(G.ns[i],    g_tmpl_regions[9 + 3 * i], 0xDB0);
+            ns_load(i);
             memcpy(G.kt[i],    g_tmpl_regions[10 + 3 * i], 0xB0);
             memcpy(G.proc[i],  g_tmpl_regions[35 + i], PROC_SZ);
         }
@@ -609,6 +639,26 @@ int jx3p_wrap_dump(int u, uint8_t *out, int cap)
  * gate's DSP mode grades the voices and the master against the plugin's per-unit renders that way;
  * 1 (the default after jx3p_init) is the plugin's engine render. */
 void jx3p_host_stage(int on) { G.host_stage_off = !on; }
+/* THE ENGINE'S CLOCK TICK (vtable +0xB8, rva 0x3F84A0; the render driver calls it 24 times per beat): per
+ * unit its note manager's counter, its tick and its note store's tick (jx3p/src/jx_seq.c) */
+void jx3p_tick(void)
+{
+    for (int u = 0; u < NUNITS; ++u) {
+        jx_nstore_cbs n = { ns_drain, (void *)(intptr_t)u };
+        jx_seq_cbs c = seq_cbs(u);
+        jx_seq_tick_unit(G.mgr.u[u], G.ns[u], &n, &c);
+    }
+}
+/* the first step-choice function the port met but does not hold (an image rva), 0 when none */
+unsigned long long jx3p_bad_hook(void) { return (unsigned long long)g_bad_hook; }
+/* the step machine's reach since the start: [0] step choices, [1] notes it played, [2] notes it released */
+void jx3p_seq_stats(unsigned long out[3]) { out[0] = g_seq_hook_calls; out[1] = g_seq_on; out[2] = g_seq_off; }
+/* how often each of the 19 modes' step functions ran since the start */
+void jx3p_seq_modes(unsigned long out[19]) { for (int k = 0; k < 19; ++k) out[k] = g_seq_mode_calls[k]; }
+/* GATE STIMULUS (jx3p/tools/jx_tick_gate.py --setmode): every unit's note store set to step mode `mode`
+ * by the port's transcription of the plugin's mode setter 0x3F1910 -- the modes no patch reaches
+ * (jx3p/docs/HOST_LAYER.md 3e); the gate calls the plugin's own setter on its side */
+void jx3p_seq_set_mode(int mode) { for (int u = 0; u < NUNITS; ++u) jxs_3F1910(G.ns[u], (uint32_t)mode); }
 /* the assigner clock of unit u (the plugin's [assigner+0xB0]): gates and diagnostics */
 long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS) ? (long long)G.ktclock[u] : -1; }
 
@@ -622,6 +672,12 @@ long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS) ? (long long)G.ktc
  * the patch) the caller gave before it: the render driver's split of a block at record offsets is not
  * ported yet (jx3p/tools/jx_product_gate.py grades blocks with their events at offset 0). */
 #include "../../src/juno_conv.c"
+/* the render driver's state (jx3p_product_block below) */
+#define JX_DRV_QMAX 256
+typedef struct { int off, on, note, vel; } jx_drv_rec;
+static jx_drv_rec g_drv_carry[JX_DRV_QMAX]; static int g_drv_ncarry;
+static long long g_drv_ph; static int g_drv_notes, g_drv_rate;
+
 static juno_ro g_ro; static int g_ro_on;
 static void jx_ro_engine(void *user, float *const *ptrs, int nch, int count)
 {
@@ -636,10 +692,90 @@ int jx3p_product_open(int host_rate)
     if (g_ro_on) juno_ro_free(&g_ro);
     juno_ro_init(&g_ro, (int)G.rate, host_rate);
     g_ro_on = 1;
+    g_drv_rate = host_rate; g_drv_ph = 0; g_drv_notes = 0; g_drv_ncarry = 0;   /* the driver at instance start */
     G.host_stage_off = 0;
     if (juno_ro_lookup(&g_ro) < 0) return -1;
     return juno_ro_kind(&g_ro);
 }
+/* THE RENDER DRIVER (JX-7, 2026-10-10): the JUNO-60's machine code in the JX (jx3p/tools/fw_map.py), as
+ * the JUNO port has it (gui/juno_bridge.c drv_block): the clock -- 24 ticks per beat, the host's tempo or
+ * 120, P = (60e9 x host rate / round(tempo x 10)) / 24 in 1e-8 host samples, its phase kept across blocks --
+ * and the block's records at their offsets (a note-on at or before the block's last note-off moves one
+ * sample after it, offsets never go down, from the first record at or past the block's end every record
+ * waits for the next block at offset 0); the block is split at every tick and record, each piece rendered
+ * through the render object; the first key down restarts the clock with a tick. */
+static void prod_render(float *L, float *R, int t0, int n);
+int jx3p_product_process(float *L, float *R, int n);
+static void drv_apply(const jx_drv_rec *r)
+{
+    if (r->on) { jx3p_note_on(r->note, r->vel); g_drv_notes++; }
+    else       { jx3p_note_off(r->note); g_drv_notes--; }
+}
+/* one host block: ev[4 i ..] = { offset, type (0 note-on, 1 note-off), note, velocity 0..127 } */
+int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
+{
+    jx_drv_rec rec[2 * JX_DRV_QMAX];
+    int nrec = 0, i, k, t, cut, s0;
+    long long P = (60000000000LL * (long long)g_drv_rate / 1200) / 24, ph;
+    if (n <= 0) return 0;
+    for (i = 0; i < g_drv_ncarry; ++i) rec[nrec++] = g_drv_carry[i];
+    for (i = 0; i < nev && nrec < 2 * JX_DRV_QMAX; ++i) {
+        rec[nrec].off = ev[4 * i]; rec[nrec].on = ev[4 * i + 1] == 0;
+        rec[nrec].note = ev[4 * i + 2]; rec[nrec].vel = ev[4 * i + 3]; ++nrec;
+    }
+    g_drv_ncarry = 0;
+    {
+        int last = -1, lastoff = -1;
+        cut = nrec;
+        for (i = 0; i < nrec; ++i) {
+            int off = rec[i].off;
+            if (rec[i].on) {
+                if (off <= lastoff) { off = lastoff + 1; rec[i].off = off; }
+            } else {
+                lastoff = off;
+            }
+            if (off <= last) { rec[i].off = last; off = last; }
+            last = off;
+            if (n <= off) { cut = i; break; }
+        }
+        for (i = cut; i < nrec && g_drv_ncarry < JX_DRV_QMAX; ++i) {
+            g_drv_carry[g_drv_ncarry] = rec[i];
+            g_drv_carry[g_drv_ncarry++].off = 0;
+        }
+    }
+    ph = g_drv_ph;
+    k = 0;
+    s0 = 0;
+    for (t = 0; t < n; ++t) {
+        int seg = (t == 0);
+        if (ph <= 100000000LL * t) {
+            if (!seg) { prod_render(L, R, s0, t - s0); s0 = t; seg = 1; }
+            while (ph <= 100000000LL * t) { jx3p_tick(); ph += P; }
+        }
+        if (k < cut && rec[k].off == t) {
+            int before = g_drv_notes;
+            if (!seg) { prod_render(L, R, s0, t - s0); s0 = t; seg = 1; }
+            while (k < cut && rec[k].off == t) { drv_apply(&rec[k]); ++k; }
+#if !JX_DRV_TOOTH   /* TOOTH (jx_product_gate.py --tooth-clock): the first key does not restart the clock */
+            if (!before && g_drv_notes > 0) { ph = 100000000LL * t + P; jx3p_tick(); }
+#else
+            (void)before;
+#endif
+        }
+        if (ph < 100000000LL * (t + 1)) {
+            if (!seg) { prod_render(L, R, s0, t - s0); s0 = t; seg = 1; }
+            while (ph < 100000000LL * (t + 1)) { jx3p_tick(); ph += P; }
+        }
+    }
+    prod_render(L, R, s0, n - s0);
+    g_drv_ph = ph - 100000000LL * n;
+    return 0;
+}
+static void prod_render(float *L, float *R, int t0, int n)
+{
+    if (n > 0) jx3p_product_process(L + t0, R + t0, n);
+}
+
 /* one host block of n samples through the render object */
 int jx3p_product_process(float *L, float *R, int n)
 {

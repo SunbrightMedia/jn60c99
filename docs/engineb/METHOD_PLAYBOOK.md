@@ -3438,3 +3438,31 @@ A transcription is proven on the branches its proof ran, nowhere else. Census th
 the function (here the two mode cells and their legal values), drive each through the product's own
 entry, and grade every sample of state, not 32 samples of output. Never trust a decompile's decimal
 constant: read the operand's bits.
+
+## 199. A NAME FROM A NEIGHBOUR IS A HYPOTHESIS -- AND "UNREACHABLE" NEEDS BOTH A READ AND A RUN
+Paid 2026-10-10 (JX-3P clock, JX-7). Three lessons from porting the note store's step machine.
+(1) A doc named the setter of the note manager's clock flag "the KEY ASSIGN setter" because host
+parameter 800 (the assigner's mode) sat near it in the census, and listed the patches with 800 = 1
+(34, 38, 59, 60) as the patches that play on the clock. The flag is set by the arpeggiator's pattern
+apply (0x3F2B00); the clock patches are those with ARPEGGIO on (34 and 61); 38, 59, 60 never step.
+The tick gate's reach counts (how often the step machine chose and played, per run) showed it --
+patch 38's machine chose 0 times -- and a census of the plugin's own code over all 64 patches
+(three keys, 300 ticks, the step functions' entries counted) confirmed it. (2) The note store was exported and compared at a size someone
+measured once (the struct's used part); the tick reads to +0xFD8 of a 0xFF0-byte allocation, and
+the store holds a pointer into ITSELF (+0x20 -> +0xDA8). Export the whole allocation; turn a
+self-pointer into its offset and refuse one that points outside. (3) Of 19 step functions the
+product reaches 3 and the engine's host entry 7. Calling the rest unreachable took both: READ (every
+operand with the flag's displacement is a compare; the mode is derived from a 6-entry template and a
+SCATTER table whose only modifier values are 0, 1, 3; no editor widget binds SCATTER) and EXECUTED (a
+write hook on the flag in all nine stores through the 64 patch loads and every one of the 744 host
+ids at seven values: no write; SCATTER in no patch record, no boot record, no getState entry). I had
+first counted the engine entry's 7 as the product's: the entry takes ids no product path sends.
+The 12 are still graded -- the plugin's own setter puts each mode into the stores and the gate
+compares event by event -- so dead code in the port is not unproven code.
+### The rule
+A name or a claim taken from a neighbouring parameter, a symbol or a census row is INFERRED until a
+counter on the product path confirms it; put the counter in the gate (a REFUSE when it reads 0).
+Compare whole allocations. "The engine's entry accepts it" is not "the product sends it": list the
+product's own senders (patch records, state entries, editor widgets, initialize). Call code
+unreachable only with a static census of its writers AND a dynamic sweep of the input space; then
+grade it anyway through the plugin's own setter.

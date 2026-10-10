@@ -3,6 +3,30 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (4) — THE CLOCK AND THE ARPEGGIATOR (JX-7)
+
+The render driver ticks the engine 24 times per beat; on the two factory patches with ARPEGGIO on (34,
+61; EXECUTED over all 64: only these step) the note store's step machine -- the arpeggiator, the
+JUNO-60 plugin's design -- then plays the notes, so before this the port was not the plugin on them
+(MEASURED through process(): 2 samples into the note's block).
+**PORTED** (jx3p/src/jx_seq.c, from the instructions): the engine's tick, the note manager's tick
+and release, the note store's tick and its graph, all 19 step functions, the store's random numbers
+and the mode setter; the note store's whole 0xFF0-byte object in the recall data; the JUNO-60's
+render driver (the clock, the records at their offsets, the block split) as jx3p_product_block.
+**What reaches what** (jx3p/docs/HOST_LAYER.md 3e, READ + EXECUTED): the PRODUCT reaches step modes
+0, 3, 6 (ARPEGGIO TYPE); SCATTER TYPE / DEPTH would add 2, 5, 8, 10, but no product path sends them
+(no patch record, no DAW-state entry, no editor widget, not initialize) -- the engine's own host
+entry takes them; modes 15-18 need the store's +0xDA1, which nothing writes.
+**Graded** (`jx_tick_gate.py`, GATE 3c: the plugin's own tick and note entries, every control object
+after every event, every unit's state at checkpoints): factory 34, 61, 0, 38, 20 (1,500 events
+each); 12 variants of the plugin's own patch load (ARPEGGIO / TYPE / STEP changed: modes 0, 3, 6;
+SCATTER appended: 2, 5, 8, 10); all 19 modes put into the stores by the plugin's own setter; a REFUSE
+when a mode class is not covered (seen: the first full run, job jx7_ticks, had no mode-0 run that
+stepped) and a tooth (the step clock stopped). Job jx7_gates (EXIT 0): the recall data 64/64 with the
+whole note store, the tick gate on 34, 61, 0, 38, 20, the product gate 12 of 12 (44100 / 48000 /
+96000 x 0, 34, 61, 20) and their teeth. Through process() with the notes inside their blocks
+(`--exact`): 34 and 61 at 48000 and 44100 EQUAL. The full make verify-jx3p with GATES 3c / 3d: owed.
+
 ## ⚠ CORRECTION 2026-10-10 (3) — THE C MASTER WAS PROVEN ON ONE STATE (playbook 198)
 
 "Master render nulls EXACTLY 0" (August) meant 32 samples of the default note state. Given the
@@ -27,7 +51,8 @@ measured equal (two crossed ones are added in GATE 3b); the tooth (the lost argu
 `JX_MASTER_TOOTH`) is seen on exactly the 3 variants that reach the sites. On the code before the
 argument fix the 64-patch run (job jx_bisect64) differed on exactly the 6 factory patches that use
 master modes 2 and 5 (34, 40, 50, 51, 52, 62). `make verify-jx3p` runs it as GATE 3b (`--gate`: 64
-patches + 9 variants + tooth); its first run is owed.
+patches + 9 variants + tooth); its first run: GREEN (job jxverify_96c6, `make verify-jx3p` on
+96c6cc4b, EXIT 0, every gate of the page green).
 
 ## ⚠ CORRECTION 2026-10-10 (2) — THE RECALL WAS A MODEL, NOT THE PATCH LOAD (playbook 197)
 

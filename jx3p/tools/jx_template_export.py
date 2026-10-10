@@ -43,9 +43,13 @@ def nan_count(buf):
 
 
 
+NS_SZ = 0xFF0          # the note store's allocation (4080 bytes, EXECUTED); 0xDB0 before 2026-10-10
+
+
 def control_blobs(jx):
     """the 36 control objects in template region order (8..43): per unit its note manager (0x7A8, the
-    sink pointers at +0x518 zeroed), note store (0xDB0) and assigner (0xB0), each vtable zeroed; then
+    sink pointers at +0x518 zeroed), note store (NS_SZ, its whole allocation since 2026-10-10: the clock
+    tick reads it to +0xFD8) and assigner (0xB0), each vtable zeroed; then
     the 9 parameter objects (0x700, vtable zeroed). The recall exporter diffs the same blobs per patch."""
     uc = jx.uc
     def rq(a): return int.from_bytes(uc.mem_read(a, 8), "little")
@@ -54,8 +58,18 @@ def control_blobs(jx):
         u = rq(jx.HOST + 0x78 + 0x40 * i)
         mgr = bytearray(uc.mem_read(u, 0x7A8))
         struct.pack_into("<QQ", mgr, 0x518, 0, 0)     # sink ptrs zeroed
-        ns = bytearray(uc.mem_read(rq(u + 0x518), 0xDB0))
+        nsa = rq(u + 0x518)
+        ns = bytearray(uc.mem_read(nsa, NS_SZ))
         struct.pack_into("<Q", ns, 0, 0)              # vtable
+        # +0x20: the step pattern's pointer -- 0 or the store's own +0xDA8 (EXECUTED, KEY ASSIGN patches): kept
+        # as its offset in the store, the form the port uses; +0xFD8: the assigner the store plays into (a
+        # pointer, the port's link)
+        p20 = struct.unpack_from("<Q", ns, 0x20)[0]
+        if p20:
+            if not nsa <= p20 < nsa + NS_SZ:
+                raise SystemExit("unit %d: the note store's +0x20 points outside it (0x%x)" % (i, p20))
+            struct.pack_into("<Q", ns, 0x20, p20 - nsa)
+        struct.pack_into("<Q", ns, 0xFD8, 0)
         kt = bytearray(uc.mem_read(rq(u + 0x520), 0xB0))
         struct.pack_into("<Q", kt, 0, 0)              # vtable
         out += [bytes(mgr), bytes(ns), bytes(kt)]

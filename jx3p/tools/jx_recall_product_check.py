@@ -7,7 +7,7 @@ records), its patch browser's load of factory patch k (75 more records), then on
 driver applies all of them at offset 0 through the engine's host entry (rva 0x3F9A30) and calls the
 engine render (rva 0x3F9220) -- where this check stops it and reads the engine: per unit u = 0..8 its
 state (0xAAC310 bytes), its parameter object (0x700), its assigner (0xB8), its note manager (0x7A8) and
-its note store (0xDB0), from the HOST's unit table.
+its note store (0xFF0), from the HOST's unit table.
 
 MODEL (tools/verify/jx_emu.py, the engine alone): static init (it fills the host entry's id map: 744
 ids), BUILD on the factory HOST, then the plugin's own host entry called with the same kind-2 records in
@@ -37,7 +37,7 @@ import jx_bank as B                                    # noqa: E402
 
 RENDER = 0x3F9220                  # the engine render (vtable 0x38)
 TICK = 0x3F84A0                    # the engine's clock tick (vtable 0xB8; the render driver calls it, rva 0x320F52)
-SIZES = {'state': 0xAAC310, 'proc': 0x700, 'assign': 0xB8, 'mgr': 0x7A8, 'nstore': 0xDB0}
+SIZES = {'state': 0xAAC310, 'proc': 0x700, 'assign': 0xB8, 'mgr': 0x7A8, 'nstore': 0xFF0}
 
 
 def snapshot(emu, host):

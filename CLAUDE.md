@@ -233,18 +233,16 @@ mine is a hypothesis (playbook 80).
   docs/hardware/SESSION_HANDOFF.md (read its 2026-09-28 section first),
   BOM v2 in docs/hardware/bom/, ordering in docs/hardware/ORDERING.md.
   The user draws every board; Claude answers at pin/net level.
-- **JX-3P (E5)**: jx3p/docs/S3_STATUS.md rules -- read its HOST DRIVE
-  correction first. The JX oracle now builds the plugin's own HOST (the zero
-  HOST gave every ramp an inf step: playbook 194); the data were regenerated on
-  it, ramps and latch live, and every JX gate is GREEN again (recall 64/64,
-  the arm + master A/B 64/64 x 3 rates, the full chain from sample 0, the
-  listen proofs, the fuzz seeds; jobs jx_verify2/3, jx_fuzz2 -- one run of the
-  five-gate `make verify-jx3p` on the commit is owed). Its web page mixed the wrong voices in
-  the 32-bit build (playbook 196): fixed; jx_wasm_check.py (GATE 5) grades the
-  delivered WASM against native on all 64 patches. Next, the plugin as a DAW
-  runs it (jx3p/docs/HOST_LAYER.md): the wrapper is the JUNO's machine code,
-  jx3p/tools/jx_host_emu.py boots it through its own process(); the product
-  is 6 voices, a 96 kHz engine, an output gain stage (the writePatch fade).
+- **JX-3P (E5)**: jx3p/docs/S3_STATUS.md rules -- read its dated blocks top
+  down. The recall is the plugin's OWN patch load (playbook 197), the C master
+  exact on every effect mode (playbook 198; `make verify-jx3p` on 96c6cc4b
+  GREEN, job jxverify_96c6). The product path (jx3p/docs/HOST_LAYER.md): the
+  96 kHz engine, the JUNO's render object and render driver (the clock, records
+  at their offsets), the arpeggiator's step machine (jx3p/src/jx_seq.c, all 19
+  modes; the product reaches 0, 3, 6) -- graded against the plugin's own
+  process() and tick (GATES 3c / 3d; their first full verify run is owed).
+  Next: the host tempo (dispatch 375 into the effects), the web app on the
+  product path, warm recall. The web page still runs the 44.1 kHz engine path.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

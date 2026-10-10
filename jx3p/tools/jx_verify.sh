@@ -20,13 +20,22 @@
 # Two-process rule honoured (Unicorn oracle and ctypes port never share a
 # process). Per-patch process-and-delete keeps the disk flat.
 #
-# What this does NOT yet cover, stated so "green" is not read wider than it is:
-#   * the note-on / voice-allocator is the ORACLE's here (control-plane voice
-#     assignment; deterministic). The DSP it feeds IS proven bit-exact. A
-#     fully device-standalone engine still needs that allocator transcribed;
-#     it is sized in jx3p/docs/S3_STATUS.md.
-#   * standalone effect entries not reached by a factory patch (those reached
-#     inside the master chain ARE covered by B).
+#   C. CLOCK + PRODUCT (2026-10-10, JX-7) -- the engine's clock tick and the
+#                  note store's step machine against the plugin's own tick and
+#                  note entries, every control object after every event: factory
+#                  patches, variants of the plugin's own patch load for every step
+#                  mode the product reaches, and all 19 modes through the plugin's
+#                  own setter (jx_tick_gate.py); then the plugin's own process()
+#                  -- its render driver, the 96 kHz engine, its render object --
+#                  against the port's product path, block for block at three host
+#                  rates, notes at block starts and inside blocks (jx_product_gate.py).
+#
+# What this does NOT yet cover, stated so "green" is not read wider than it is
+# (jx3p/docs/SCOPE_AUDIT.md is the full table): a patch change on a running
+# engine (warm recall), audio under polyphony (the control plane is graded),
+# block sizes other than 512 through process(), rates 88200 / 192000, the
+# editor's controls through process() (their effect on the engine is graded),
+# standalone effect entries no patch reaches.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -84,6 +93,18 @@ echo "=== JX GATE 3b: THE MASTER, EVERY SAMPLE OF STATE (64 patches + the mode v
 # 12,000, against the plugin; the variants set the two effect-mode cells to the values no factory
 # patch holds, through the plugin's own host entry; the tooth puts the decompile's lost argument back
 python3 "$HERE/jx_master_bisect.py" --gate 12000
+echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object after every event; JX-7) ==="
+# 5 factory patches x 1,500 events, 12 variants of the plugin's own patch load (every step mode the
+# product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the
+# tooth stops the port's step clock
+python3 "$HERE/jx_tick_gate.py"
+python3 "$HERE/jx_tick_gate.py" --tooth --patches 34,61 --variants '34:+0x600120=8' --no-setmode \
+        --events 300 --variant-events 300
+echo "=== JX GATE 3d: THE PRODUCT PATH (the plugin's own process(): render driver, 96 kHz engine, render object) ==="
+python3 "$HERE/jx_product_gate.py" --patches 0,34,61,20
+python3 "$HERE/jx_product_gate.py" --exact --patches 34,61 --on 0.61 --off 0.93 --secs 1.2
+python3 "$HERE/jx_product_gate.py" --tooth --patches 0                 # no render object: every rate differs
+python3 "$HERE/jx_product_gate.py" --tooth-clock --patches 34,61       # the first key does not restart the clock
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null
@@ -95,4 +116,4 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "[jx verify] FAIL -- no node: the delivered WASM cannot be graded"; exit 1
 fi
-echo "[jx verify] GREEN -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0; the web engine == native"
+echo "[jx verify] GREEN -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0; the clock and every step mode == the plugin's; process() == the product path at 3 host rates; the web engine == native"

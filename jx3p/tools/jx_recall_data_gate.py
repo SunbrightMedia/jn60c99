@@ -97,7 +97,7 @@ def port(so, patches, shift):
             if n < 0:
                 raise SystemExit('wrap record %d too long' % u)
             wraps.append(buf.raw[:n])
-        sizes = (0x7A8, 0xDB0, 0xB0)
+        sizes = (0x7A8, 0xFF0, 0xB0)
         ctl = [ctypes.string_at(lib.jx3p_ctl(w, i), sizes[w]) for i in range(9) for w in range(3)]
         ctl += [ctypes.string_at(lib.jx3p_ctl(3, i), 0x700) for i in range(9)]
         hb = ctypes.create_string_buffer(28)

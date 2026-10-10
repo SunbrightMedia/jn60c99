@@ -154,24 +154,32 @@ records in jx3p/gen/jx_patch_records.json from `jx_patch_records.py`). `jx_recal
 that engine equals the booted plugin's at its render, word for word, every unit's state, parameter
 object and assigner (patches 0, 5, 20, 49, 63; tooth: one record left out, 81 words differ).
 
-## 3c. The render driver's clock tick (EXECUTED + READ, 2026-10-10)
+## 3c. The render driver's clock tick (EXECUTED + READ, 2026-10-10; PORTED, JX-7)
 
 The render driver (the JUNO-60's machine code) ticks the engine 24 times per beat at the host tempo,
 120 when the host gives none: one tick per 1,000 samples at 48 kHz, the first at sample 0 of the first
 block, before the engine renders. A tick is the engine's vtable +0xB8 (rva 0x3F84A0, called at
 0x320F52): per unit its note manager's counter +0x0 += 1, the manager's tick (0x3F5910) and the note
-store's tick (0x3EFD10). The manager's tick does nothing until the flag +6 is set -- the KEY ASSIGN
-setter sets it at a patch load (0x3F2C28) -- and then, at the next 12- (or 24-) tick boundary, clears
+store's tick (0x3EFD10). The manager's tick does nothing until the flag +6 is set -- the arpeggiator's
+pattern apply sets it (0x3F2C28, in 0x3F2B00: 3e) -- and then, at the next 12- (or 24-) tick boundary, clears
 it and plays its note lists again through the note store; the note store's tick runs its step machine
 (+0x2C state, +0x14 / +0x18 counters, 16 slots of 12 bytes at +0x326) and plays notes through its own
-output (vtable +8, the hook at +0xD98). MEASURED through process() at 48000: on a KEY ASSIGN 1 patch
-(800 = 1: factory 34, 38, 59, 60) the note plays on the clock -- 2 samples after its block starts the
-plugin's output and the port's differ; patch 0 (no KEY ASSIGN) is equal. Not ported yet: ~1,400
-instructions (0x3F84A0, 0x3F5910, 0x3EFD10 and its graph: 0x3EF210, 0x3EF3B0, 0x3EF910, 0x3EFBF0,
-0x3F1650, 0x3F1B10, 0x3F1EA0, 0x3F2120, 0x3F56E0, ...; jx_nstore.c's seam at 0x3EF210 is a stub) and
-the driver's tick timing inside a block (the JUNO-60's drv_block in gui/juno_bridge.c).
-jx_recall_product_check.py now compares the note managers and note stores too, with the first tick on
-the model side.
+output (vtable +0 / +8 into the assigner at +0xFD8; the step function at +0xD98). MEASURED through
+process() at 48000 before the port: on factory patch 34 the note plays on the clock -- 2 samples after
+its block starts the plugin's output and the port's differed; patch 0 was equal. (This section first
+named the setter of +6 "the KEY ASSIGN setter" and listed 38, 59 and 60 with 34 as clock patches,
+from host parameter 800: wrong -- 800 is the assigner's mode; the clock patches are those with the
+ARPEGGIO switch on, 34 and 61, EXECUTED by jx_tick_gate.py's reach counts.)
+
+PORTED (jx3p/src/jx_seq.c, ~1,150 lines, every branch from the instructions): the tick 0x3F84A0, the
+manager's tick 0x3F5910 and release 0x3F56E0, the note store's tick 0x3EFD10 and its graph (0x3EF210,
+0x3EF3B0, 0x3EF910, 0x3EFBF0, 0x3F1650, 0x3F1B10, 0x3F1EA0, 0x3F2120), the 19 step functions, the
+store's random numbers 0x3F2A90 and the mode setter 0x3F1910; the note store's whole object (0xFF0
+bytes, its +0x20 pattern pointer kept as its offset). The render driver's tick timing inside a block is
+the JUNO-60's drv_block (gui/juno_bridge.c), ported as jx3p_product_block. Graded by
+`jx3p/tools/jx_tick_gate.py` (the tick and the note fan-outs against the plugin's own, event by
+event, every control object after every event, every unit's state at checkpoints) and
+`jx_product_gate.py` (process(), 3d).
 
 ## 3d. The product path, stage 1 (EXECUTED, 2026-10-10)
 
@@ -182,14 +190,67 @@ the template's own rate -- 96000, the automatic setting's at hosts 44100, 48000 
 (the render object, equal to the JX's). `jx3p/tools/jx_product_gate.py` grades it against the plugin's
 own process() (jx_host_emu: its patch browser's load, its render driver, its render object): patch 0
 EQUAL at 44100 (130 blocks of 512), 48000 (141) and 96000 (282), a note from 0.6 s to 1.2 s; the tooth
-(the 44.1 kHz data, no render object: the web app's path) differs at every rate. Patch 34 (KEY ASSIGN
-1) differs: 3c.
+(the 44.1 kHz data, no render object: the web app's path) differs at every rate. Patch 34 (ARPEGGIO
+on) differed until the clock was ported (3c); with the render driver (jx3p_product_block, JX-7) patches
+0, 34, 61 and 20 are EQUAL at the three rates (job jx7_gates), and with the notes inside their blocks
+(`--exact`); a second tooth (`--tooth-clock`: the first key does not restart the clock) must differ on
+34 and 61.
+
+## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
+
+The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md
+"The arp controller": the same dispatch ids 831..835 with the same roles). Its step function (+0xD98)
+is one of 19 (the mode setter 0x3F1910, jump table 0x3F1A50; above 18, unsigned, mode 12's). Its one
+caller is the pattern apply 0x3F4C50 (thunk 0x3F4BB0, called from 0x3F2B00 at 0x3F2B72), which copies
+a template (table 0x9FAE50, 6-byte entries 0..5) and a step pattern (0x9FAE80, rows of 0x226 bytes)
+into the store and derives the mode:
+
+| input | where it comes from (READ: the host entry's dispatch at 0x3F9B99) |
+|---|---|
+| ARPEGGIO (X+0) | record 52, id 0x600108, dispatch 831 (0x3F66B0, v != 0); off: the apply is not run |
+| ARPEGGIO TYPE, ka+0x18 (0..5) | record 53, id 0x600110, dispatch 832 (0x3F6B10; above 5 ignored) |
+| ARPEGGIO STEP, ka+0x1C (0..5) | record 54, id 0x600118, dispatch 833 (0x3F6670; above 5 ignored) |
+| SCATTER TYPE, ka+0x20 (0..9) | id 0x600120, dispatch 834 (0x3F6BD0) |
+| SCATTER DEPTH, ka+0x24 (-7..7, stored + 7) | id 0x600128, dispatch 835 (0x3F6BA0) |
+| +0xDA1 (byte) | nothing writes it but the constructor's 0 |
+
+The template's byte 2 is the base mode: ARPEGGIO TYPE 0..5 (Script.xml: 1OCT UP, 1OCT UP+DOWN, 1OCT
+DOWN, 2OCT DOWN, 2OCT UP+DOWN, 2OCT UP) gives 0, 6, 3, 3, 6, 0. The SCATTER table at 0xA0F0D0 (10
+types x 10 fields x 15 depths of int32; fields 0..6 go to parameters 0x138..0x13E of the object at
+ka+0x10, field 7 to 0x3F51B0, field 9 to 0x3F5180) gives in field 8 the mode modifier: 1 (type 8,
+every depth) makes the base 0 / 3 / 6 into 2 / 5 / 8 (templates 0 and 5 / 2 and 3 / 1 and 4); 3 (type
+9, depths -5..+5) makes every base 10; 2 would make 11 but no entry holds it. With +0xDA1 set the
+mode would be 15..18 from +0xFE4 -- and the step clock would play through 0x3F2120 instead of
+0x3F1EA0 -- but no instruction stores to +0xDA1 (READ: every displacement-0xDA1 operand in the image is
+a compare), it is 0 after the boot, and nothing wrote it through the 64 factory patch loads and every
+one of the host entry's 744 ids set to 0, 1, 2, 3, 5, 9 and 127 (EXECUTED, a write hook on all nine
+stores).
+
+NO PRODUCT PATH SENDS SCATTER, as in the JUNO-60 plugin (EXECUTED: not in any factory patch's 75
+records, not in initialize's 84, not among the 210 entries of the plugin's own getState; READ: none of
+the 303 editor widgets of Script.xml binds SCATTER TYPE / DEPTH, where ARPEGGIO, TYPE and STEP each
+have one; a host parameter change with the model id reaches nothing -- but so does ARPEGGIO TYPE's,
+so that probe proves nothing). SCATTER stays at the build's (0, 7): field 8 = 0. So the PRODUCT
+reaches modes 0, 3 and 6 -- every one in the factory bank (ARPEGGIO = 1 only on patches 34 and 61,
+the two that play on the clock); the engine's own host entry reaches 2, 5, 8 and 10 more.
+
+Graded (`jx3p/tools/jx_tick_gate.py`, every control object after every event, every unit's state at
+checkpoints): the factory patches 34, 61, 0, 38, 20; variants of the plugin's own patch load --
+ARPEGGIO / TYPE / STEP changed (product states, modes 0, 3, 6), SCATTER appended (the engine's entry,
+modes 2, 5, 8, 10); and every one of the 19 modes put into every store by the plugin's own setter after
+patch 34's load (the port: its transcription), the 12 no input reaches included.
 
 ## 4. Next
 
-1. The clock tick (3c): the driver's tick timing and split of a block, the engine's tick entry and
-   the note store's step machine, transcribed and graded by jx_product_gate.py on patches 34, 38, 59,
-   60 (and a gate of the tick alone, model against port, every state word).
-2. Records at offsets inside a block (notes at any sample), the render driver's split; then the web
-   app on the product path.
-3. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.
+1. The host tempo (READ, 2026-10-10): the render driver computes T = round(tempo x 10) from the
+   ProcessContext and, when the host's tempo is valid and T changed, calls the engine's vt+0xB0
+   (0x3F9DD0): for T in 400..3000 every unit's dispatch 375 (0x177) = T -- the parameter object's
+   vt+0x650 (0x3EB7E0): 0x3E12D0, then by the effect type [obj+0x5B8] (0..5) the effect object's tempo
+   setter (+0x3270 / +0x3330: vt+0xA8, +0x3400 / +0x34D8 / +0x35B0: vt+0xC0, +0x3680: vt+0x138),
+   [obj+0x440] = T, vt+0x8B0. Every DAW gives a tempo, so this runs at the first block of every DAW
+   session; the port's driver has the fixed 120 and no tempo entry (vt+0xD0 / +0xF0, the transport,
+   are `ret 0`). Port it and grade it through process() with a ProcessContext.
+2. The web app on the product path (96 kHz data, the render object, the render driver).
+3. A patch change on a running engine (warm recall, SCOPE_AUDIT row 9) and host edits beyond a patch
+   load (row 12).
+4. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.

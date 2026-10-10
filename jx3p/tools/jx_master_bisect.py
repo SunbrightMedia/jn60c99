@@ -129,7 +129,7 @@ def port(so, k, n, fine=None, stop=None):
             return None
         lib.jx3p_render(Lb, Rb, m)
         bits = list(struct.unpack('<%dI' % m, bytes(Lb))) + list(struct.unpack('<%dI' % m, bytes(Rb)))
-        sizes = (0x7A8, 0xDB0, 0xB0)
+        sizes = (0x7A8, 0xFF0, 0xB0)
         ctl = [ctypes.string_at(lib.jx3p_ctl(w, i), sizes[w]) for i in range(9) for w in range(3)]
         ctl += [ctypes.string_at(lib.jx3p_ctl(3, i), 0x700) for i in range(9)]
         res.append([hashlib.sha256(clean(ctypes.string_at(lib.jx3p_vstate(u), SNAP_V) if u < 8 else

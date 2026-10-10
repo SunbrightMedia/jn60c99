@@ -133,13 +133,19 @@ def wrap_record(jx, uc, u):
 def variant_records(spec):
     """'34:67=3' -> factory patch 34's patch-load records with record 67's value set to 3 (several
     'idx=val' pairs may follow, comma-separated). The records stay the plugin's own; only a value
-    changes, to one the plugin's host entry accepts (the gates print the cells it set)."""
+    changes, to one the plugin's host entry accepts (the gates print the cells it set).
+    '+0xID=V' appends a record for a model id the patch does not carry (its GUI's controls, e.g. the
+    step pattern's row 0x600120 and column 0x600128 -- jx3p/docs/HOST_LAYER.md 3e), after the load,
+    as the editor sends it; V may be negative (the value travels as its 32 bits)."""
     import copy
     base, _, edits = spec.partition(":")
     recs = copy.deepcopy(J.JX.records()["patches"][int(base)])
     for e in filter(None, edits.split(",")):
         i, _, v = e.partition("=")
-        recs[int(i)][2] = int(v, 0)
+        if i.startswith("+"):
+            recs.append([2, int(i[1:], 0), int(v, 0)])
+        else:
+            recs[int(i)][2] = int(v, 0)
     return recs
 
 
