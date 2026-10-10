@@ -21,23 +21,42 @@ Everything else keeps e2e_emu's default (unknown imports return 0).
 """
 import os, sys, struct, collections
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'tools', 'verify'))
-import e2e_emu as E
-import truth as _truth
 from unicorn import UC_HOOK_CODE, UC_PROT_ALL
 from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8,
                                UC_X86_REG_R9, UC_X86_REG_RSP, UC_X86_REG_RIP, UC_X86_REG_GS_BASE)
 
-IB = E.IB
+# ANOTHER ROLAND CLOUD PLUGIN: the wrapper code is shared (jx3p/tools/fw_map.py proves it per function), so
+# this module boots any of them. A loader executes a second copy of this file with PROFILE set (the plugin's
+# emulator module and the few addresses that differ: jx3p/tools/jx_host_emu.py); without it, as imported by
+# every JUNO gate, it is the JUNO-60 exactly as before.
+P = globals().get('PROFILE')
+if P is None:
+    import e2e_emu as E
+    import truth as _truth
+    BASE, SCRIPT_XML = E.E2E, _truth.SCRIPT_XML
+    IB = E.IB
+    DLLMAIN, INITDLL, FACTORY = IB + 0x67697C, IB + 0x3C9740, IB + 0x348B40
+    CREATE_PROC = IB + 0x349CA0            # CVstProcessor::createInstance -> IAudioProcessor (class + 272)
+    TLS_TEMPLATE, TLS_INDEX = (0xB2C058, 0xB2C074), 0xCB6338
+    DATA_DIR = 'C:\\ProgramData\\Roland Cloud\\JUNO-60'
+    USER_DIR = 'C:\\Users\\u\\AppData\\Local\\Roland Cloud\\JUNO-60'
+    MODPATH = 'C:\\Program Files\\Common Files\\VST3\\JUNO-60.vst3\\Contents\\x86_64-win\\JUNO-60.vst3'
+    INITIALIZE, PATCH_LOAD = IB + 0x34A110, IB + 0x335850
+    CONTROLLER_CID = bytes.fromhex('c74480f256663d4c9cfcecce62993ffd')
+else:
+    E = P['E']
+    BASE, SCRIPT_XML = P['BASE'], P['SCRIPT_XML']
+    IB = E.IB
+    DLLMAIN, INITDLL, FACTORY, CREATE_PROC = (IB + P[k] for k in ('DLLMAIN', 'INITDLL', 'FACTORY', 'CREATE_PROC'))
+    TLS_TEMPLATE, TLS_INDEX = P['TLS_TEMPLATE'], P['TLS_INDEX']
+    DATA_DIR, USER_DIR, MODPATH = P['DATA_DIR'], P['USER_DIR'], P['MODPATH']
+    INITIALIZE = IB + P['INITIALIZE'] if P.get('INITIALIZE') else None   # None: the component's vtable slot 3
+    PATCH_LOAD = IB + P['PATCH_LOAD']
+    CONTROLLER_CID = P.get('CONTROLLER_CID')   # None: asked from the component (getControllerClassId)
 TEB = 0x580000000                      # free: heap ends at 0x510000000
 COM = 0x5A0000000                      # fake COM objects + pidls
 DYN = E.STUB_BASE + 0x4000             # named stubs for GetProcAddress / COM methods
 DYN_END = E.STUB_BASE + 0x7FF0
-DLLMAIN, INITDLL, FACTORY = IB + 0x67697C, IB + 0x3C9740, IB + 0x348B40
-CREATE_PROC = IB + 0x349CA0            # CVstProcessor::createInstance -> IAudioProcessor (class + 272)
-TLS_TEMPLATE, TLS_INDEX = (0xB2C058, 0xB2C074), 0xCB6338
-DATA_DIR = 'C:\\ProgramData\\Roland Cloud\\JUNO-60'
-USER_DIR = 'C:\\Users\\u\\AppData\\Local\\Roland Cloud\\JUNO-60'
-MODPATH = 'C:\\Program Files\\Common Files\\VST3\\JUNO-60.vst3\\Contents\\x86_64-win\\JUNO-60.vst3'
 SCRIPT_DIR = MODPATH.rsplit('\\', 1)[0] + '\\Script'     # where the module init looks for Script.xml (MEASURED)
 S_OK, S_FALSE, E_FAIL, E_NOINTERFACE, E_NOTFOUND = 0, 1, 0x80004005, 0x80004002, 0x80070002
 
@@ -84,7 +103,7 @@ def _norm(p):
     return p
 
 
-class Wrapper(E.E2E):
+class Wrapper(BASE):
     def __init__(self):
         super().__init__()
         uc = self.uc
@@ -106,7 +125,7 @@ class Wrapper(E.E2E):
         self.fslog, self.handles, self.finds = [], {}, {}
         self.lasterr = 0
         self.screen = {}                  # GetSystemMetrics' answers by index (none: 0, no screen)
-        script = open(_truth.SCRIPT_XML, 'rb').read()
+        script = open(SCRIPT_XML, 'rb').read()
         # TextCodeTable.dat (GUI message strings; not supplied) is served EMPTY: the module init
         # requires it to open, and nothing in it reaches the engine.
         self.files = {_norm(SCRIPT_DIR + '\\Script.xml').lower(): script,
@@ -547,7 +566,10 @@ class Wrapper(E.E2E):
         self.audio = ap
         self.core = self.base + 0x148             # the processor's wrapper core (vtable 0x9679C8)
         ctx = self.new_obj('hostctx')
-        r = self.call(IB + 0x34A110, rcx=self.comp, rdx=ctx, count=4_000_000_000) & 0xFFFFFFFF
+        if INITIALIZE is None:                    # the component's own vtable: IPluginBase::initialize
+            r = self.vcall(self.comp, 3, ctx, count=4_000_000_000) & 0xFFFFFFFF
+        else:
+            r = self.call(INITIALIZE, rcx=self.comp, rdx=ctx, count=4_000_000_000) & 0xFFFFFFFF
         log('IComponent::initialize -> 0x%x' % r)
         assert r == 0, 'initialize failed'
         return self.base
@@ -561,7 +583,11 @@ class Wrapper(E.E2E):
         self.boot(log=log)
         fac = self.call(FACTORY, count=100_000_000)
         buf = self.alloc_com(0x40)
-        self.uc.mem_write(buf, bytes.fromhex('c74480f256663d4c9cfcecce62993ffd') + IID_IEDITCONTROLLER)
+        cid = CONTROLLER_CID
+        if cid is None:                             # IComponent::getControllerClassId
+            assert self.vcall(self.comp, 5, buf) & 0xFFFFFFFF == 0
+            cid = bytes(self.uc.mem_read(buf, 16))
+        self.uc.mem_write(buf, cid + IID_IEDITCONTROLLER)
         assert self.vcall(fac, 6, buf, buf + 16, buf + 0x30) & 0xFFFFFFFF == 0
         ctrl = q(buf + 0x30)
         assert self.vcall(ctrl, 3, self.new_obj('hostctx'), count=4_000_000_000) & 0xFFFFFFFF == 0
@@ -586,7 +612,7 @@ class Wrapper(E.E2E):
         vec = self.alloc_com(24)
         self.uc.mem_write(vec, struct.pack('<QQQ', data, data + len(rec_tail), data + len(rec_tail)))
         n0 = len(self.queue())
-        self.call(IB + 0x335850, rcx=vec, rdx=q(self.comp + 280 + 8), r8=0, r9=0, count=4_000_000_000)
+        self.call(PATCH_LOAD, rcx=vec, rdx=q(self.comp + 280 + 8), r8=0, r9=0, count=4_000_000_000)
         return self.queue()[n0:]
 
     def vcall(self, obj, slot, *args, count=2_000_000_000):

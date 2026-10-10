@@ -34,14 +34,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(REPO, 'probes', 'b6'))
-import wrapper_emu as W                                     # noqa: E402
+W = globals().get('W_MODULE')                              # another plugin: its loader hands its wrapper
+if W is None:                                              # module (probes/b6/wrapper_emu.py, PROFILE)
+    import wrapper_emu as W                                 # noqa: E402
 from unicorn import UC_HOOK_CODE                            # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_RSP, UC_X86_REG_RIP, UC_X86_REG_RAX, UC_X86_REG_RCX,   # noqa: E402
                                UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9)
 
 E = W.E
 IB = E.IB
-ENGINE_RENDER = IB + 0x3C7400       # CWaveGen vt+56
+P = W.P                             # None: the JUNO-60
+ENGINE_RENDER = IB + (P['ENGINE_RENDER'] if P else 0x3C7400)    # CWaveGen vt+56 (a profile: where its
+                                                                # own render service stops, jx3p/tools/jx_host_emu.py)
+ZOOM_GET = IB + (P['ZOOM_GET'] if P else 0x2AA590)              # a window's zoom getter
+WINDOW_FIT = IB + (P['WINDOW_FIT'] if P else 0x312750)          # a panel window's fit
 PROCESS_SLOT = 9                    # IAudioProcessor::process (rva 0x34A380)
 SAMPLERATE_ID = 0x0FFFC015          # vm.vs.sampleRate
 K_PLAYING, K_PPQ, K_TEMPO, K_CYCLE = 0x2, 0x200, 0x400, 0x1000
@@ -108,7 +114,7 @@ class HostProcess(W.Wrapper):
                 this = uc_.reg_read(UC_X86_REG_RCX)
                 r = struct.unpack('<4i', uc_.mem_read(this + 0x18, 16))
                 self.windows[(r[2] - r[0], r[3] - r[1])] = this
-            uc.hook_add(UC_HOOK_CODE, on_fit, begin=IB + 0x312750, end=IB + 0x312750)
+            uc.hook_add(UC_HOOK_CODE, on_fit, begin=WINDOW_FIT, end=WINDOW_FIT)
         name, t = self.alloc_com(16), self.alloc_com(16)
         uc.mem_write(name, b'editor\0')
         uc.mem_write(t, b'HWND\0')
@@ -122,7 +128,7 @@ class HostProcess(W.Wrapper):
     def window_conv(self, size):
         """a coordinate conversion of the panel window of that size (a draw, an invalidation, a hit
         test): its own zoom getter (rva 0x2AA590); returns the zoom it read (int)"""
-        z = self.call(IB + 0x2AA590, rcx=self.windows[size], count=500_000_000) & 0xFFFFFFFF
+        z = self.call(ZOOM_GET, rcx=self.windows[size], count=500_000_000) & 0xFFFFFFFF
         return z - (1 << 32) if z >= 1 << 31 else z
 
     def _top(self):
