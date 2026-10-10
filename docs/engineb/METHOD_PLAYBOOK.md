@@ -3340,3 +3340,21 @@ holding `$(MAKE)` / `${MAKE}` / a '+' line (its --guard-tooth bites).
 Before asking make to print a recipe, check that make will not run it. And a static audit that names
 "everything" sees nothing: the runner's first audit was blind because the prelude's dependency list
 names every script (its tooth caught it).
+
+## 194. A DEFECT INFERRED FOR A SIBLING PORT IS OWED A MEASUREMENT -- OF ALL MEMORY, PAST THE MUTE
+Paid 2026-10-10 (JX-3P, task #83). Playbook 101 (JP8 D7, 2026-09-23) found that a zero HOST makes
+BUILD run at rate 0; CLAUDE.md then said "INFERRED defect for the JX owners -- check it", and nobody
+did for 17 days. Measured now (jx3p/tools/jx_host_drive_check.py): the JX oracle's zero HOST armed
+every ramp record of every unit with an inf step (196 value words per unit in the ramp array, a
+0x6F3F-byte allocation the unit state points at, +0x58); the plugin's factory HOST builds at its
+ctor's 96000 and SETSR never rewrites them, so the plugin's ramps run, the oracle's jumped. The
+output differs from sample 961 -- the first sample after the 960-sample start-up mute -- at 44100,
+48000 and 96000; at 96000 the cells only SETSR writes also stay 0.0 (11 to 68 words per unit),
+because SETSR returns at once when the rate is unchanged (0x3F9981, READ). Every JX gate stayed EXACTLY 0: the C engine replays the template the
+same wrong boot exported. The first version of the check compared only the nine unit states, and
+only after note events: it saw nothing at 44100 and 48000. The ramp array is its own allocation,
+and its steps reach the output only when a ramp is stepped after the mute.
+### The rule
+An inferred defect is measured the day it is written down, or the claim it threatens is marked
+unproven. A drive comparison covers every allocation, the HOST and the image, and renders past
+every latch and mute; a state-only comparison before rendering proves the boot, not the sound.

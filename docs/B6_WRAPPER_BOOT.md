@@ -54,6 +54,24 @@ their workers not signalled). So the plugin as shipped plays SIX voices. The
 `e2e_emu` harness builds on a zero HOST (engine+0x38 = 0, assigners at 8) and
 renders all eight units: it omitted this preamble. Now run by the harness and the port, gated: CLAIMS A21, tools/verify/voice_count_gate.py (25/25).
 
+## The zero HOST is a model, not the boot (MEASURED 2026-10-10, playbook 194)
+
+`e2e_emu.build()` hands BUILD a zero HOST, so BUILD runs at rate 0. The
+plugin's processor builds its HOST with the factory, rva 0x3C6790 (operator
+new(0x880) + the CWaveGen ctor 0x3C5A50: vtable rva 0x9DF1D8, engine+8 =
+96000.0, engine+0x38 = 8; EXECUTED). probes/b6/host_drive_check.py boots both
+and compares every allocation: every unit's ramp array (a 0x7CD7-byte
+allocation) holds 244 words that are +inf on the zero HOST and finite on the
+factory one (0.000822, 0.0148, 0.0260 = 2500/96000 ...), at 96000 another 89
+words of every unit state differ (setSampleRate returns when the rate is
+unchanged), and the outputs differ from sample 960. That is why the
+product claims are graded on the plugin's real boot (host_process_emu: the
+factory, BUILD at 96000, its ramps in flight -- CLAIMS A25, A29) and why
+juno_gui_plugin_init builds at 96000 and replays the boot ramps. The engine
+gates grade juno_gui_create against the e2e model; the apps never use it (the
+device firmware still does: apply_bank). The JX-3P oracle had the same zero
+HOST and no product path to catch it (jx3p/docs/S3_STATUS.md).
+
 ## Census (probes/b6/state_load_census.py, EXECUTED 2026-10-06)
 
 | payload | engine events | order | values | handler calls |

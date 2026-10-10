@@ -233,11 +233,15 @@ mine is a hypothesis (playbook 80).
   docs/hardware/SESSION_HANDOFF.md (read its 2026-09-28 section first),
   BOM v2 in docs/hardware/bom/, ordering in docs/hardware/ORDERING.md.
   The user draws every board; Claude answers at pin/net level.
-- **JX-3P (E5)**: PLAYS AND SOUNDS RIGHT. Recall 64/64 EXACT, full chain
-  EXACTLY 0, listen proofs green on oracle and C twin, web app published.
-  jx3p/docs/S3_STATUS.md rules. Open: master FX in the app, host recall
-  protocol, other rates. INFERRED defect for the JX owners: jx_emu.build()
-  also hands BUILD a zero HOST (JP8 D7 / playbook 101) — check it.
+- **JX-3P (E5)**: jx3p/docs/S3_STATUS.md rules -- read its HOST DRIVE
+  correction first. The JP8 D7 defect REACHED the JX (MEASURED, playbook
+  194): the old oracle's zero HOST gave every ramp an inf step, so every JX
+  gate graded a sound the plugin never makes (the output differs from sample
+  961). jx_emu now builds the plugin's own HOST; until the JX data are
+  regenerated and every JX gate re-runs green, the JX claims (recall 64/64,
+  full chain EXACTLY 0, listen proofs, the web app) are UNPROVEN. The JX
+  wrapper is the JUNO's machine code (render driver, converter, process(),
+  patch manager): the JUNO host layer is the JX's next step.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

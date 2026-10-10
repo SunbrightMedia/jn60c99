@@ -3,6 +3,47 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## ⚠ CORRECTION 2026-10-10 — THE HOST DRIVE WAS WRONG (playbooks 101, 194)
+
+The JP8's D7 defect (playbook 101) was written down for the JX as INFERRED on
+2026-09-23 and MEASURED only now (`jx3p/tools/jx_host_drive_check.py`, every
+allocation, the HOST and the image compared, rendered past the mute):
+
+- The plugin's processor builds its engine HOST with the factory 0x3F84E0
+  (ALLOC 0x880 + ctor: vtable 0xA15B88, [HOST+8] = 96000.0, [HOST+0x38] = 8;
+  the call at 0x32064B, READ). The oracle handed BUILD a zero 0x8000 block:
+  BUILD ran at rate 0.
+- MEASURED: at 44100 / 48000 / 96000 every unit's RAMP ARRAY (the 0x6F3F-byte
+  allocation the unit state points at, +0x58) holds 196 value words that are
+  +inf on the zero HOST and finite on the factory HOST (0.000822, 0.01787,
+  0.02604 = 2500/96000, ...): the plugin's ramps run, the oracle's jumped.
+  SETSR never rewrites them. The output differs from sample 961, the first
+  sample after the 960-sample start-up mute (44100, 9 note events).
+- MEASURED at 96000: the cells only SETSR writes stay 0.0 on the factory HOST
+  (68 words per unit state right after the boot; 11 after the controller's
+  default push and a recall of patch 0: 0.0208, 0.2305, 0.0217, 1.0 ... on
+  the zero HOST). READ: SETSR returns at once when the rate equals [HOST+8]
+  (0x3F9981 `ucomiss xmm6,[rcx+8]; je`): on the factory HOST, 96000 is the
+  build's own rate and SETSR changes nothing. The zero HOST also had 0 voices
+  at [HOST+0x38] (the factory writes 8).
+
+Every JX gate stayed EXACTLY 0 because the C engine replays the template the
+same wrong boot exported. So the claims below -- recall 64/64, the full chain
+EXACTLY 0, the listen proofs, the web app -- are UNPROVEN until the template,
+the recall aux and every reference are regenerated on the corrected drive and
+every gate re-runs green. `jx_emu.build()` now builds the HOST with the
+factory (`JX_EMU_LEGACY_HOST=1` keeps the old one for the check only).
+
+Also found the same day: the JX wrapper (render driver 0x320A00, converter
+0x343CF0, render-object lookup 0x343940, core setup 0x3219A0, setActive
+0x34A910, non-note path 0x31F3C0, UI drain 0x320000, patch load 0x335730,
+patch manager 0x337F70, ManagePatch 0x322D40) is the JUNO's machine code
+(normalized instruction streams equal; READ). So the JX plugin, like the JUNO,
+renders its engine through the same render object and converter (INFERRED from
+the equal code; its default engine rate is not yet executed) -- the JUNO's host
+layer (docs/HOST_RENDER_LAYER.md) is the JX's next step, graded through the JX
+plugin's own process().
+
 ## ⚠ CORRECTION 2026-09-05 — THE DRIVE WAS WRONG (playbook 87)
 
 Every oracle run before this date called setSampleRate (0x3F9970) with the

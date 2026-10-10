@@ -39,6 +39,8 @@ NOTEOFF   = IB + 0x3F90F0     # (rcx=HOST, dl=note, r8b=vel)  engine vtbl 0x78
 ASG_NOTIFY= IB + 0x356BF0     # (rcx=assign obj, edx=what)    JUNO twin 0x3549B0
 HOSTPARAM = IB + 0x3F9A30     # (rcx=HOST, edx=host id, r8d=val) -- needs the
                               # controller-built id map at .data 0xCE9038
+FACTORY   = IB + 0x3F84E0     # the engine factory (no args): ALLOC(0x880) + ctor inline; rax = HOST (READ)
+HOST_SZ   = 0x880             # its ALLOC size (`mov ecx,0x880` at 0x3F84F4, READ)
 ENGINE_VTBL = IB + 0xA15B88   # slots: 08 BUILD 18 SETSR 38 RENDER 78 NOTEOFF
                               #        80 NOTEON 70 HOSTPARAM (pe_recon vtable)
 XC_TABLE  = (0x96C660, 0x96E0C8)   # C++ static initializers (pe_recon crt_init);
@@ -287,8 +289,30 @@ class JX:
         uc.emu_start(stub,RET,count=0)
         rip=uc.reg_read(UC_X86_REG_RIP)
         if rip!=RET: raise RuntimeError("stub stopped rva 0x%x"%(rip-IB))
-    def build(self):
-        self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000)
+    def make_host(self):
+        """the plugin processor's own construction (call at 0x32064B): FACTORY 0x3F84E0 = ALLOC(0x880)
+        + the ctor inline (base ctor 0x34ABA0 with xmm1 = .rdata 0x9BF5D4 = 96000.0 -> [HOST+8];
+        vtable 0xA15B88; [HOST+0x38] = 8 voices) -- the JP8 D7 drive (playbook 101). Checks those
+        READ facts on the result. The old zero HOST (JX_EMU_LEGACY_HOST=1) BUILDs at rate 0 and has
+        no vtable; SETSR returns at once when the rate equals [HOST+8] (0x3F9981, READ), so the two
+        drives differ wherever BUILD's rate reaches a cell SETSR does not rewrite -- MEASURED by
+        jx3p/tools/jx_host_drive_check.py (jx3p/docs/S3_STATUS.md, the HOST drive section)."""
+        u=self.uc; n0=len(self.allocs)
+        h=self.call(FACTORY, count=400_000_000)
+        assert h and self.allocs[n0]==(h,HOST_SZ), "factory: first alloc %r, rax 0x%x"%(self.allocs[n0:n0+1],h)
+        vp=int.from_bytes(u.mem_read(h,8),'little')
+        rate=struct.unpack("<f",u.mem_read(h+8,4))[0]; nv=struct.unpack("<i",u.mem_read(h+0x38,4))[0]
+        assert vp==ENGINE_VTBL and rate==96000.0 and nv==8, \
+            "factory HOST: vptr rva 0x%x rate %r voices %d"%(vp-IB,rate,nv)
+        return h
+    def build(self, factory=None):
+        """BUILD on the plugin's own HOST (make_host); factory=False or JX_EMU_LEGACY_HOST=1: the old
+        zero HOST, kept only so jx_host_drive_check.py can measure what it changed"""
+        if factory is None: factory = os.environ.get("JX_EMU_LEGACY_HOST") != "1"
+        if factory:
+            self.HOST=self.make_host()
+        else:
+            self.HOST=self.bump(0x8000); self.uc.mem_write(self.HOST,b"\x00"*0x8000)
         self.call(BUILD, rcx=self.HOST)
         u=self.uc; self.state=[]; self.proc=[]; self.assign=[]
         for i in range(N_UNITS):
