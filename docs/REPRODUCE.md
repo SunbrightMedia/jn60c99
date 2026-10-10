@@ -24,6 +24,31 @@ passed stages, re-runs a failed one, and survives a second resume.
 COMMIT defaults to HEAD, DIR to `juno60_repro` next to this tree (its logs in `DIR.logs/`; next to
 the tree so Node finds the same node_modules). Long jobs only through `tools/run_job.sh` (CLAUDE.md).
 
+## The proof run (repro4, 2026-10-10): GREEN
+
+A fresh clone of commit 0ca9f018 (`/home/user/juno60_repro`), job repro4, 08:37-17:13 UTC:
+
+| Stage | Exit | Seconds |
+|---|---|---|
+| clone, inputs, doctor | 0, 0, 0 | 2, 0, 1 |
+| test, static | 0, 0 | 160, 42 |
+| verify | 2: 44 of 45 sections GREEN; section 6 (ARP SCATTER GRID) killed by the kernel (memory, four sections at a time) | 13,245 |
+| native, webapp, engineb | 0, 0, 0 | 4,767, 1,037, 4,671 |
+| regen, determinism | 0, 0 | 3,787, 85 |
+| pi, esp32, tree | 0, 0, 0 | 269, 2,848, 0 |
+
+Section 6 run again ALONE in the same clone (job repro4_sec6, 17:14-17:38, EXIT 0): the plugin's
+reference grid rebuilt, 300/300 schedules MATCH the plugin's own arp, its reach check (67 and 83
+distinct plugin schedules) and both teeth bite. The clone predates the rule that does this retry
+itself (a6885317: run_sections.py waits for 4 GiB free and re-runs a killed section alone, once).
+The FAIL lines in the webapp stage's log are its teeth's own output (`skin_pm_check --tooth button:
+BITES`). So every stage of reproduce.sh is GREEN at 0ca9f018, which holds A38-A40 (their full verify).
+After 0ca9f018 only jx3p/, the docs and the oracle's plugin PROFILE (probes/b6/wrapper_emu.py,
+tools/verify/host_process_emu.py: the JX-3P boots on the same code) changed outside run_sections.py
+and the job tools. The JUNO-60's oracle is unchanged by it, EXECUTED: a boot, two notes, a bend through
+process() and 40 blocks give the same output blocks and the same heap, byte for byte, at HEAD
+(8a8596ea + the JX edits) and at 0ca9f018 (two processes, one per tree, 2026-10-10).
+
 ## Inputs (nothing else is read)
 
 | Input | Where | Check |

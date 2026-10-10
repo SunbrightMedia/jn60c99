@@ -22,7 +22,7 @@ emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
   jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
   jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
-  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_block","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_block","_jx3p_product_param","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","FS"]' \
   -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_ES6=1 \
   -s EXPORT_NAME=Jx3pModule -s ENVIRONMENT=web \
@@ -56,7 +56,7 @@ emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
   jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
   jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
-  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_block","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_block","_jx3p_product_param","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","FS"]' \
   -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME=Jx3pModule \
   -s ENVIRONMENT=web \

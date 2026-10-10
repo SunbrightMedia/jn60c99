@@ -196,6 +196,35 @@ on) differed until the clock was ported (3c); with the render driver (jx3p_produ
 (`--exact`); a second tooth (`--tooth-clock`: the first key does not restart the clock) must differ on
 34 and 61.
 
+## 3f. Host automation through process() (READ + EXECUTED, 2026-10-10; PORTED, JX-11d)
+
+The JUNO-60's wrapper code, the JX's tables. READ, the functions equal by `fw_map.py --pair`: process()'s
+parameter record 0x31F1A0 (JUNO 0x31F2C0), the id map lookup 0x319990 (0x319AB0; its id pre-map 0x40F340
+is `mov eax, ecx`), the record value law 0x31A820 (0x31A940), the CC value law 0x31A730 (0x31A850), the
+vector's id 0x319B30 (0x319C50), the CC map lookup 0x319940 (0x319A60), the render driver 0x320A00
+(0x320B20, 923 instructions); the round 0x428460 = the JUNO's 0x3F2050 (0.5, floor / ceil). The driver
+(rva 0x3210B6): a kind-1 record's id through the id map (the tree at .data 0xCE8638; none: nothing) to
+the engine's host entry vt+0x70 (0x3F9A30) with the record's OWN id and the value law
+round(min + (max - min) x v) in single precision, half away from zero, clamped to int32; kind 2 straight
+to the host entry. process() makes one kind-1 record per parameter queue below the MIDI-mapping base
+(0x0FFFC100) -- its last point, the value as a float -- after the block's notes, in queue order.
+
+EXECUTED (jx_gen_midi_tables.py, the booted plugin at 48000 and 44100, equal): 83 parameters in the core's
+vector -- the model ids 0x0060xxxx, 0x00A0xxxx (two with the range 0..0x3F800000, the bits of 1.0f),
+MASTER TUNE 0x00000002 (0..200) and ten host settings (voiceCount 0x0FFFC00E 2..8, sampleRate 0x0FFFC015
+0..3, writePatch 0x0FFFC01D ...); 83 ids in the id map, every key cross-checked through the lookup and
+911 ids probed (the host entry's 744, the settings, the MIDI ids); 55 CCs in the default map. Generated
+into jx3p/src/jx_midi_tables.h (`--check` rebuilds it from two boots).
+
+PORTED: `jx3p_product_param(id, offset, value)` (jx_bridge.c) queues the record as process() makes it; the
+next `jx3p_product_block` puts it after its own events; the driver applies it through the id map, the law
+and the lifted host entry. A MIDI-mapping id (base + 0..129: CC, aftertouch, bend) is refused (-1): not
+ported yet. GRADED (jx_product_gate.py --edits, GATE 3d): seeded queues from the note-on on -- ids from
+the map and ids it lacks, values 0..1, the ends, -0.25, 1.25, 1e-9, several points of one id per block,
+several ids at one sample: seed 1 at 48000, 108 points (107 records), 225 blocks EQUAL to the plugin's
+process(); teeth: no points to the port (`--tooth-edits`: differs from block 68), the law truncated
+(`--tooth-law`).
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include <math.h>
 
 /* ---- the guest heap's translation for transcribed code: host = guest + delta (set at init) ---- */
 unsigned long long jx_g2h_delta;
@@ -731,8 +732,11 @@ long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS && G.kt[u]) ? (long
 #include "../../src/juno_conv.c"
 /* the render driver's state (jx3p_product_block below) */
 #define JX_DRV_QMAX 256
-typedef struct { int off, on, note, vel, kind; } jx_drv_rec;   /* kind 0 a key, 2 an engine parameter record */
+typedef struct { int off, on, note, vel, kind; } jx_drv_rec;   /* kind 0 a key, 1 a host parameter record (note
+                                                                * the id, vel the float value's bits), 2 an
+                                                                * engine parameter record */
 static jx_drv_rec g_drv_carry[JX_DRV_QMAX]; static int g_drv_ncarry;
+static jx_drv_rec g_drv_pend[JX_DRV_QMAX]; static int g_drv_npend;     /* jx3p_product_param's points */
 static long long g_drv_ph; static int g_drv_notes, g_drv_rate;
 
 static juno_ro g_ro; static int g_ro_on;
@@ -750,6 +754,7 @@ int jx3p_product_open(int host_rate)
     juno_ro_init(&g_ro, (int)jxg_rate(), host_rate);
     g_ro_on = 1;
     g_drv_rate = host_rate; g_drv_ph = 0; g_drv_notes = 0; g_drv_ncarry = 0;   /* the driver at instance start */
+    g_drv_npend = 0;
     G.host_stage_off = 0;
     if (juno_ro_lookup(&g_ro) < 0) return -1;
     return juno_ro_kind(&g_ro);
@@ -763,15 +768,78 @@ int jx3p_product_open(int host_rate)
  * through the render object; the first key down restarts the clock with a tick. */
 static void prod_render(float *L, float *R, int t0, int n);
 int jx3p_product_process(float *L, float *R, int n);
+/* THE HOST PARAMETER RECORDS (kind 1): the JUNO-60's wrapper code in the JX (jx3p/tools/fw_map.py), the
+ * tables the JX's own (jx3p/src/jx_midi_tables.h, generated from the booted plugin by
+ * jx3p/tools/jx_gen_midi_tables.py). process() (rva 0x34A240) makes one record per host parameter queue
+ * below the MIDI-mapping base -- its last point, the value as a float -- after the block's notes; the render
+ * driver (rva 0x3210B6) looks the id up in the id map (rva 0x319990: none, nothing) and calls the engine's
+ * host entry (vt+0x70) with the record's own id and the parameter's value law (rva 0x31A820). */
+#include "../src/jx_midi_tables.h"
+#ifndef JX_LAW_TOOTH
+#define JX_LAW_TOOTH 0
+#endif
+static int jx_midi_entry(uint32_t id)
+{
+    int lo = 0, hi = JX_MIDI_IDMAP_N - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (JX_MIDI_IDMAP[mid].id == id) return JX_MIDI_IDMAP[mid].entry;
+        if (JX_MIDI_IDMAP[mid].id < id) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+/* rva 0x31A820: (float)(max - min, 32 bits zero-extended) x v + (float)min in single precision, to double,
+ * rounded half away from zero (rva 0x428460: below 0 ceil(x - 0.5), else -- NaN too -- floor(x + 0.5)),
+ * below -2147483647 (NaN too) 0x80000001, above 2147483647 0x7FFFFFFF, else truncated */
+static int32_t jx_midi_record_value(int e, float v)
+{
+    const jx_midi_param *p = &JX_MIDI_PARAM[e];
+    float x = (float)(int64_t)((uint32_t)p->max - (uint32_t)p->min) * v;
+    double r;
+    x = x + (float)p->min;
+    r = (double)x;
+#if !JX_LAW_TOOTH   /* TOOTH (jx_product_gate.py --tooth-law): truncated, not rounded */
+    r = (0.0 > r) ? ceil(r - 0.5) : floor(r + 0.5);
+#else
+    r = (0.0 > r) ? ceil(r) : floor(r);
+#endif
+    if (!(r >= -2147483647.0)) return (int32_t)0x80000001u;
+    if (r > 2147483647.0) return 0x7FFFFFFF;
+    return (int32_t)r;
+}
 static void drv_apply(const jx_drv_rec *r)
 {
     if (r->kind == 2) { jx3p_param(r->note, r->vel); return; }   /* the engine's host entry (JX-11) */
+    if (r->kind == 1) {
+        int e = jx_midi_entry((uint32_t)r->note);
+        float f;
+        memcpy(&f, &r->vel, 4);
+        if (e >= 0) jx3p_param(r->note, jx_midi_record_value(e, f));
+        return;
+    }
     if (r->on) { jx3p_note_on(r->note, r->vel); g_drv_notes++; }
     else       { jx3p_note_off(r->note); g_drv_notes--; }
 }
+/* One host parameter queue's last point for the next block, as process() (rva 0x34A240) takes it: an id below
+ * the MIDI-mapping base (as signed 32-bit values) becomes a parameter record (kind 1) with the value as a
+ * float; the next jx3p_product_block puts these after its own events (the plugin's process(): the notes,
+ * then one record per queue in queue order). Returns 0; -1 for a MIDI-mapping id (base + 0..129: CC,
+ * aftertouch, bend -- not ported yet) or a full queue. */
+int jx3p_product_param(unsigned int id, int offset, double value)
+{
+    float f = (float)value;
+    jx_drv_rec *r;
+    if (!((int32_t)JX_MIDI_BASE > (int32_t)id) || g_drv_npend >= JX_DRV_QMAX) return -1;
+    r = &g_drv_pend[g_drv_npend++];
+    r->off = offset; r->on = 0; r->kind = 1; r->note = (int)id;
+    memcpy(&r->vel, &f, 4);
+    return 0;
+}
 /* one host block: ev[4 i ..] = { offset, type, a, b }: type 0 a note-on (a key, b velocity 0..127), 1 a
  * note-off (a key), 2 an engine parameter record (a the model id, b the 32-bit value) -- what the plugin's
- * patch browser and editor queue, in queue order: a patch load's records come before the block's keys */
+ * patch browser and editor queue, in queue order: a patch load's records come before the block's keys; then
+ * the host parameter points jx3p_product_param queued */
 int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
 {
     jx_drv_rec rec[2 * JX_DRV_QMAX];
@@ -784,6 +852,8 @@ int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
         rec[nrec].kind = ev[4 * i + 1] == 2 ? 2 : 0;
         rec[nrec].note = ev[4 * i + 2]; rec[nrec].vel = ev[4 * i + 3]; ++nrec;
     }
+    for (i = 0; i < g_drv_npend && nrec < 2 * JX_DRV_QMAX; ++i) rec[nrec++] = g_drv_pend[i];
+    g_drv_npend = 0;
     g_drv_ncarry = 0;
     {
         int last = -1, lastoff = -1;

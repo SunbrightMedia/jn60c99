@@ -114,6 +114,13 @@ python3 "$HERE/jx_product_gate.py" --tooth-voices --rates 48000 --patches 0 --po
 python3 "$HERE/jx_product_gate.py" --rates 48000,96000 --patches 0,34 --on 0.3 --off 2.0 --secs 2.4 --recall '20@0.9'
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --on 0.3 --off 2.0 --secs 2.4 --recall '61@0.9'   # to the arpeggiator, a key held
 python3 "$HERE/jx_product_gate.py" --tooth-recall --rates 48000 --patches 0 --on 0.3 --off 2.0 --secs 2.4 --recall '20@0.9'
+# HOST AUTOMATION (JX-11d): seeded VST3 parameter queues through process() -- the driver's id map and value law
+# (jx3p/src/jx_midi_tables.h, from the booted plugin: --check rebuilds it from two boots) and the lifted host entry
+python3 "$HERE/jx_gen_midi_tables.py" --check
+python3 "$HERE/jx_product_gate.py" --rates 44100,96000 --patches 0 --on 0.6 --off 2.0 --secs 2.4 --edits 1,2
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 34 --on 0.6 --off 2.0 --secs 2.4 --edits 3
+python3 "$HERE/jx_product_gate.py" --tooth-edits --rates 48000 --patches 0 --on 0.6 --off 2.0 --secs 2.4 --edits 1
+python3 "$HERE/jx_product_gate.py" --tooth-law --rates 48000 --patches 0 --on 0.6 --off 2.0 --secs 2.4 --edits 1
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return

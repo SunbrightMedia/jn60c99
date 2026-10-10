@@ -39,6 +39,16 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   its render driver hands them to the lifted host entry. A held note crosses the change; every change
   mutes 0.5 s and fades in (writePatch).
   --tooth-recall: the port loads patch P+1 where the plugin loads P -- every --recall run must differ.
+  --edits SEEDS (e.g. 1,2): HOST AUTOMATION -- per seed a run whose blocks, from the note-on on, carry
+  seeded host parameter points (VST3 parameter queues) through the plugin's process(): ids from the id map
+  its render driver searches (jx3p/src/jx_midi_tables.h, generated from the booted plugin) and ids the map
+  lacks, values 0..1, the ends, a few beyond them, several points of one id in a block (process() reads the
+  last), several ids at one sample. The port takes each queue's last point (jx3p_product_param: the value as
+  a float, a kind-1 record after the block's notes; the driver's id map and value law, the lifted host
+  entry).
+  --tooth-edits: the port gets no host parameter points -- every --edits run must differ.
+  --tooth-law: the port built with JX_LAW_TOOTH (the value law truncates, rva 0x31A820 rounds) -- every
+  --edits run must differ.
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import ctypes
@@ -116,7 +126,47 @@ def recall_map(spec, rate, blk):
     return out
 
 
-def oracle(rate, patch, nblk, blk, on, off, recalls=''):
+def edit_ids():
+    """the VST3 parameter ids the render driver's id map holds (jx3p/src/jx_midi_tables.h, generated from the
+    booted plugin by jx_gen_midi_tables.py) and, apart, ids below the MIDI-mapping base that it lacks"""
+    import re
+    src = open(os.path.join(REPO, 'jx3p', 'src', 'jx_midi_tables.h')).read()
+    ids = sorted(int(m, 16) for m in re.findall(r'\{ 0x([0-9A-F]{8})u, -?\d+ \}',
+                                                   src[src.index('JX_MIDI_IDMAP[JX_MIDI_IDMAP_N]'):]))
+    lack = [x for x in (0x0, 0x1, 0x00600001, 0x00600200, 0x0FFFC001, 0x0FFFC0FF, 0x80000000) if x not in ids]
+    return ids, lack
+
+
+def edit_schedule(nblk, blk, start, seed):
+    """the --edits sequence: per block its host parameter points (id, offset, value) in sample order, from host
+    sample `start` to the last block"""
+    import random
+    ids, lack = edit_ids()
+    r = random.Random(7919 * seed + 1)
+    out = [[] for _ in range(nblk)]
+    s, end = start, nblk * blk
+    while True:
+        s += r.choice((0, 0, 1, 7, 64, 300, 1000, 2500, 6000))
+        if s >= end:
+            break
+        pid = r.choice(ids) if r.random() < 0.92 else r.choice(lack)
+        v = r.choice((0.0, 1.0, 0.5, r.random(), r.random(), r.random(), r.random(), -0.25, 1.25, 1e-9))
+        out[s // blk].append((pid, s % blk, v))
+    return out
+
+
+def queues(points):
+    """the block's points as process() reads them: one record per parameter queue (first appearance order), its
+    last point"""
+    last, order = {}, []
+    for pid, off, v in points:
+        if pid not in last:
+            order.append(pid)
+        last[pid] = (off, v)
+    return [(pid,) + last[pid] for pid in order]
+
+
+def oracle(rate, patch, nblk, blk, on, off, recalls='', edits=-1):
     sys.path.insert(0, HERE)
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     import jx_bank as B
@@ -128,11 +178,12 @@ def oracle(rate, patch, nblk, blk, on, off, recalls=''):
     h.load_patch(tail)
     out = []
     rmap = recall_map(recalls, rate, blk)
+    par = edit_schedule(nblk, blk, on if on >= 0 else off, edits) if edits >= 0 else [[] for _ in range(nblk)]
     for b, ev in enumerate(schedule(nblk, blk, on, off)):
         if b in rmap:                         # the plugin's patch browser, between two blocks (WARM: JX-11)
             p = rmap[b]
             h.load_patch(bank[B.BANK_HEADER + p * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (p + 1) * B.BANK_STRIDE])
-        L, R = h.process(blk, events=ev)
+        L, R = h.process(blk, events=ev, params=par[b])
         out.append([list(L), list(R)])
     return out
 
@@ -148,7 +199,7 @@ def guest96(tmp):
     return raw
 
 
-def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls=''):
+def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits=-1):
     lib = ctypes.CDLL(so)
     lib.jx_enable_hw_ftz()
     lib.jx3p_lift_error.restype = ctypes.c_char_p
@@ -166,6 +217,8 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls=''):
             raise SystemExit('jx3p_product_open(%d) -> %d' % (rate, kind))
     out = []
     rmap = recall_map(recalls, rate, blk)
+    par = edit_schedule(nblk, blk, on if on >= 0 else off, edits) if edits >= 0 else [[] for _ in range(nblk)]
+    lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
     sys.path.insert(0, HERE)
     import jx_records
     JX_RECORDS = jx_records.records()
@@ -186,6 +239,10 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls=''):
                 pr = [(pid, v) for kind, pid, v in JX_RECORDS['patches'][q % 64] if kind == 2]
                 recs = [x for pid, v in pr for x in (0, 2, pid, v - (1 << 32) if v >= 1 << 31 else v)] + recs
                 nev += len(pr)
+            if os.environ.get('JX_EDIT_TOOTH') != '1':         # TOOTH: no host parameter points
+                for pid, off, v in queues(par[b]):
+                    if lib.jx3p_product_param(pid, off, v) != 0:
+                        raise SystemExit('jx3p_product_param(0x%x) refused' % pid)
             arr = (ctypes.c_int * max(1, len(recs)))(*recs)
             lib.jx3p_product_block(Lb, Rb, blk, arr, nev)
         out.append([list(struct.unpack('<%dI' % blk, bytes(Lb))), list(struct.unpack('<%dI' % blk, bytes(Rb)))])
@@ -197,10 +254,10 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls=''):
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        json.dump(oracle(*[int(x) for x in a[1:7]], recalls=a[7] if len(a) > 7 else ''), sys.stdout)
+        json.dump(oracle(*[int(x) for x in a[1:7]], recalls=a[7], edits=int(a[8])), sys.stdout)
         return 0
     if a[:1] == ['--port']:
-        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10] if len(a) > 10 else ''), sys.stdout)
+        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10], int(a[11])), sys.stdout)
         return 0
     opt = lambda k, d: a[a.index(k) + 1] if k in a else d
     rates = [int(x) for x in opt('--rates', '44100,48000,96000').split(',')]
@@ -211,6 +268,11 @@ def main():
     trec = '--tooth-recall' in a
     if trec:
         os.environ['JX_RECALL_TOOTH'] = '1'
+    tedit = '--tooth-edits' in a
+    if tedit:
+        os.environ['JX_EDIT_TOOTH'] = '1'
+    tlaw = '--tooth-law' in a
+    eseeds = [int(x) for x in opt('--edits', '').split(',') if x]
     silent = '--expect-silent' in a
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     recalls = opt('--recall', '')               # 'P@T,...': warm patch loads (the plugin's patch browser)
@@ -218,6 +280,7 @@ def main():
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    (['-DJX_DRV_TOOTH=1'] if tclock else []) + (['-DJX_VC_TOOTH=1'] if tvc else []) +
+                   (['-DJX_LAW_TOOTH=1'] if tlaw else []) +
                    [os.path.join(REPO, s) for s in SRCS] + ['-lm'],
                    check=True)
     img96 = guest96(tmp)
@@ -229,14 +292,17 @@ def main():
         else:                                 # offset 0 of the first block from it
             on, off = (-(-int(t * rate) // blk) * blk for t in (t_on, t_off))
         # (on, off) per run: the one note, or per --poly seed (-seed - 1, the sequence's first sample)
-        plans = [(-sd - 1, int(t_on * rate)) for sd in seeds] if seeds else [(on, off)]
-        for patch, (on, off) in [(p, pl) for p in patches for pl in plans]:
+        plans = [(-sd - 1, int(t_on * rate), -1) for sd in seeds] if seeds else [(on, off, -1)]
+        if eseeds:                            # host automation: each seed on the plan's notes
+            plans = [(pon, poff, es) for (pon, poff, _) in plans for es in eseeds]
+        for patch, (on, off, es) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
-            o = subprocess.run([sys.executable, __file__, '--oracle'] + args + [recalls], capture_output=True, text=True)
+            o = subprocess.run([sys.executable, __file__, '--oracle'] + args + [recalls, str(es)], capture_output=True,
+                               text=True)
             if o.returncode:
                 raise SystemExit('oracle failed: ' + o.stderr[-1500:])
-            p = subprocess.run([sys.executable, __file__, '--port', so] + args + ['1' if tooth else '0', img96, recalls],
-                               capture_output=True, text=True)
+            p = subprocess.run([sys.executable, __file__, '--port', so] + args +
+                               ['1' if tooth else '0', img96, recalls, str(es)], capture_output=True, text=True)
             if p.returncode:
                 raise SystemExit('port failed: ' + p.stderr[-1500:])
             ro, rp = json.loads(o.stdout), json.loads(p.stdout)
@@ -247,6 +313,10 @@ def main():
             if on < 0:
                 nev = sum(len(e) for e in schedule(nblk, blk, on, off))
                 what += ' (%d events)' % nev
+            if es >= 0:
+                sched = edit_schedule(nblk, blk, on if on >= 0 else off, es)
+                what += ' edits seed %d (%d points, %d records)' % (es, sum(len(x) for x in sched),
+                                                                     sum(len(queues(x)) for x in sched))
             if first is None:
                 print('  host %d %s: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
                     rate, what, nblk, blk, loud), flush=True)
@@ -261,10 +331,11 @@ def main():
                     print('  REFUSE: --expect-silent, but the plugin sounds at host %d' % rate); bad += 1
             elif not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
-    n = len(rates) * len(patches) * max(1, len(seeds))
-    if tooth or tclock or tvc or trec:
+    n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds))
+    if tooth or tclock or tvc or trec or tedit or tlaw:
         print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices'
-                                          if tvc else '--tooth-recall',
+                                          if tvc else '--tooth-recall' if trec else '--tooth-edits' if tedit
+                                          else '--tooth-law',
                                           'BITES (%d of %d differ)' % (bad, n) if bad == n else
                                           'DID NOT BITE on %d of %d' % (n - bad, n)))
         return 0 if bad == n else 1

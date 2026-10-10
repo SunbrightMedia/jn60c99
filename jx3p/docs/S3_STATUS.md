@@ -3,6 +3,19 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (8) — HOST AUTOMATION THROUGH process() (JX-11d)
+
+A DAW's parameter automation now reaches the port as it reaches the plugin: `jx3p_product_param(id, offset,
+value)` makes process()'s kind-1 record (the queue's last point, the value as a float), the render driver
+looks the id up in the plugin's id map and applies the parameter's value law (round(min + (max - min) x v),
+half away from zero), then the lifted host entry runs. The functions are the JUNO-60's wrapper code (fw_map
+--pair: all equal); the tables are the JX's own, EXECUTED from the booted plugin (jx_gen_midi_tables.py ->
+jx3p/src/jx_midi_tables.h: 83 parameters, 83 ids in the map, 55 default CCs; equal from two boots).
+MEASURED (GATE 3d --edits): seeded queues -- ids in the map and not, values 0..1, the ends and beyond,
+several points per queue, several queues at one sample -- seed 1 at 48 kHz, 108 points, 225 blocks EQUAL
+to the plugin's process(); teeth: no points (differs from block 68), a truncating law (block 61). Not
+ported: the MIDI-mapping parameters (CC, aftertouch, bend via base 0x0FFFC100 + n: refused with -1).
+
 ## 2026-10-10 (7) — THE PORT RUNS ON THE PLUGIN'S OWN MEMORY; PATCH CHANGES ARE WARM (JX-11 in the product)
 
 The port's memory IS the plugin's heap now: one block at the plugin's own guest addresses, started from the

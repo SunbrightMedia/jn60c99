@@ -178,9 +178,9 @@ mine is a hypothesis (playbook 80).
   web page's files.js; patch_manager_gate.py, exe_pm_check.py,
   skin_pm_check.py; docs/PATCH_MANAGER.md) and A40 (a window's zoom fit to
   the screen and the LED's show; zoom_fit_gate.py; the oracle now attaches
-  the plugin's editor; docs/WINDOW_ZOOM.md) -- a full verify of A38-A40 is
-  owed (final_a40 died in a container restart; repro3's verify stage covers
-  it). Jobs run from tools/snap_tree.sh snapshots (playbook 178).
+  the plugin's editor; docs/WINDOW_ZOOM.md) -- their full verify: the proof
+  run's verify stage (repro4 at 0ca9f018, GREEN). Jobs run from
+  tools/snap_tree.sh snapshots (playbook 178).
 - **Repeatability (task #62, the user's 2026-10-09 request)**: ONE command,
   tools/repro/reproduce.sh, re-runs everything from a fresh clone (docs/REPRODUCE.md):
   inputs, doctor, make test static verify native webapp engineb, regen_check
@@ -200,9 +200,11 @@ mine is a hypothesis (playbook 80).
   tools/repro/esp32_check.sh = the retired device JUNO gate at its own commit
   8cb8e141 + every image built with the pinned IDF 6.1 + the MINISYNTH
   self-test in QEMU + reproducible images equal from two paths (playbooks
-  184-188). The proof run of reproduce.sh: job repro3 (commit 3a4291df) -- owed
-  until its EXIT (repro2 died in a container restart; after a restart:
-  reproduce.sh --resume, playbook 189). The cleanup moved 8 root entries
+  184-188). The proof run of reproduce.sh is GREEN: job repro4, a fresh clone
+  of 0ca9f018 -- 13 of 14 stages in one run, verify 44 of 45 sections, its one
+  memory-killed section (6, the arp grid) GREEN alone (job repro4_sec6;
+  run_sections.py retries so itself since a6885317). After a container
+  restart: reproduce.sh --resume (playbook 189). The cleanup moved 8 root entries
   (README.md Layout); make engineb now runs the event gate (O1).
   The two days 2026-10-05/06
   were audited: docs/AUDIT_2026-10-06.md (read its HANDOFF section first). CLAIMS B1-B12
