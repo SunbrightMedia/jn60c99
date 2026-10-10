@@ -248,9 +248,13 @@ mine is a hypothesis (playbook 80).
   block at its guest addresses, jx_guest_export.py) and patch loads / host
   edits run the plugin's own parameter system, LIFTED (jx3p/src/jx_lift.c,
   jx_lift_gate.py GATE 3e) -- warm patch changes graded through process()
-  (GATE 3d --recall); the full verify of that commit is owed. Next: the host
-  tempo (lift root 0x3F9DD0), the patch browser for user banks, host edits
-  through process().
+  (GATE 3d --recall). Through process() since: host automation (JX-11d,
+  --edits: the driver's id map and value law, jx3p/src/jx_midi_tables.h from
+  the booted plugin) and the MIDI controllers (JX-12, --ctl: the push, the CC
+  map, the engine's CC / bend entries lifted; .rdata and .data ship whole in
+  the guest image, playbook 202; OPEN: the product gate --ctl is RED). Full verify owed on the newest commit (job
+  jxverify_8a85 runs 8a8596ea). Next: the host tempo (lift root 0x3F9DD0, the
+  driver's T and tick period as the JUNO's), the patch browser for user banks.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

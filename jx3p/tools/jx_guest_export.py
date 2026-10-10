@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 import jx_emu as J                                    # noqa: E402
 
 STACK_BELOW = 0x20000                                 # guest stack mapped below rsp (census: the calls use < 0x2000)
+DATA_SECTIONS = ((0x96B000, 0xC7B000), (0xC7B000, 0xCF3000))   # .rdata, .data (the PE section table, READ)
 STACK_ABOVE = 0x1000
 GAP = 64                                              # zero gaps shorter than this stay inside a run
 
@@ -61,7 +62,9 @@ def image_pages():
       every data address the lifted source names (a 0x18xxxxxxx literal in .rdata / .data) and the page after it
       (an indexed table may run on),
       every switch table of a lifted function (its jmp-reg site's table load, entries read as the lifter reads
-      them), and every live class's vtable (jx3p/gen/jx_lift_roots.json).
+      them; and, from the lifted source itself, every indexed read with an image-sized displacement just before
+      a switch jump, 1 KB from it), every live class's vtable (jx3p/gen/jx_lift_roots.json), and the whole of
+      .rdata and .data.
     On Linux the port makes every other page of the image block no-access (jx_bridge.c): a read the census missed
     crashes the gate that made it, never reads zeros."""
     import re
@@ -77,27 +80,54 @@ def image_pages():
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = True
     for site in sorted(set(int(x, 16) for x in re.findall(r'/\*([0-9a-f]+) jmp r[a-z0-9]+\*/', src))):
-        ins = list(md.disasm(img[site - 16:site + 2], J.IB + site - 16))
-        for k in range(len(ins)):           # decode from every start that lands on the site
-            seq = list(md.disasm(img[site - 16 + k:site + 2], J.IB + site - 16 + k))
-            if seq and seq[-1].address - J.IB == site and len(seq) >= 3:
-                mov = seq[-3]
-                if mov.mnemonic == 'mov' and len(mov.operands) == 2 and mov.operands[1].type == x86.X86_OP_MEM and \
-                        mov.operands[1].mem.scale == 4:
-                    tbl = mov.operands[1].mem.disp
-                    n = 0
-                    while n < 1024:
-                        e = struct.unpack_from('<I', img, tbl + 4 * n)[0]
-                        if not (0x1000 <= e < 0x96B000) or abs(e - site) > 0x40000:
-                            break
-                        n += 1
-                    for a in range(tbl & ~0xFFF, tbl + 4 * n + 1, 0x1000):
+        # decode from every BYTE offset of the 24 before the site that lands on it (2026-10-10: the loop ran over the
+        # count of a garbage decode instead and missed the assigner's control entry 0x356CC0 -- its CC 123 then
+        # read its tables as zeros outside the image block, a loud trap in the product gate)
+        for k in range(24):
+            seq = list(md.disasm(img[site - 24 + k:site + 2], J.IB + site - 24 + k))
+            if not (seq and seq[-1].address - J.IB == site and len(seq) >= 3):
+                continue
+            mov = seq[-3]
+            if mov.mnemonic == 'mov' and len(mov.operands) == 2 and mov.operands[1].type == x86.X86_OP_MEM and \
+                    mov.operands[1].mem.scale == 4:
+                tbl = mov.operands[1].mem.disp
+                n = 0
+                while n < 1024:
+                    e = struct.unpack_from('<I', img, tbl + 4 * n)[0]
+                    if not (0x1000 <= e < 0x96B000) or abs(e - site) > 0x40000:
+                        break
+                    n += 1
+                for a in range(tbl & ~0xFFF, tbl + 4 * n + 1, 0x1000):
+                    pages.add(a & ~0xFFF)
+                # MSVC's two-level form: a byte index table read first (movzx eA, byte [rB + rI + tbl2]), up to 256
+                ix = seq[-4] if len(seq) >= 4 else None
+                if ix is not None and ix.mnemonic == 'movzx' and len(ix.operands) == 2 and \
+                        ix.operands[1].type == x86.X86_OP_MEM and ix.operands[1].size == 1:
+                    t2 = ix.operands[1].mem.disp
+                    for a in range(t2 & ~0xFFF, t2 + 256 + 1, 0x1000):
                         pages.add(a & ~0xFFF)
                 break
+    # the same tables as the lifted code reads them: an indexed read with an image-sized displacement in the six
+    # statements before a switch jump (MSVC: rB holds the image base, so the displacement IS the table's rva) --
+    # the pages of [disp, disp + 1024)
+    lines = src.split('\n')
+    for i, line in enumerate(lines):
+        if re.search(r'/\*[0-9a-f]+ jmp r[a-z0-9]+\*/', line):
+            for prev in lines[max(0, i - 6):i]:
+                for m in re.findall(r'M(?:8|16|32|64)\(\(R\(\d+\)\+R\(\d+\)\*\d\+0x([0-9a-f]+)ULL\)\)', prev):
+                    d = int(m, 16)
+                    if 0x1000 <= d < J.IMGSZ:
+                        for a in range(d & ~0xFFF, d + 1024, 0x1000):
+                            pages.add(a & ~0xFFF)
     for c in json.load(open(os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_roots.json')))['classes']:
         v = int(c['vtable'], 16)
         for a in range(v - 8, v + 8 * c['slots'], 8):
             pages.add(a & ~0xFFF)
+    # and ALL of the image's data: .rdata and .data whole (1.2 MB gzipped). A table the code indexes with a computed
+    # value (the bend curve: 64 KB, 17 pages, read at bend + 8192) has pages no census run reaches; the WASM build has
+    # no page guard, so a page left out would read as zeros there, silently (2026-10-10, JX-12)
+    for lo, hi in DATA_SECTIONS:
+        pages.update(range(lo, hi, 0x1000))
     return sorted(p for p in pages if 0x1000 <= p < J.IMGSZ)
 
 
@@ -148,15 +178,10 @@ def host_record(jx):
 
 
 def guest_file(rate_k, tmp=None):
-    """the committed guest image for an engine rate (44 or 96): the raw file, or the .gz inflated into tmp"""
-    raw = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_%dk.bin' % rate_k)
-    if os.path.exists(raw):
-        return raw
-    import tempfile
-    dst = os.path.join(tmp or tempfile.mkdtemp(), 'jx_guest_%dk.bin' % rate_k)
-    with gzip.open(raw + '.gz', 'rb') as f:
-        open(dst, 'wb').write(f.read())
-    return dst
+    """the committed guest image for an engine rate (44 or 96): its .gz inflated (jx_guest.py)"""
+    sys.path.insert(0, HERE)
+    import jx_guest
+    return jx_guest.path(rate_k, tmp)
 
 
 def main():

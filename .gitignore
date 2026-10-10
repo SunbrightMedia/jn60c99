@@ -93,5 +93,6 @@ esp32s3/build_*/
 tests/test_rate_laws
 tests/test_multi_instance
 .snapshot_tree
-# the 96 kHz engine data ride as .gz only (jx3p/tools/jx_product_gate.py inflates them)
+# the JX-3P guest images ride as .gz only (jx3p/tools/jx_guest.py inflates them; an export leaves the raw .bin)
 jx3p/gen/*_96k.bin
+jx3p/gen/jx_guest_44k.bin

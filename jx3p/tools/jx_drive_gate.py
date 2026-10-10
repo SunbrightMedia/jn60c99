@@ -138,16 +138,16 @@ def check_decode():
 
 
 def check_base_match():
-    """playbook 89: the shipped data must be THIS boot. The guest images (jx3p/gen/jx_guest_44k.bin and the 96 kHz
-    .gz, jx_guest_export.py): every byte of the plugin's heap after its boot at that rate, the image pages the
+    """playbook 89: the shipped data must be THIS boot. The committed guest images (jx3p/gen/jx_guest_44k.bin.gz and
+    _96k.bin.gz, jx_guest_export.py): every byte of the plugin's heap after its boot at that rate, the image pages the
     lifted code reads, the patch records -- equal to a boot made now, or RED."""
     import gzip
     import json as _json
     import struct as _st
     import jx_emu as J
-    for rate, name in ((44100.0, "jx_guest_44k.bin"), (96000.0, "jx_guest_96k.bin.gz")):
+    for rate, name in ((44100.0, "jx_guest_44k.bin.gz"), (96000.0, "jx_guest_96k.bin.gz")):
         path = os.path.join(REPO, "jx3p", "gen", name)
-        b = gzip.open(path, "rb").read() if name.endswith(".gz") else open(path, "rb").read()
+        b = gzip.open(path, "rb").read()
         hb, hlen, host = _st.unpack_from("<3Q", b, 8)
         jx = J.JX().boot(rate, snap=False, product=True)
         uc = jx.uc

@@ -3509,3 +3509,33 @@ Treat a dynamic reach as a sample: close it with what the binary states (live cl
 families, the table forms), then grade the closed reach on the mode space the sample missed. Census
 pages in the native twin, never by protecting the emulator's big maps. Make the port's memory the
 plugin's own where you can: then the gates compare every byte instead of masked windows.
+
+## 202. A COVERAGE HEURISTIC NEEDS ITS OWN PROOF; AN END-STATE COMPARE HIDES A DROPPED STEP; THE PORT CONVERTS, NOT THE HARNESS
+Paid 2026-10-10 (JX-3P, JX-12: the MIDI controllers through process()).
+1. The guest image ships only the image pages the lifted code reads: a dynamic census plus a static scan
+of every switch table. The scan decoded backwards from each `jmp reg` -- but its loop ran over the
+instruction count of a garbage decode, not over the byte offsets, and missed tables. The first CC 123
+in the product gate read the assigner's control-entry tables (0x356DBC, a page below the shipped span)
+as zeros and jumped to the image base: a loud trap, but only because that path ran. Fixed twice over:
+every byte offset, and a second scan of the lifted SOURCE itself (every indexed read with an image-sized
+displacement just before a switch jump) -- what the code reads, not a re-decode of it.
+1b. Then the bend: its entry reads a 64 KB curve table (17 pages) at bend + 8192. The census ran three
+bend values and shipped three of the pages; a bend of 0.7 read a fourth. On Linux the page guard made it a
+crash; the WASM build has no guard -- there it would have read zeros, silently. A census cannot sample
+every value a computed index takes. The image's data now ships whole (.rdata and .data: 1.2 MB gzipped);
+the census and the scans remain for the code pages (switch tables), which the guard still covers.
+2. The controller lift gate compared the heap once, at the end. A tooth that dropped a sustain release
+did NOT bite: a later release freed the same notes. Now a heap checkpoint follows every controller call;
+the same tooth (the call list's entry 72) must bite.
+3. The product gate converted the note velocity itself ((int)(float)(v x 127) & 0x7F) before handing it
+to the port: harness code doing the plugin's job, and the port's own product API had no conversion and
+none of the wrapper's rules (a note-on at velocity 0 is a note-off at 64; a note-off carries its own
+velocity -- the port had passed a fixed 64). The conversion and the push now live in the port
+(jx3p_product_note / jx3p_product_param, the JUNO's wrapper code), and the gate hands the port exactly
+what it hands the plugin's process().
+### The rule
+A static coverage heuristic is code: give it a check against what the program actually reads (the
+lifted source, the dynamic census), not just a pattern; and where an index is computed from input, ship
+the whole region -- a sample of inputs is not a bound. Compare state after every judged step when one
+step can undo another. And the harness passes the plugin's inputs as they are; any conversion belongs
+to the port, where the gate grades it.

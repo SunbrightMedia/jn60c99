@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 import numpy as np
 import jx_bank as B
 import audio_metrics as M
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn)
 
 SR = 44100.0
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -55,7 +57,7 @@ def main():
     bank = B.bank_bytes()
     fails = 0
     for patch in patches:
-        ok = lib.jx3p_init(os.path.join(REPO, "jx3p", "gen", "jx_guest_44k.bin").encode(),
+        ok = lib.jx3p_init(jx_guest.path(44).encode(),
                            os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(), None)
         if not ok:
             raise SystemExit("jx3p_init failed")

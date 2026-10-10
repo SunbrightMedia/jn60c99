@@ -49,6 +49,17 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   --tooth-edits: the port gets no host parameter points -- every --edits run must differ.
   --tooth-law: the port built with JX_LAW_TOOTH (the value law truncates, rva 0x31A820 rounds) -- every
   --edits run must differ.
+  --ctl SEEDS (JX-12): THE MIDI CONTROLLERS as a DAW sends them -- seeded MIDI-mapping parameter points (the
+  base 0x0FFFC100 + n: the CC n, 128 channel aftertouch, 129 bend, beyond that nothing): sustain (CC 64) on
+  and off, all notes off (123), mod (1), expression (11), the CCs the plugin's default map assigns to
+  parameters, CCs it ignores, bend and aftertouch -- with the plan's notes (best with --poly). The port: its
+  process() conversion and push (jx3p_product_param: the CC map's parameter record, then the message), the
+  driver's dispatch to the engine's CC and bend entries (lifted).
+  --tooth-ctl: the port gets no controller points -- every --ctl run must differ.
+  --ctl-only N,...: only those MIDI-mapping numbers of the --ctl sequence (1 mod, 11 expression, 64 sustain,
+  123 all notes off, 128 aftertouch, 129 bend, any CC) -- to bisect a difference.
+The notes reach the port as process() takes them (jx3p_product_note: the float velocity, the wrapper's
+rules); the patch loads' records as the patch browser queues them (jx3p_product_block's type-2 events).
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import ctypes
@@ -155,6 +166,66 @@ def edit_schedule(nblk, blk, start, seed):
     return out
 
 
+def midi_base():
+    import re
+    return int(re.search(r'#define JX_MIDI_BASE 0x([0-9A-F]+)u', open(os.path.join(REPO, 'jx3p', 'src',
+                                                                               'jx_midi_tables.h')).read()).group(1), 16)
+
+
+def ctl_schedule(nblk, blk, start, seed):
+    """the --ctl sequence: per block its MIDI-mapping points (base + n, offset, value) in sample order, from host
+    sample `start` to the last block"""
+    import random
+    import re
+    src = open(os.path.join(REPO, 'jx3p', 'src', 'jx_midi_tables.h')).read()
+    blk_map = src[src.index('JX_CC_MAP[128]'):]
+    cmap = [int(x) for x in re.findall(r'-?\d+', blk_map[blk_map.index('{'):blk_map.index('}')])]
+    mapped = [cc for cc in range(128) if cmap[cc] >= 0]
+    base = midi_base()
+    r = random.Random(104729 * seed + 7)
+    out = [[] for _ in range(nblk)]
+    s, end = start, nblk * blk
+    while True:
+        s += r.choice((0, 0, 1, 7, 64, 300, 1000, 2500, 6000))
+        if s >= end:
+            break
+        u = r.random()
+        if u < 0.22:
+            n, v = 64, r.choice((0.0, 1.0, 0.5, 0.003, 0.0, 1.0))         # sustain off / on (0.003 x 127 rounds to 0)
+        elif u < 0.30:
+            n, v = 123, r.choice((0.0, 1.0, r.random()))                  # all notes off
+        elif u < 0.42:
+            n, v = 1, r.choice((0.0, 1.0, r.random(), r.random(), 1.2))   # mod (data 152 > 127: ignored)
+        elif u < 0.50:
+            n, v = 11, r.choice((0.0, 1.0, r.random(), r.random()))       # expression
+        elif u < 0.66:
+            n, v = 129, r.choice((0.5, 0.0, 1.0, r.random(), r.random()))  # bend
+        elif u < 0.70:
+            n, v = 128, r.random()                                         # channel aftertouch: an empty entry
+        elif u < 0.92:
+            n, v = r.choice(mapped), r.choice((0.0, 1.0, r.random(), r.random(), -0.1))   # a mapped CC
+        else:
+            n, v = r.choice((10, 2, 3, 120, 127, 130, 200)), r.random()    # ignored CCs, beyond 129: nothing
+        out[s // blk].append((base + n, s % blk, v))
+    return out
+
+
+def points(nblk, blk, on, off, es):
+    """the run's host parameter points per block: es '-1' none, 'e<seed>' --edits, 'c<seed>' --ctl, 'c<seed>:n,n'
+    --ctl with --ctl-only (only those MIDI-mapping numbers kept: a bisection of a difference)"""
+    start = on if on >= 0 else off
+    if es.startswith('e'):
+        return edit_schedule(nblk, blk, start, int(es[1:]))
+    if es.startswith('c'):
+        seed, _, only = es[1:].partition(':')
+        sched = ctl_schedule(nblk, blk, start, int(seed))
+        if only:
+            keep, base = {int(x) for x in only.split(',')}, midi_base()
+            sched = [[p for p in b if p[0] - base in keep] for b in sched]
+        return sched
+    return [[] for _ in range(nblk)]
+
+
 def queues(points):
     """the block's points as process() reads them: one record per parameter queue (first appearance order), its
     last point"""
@@ -166,7 +237,7 @@ def queues(points):
     return [(pid,) + last[pid] for pid in order]
 
 
-def oracle(rate, patch, nblk, blk, on, off, recalls='', edits=-1):
+def oracle(rate, patch, nblk, blk, on, off, recalls='', edits='-1'):
     sys.path.insert(0, HERE)
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     import jx_bank as B
@@ -178,7 +249,7 @@ def oracle(rate, patch, nblk, blk, on, off, recalls='', edits=-1):
     h.load_patch(tail)
     out = []
     rmap = recall_map(recalls, rate, blk)
-    par = edit_schedule(nblk, blk, on if on >= 0 else off, edits) if edits >= 0 else [[] for _ in range(nblk)]
+    par = points(nblk, blk, on, off, edits)
     for b, ev in enumerate(schedule(nblk, blk, on, off)):
         if b in rmap:                         # the plugin's patch browser, between two blocks (WARM: JX-11)
             p = rmap[b]
@@ -190,21 +261,19 @@ def oracle(rate, patch, nblk, blk, on, off, recalls='', edits=-1):
 
 def guest96(tmp):
     """the 96 kHz engine's guest image: the committed .gz (jx_guest_export.py --rate 96000), inflated into tmp"""
-    import gzip
-    raw = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin')
-    if not os.path.exists(raw):
-        raw = os.path.join(tmp, 'jx_guest_96k.bin')
-        with gzip.open(os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin.gz'), 'rb') as f:
-            open(raw, 'wb').write(f.read())
-    return raw
+    sys.path.insert(0, HERE)
+    import jx_guest
+    return jx_guest.path(96, tmp)
 
 
-def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits=-1):
+def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-1'):
     lib = ctypes.CDLL(so)
     lib.jx_enable_hw_ftz()
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    if not lib.jx3p_init(g('gen/jx_guest_44k.bin') if tooth else img96.encode(), g('truth/preset_bank_1.bin'), None):
+    sys.path.insert(0, HERE)
+    import jx_guest
+    if not lib.jx3p_init(jx_guest.path(44).encode() if tooth else img96.encode(), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
     lib.jx3p_recall(patch)
     if lib.jx3p_lift_error():
@@ -217,8 +286,9 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits=-1
             raise SystemExit('jx3p_product_open(%d) -> %d' % (rate, kind))
     out = []
     rmap = recall_map(recalls, rate, blk)
-    par = edit_schedule(nblk, blk, on if on >= 0 else off, edits) if edits >= 0 else [[] for _ in range(nblk)]
+    par = points(nblk, blk, on, off, edits)
     lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
+    lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
     sys.path.insert(0, HERE)
     import jx_records
     JX_RECORDS = jx_records.records()
@@ -232,15 +302,17 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits=-1
                     lib.jx3p_note_off(e[3])
             lib.jx3p_render(Lb, Rb, blk)
         else:                                 # the render driver: the records at their offsets, the clock
-            recs = [x for e in ev for x in (e[1], 0 if e[0] == 'on' else 1, e[3], vel7(e[4]))]
-            nev = len(ev)
-            if b in rmap:                     # the patch load's records, queued before the block's keys
+            recs, nev = [], 0
+            if b in rmap:                     # the patch load's records, queued before process() runs
                 q = rmap[b] + (1 if os.environ.get('JX_RECALL_TOOTH') == '1' else 0)     # TOOTH: the wrong patch
                 pr = [(pid, v) for kind, pid, v in JX_RECORDS['patches'][q % 64] if kind == 2]
-                recs = [x for pid, v in pr for x in (0, 2, pid, v - (1 << 32) if v >= 1 << 31 else v)] + recs
-                nev += len(pr)
+                recs = [x for pid, v in pr for x in (0, 2, pid, v - (1 << 32) if v >= 1 << 31 else v)]
+                nev = len(pr)
+            for e in ev:                      # process(): the host's note events, as the oracle gets them
+                if lib.jx3p_product_note(0 if e[0] == 'on' else 1, e[1], e[2], e[3], e[4]) != 0:
+                    raise SystemExit('jx3p_product_note refused')
             if os.environ.get('JX_EDIT_TOOTH') != '1':         # TOOTH: no host parameter points
-                for pid, off, v in queues(par[b]):
+                for pid, off, v in queues(par[b]):             # process(): then one record per queue
                     if lib.jx3p_product_param(pid, off, v) != 0:
                         raise SystemExit('jx3p_product_param(0x%x) refused' % pid)
             arr = (ctypes.c_int * max(1, len(recs)))(*recs)
@@ -254,10 +326,10 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits=-1
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        json.dump(oracle(*[int(x) for x in a[1:7]], recalls=a[7], edits=int(a[8])), sys.stdout)
+        json.dump(oracle(*[int(x) for x in a[1:7]], recalls=a[7], edits=a[8]), sys.stdout)
         return 0
     if a[:1] == ['--port']:
-        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10], int(a[11])), sys.stdout)
+        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10], a[11]), sys.stdout)
         return 0
     opt = lambda k, d: a[a.index(k) + 1] if k in a else d
     rates = [int(x) for x in opt('--rates', '44100,48000,96000').split(',')]
@@ -268,11 +340,13 @@ def main():
     trec = '--tooth-recall' in a
     if trec:
         os.environ['JX_RECALL_TOOTH'] = '1'
-    tedit = '--tooth-edits' in a
+    tedit = '--tooth-edits' in a or '--tooth-ctl' in a
     if tedit:
         os.environ['JX_EDIT_TOOTH'] = '1'
     tlaw = '--tooth-law' in a
-    eseeds = [int(x) for x in opt('--edits', '').split(',') if x]
+    only = opt('--ctl-only', '')                 # e.g. 64,123: only these MIDI-mapping numbers of --ctl (bisection)
+    eseeds = ['e%d' % int(x) for x in opt('--edits', '').split(',') if x] + \
+        ['c%d%s' % (int(x), ':' + only if only else '') for x in opt('--ctl', '').split(',') if x]
     silent = '--expect-silent' in a
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     recalls = opt('--recall', '')               # 'P@T,...': warm patch loads (the plugin's patch browser)
@@ -292,8 +366,8 @@ def main():
         else:                                 # offset 0 of the first block from it
             on, off = (-(-int(t * rate) // blk) * blk for t in (t_on, t_off))
         # (on, off) per run: the one note, or per --poly seed (-seed - 1, the sequence's first sample)
-        plans = [(-sd - 1, int(t_on * rate), -1) for sd in seeds] if seeds else [(on, off, -1)]
-        if eseeds:                            # host automation: each seed on the plan's notes
+        plans = [(-sd - 1, int(t_on * rate), '-1') for sd in seeds] if seeds else [(on, off, '-1')]
+        if eseeds:                            # host automation / controllers: each seed on the plan's notes
             plans = [(pon, poff, es) for (pon, poff, _) in plans for es in eseeds]
         for patch, (on, off, es) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
@@ -313,10 +387,11 @@ def main():
             if on < 0:
                 nev = sum(len(e) for e in schedule(nblk, blk, on, off))
                 what += ' (%d events)' % nev
-            if es >= 0:
-                sched = edit_schedule(nblk, blk, on if on >= 0 else off, es)
-                what += ' edits seed %d (%d points, %d records)' % (es, sum(len(x) for x in sched),
-                                                                     sum(len(queues(x)) for x in sched))
+            if es != '-1':
+                sched = points(nblk, blk, on, off, es)
+                what += ' %s seed %s (%d points, %d records)' % ('edits' if es[0] == 'e' else 'controllers', es[1:],
+                                                                   sum(len(x) for x in sched),
+                                                                   sum(len(queues(x)) for x in sched))
             if first is None:
                 print('  host %d %s: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
                     rate, what, nblk, blk, loud), flush=True)
@@ -334,8 +409,8 @@ def main():
     n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds))
     if tooth or tclock or tvc or trec or tedit or tlaw:
         print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices'
-                                          if tvc else '--tooth-recall' if trec else '--tooth-edits' if tedit
-                                          else '--tooth-law',
+                                          if tvc else '--tooth-recall' if trec else ('--tooth-ctl' if '--tooth-ctl' in a
+                                          else '--tooth-edits') if tedit else '--tooth-law',
                                           'BITES (%d of %d differ)' % (bad, n) if bad == n else
                                           'DID NOT BITE on %d of %d' % (n - bad, n)))
         return 0 if bad == n else 1

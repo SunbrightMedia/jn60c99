@@ -8,6 +8,8 @@ exit 0 = L/R EXACTLY 0 on every patch.
 usage: jx_full_c.py <refdir> <libjx3p.so> [patches] [n]
 """
 import sys, os, ctypes, struct
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn)
 REPO = os.path.abspath(os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "..", ".."))
 
@@ -26,7 +28,7 @@ def main():
         # jx3p_init is a fresh engine: the plugin's heap after its boot (the guest image), then the patch's
         # records through the plugin's own parameter system, lifted (JX-11)
         ok = lib.jx3p_init(
-            os.path.join(REPO, "jx3p", "gen", "jx_guest_44k.bin").encode(),
+            jx_guest.path(44).encode(),
             os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(), None)
         if not ok:
             raise SystemExit("jx3p_init failed")

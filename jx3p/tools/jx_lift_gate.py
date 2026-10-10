@@ -20,14 +20,19 @@ heap after the calls (byte for byte), the stack (reported).
   --loads sweep: every id of the host entry's map at 13 values, a heap checkpoint after each id, the base
   patch's records after it (the host edits beyond a patch load).
   --tooth RVA: lift with that one addss turned into subss (jp8_lift.py --tooth) -- the gate must FAIL.
+  --tooth-skip K: the C twin does not replay entry K of the call list (calls and checkpoints alternate under
+  --loads ctl: --tooth-skip 86 drops ctl call 43, the sustain's release with keys held) -- the gate must FAIL.
   --loads all: the 75 records of every factory patch in turn.
   --loads settings: the host settings 0x0FFFC000..0x0FFFC01F (not in the id map) at 7 values each.
   --loads modes: every factory patch with the master's effect-type cells (records 65, 67) forced to each of
   0..5 -- the effect classes the bank never selects (the variant 0:65=5 once trapped: jx_lift_roots.py).
+  --loads ctl: the render driver's kind-0 targets (JX-12): the engine's CC entry (mod, expression, sustain,
+  all notes off, ignored CCs), its bend entry, the empty entries and its note entries around them
+  (jx_dynreach.py ctl_script) -- each call through the plugin's entry and through the lifted one.
   --census OUT: no grading but a CENSUS (jx_lift_census.c): the same replay with every region's pages armed --
   which 4 KB pages of the heap, the image and the stack the lifted calls read and write; the replay must end
   EXACT or nothing is written.
-  --pages: the census of the four reach runs (patches 0 and 34, all loads and the id sweep) merged into
+  --pages: the census of the six reach runs (patches 0 and 34: all loads, the id sweep, the controllers) merged into
   jx3p/gen/jx_lift_pages.json -- the image pages the port's guest image carries (jx_guest_export.py).
 exit 0 = every return value and every heap byte equal.
 """
@@ -51,7 +56,9 @@ SWEEP = (0, 1, 2, 3, 5, 7, 9, 64, 127, 128, 255, 1000, -1)    # = jx_dynreach.py
 # reach from one base alone missed the switch-off path (the gate trapped: "indirect target 0x3e0210 not lifted")
 REACH = (('dynreach_loads.json', ['--no-sweep']), ('dynreach_sweep.json', []),
          ('dynreach_loads_b34.json', ['--base', '34', '--no-sweep']), ('dynreach_sweep_b34.json', ['--base', '34']),
-         ('dynreach_loads_b61.json', ['--base', '61', '--no-sweep']), ('dynreach_loads_b40.json', ['--base', '40', '--no-sweep']))
+         ('dynreach_loads_b61.json', ['--base', '61', '--no-sweep']), ('dynreach_loads_b40.json', ['--base', '40', '--no-sweep']),
+         # the render driver's kind-0 targets (JX-12): the controller entries and the note entries around them
+         ('dynreach_ctl.json', ['--ctl']), ('dynreach_ctl_b34.json', ['--base', '34', '--ctl']))
 RET = 0x100000 + 0x5000                    # jx_emu.call's return sentinel (SCRATCH + 0x5000)
 CPU_SZ, RSP_OFF, RAX_OFF, MX_OFF = 512, 4 * 8, 0, 16 * 8 + 16 * 16 + 5 * 4     # jp8_cpu.h CPU
 
@@ -109,6 +116,21 @@ def oracle(ref, base, loads):
             for kind, rid, val in recs[base]:
                 if kind == 2:
                     host(rid, val)
+    elif loads == ['ctl']:
+        # the render driver's kind-0 targets, in jx_dynreach.py's order (one script for the reach and the gate); a
+        # CHECKPOINT (the heap's sha256) after EVERY call: a later call can undo an earlier one's effect (a sustain
+        # release, then another -- the end state alone hid a dropped release: --tooth-skip 36 did not bite)
+        import hashlib
+        sys.path.insert(0, HERE)
+        import jx_dynreach as D
+        for n, c in enumerate(D.ctl_script()):
+            rax = D.ctl_call(jx, c)
+            k = c[0]
+            fn = {'cc': D.CC_ENTRY, 'bend': D.BEND_ENTRY, 'on': J.NOTEON - J.IB, 'off': J.NOTEOFF - J.IB}.get(k, c[1] if k == 'empty' else None)
+            rdx, r8 = ((c[1], c[2]) if k in ('cc', 'on', 'off') else (c[1] & 0xFFFF, 0) if k == 'bend' else (c[2], 0))
+            calls.append(dict(fn=fn, rcx=jx.HOST, rdx=rdx, r8=r8, r9=0, mx=mx, rax=rax))
+            calls.append(dict(check=hashlib.sha256(bytes(uc.mem_read(J.HEAP_BASE, heap_end - J.HEAP_BASE))).hexdigest(),
+                              id=n))
     elif loads == ['sweep']:
         # every id of the host entry's map at every SWEEP value; a CHECKPOINT (the heap's sha256) after each id's
         # values, before the base patch's records restore the engine
@@ -160,11 +182,15 @@ def ctwin(ref, so):
     cp = ctypes.addressof(cpu)
     bad, trap = 0, None
     import hashlib
+    skip = int(os.environ.get('JX_LIFT_SKIP', '-1'))       # TOOTH (--tooth-skip K): call K not replayed
     for k, c in enumerate(m['calls']):
+        if k == skip:
+            continue
         if 'check' in c:                          # the oracle's heap hash after one id's sweep
             if hashlib.sha256(ctypes.string_at(H(m['heap_base']), heap_len)).hexdigest() != c['check']:
                 bad += 1
-                print('  CHECKPOINT %d: the heap differs after the sweep of id 0x%x' % (k, c['id']))
+                print('  CHECKPOINT %d: the heap differs after %s 0x%x' % (k, 'the sweep of id' if m['loads'] != ['ctl'] else
+                                                                          'controller call', c['id']))
                 if bad >= 3:
                     break
             continue
@@ -263,7 +289,7 @@ def census(ref, so, out):
     return 0
 
 
-CENSUS = ((0, 'all'), (34, 'all'), (0, 'sweep'), (34, 'sweep'))
+CENSUS = ((0, 'all'), (34, 'all'), (0, 'sweep'), (34, 'sweep'), (0, 'ctl'), (34, 'ctl'))
 
 
 def pages(outs):
@@ -275,7 +301,7 @@ def pages(outs):
         stack.update(a - c['rsp'] for a, f in c['pages']['stack'])
         if c['pages']['page0']:
             raise SystemExit('census %s: page 0 touched -- the guest image carries no page 0' % o)
-        rows.append(dict(base=c['base'], loads='sweep' if c['loads'] == ['sweep'] else 'all', calls=c['calls'],
+        rows.append(dict(base=c['base'], loads=c['loads'][0] if c['loads'] in (['sweep'], ['ctl']) else 'all', calls=c['calls'],
                          heap=len(c['pages']['heap']), heap_written=sum(1 for _, f in c['pages']['heap'] if f & 2),
                          image=len(c['pages']['image'])))
     dst = os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_pages.json')
@@ -291,7 +317,7 @@ def pages(outs):
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings') else [int(x) for x in a[3].split(',')])
+        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings', 'ctl') else [int(x) for x in a[3].split(',')])
         return 0
     if a[:1] == ['--c']:
         return 1 if ctwin(a[1], a[2]) else 0
@@ -300,6 +326,9 @@ def main():
     opt = lambda k, d: a[a.index(k) + 1] if k in a else d
     base, loads = int(opt('--base', '0')), opt('--loads', '5,34,40,62')
     tooth = opt('--tooth', None)
+    tskip = opt('--tooth-skip', None)                # the C twin drops one judged call: the gate must FAIL
+    if tskip is not None:
+        os.environ['JX_LIFT_SKIP'] = tskip
     os.makedirs(BUILD, exist_ok=True)
     if '--reach' in a:
         # the dynamic reach (indirect call / jump targets the oracle reached), run again and merged into the
@@ -371,11 +400,14 @@ def main():
     ref = reference(base, loads)
     r = subprocess.run([sys.executable, __file__, '--c', ref, so])
     drop(ref)
-    if tooth:
-        print('jx_lift_gate --tooth 0x%s: %s' % (tooth, 'BITES' if r.returncode else 'DID NOT BITE'))
+    if tooth or tskip is not None:
+        print('jx_lift_gate %s: %s' % ('--tooth 0x%s' % tooth if tooth else '--tooth-skip %s' % tskip,
+                                       'BITES' if r.returncode else 'DID NOT BITE'))
         return 0 if r.returncode else 1
-    print('jx_lift_gate: base %d, warm loads %s through the lifted host entry: %s' % (
-        base, loads, 'EXACTLY 0 -- every return value and heap byte' if not r.returncode else 'RED'))
+    print('jx_lift_gate: base %d, %s: %s' % (
+        base, 'the controller and note calls through the lifted engine entries' if loads == 'ctl' else
+        'warm loads %s through the lifted host entry' % loads,
+        'EXACTLY 0 -- every return value and heap byte' if not r.returncode else 'RED'))
     return r.returncode
 
 

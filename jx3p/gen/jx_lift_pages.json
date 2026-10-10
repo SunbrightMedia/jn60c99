@@ -1,6 +1,7 @@
 {
  "note": "jx_lift_gate.py --pages: the pages the lifted parameter system touches (image: rvas; stack: offsets from the calls' rsp), the union of the census runs",
  "image": [
+  3497984,
   3510272,
   4059136,
   4063232,
@@ -14,6 +15,13 @@
   10100736,
   10104832,
   10108928,
+  10125312,
+  10129408,
+  10141696,
+  10145792,
+  10153984,
+  10158080,
+  10166272,
   10174464,
   10178560,
   10182656,
@@ -99,6 +107,22 @@
    "heap": 652,
    "heap_written": 501,
    "image": 61
+  },
+  {
+   "base": 0,
+   "loads": "ctl",
+   "calls": 66,
+   "heap": 512,
+   "heap_written": 287,
+   "image": 25
+  },
+  {
+   "base": 34,
+   "loads": "ctl",
+   "calls": 66,
+   "heap": 461,
+   "heap_written": 101,
+   "image": 21
   }
  ]
 }

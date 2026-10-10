@@ -225,6 +225,39 @@ several ids at one sample: seed 1 at 48000, 108 points (107 records), 225 blocks
 process(); teeth: no points to the port (`--tooth-edits`: differs from block 68), the law truncated
 (`--tooth-law`).
 
+## 3g. The MIDI controllers through process() (READ + EXECUTED, 2026-10-10; PORTED, JX-12)
+
+A DAW sends MIDI controllers as VST3 MIDI-mapping parameters: base 0x0FFFC100 + n (n 0..127 the CC n, 128
+channel aftertouch, 129 bend). process() (the JUNO's code, 3f) makes a MIDI message of each queue's last
+point -- CC data round(v x 127), bend round(v x 16383) as two 7-bit bytes, beyond 129 three zero bytes --
+and hands it to the push (0x31F3C0): a CC the default map assigns (55 CCs) first queues that parameter's
+kind-1 record (the CC value law 0x31A730), then the message's own record after the wrapper's rules (a
+note-on at velocity 0 becomes a note-off at 64; the velocity switch, on by default, changes nothing). The
+render driver's dispatch (rva 0x32113C; its status table at 0x32193C / 0x32191C, READ): 0x90 note on
+(vt+0x80), 0x80 note off (vt+0x78, with the message's velocity), 0xB0 the CC entry (vt+0x88 = 0x34AD50:
+CC 1 -> vt+0x100 mod = dispatch 495 to the nine units, 10 -> `ret`, 11 -> vt+0x118 expression = dispatch
+498, 64 -> vt+0x120 sustain: per unit 0x3F6B50 on [HOST+0x88+0x40 u] (its +0xC, then the note manager's
++0xA and +0x9: 0x3F6210 / 0x3F61E0, the held notes released when off), 123 -> vt+0x128 all notes off: per
+unit 0x3F56C0, the assigner's vt+0x20 with 123; every other CC nothing), 0xE0 the bend entry (vt+0x98 =
+0x3F91B0: clamped to -8192..8191 by 0x3F6D00, dispatch 493), 0xA0 / 0xC0 / 0xD0 three entries that are
+`ret 0`.
+
+PORTED (jx_bridge.c): `jx3p_product_note(type, offset, channel, pitch, velocity)` -- process()'s note
+conversion and the push; `jx3p_product_param` takes the MIDI-mapping ids too; the driver's kind-0 dispatch
+calls the CC and bend entries through the LIFT: the engine's vtable slots 0x78..0xA8 are lift roots
+(jx_lift_roots.py CONTROL_SLOTS) and the reach has two controller runs (jx_dynreach.py --ctl). Not ported:
+MIDI learn and the CC map's state entries (the map is the boot's), the model's records the push also
+makes (the UI timer's), the velocity switch's other value (no path reaches it).
+
+MEASURED (jx_lift_gate.py --loads ctl, GATE 3e): the controller script (jx_dynreach.py ctl_script: 66 calls
+-- mod, expression and ignored CCs at their ends, 15 bends across and beyond the clamp, sustain on / off
+around note-offs and note-ons, all notes off with keys down and held, the three empty entries) through the
+plugin's entries and the lifted ones from patches 0 and 34: every return value and a heap checkpoint after
+every call EXACTLY 0; teeth: the C twin skipping a sustain release (entry 86) or one CC (entry 6) is RED.
+The first gate compared only the end state, and a skipped release did not bite (a later release freed the
+same notes): playbook 202. The guest image: a bend read a page of the 64 KB curve table (0x9A4000-
+0x9B4000, read at bend + 8192) that no census run had reached; .rdata and .data now ship whole.
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

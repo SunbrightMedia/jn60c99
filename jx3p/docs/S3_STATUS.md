@@ -3,6 +3,22 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (9) — THE MIDI CONTROLLERS THROUGH process() (JX-12)
+
+A DAW's MIDI controllers reach the port as they reach the plugin. process() and the push are ported
+(jx3p_product_note / jx3p_product_param: the note conversion, the wrapper's rules, the MIDI-mapping ids
+0x0FFFC100 + n made CC / aftertouch / bend messages, the default CC map's parameter records); the render
+driver's kind-0 dispatch calls the engine's own CC entry (mod, expression, sustain, all notes off) and bend
+entry, LIFTED: the engine's vtable slots 0x78..0xA8 are lift roots, two reach runs drive the controllers
+(889 functions now). MEASURED: the lifted controller and note entries EXACTLY 0 against the plugin from
+patches 0 and 34 (66 calls, a heap checkpoint after each; teeth: a dropped sustain release and a dropped CC
+each make it RED); every earlier lift run still EXACTLY 0 (loads, modes 57,600 calls, settings, the 65,472-
+call sweep). Found on the way (playbook 202): the switch-table scan missed tables (a loop bound), and a bend
+read a page of its 64 KB curve table no census had reached -- a crash under the page guard, silent zeros in
+WASM; the guest image now carries .rdata and .data whole. OPEN: the product gate (--ctl) is RED -- a small difference after a note-on when sustain / all
+notes off and mapped CCs are used together (each group alone EQUAL: bisected with --ctl-only); not
+yet found. This block is work in progress.
+
 ## 2026-10-10 (8) — HOST AUTOMATION THROUGH process() (JX-11d)
 
 A DAW's parameter automation now reaches the port as it reaches the plugin: `jx3p_product_param(id, offset,

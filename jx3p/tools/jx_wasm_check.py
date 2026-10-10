@@ -58,11 +58,9 @@ def fnv(b):
 def guest96(tmp):
     """the page's data: the 96 kHz guest image (jx3p/gen/jx_guest_96k.bin.gz, the plugin's heap after its boot),
     inflated"""
-    dst = os.path.join(tmp, 'jx_guest_96k.bin')
-    if not os.path.exists(dst):
-        with gzip.open(os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin.gz'), 'rb') as f:
-            open(dst, 'wb').write(f.read())
-    return dst
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import jx_guest
+    return jx_guest.path(96, tmp)
 
 
 def native(so, patches, ftz, planfile):

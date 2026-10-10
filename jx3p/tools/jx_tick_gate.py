@@ -42,6 +42,8 @@ import struct
 import subprocess
 import sys
 import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -163,7 +165,7 @@ def port(so, load, evs, want_raw=None):
     lib.jx3p_bad_hook.restype = ctypes.c_ulonglong
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    if not lib.jx3p_init(g('gen/jx_guest_44k.bin'), g('truth/preset_bank_1.bin'), None):
+    if not lib.jx3p_init(jx_guest.path(44).encode(), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
     if 'variant' in load:                     # the variant's records through the lifted host entry (JX-11)
         sys.path.insert(0, HERE)

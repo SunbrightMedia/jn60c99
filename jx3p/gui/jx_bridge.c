@@ -325,7 +325,7 @@ static int guest_link(void)
 }
 
 /* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): what a previous
- * call held is freed. image_path: the guest image (jx3p/gen/jx_guest_44k.bin or _96k); bank_path: the bank
+ * call held is freed. image_path: the guest image (jx3p/gen/jx_guest_44k.bin.gz or _96k, inflated: jx3p/tools/jx_guest.py); bank_path: the bank
  * file; the third argument is unused (it named the old recall data). */
 int jx3p_init(const char *image_path, const char *bank_path, const char *unused)
 {
@@ -732,9 +732,11 @@ long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS && G.kt[u]) ? (long
 #include "../../src/juno_conv.c"
 /* the render driver's state (jx3p_product_block below) */
 #define JX_DRV_QMAX 256
-typedef struct { int off, on, note, vel, kind; } jx_drv_rec;   /* kind 0 a key, 1 a host parameter record (note
-                                                                * the id, vel the float value's bits), 2 an
-                                                                * engine parameter record */
+typedef struct { int off, st, note, vel, kind; } jx_drv_rec;   /* kind 0 a MIDI message (st its status byte, note
+                                                                * and vel its data bytes), 1 a host parameter
+                                                                * record (note the id, vel the float value's bits),
+                                                                * 2 an engine parameter record (note the id, vel
+                                                                * the value) */
 static jx_drv_rec g_drv_carry[JX_DRV_QMAX]; static int g_drv_ncarry;
 static jx_drv_rec g_drv_pend[JX_DRV_QMAX]; static int g_drv_npend;     /* jx3p_product_param's points */
 static long long g_drv_ph; static int g_drv_notes, g_drv_rate;
@@ -808,6 +810,14 @@ static int32_t jx_midi_record_value(int e, float v)
     if (r > 2147483647.0) return 0x7FFFFFFF;
     return (int32_t)r;
 }
+/* the engine's entries the driver calls for a MIDI message (rva 0x32113C, the status' table at 0x32193C /
+ * 0x32191C, READ): 0x90 note on (vt+0x80, the transcribed note path: jx_alloc.c ...), 0x80 note off (vt+0x78,
+ * the same, with the message's velocity), 0xB0 the CC entry (vt+0x88, 0x34AD50: 1 mod, 11 expression, 64
+ * sustain, 123 all notes off; 10 and every other CC nothing), 0xE0 bend (vt+0x98, 0x3F91B0) with
+ * data1 + ((data2 - 64) << 7) as 16 bits -- these two LIFTED (jx_lift_roots.py CONTROL_SLOTS, JX-12) --;
+ * 0xA0 (vt+0xA0), 0xC0 (vt+0x90), 0xD0 (vt+0xA8): `ret 0` (READ) */
+#define JX_CC_ENTRY   0x34AD50
+#define JX_BEND_ENTRY 0x3F91B0
 static void drv_apply(const jx_drv_rec *r)
 {
     if (r->kind == 2) { jx3p_param(r->note, r->vel); return; }   /* the engine's host entry (JX-11) */
@@ -818,22 +828,126 @@ static void drv_apply(const jx_drv_rec *r)
         if (e >= 0) jx3p_param(r->note, jx_midi_record_value(e, f));
         return;
     }
-    if (r->on) { jx3p_note_on(r->note, r->vel); g_drv_notes++; }
-    else       { jx3p_note_off(r->note); g_drv_notes--; }
+    switch (r->st & 0xF0) {
+    case 0x90: jx3p_note_on(r->note, r->vel); g_drv_notes++; break;
+    case 0x80: jx_alloc_note_off(&G.mgr, &g_acbs, r->note, r->vel); g_drv_notes--; break;
+    case 0xB0: jxg_call(JX_CC_ENTRY, G.hostg, (uint64_t)(r->note & 0xFF), (uint64_t)(r->vel & 0xFF), 0, NULL); break;
+    case 0xE0: {
+        uint16_t d = (uint16_t)((r->note & 0xFF) + (uint16_t)(int16_t)(((r->vel & 0xFF) - 0x40) * 0x80));
+        jxg_call(JX_BEND_ENTRY, G.hostg, (uint64_t)d, 0, 0, NULL);
+        break;
+    }
+    default: break;
+    }
 }
-/* One host parameter queue's last point for the next block, as process() (rva 0x34A240) takes it: an id below
- * the MIDI-mapping base (as signed 32-bit values) becomes a parameter record (kind 1) with the value as a
- * float; the next jx3p_product_block puts these after its own events (the plugin's process(): the notes,
- * then one record per queue in queue order). Returns 0; -1 for a MIDI-mapping id (base + 0..129: CC,
- * aftertouch, bend -- not ported yet) or a full queue. */
+/* ---- process() AND THE PUSH (JX-12): the JUNO-60's wrapper code in the JX (process() rva 0x34A240, the push
+ * 0x31F3C0 = JUNO 0x31F4E0, the CC value law 0x31A730 = 0x31A850, the CC map lookup 0x319940 = 0x319A60: equal by
+ * fw_map --pair), the JX's tables (jx_midi_tables.h) ---- */
+/* the model's velSense (0x0FFFC00D): initialize's records set 1 and no path of the port changes it (no model, no
+ * state load is ported; the id map lacks the id, so no automation reaches it) */
+#define JX_VELSW 1
+/* the wrapper's rules for one message, in place (rva 0x31F3C0; the JUNO port's juno_gui_wrapper_midi, graded
+ * byte for byte there): a note-on at velocity 0 becomes a note-off at 64; with the velocity switch off a
+ * note-on's velocity -- the converted note-off's too -- becomes 100 and a note-off's 64 */
+static void jx_wrapper_midi(unsigned char m[3])
+{
+    if ((m[0] & 0xF0) == 0x90) {
+        if (!m[2]) { m[0] = (unsigned char)((m[0] & 0x0F) | 0x80); m[2] = 64; }
+        if (!JX_VELSW) m[2] = 100;
+    } else if ((m[0] & 0xF0) == 0x80) {
+        if (!JX_VELSW) m[2] = 64;
+    }
+}
+/* the value a mapped CC gives its parameter record (rva 0x31A730): the CC byte over the entry's range, rounded
+ * ((trunc(2x / 127) + 1) / 2) or, entry byte +16, truncated; both converted from 32 bits zero-extended */
+static float jx_midi_cc_value(int e, int cc)
+{
+    const jx_midi_param *p = &JX_MIDI_PARAM[e];
+    uint32_t range = (uint32_t)p->max - (uint32_t)p->min;
+    int32_t x = (int32_t)(range * (uint32_t)cc), q;
+    if (p->trunc) {
+        q = x / 127;
+    } else {
+        int32_t t = (int32_t)((uint32_t)x * 2u) / 127;
+        q = (t + 1) / 2;
+    }
+    if (p->min == p->max) return 0.0f;
+    return (float)(int64_t)(uint32_t)q / (float)(int64_t)range;
+}
+static void drv_pend(int kind, int off, int st, int a, int b)
+{
+    jx_drv_rec *r;
+    if (g_drv_npend >= JX_DRV_QMAX) return;
+    r = &g_drv_pend[g_drv_npend++];
+    r->off = off; r->kind = kind; r->st = st; r->note = a; r->vel = b;
+}
+/* the push (rva 0x31F3C0): a CC the boot's map assigns (no MIDI learn slot open: the port has no learn) first
+ * queues its parameter's record (kind 1, the CC value law); then every message its own record, after the
+ * wrapper's rules (the model's records the push also makes -- the UI timer's -- are not ported: no model) */
+static void jx_push(unsigned char m[3], int offset)
+{
+    if ((m[0] & 0xF0) == 0xB0) {
+        int e = m[1] < 128 ? JX_CC_MAP[m[1]] : -1;
+        if (e >= 0) {
+            float f = jx_midi_cc_value(e, m[2]);
+            int bits;
+            memcpy(&bits, &f, 4);
+            drv_pend(1, offset, 0, (int)JX_MIDI_PARAM[e].id, bits);
+        }
+    }
+    jx_wrapper_midi(m);
+    drv_pend(0, offset, m[0], m[1], m[2]);
+}
+/* One host note event for the next block, as process() takes it (the event list, before the parameter queues):
+ * type 0 note-on / 1 note-off, the channel, the pitch and the velocity 0..1 -> status | channel, pitch & 0x7F,
+ * (int)(float)(velocity x 127.0) & 0x7F, through the push. Returns 0; -1 when the queue is full. */
+int jx3p_product_note(int type, int offset, int channel, int pitch, float velocity)
+{
+    unsigned char m[3];
+    if (g_drv_npend >= JX_DRV_QMAX) return -1;
+    m[0] = (unsigned char)((channel & 0x0F) | (type == 0 ? 0x90 : 0x80));
+    m[1] = (unsigned char)(pitch & 0x7F);
+    m[2] = (unsigned char)((int)(float)((double)velocity * 127.0) & 0x7F);
+    jx_push(m, offset);
+    return 0;
+}
+/* One host parameter queue's last point for the next block, as process() (rva 0x34A240) takes it, after the
+ * block's note events (jx3p_product_note), in queue order: an id below the MIDI-mapping base (as signed 32-bit
+ * values) becomes a parameter record (kind 1) with the value as a float; base + n becomes a MIDI message
+ * through the push -- n 0..127 the CC n with round(value x 127), 128 channel aftertouch the same, 129 the
+ * pitch bend round(value x 16383) as two 7-bit bytes (rounded half away from zero, rva 0x428460; below 0 or
+ * NaN 0, above 255 / 65535 that), any other n three zero bytes (the driver skips them). The next
+ * jx3p_product_block puts these after its own events. Returns 0; -1 when the queue is full. */
 int jx3p_product_param(unsigned int id, int offset, double value)
 {
-    float f = (float)value;
-    jx_drv_rec *r;
-    if (!((int32_t)JX_MIDI_BASE > (int32_t)id) || g_drv_npend >= JX_DRV_QMAX) return -1;
-    r = &g_drv_pend[g_drv_npend++];
-    r->off = offset; r->on = 0; r->kind = 1; r->note = (int)id;
-    memcpy(&r->vel, &f, 4);
+    int32_t sid = (int32_t)id, base = (int32_t)JX_MIDI_BASE;
+    unsigned char m[3] = { 0, 0, 0 };
+    if (g_drv_npend >= JX_DRV_QMAX - 1) return -1;           /* a mapped CC queues two records */
+    if (base > sid) {
+        float f = (float)value;
+        int bits;
+        memcpy(&bits, &f, 4);
+        drv_pend(1, offset, 0, (int)id, bits);
+        return 0;
+    }
+    {
+        uint32_t d = (uint32_t)sid - (uint32_t)base;
+        if (d <= 128u) {
+            double x = value * 127.0;
+            unsigned char b;
+            x = (0.0 > x) ? ceil(x - 0.5) : floor(x + 0.5);
+            b = !(x >= 0.0) ? 0 : (x > 255.0 ? 0xFF : (unsigned char)(int)x);
+            if (d < 128u) { m[0] = 0xB0; m[1] = (unsigned char)d; m[2] = b; }
+            else { m[0] = 0xD0; m[1] = b; }
+        } else if (d == 129u) {
+            double x = value * 16383.0;
+            unsigned w;
+            x = (0.0 > x) ? ceil(x - 0.5) : floor(x + 0.5);
+            w = !(x >= 0.0) ? 0u : (x > 65535.0 ? 0xFFFFu : (unsigned)(int)x & 0xFFFFu);
+            m[0] = 0xE0; m[1] = (unsigned char)(w & 0x7F); m[2] = (unsigned char)((w >> 7) & 0x7F);
+        }
+    }
+    jx_push(m, offset);
     return 0;
 }
 /* one host block: ev[4 i ..] = { offset, type, a, b }: type 0 a note-on (a key, b velocity 0..127), 1 a
@@ -848,7 +962,8 @@ int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
     if (n <= 0) return 0;
     for (i = 0; i < g_drv_ncarry; ++i) rec[nrec++] = g_drv_carry[i];
     for (i = 0; i < nev && nrec < 2 * JX_DRV_QMAX; ++i) {
-        rec[nrec].off = ev[4 * i]; rec[nrec].on = ev[4 * i + 1] == 0;
+        rec[nrec].off = ev[4 * i];
+        rec[nrec].st = ev[4 * i + 1] == 0 ? 0x90 : 0x80;
         rec[nrec].kind = ev[4 * i + 1] == 2 ? 2 : 0;
         rec[nrec].note = ev[4 * i + 2]; rec[nrec].vel = ev[4 * i + 3]; ++nrec;
     }
@@ -859,11 +974,10 @@ int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
         int last = -1, lastoff = -1;
         cut = nrec;
         for (i = 0; i < nrec; ++i) {
-            int off = rec[i].off;
-            if (rec[i].kind) {                      /* a parameter record: only "offsets never go down" */
-            } else if (rec[i].on) {
+            int off = rec[i].off, st = rec[i].kind ? 0 : rec[i].st & 0xF0;
+            if (st == 0x90) {                       /* a parameter record, a CC, a bend: only "offsets never go down" */
                 if (off <= lastoff) { off = lastoff + 1; rec[i].off = off; }
-            } else {
+            } else if (st == 0x80) {
                 lastoff = off;
             }
             if (off <= last) { rec[i].off = last; off = last; }

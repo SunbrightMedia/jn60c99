@@ -121,6 +121,12 @@ python3 "$HERE/jx_product_gate.py" --rates 44100,96000 --patches 0 --on 0.6 --of
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 34 --on 0.6 --off 2.0 --secs 2.4 --edits 3
 python3 "$HERE/jx_product_gate.py" --tooth-edits --rates 48000 --patches 0 --on 0.6 --off 2.0 --secs 2.4 --edits 1
 python3 "$HERE/jx_product_gate.py" --tooth-law --rates 48000 --patches 0 --on 0.6 --off 2.0 --secs 2.4 --edits 1
+# THE MIDI CONTROLLERS (JX-12): seeded MIDI-mapping points (sustain, all notes off, mod, expression, mapped and
+# ignored CCs, bend, aftertouch) with seeded polyphony -- process()'s conversion and push, the driver's dispatch,
+# the engine's CC and bend entries (lifted)
+python3 "$HERE/jx_product_gate.py" --rates 48000,96000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
+python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 61,34 --poly 2 --ctl 2 --on 0.55 --secs 2.4
+python3 "$HERE/jx_product_gate.py" --tooth-ctl --rates 48000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
@@ -131,6 +137,11 @@ python3 "$HERE/jx_lift_gate.py" --loads sweep                     # every id x 1
 python3 "$HERE/jx_lift_gate.py" --loads modes                     # every patch at every effect type (records 65, 67)
 python3 "$HERE/jx_lift_gate.py" --loads settings                  # the host settings 0x0FFFC000..1F (quality among them)
 python3 "$HERE/jx_lift_gate.py" --loads 5 --tooth 35D29F          # one multiply made a divide: must be seen
+# the render driver's kind-0 targets (JX-12): CC, bend, the empty entries and the note entries, a heap checkpoint
+# after every call
+python3 "$HERE/jx_lift_gate.py" --loads ctl
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads ctl
+python3 "$HERE/jx_lift_gate.py" --loads ctl --tooth-skip 86         # a sustain release dropped: must be seen
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null

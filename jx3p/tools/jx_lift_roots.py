@@ -9,7 +9,9 @@ heap after its boot (the parameter system allocates nothing: their vtables are e
 at a vtable -- an RTTI object locator before it, code pointers in it); two classes are RELATED when they share a
 base class (MSVC RTTI: the class hierarchy descriptor's base class array); and every reached target at slot k of
 a class adds slot k of every related live class; the control classes (the parameter object, the assigner, the
-keyboard arpeggiator) add every slot (FULL_CLASSES). The three code pointers the heap stores outside any vtable
+keyboard arpeggiator) add every slot (FULL_CLASSES); the engine's vtable slots the render driver calls for a MIDI
+message (CONTROL_SLOTS: notes, the CC entry, bend, three empty entries) are roots too (JX-12). The three code
+pointers the heap stores outside any vtable
 (a step function of the note store, 0x3F0C20, which jx3p/src/jx_seq.c ports; the render worker's entry 0x3F8C60;
 a runtime-library routine 0x6B6B20) are listed, not lifted: no parameter call reaches them. The result is
 jx3p/gen/jx_lift_roots.json; jx_lift_gate.py lifts from the host entry and these roots.
@@ -26,9 +28,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_roots.json')
 REACH = os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_reach.json')
-GUEST = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_44k.bin')
+sys.path.insert(0, HERE)
+import jx_guest                                       # noqa: E402  (the committed .gz, inflated)
 IB = 0x180000000
 FULL_CLASSES = ('.?AVCPrmDSPJx3pPlugin@@', '.?AVCAssignB@@', '.?AVCKbdArp@@')
+# THE RENDER DRIVER'S KIND-0 TARGETS (JX-12; rva 0x32113C, READ): the engine's vtable slots it calls for a MIDI
+# message -- note off / on (+0x78 / +0x80), the CC entry (+0x88), bend (+0x98), the three empty ones (+0x90 /
+# +0xA0 / +0xA8) -- roots of their own: the port calls them through the lift (jx_bridge.c)
+ENGINE_VT = 0xA15B88
+CONTROL_SLOTS = (0x78, 0x80, 0x88, 0x90, 0x98, 0xA0, 0xA8)
 TEXT = (0x1000, 0x96B000)
 RDATA = (0x96B000, 0xC7B000)
 
@@ -41,7 +49,7 @@ def image():
 
 
 def heap_image():
-    b = open(GUEST, 'rb').read()
+    b = open(jx_guest.path(44), 'rb').read()
     hb, hlen = struct.unpack_from('<2Q', b, 8)
     heap = bytearray(hlen)
     o = 8 + 56 + 8
@@ -102,9 +110,14 @@ def main():
     for v in vts:
         if names[v][0] in FULL_CLASSES:
             add.update(ent[v])
+    if ENGINE_VT not in vts:
+        raise SystemExit('the engine vtable 0x%x is not live in the heap' % ENGINE_VT)
+    add.update(q(ENGINE_VT + s) - IB for s in CONTROL_SLOTS)
     roots = sorted(add - {0x3F9A30})
     res = dict(note='jx_lift_roots.py: the slot-family closure of the reached virtual targets over the classes '
-                    'live in the plugin\'s heap after its boot (the code pointers the heap stores are listed, not roots)',
+                    'live in the plugin\'s heap after its boot (the code pointers the heap stores are listed, not roots), '
+                    'the control classes in full and the render driver\'s kind-0 targets (the engine\'s vtable slots '
+                    '0x78..0xA8)',
                classes=[dict(vtable='%x' % v, cls=names[v][0], slots=len(ent[v])) for v in vts],
                code_pointers=['%x' % f for f in sorted(fptrs)],
                roots=['%x' % r for r in roots])

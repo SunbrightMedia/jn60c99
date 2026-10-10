@@ -26,6 +26,8 @@ import os
 import subprocess
 import sys
 import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -83,7 +85,7 @@ def port(so, patches, shift):
     buf = ctypes.create_string_buffer(1 << 20)
     res = {}
     for k in patches:
-        if not lib.jx3p_init(g('gen/jx_guest_44k.bin').encode(), g('truth/preset_bank_1.bin').encode(), None):
+        if not lib.jx3p_init(jx_guest.path(44).encode(), g('truth/preset_bank_1.bin').encode(), None):
             raise SystemExit('jx3p_init failed')
         lib.jx3p_recall(min(k + shift, 63))
         if lib.jx3p_lift_error():
