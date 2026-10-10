@@ -27,24 +27,27 @@
 set -u
 R=$(cd "$(dirname "$0")/../.." && pwd)
 IDF=${IDF_PATH:-/home/user/esp-idf}
+ONLY=${ESP32_CHECK_ONLY:-}          # e.g. ESP32_CHECK_ONLY=repro: one part (default: every part)
+want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
+fail=0
+if want builds || want repro; then  # the history part is host cc only: it runs without the IDF
 [ -f "$IDF/export.sh" ] || { echo "FAIL no ESP-IDF at $IDF (CLAUDE.md BUILD & GIT: clone v6.1 + ./install.sh esp32s3)"; exit 1; }
 export IDF_PYTHON_CHECK_CONSTRAINTS=no
 cd "$IDF" && . ./export.sh > /dev/null 2>&1 || { echo "FAIL $IDF/export.sh"; exit 1; }   # it finds IDF_PATH from $PWD
 cd "$R/esp32s3" || exit 1
-fail=0
 want=$(awk '/^  idf:/{f=1} f && /version:/{print $2; exit}' dependencies.lock)
 have=$(idf.py --version 2>/dev/null | sed -n 's/^ESP-IDF v\([0-9][0-9.]*\).*/\1/p')
 case "$have" in *.*.*) ;; ?*) have=$have.0 ;; esac
 if [ "$have" != "$want" ]; then echo "FAIL ESP-IDF $have, the pin is $want (esp32s3/dependencies.lock)"; exit 1; fi
 echo "ok   ESP-IDF $have == the pin (esp32s3/dependencies.lock)"
+fi
+cd "$R/esp32s3" || exit 1
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 # a reproducible image's version: the commit (IDF's default is `git describe` of the checkout, so a
 # copy of the tree without .git would stamp another version)
 VER=$(git -C "$R" rev-parse --short=12 HEAD)
 BEFORE=$(git -C "$R" status --porcelain -- esp32s3)
-ONLY=${ESP32_CHECK_ONLY:-}          # e.g. ESP32_CHECK_ONLY=repro: one part (default: every part)
-want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 errors() { grep -E "error:|undefined reference|FAILED:" "$1" | head -12; tail -3 "$1"; }
 
 build() {   # build NAME DIR CONFIG(tree|repro|defaults|repro-defaults|qemu) [idf.py -D args]
@@ -98,6 +101,27 @@ if git -C "$R" worktree add -q --detach "$T/hist" "$DEVICE_JUNO" > "$T/chain_gat
   fi
 else
   echo "FAIL chain_gate at ${DEVICE_JUNO:0:8}:"; errors "$T/chain_gate.log"; fail=1
+fi
+# The track's O1-O3 suites at the same commit (tools/engineb/o3_gates.sh, which runs o2_gates.sh: the
+# event queue and the input boundary, the chunked patch and note builds and their budget, the
+# parameter map, sequence and warm edit = the plugin -- 57 teeth). Two build products come first:
+# make_boot.py's boot image (chunk_gate and held_gate read it) and devrecall_gate.py's record scan
+# (paramclass_gate reads its measured positions). The device-recall gate itself is red at that commit
+# (docs/REPRODUCE.md: its record list is stale, its scatter tooth parses a list the generator no
+# longer has); only its scan's measurement is used, and its verdict is printed.
+# Tooth: ESP32_CHECK_TOOTH=noboot skips the boot image -- the suites must then go RED (chunk, held).
+if [ -d "$T/hist" ]; then
+  t0=$(date +%s)
+  boot="python3 tools/engineb/devboot/make_boot.py"
+  [ "${ESP32_CHECK_TOOTH:-}" = noboot ] && boot=true
+  if ( cd "$T/hist" && $boot \
+       && { python3 tools/engineb/devrecall_gate.py --patch-scan --no-teeth; [ -s build/devrecall/recall_positions.txt ]; } \
+       && sh tools/engineb/o3_gates.sh ) > "$T/osuites.log" 2>&1 && grep -q "O3 GATES: ALL GREEN" "$T/osuites.log"; then
+    echo "ok   O1-O3 suites at ${DEVICE_JUNO:0:8}: $(grep -c 'teeth): GREEN' "$T/osuites.log") gates GREEN, every tooth caught ($(( $(date +%s) - t0 )) s)"
+  else
+    echo "FAIL O1-O3 suites at ${DEVICE_JUNO:0:8}:"; grep -E '\*\*\* |NOT CAUGHT|missing|Traceback' "$T/osuites.log" | head -8; fail=1
+  fi
+  echo "note devrecall_gate at ${DEVICE_JUNO:0:8} (stated): $(grep -m1 -oE 'EB_RECALL_POS\[\] IS STALE: measured [0-9]+, listed [0-9]+|EB_RECALL_POS.* matches' "$T/osuites.log" || echo 'no scan verdict')"
 fi
 git -C "$R" worktree remove --force "$T/hist" > /dev/null 2>&1; git -C "$R" worktree prune
 fi

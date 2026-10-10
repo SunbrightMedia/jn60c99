@@ -13,8 +13,9 @@
 #                    subsystem; everything downstream inherits that.
 #   2  unit tests    the engine B contracts (sizes / free-run / patch decode).
 #                    They need no oracle, so they come before anything slow.
-#   2b event (O1)    the firmware's event queue (engine_b/event/teeth.sh):
-#                    seven planted defects caught, then the clean run.
+#   2b event (O1)    the firmware's event queue (engine_b/event/teeth.sh) and its
+#                    input boundary (boundary_teeth.sh): planted defects caught,
+#                    then the clean runs.
 #   3  self-test     null_b --module none MUST be EXACTLY 0. This is the
 #                    comparator's own passthrough proof. If it is not exactly
 #                    zero, no module result below it can be believed.
@@ -103,10 +104,11 @@ make -C engine_b/tests || die "an engine B unit test failed" \
 
 # ---------------------------------------------------------------- 2b event boundary
 STEP="2b event boundary (O1)"
-say "$STEP" "the firmware's event queue: seven planted defects caught, then the clean run"
-sh engine_b/event/teeth.sh || die "the event boundary gate is red, or blind to a planted defect" \
+say "$STEP" "the firmware's event queue (7 planted defects) and its input boundary (3), then the clean runs"
+{ sh engine_b/event/teeth.sh && sh tools/engineb/boundary_teeth.sh; } || die "the event boundary gate is red, or blind to a planted defect" \
     "engine_b/event/juno_event.c is compiled into the firmware exactly as this" \
-    "gate compiles it (esp32s3/main/CMakeLists.txt EVENT_SRCS). No oracle." \
+    "gate compiles it (esp32s3/main/CMakeLists.txt EVENT_SRCS); boundary_check.py" \
+    "reads esp32s3/main/*.c: every input submits through juno_event_*(). No oracle." \
     "FIX: a 'NOT CAUGHT' / 'DID NOT APPLY' line names the tooth that failed;" \
     "     otherwise the clean run's FAIL line names the contract that broke."
 
