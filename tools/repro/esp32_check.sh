@@ -121,7 +121,7 @@ if [ -d "$T/hist" ]; then
        && sh tools/engineb/o3_gates.sh ) > "$T/osuites.log" 2>&1 && grep -q "O3 GATES: ALL GREEN" "$T/osuites.log"; then
     echo "ok   O1-O3 suites at ${DEVICE_JUNO:0:8}: $(grep -c 'teeth): GREEN' "$T/osuites.log") gates GREEN, every tooth caught ($(( $(date +%s) - t0 )) s)"
   else
-    echo "FAIL O1-O3 suites at ${DEVICE_JUNO:0:8}:"; grep -E '\*\*\* |NOT CAUGHT|missing|Traceback' "$T/osuites.log" | head -8; fail=1
+    echo "FAIL O1-O3 suites at ${DEVICE_JUNO:0:8}:"; grep -E ': RED$|NOT CAUGHT|^missing|Traceback|GATES:' "$T/osuites.log" | head -8; fail=1
   fi
   echo "note devrecall_gate at ${DEVICE_JUNO:0:8} (stated): $(grep -m1 -oE 'EB_RECALL_POS\[\] IS STALE: measured [0-9]+, listed [0-9]+|EB_RECALL_POS.* matches' "$T/osuites.log" || echo 'no scan verdict')"
 fi
