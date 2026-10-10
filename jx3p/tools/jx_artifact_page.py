@@ -7,8 +7,10 @@ died with the container -- PORT_PIPELINE step 8):
   jx3p/gui/web/jx3p_artifact.wasm   inlined as base64, fed through
                                     instantiateWasm (SINGLE_FILE's binary
                                     string is charset-fragile: seen to fail)
-  jx3p/gui/web/{jx_template,jx_master_recall,bank}.bin.gz
-                                    inflated in the browser (no zlib)
+  jx3p/gui/web/{jx_guest_96k,bank}.bin.gz
+                                    inflated in the browser (no zlib): the plugin's
+                                    heap after its boot (the engine at 96 kHz, played
+                                    through the render object and driver, JX-10/11)
 The page is pure ASCII. usage: jx_artifact_page.py [out.html]
 """
 import sys, os, base64
@@ -23,7 +25,7 @@ def _b64(name):
 
 JS = open(os.path.join(WEB, "jx3p_artifact.js"), encoding="utf-8").read()
 WASM = _b64("jx3p_artifact.wasm")
-BT, BA, BB = _b64("jx_template.bin.gz"), _b64("jx_master_recall.bin.gz"), _b64("bank.bin.gz")
+BT, BB = _b64("jx_guest_96k.bin.gz"), _b64("bank.bin.gz")
 
 HTML = """<title>JX-3P Playable Port</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -99,13 +101,13 @@ HTML = """<title>JX-3P Playable Port</title>
   <div class="kbd-wrap"><div id="kbd"></div></div>
   <div class="foot">
     <div><b>Play:</b> <kbd>A</kbd>-<kbd>K</kbd> white &middot; <kbd>W E T Y U</kbd> black &middot; <kbd>Z</kbd>/<kbd>X</kbd> octave</div>
-    <div class="mono">clean boot &middot; 8 voices &middot; 44100 Hz</div>
+    <div class="mono">the plugin's own boot &middot; 6 voices &middot; engine 96 kHz</div>
     <div>Full master chain (chorus, delay, reverb) -- proven EXACTLY 0 against the plugin over idle and played samples.</div>
   </div>
 </div>
 <script>__ENGINE__</script>
 <script>
-const B64 = { tmpl:"__BT__", aux:"__BA__", bank:"__BB__" };
+const B64 = { guest:"__BT__", bank:"__BB__" };
 const WASM_B64 = "__WASM__";
 function b64bytes(s){ const bin=atob(s); const u=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
@@ -119,12 +121,11 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
   const mod=await Jx3pModule({ instantiateWasm:(imports,cb)=>{
     WebAssembly.instantiate(b64bytes(WASM_B64),imports).then(r=>cb(r.instance));
     return {}; } });
-  const [t,a,b]=await Promise.all([gunzip(b64bytes(B64.tmpl)),
-    gunzip(b64bytes(B64.aux)), gunzip(b64bytes(B64.bank))]);
-  mod.FS.writeFile('/t.bin',t); mod.FS.writeFile('/a.bin',a);
+  const [t,b]=await Promise.all([gunzip(b64bytes(B64.guest)), gunzip(b64bytes(B64.bank))]);
+  mod.FS.writeFile('/g.bin',t);
   mod.FS.writeFile('/b.bin',b);
   if(!mod.ccall('jx3p_init','number',['string','string','string'],
-                ['/t.bin','/b.bin','/a.bin'])){ lcd('ENGINE INIT FAILED'); return; }
+                ['/g.bin','/b.bin',''])){ lcd('ENGINE INIT FAILED'); return; }
   const recall=i=>{ mod.ccall('jx3p_recall',null,['number'],[i]);
     lcd('PATCH '+String(i+1).padStart(2,'0')+'  -  READY');
     document.querySelectorAll('.patchbtn').forEach((el,k)=>
@@ -140,15 +141,19 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
     d.className='patchbtn'; d.title='Patch '+(i+1);
     d.onclick=()=>recall(i); strip.appendChild(d); }
   recall(0);
-  const N=256, pL=mod._malloc(N*4), pR=mod._malloc(N*4);
+  const N=256, pL=mod._malloc(N*4), pR=mod._malloc(N*4), QMAX=128, pEv=mod._malloc(QMAX*16), queue=[];
   let ctx=null;
   const power=document.getElementById('power');
   power.disabled=false;
   power.onclick=()=>{ if(ctx) return;
     ctx=new AudioContext({sampleRate:44100});
+    if(mod.ccall('jx3p_product_open','number',['number'],[ctx.sampleRate])<0){ lcd('RENDER OBJECT FAILED'); return; }
     const node=ctx.createScriptProcessor(N,0,2);
     node.onaudioprocess=e=>{
-      mod.ccall('jx3p_render',null,['number','number','number'],[pL,pR,N]);
+      const n=Math.min(queue.length,QMAX), v=new Int32Array(mod.HEAPF32.buffer,pEv,QMAX*4);
+      for(let i=0;i<n;i++) v.set(queue[i],4*i);
+      queue.splice(0,n);
+      mod.ccall('jx3p_product_block','number',['number','number','number','number','number'],[pL,pR,N,pEv,n]);
       /* FULL MASTER CHAIN (chorus/delay/reverb), proven 2026-09-06: the
        * full-chain gate compares 1024 idle + 12000 played samples against
        * the plugin and they are EXACTLY 0. Gain 1.0 = the plugin's own
@@ -164,8 +169,8 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
     power.textContent='AUDIO RUNNING';
     lcd('PATCH '+String((sel.value|0)+1).padStart(2,'0')+'  -  PLAY'); };
   let octave=4, kbase=3; const held=new Set(), els={};
-  const on=n=>mod.ccall('jx3p_note_on',null,['number','number'],[n,100]);
-  const off=n=>mod.ccall('jx3p_note_off',null,['number'],[n]);
+  const on=n=>{ if(ctx) queue.push([0,0,n,100]); };
+  const off=n=>{ if(ctx) queue.push([0,1,n,0]); };
   const paint=()=>{ for(const[rel,el] of Object.entries(els))
     el.classList.toggle('on',held.has(12*kbase+(+rel))); };
   const setOct=d=>{ for(const n of [...held]) off(n); held.clear();
@@ -199,7 +204,7 @@ const lcd=t=>document.getElementById('lcd').textContent=t;
 </script>
 """
 out = (HTML.replace("__ENGINE__", JS).replace("__WASM__", WASM)
-       .replace("__BT__", BT).replace("__BA__", BA).replace("__BB__", BB))
+       .replace("__BT__", BT).replace("__BB__", BB))
 assert all(ord(c) < 128 for c in out), "page must be pure ASCII (charset mojibake seen)"
 dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO, "jx3p", "gen", "jx3p_port.html")
 open(dst, "w").write(out)

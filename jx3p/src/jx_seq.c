@@ -18,7 +18,8 @@
  *   (the bad_hook callback). The factory bank holds modes 0, 3 and 6 (EXECUTED).
  *
  * The objects are RAW BYTE BLOBS at the plugin's own offsets (jx_alloc.c, jx_nstore.c). The note store's
- * pointer at +0x20 is kept as its OFFSET in the store (0 or 0xDA8: the store's own pattern, EXECUTED);
+ * pointer at +0x20 is kept as its OFFSET in the store (0 or 0xDA8: the store's own pattern, EXECUTED) -- or,
+ * in the port's guest memory (jx_bridge.c, JX-11), as the plugin's own pointer, read through JXS_PTR;
  * +0xFD8 (the assigner) and the vtable are the callbacks below.
  *
  * Transcription is LITERAL: each branch mirrors an instruction. Do not "improve" the logic -- bit-exact
@@ -47,6 +48,9 @@ static unsigned long g_seq_hook_calls, g_seq_on, g_seq_off, g_seq_mode_calls[19]
 #define SI(o)   (*(int32_t *)(ns + (o)))
 #define SW(o)   (*(uint16_t *)(ns + (o)))
 #define SQ(o)   (*(uint64_t *)(ns + (o)))
+#ifndef JXS_PTR
+#define JXS_PTR(ns, v) ((ns) + (v))      /* +0x20 as an offset in the store */
+#endif
 
 /* 0x3F5240 -- vtable +8: rcx = [rcx+0xFD8]; r8b = 0x40; jmp [vtbl+0x10] (the assigner's note-off) */
 static void jxs_off(uint8_t *ns, const jx_seq_cbs *cb, int note)
@@ -1097,7 +1101,7 @@ tail:                                            /* 0x3EFE4E */
                         }
                     }
                     SI(0x2C) = bp2;
-                    jxs_3F1650(ns, SQ(0x20) ? ns + SQ(0x20) : 0, ns + 0x324);   /* +0x20: an offset (see top) */
+                    jxs_3F1650(ns, SQ(0x20) ? JXS_PTR(ns, SQ(0x20)) : 0, ns + 0x324);   /* +0x20 (see top) */
                     jxs_3F1B10(ns, 0);
                     S8(0x28) = 0;
                 }

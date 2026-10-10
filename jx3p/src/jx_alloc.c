@@ -239,7 +239,11 @@ static void jx_unit_note_off(uint8_t *b, const jx_alloc_cbs *cb, int unit,
 
 /* ---- the 9-unit fan-outs (0x3F9150 / 0x3F90F0) and setters ---- */
 
+#ifdef JXA_UNIT_PTRS    /* the port's guest memory (jx3p/gui/jx_bridge.c): each blob IS the plugin's own object */
+typedef struct { uint8_t *u[JXA_UNITS]; } jx_alloc;
+#else
 typedef struct { uint8_t u[JXA_UNITS][JXA_UNIT_SZ]; } jx_alloc;
+#endif
 
 void jx_alloc_note_on(jx_alloc *a, const jx_alloc_cbs *cb, int note, int vel)
 {

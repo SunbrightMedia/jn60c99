@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""jx_recall_data_gate.py -- the JX port's recall (jx3p_recall: the template + the recall aux) against the
-plugin's own patch load, all 64 factory patches (two processes: Unicorn here, ctypes in a child).
+"""jx_recall_data_gate.py -- the JX port's patch load (jx3p_recall: the patch's records through the plugin's own
+parameter system, lifted -- JX-11) against the plugin's own patch load, all 64 factory patches (two processes:
+Unicorn here, ctypes in a child).
 
 ORACLE  tools/verify/jx_emu.py boot(44100, product=True, patch=k): static init, BUILD on the factory
         HOST, SETSR, initialize's records and patch k's patch-browser records through the engine's own
         host entry -- word for word the engine the plugin holds after its own patch load
         (jx3p/tools/jx_recall_product_check.py).
-PORT    jx3p/gui/jx_bridge.c: jx3p_init (jx3p/gen/jx_template.bin, jx_master_recall.bin) + jx3p_recall(k).
+PORT    jx3p/gui/jx_bridge.c: a fresh jx3p_init (jx3p/gen/jx_guest_44k.bin, the plugin's heap after its boot)
+        + jx3p_recall(k), per patch.
 
-Compared per patch, the windows the exporters ship: each voice unit's state [0, 0x60000) (its object
-pointer at +136 excluded: the port links its own), its window [0xA60000, 0xAAD000), the master unit's
-state [0, 0xAAD000) (+136 excluded), the 9 wrapper + ramp records in the exporter's form, the 36
-control objects (note managers, note stores, assigners, parameter objects) and the engine HOST record
-(the voice count, the output gain stage, the engine rate).
+Compared per patch: each voice unit's state [0, 0x60000), its window [0xA60000, 0xAAD000), the master unit's
+state [0, 0xAAD000), the 9 wrapper + ramp records (the exporter's form), the 36 control objects (note
+managers, note stores, assigners, parameter objects -- every byte, pointers and vtables included) and the
+engine HOST record (the voice count, the output gain stage, the engine rate).
 
     python3 jx3p/tools/jx_recall_data_gate.py [--patches 0,5,20] [--tooth]
   --tooth: the port reads patch k+1's data for patch k (one off) -- must be seen (exit 0 = bites)
@@ -43,12 +44,10 @@ def windows(lows, highs, master, wraps, ctl=(), host=None):
         out['c%02d' % i] = digest(b)
     if host is not None:
         out['host'] = host.hex()
-    for v in range(8):
-        lo = bytearray(lows[v]); lo[136:144] = bytes(8)
-        out['v%d' % v] = digest(bytes(lo))
+    for v in range(8):                           # every byte: the port's memory is the plugin's (JX-11)
+        out['v%d' % v] = digest(lows[v])
         out['h%d' % v] = digest(highs[v])
-    m = bytearray(master); m[136:144] = bytes(8)
-    out['m'] = digest(bytes(m))
+    out['m'] = digest(master)
     for u in range(9):
         out['w%d' % u] = digest(wraps[u])
     return out
@@ -58,8 +57,7 @@ def oracle(patches):
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     sys.path.insert(0, HERE)
     import jx_emu as J
-    import jx_master_recall_export as X
-    import jx_template_export as T
+    import jx_guest_export as GX
     res = {}
     for k in patches:
         jx = J.JX().boot(44100.0, snap=False, product=True, patch=k)
@@ -67,11 +65,11 @@ def oracle(patches):
         lows = [bytes(uc.mem_read(jx.state[v], SNAP_V)) for v in range(8)]
         highs = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ)) for v in range(8)]
         master = bytes(uc.mem_read(jx.state[8], SNAP_M))
-        wraps = [X.wrap_record(jx, uc, u) for u in range(9)]
+        wraps = [GX.wrap_record(jx, u) for u in range(9)]
         q = lambda a: int.from_bytes(uc.mem_read(a, 8), 'little')
         for i in range(9):                       # the assigner the render syncs IS the note manager's +0x520
             assert q(q(jx.HOST + 0x78 + 0x40 * i) + 0x520) == jx.assign[i], 'unit %d: two assigners' % i
-        res[str(k)] = windows(lows, highs, master, wraps, T.control_blobs(jx), T.host_record(jx))
+        res[str(k)] = windows(lows, highs, master, wraps, GX.control_raw(jx), GX.host_record(jx))
         print('oracle patch %d' % k, file=sys.stderr, flush=True)
     return res
 
@@ -80,14 +78,16 @@ def port(so, patches, shift):
     lib = ctypes.CDLL(so)
     for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_vhigh', 'jx3p_ctl'):
         getattr(lib, f).restype = ctypes.c_void_p
+    lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p)
-    if not lib.jx3p_init(g('gen/jx_template.bin').encode(), g('truth/preset_bank_1.bin').encode(),
-                         g('gen/jx_master_recall.bin').encode()):
-        raise SystemExit('jx3p_init failed')
     buf = ctypes.create_string_buffer(1 << 20)
     res = {}
     for k in patches:
+        if not lib.jx3p_init(g('gen/jx_guest_44k.bin').encode(), g('truth/preset_bank_1.bin').encode(), None):
+            raise SystemExit('jx3p_init failed')
         lib.jx3p_recall(min(k + shift, 63))
+        if lib.jx3p_lift_error():
+            raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
         lows = [ctypes.string_at(lib.jx3p_vstate(v), SNAP_V) for v in range(8)]
         highs = [ctypes.string_at(lib.jx3p_vhigh(v), HI_SZ) for v in range(8)]
         master = ctypes.string_at(lib.jx3p_mstate(), SNAP_M)

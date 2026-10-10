@@ -242,9 +242,9 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
 
 ## 4. Next
 
-1. The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44 of the factory bank render
-   differently with T = 1200 than without -- a scratch census of the plugin's engine, 24,000 samples a
-   patch, the rest of the bank was still running): the render driver computes T = round(tempo x 10) from the
+1. The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44, 48 and 54 of the factory bank (6 of
+   64) render differently with T = 1200 than without -- a census of the plugin's engine, 24,000 samples a
+   patch, every patch): the render driver computes T = round(tempo x 10) from the
    ProcessContext and, when the host's tempo is valid and T changed, calls the engine's vt+0xB0
    (0x3F9DD0): for T in 400..3000 every unit's dispatch 375 (0x177) = T -- the parameter object's
    vt+0x650 (0x3EB7E0): 0x3E12D0, then by the effect type [obj+0x5B8] (0..5) the effect object's tempo
@@ -275,6 +275,13 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
    each id (65,472 calls). Tooth: one mulss of the LFO-rate listener made a divss (0x35D29F) -- 72 words
    differ, the 8 rate cells of each of the 9 units. A reach from patch 0 alone missed the arpeggiator's
    switch-off: the gate trapped there ("indirect target 0x3e0210 not lifted") -- a gap is a trap, never a
-   silent difference. NOT YET IN THE PRODUCT: the port's memory is not the guest layout the lifted code
-   needs (next: its unit states, parameter objects and HOST as guest regions, the DSP reading them).
+   silent difference. IN THE PRODUCT (2026-10-10, S3_STATUS (7)): the port's memory is the plugin's heap
+   (jx_bridge.c: one block at the guest addresses, from jx_guest_export.py's image of the heap after the
+   boot); jx3p_recall runs a patch's records through the lifted entry on the running engine (WARM),
+   jx3p_param one host edit, the render driver takes parameter records (type 2) in a block's event list.
+   The lift's roots: the host entry, the oracle's reach (jx3p/gen/jx_lift_reach.json) and the
+   slot-family closure over the classes live in the heap plus the control classes in full
+   (jx_lift_roots.py); the image pages it reads: a dynamic census and a static scan (jx_guest_export.py
+   image_pages). Graded: GATE 3d --recall (warm changes, a key held, through the plugin's process()),
+   GATE 3e --loads modes / settings.
 4. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.

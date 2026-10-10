@@ -20,8 +20,8 @@ mode into 2, 5, 8 or 10) and the store's +0xDA1 (modes 15-18; nothing writes it)
 sends SCATTER (no patch record, no DAW-state entry, no editor control, not initialize: EXECUTED +
 READ), so the PRODUCT reaches modes 0, 3, 6 (REACHABLE) and the engine's own host entry 2, 5, 8, 10
 more (ENTRY). --variants loads states through the plugin's own patch load (factory records with values
-changed, or a SCATTER record appended -- class ENTRY: jx_master_recall_export.variant_records; the port
-gets their recall data from the same exporter). --setmode puts every mode, the 12 no entry reaches
+changed, or a SCATTER record appended -- class ENTRY: jx_records.variant_records; the port runs the same
+records through the lifted host entry, JX-11). --setmode puts every mode, the 12 no entry reaches
 included, into every unit's store through the plugin's own setter (the port: its transcription) after
 factory patch 34's load: the step functions graded on states no input makes.
 
@@ -120,9 +120,9 @@ def oracle_load(load):
     sys.path.insert(0, HERE)
     import jx_emu as J
     if 'variant' in load:
-        import jx_master_recall_export as X
+        import jx_records
         jx = J.JX().boot(44100.0, snap=False, product=True)
-        jx.host_records(X.variant_records(load['variant']))
+        jx.host_records(jx_records.variant_records(load['variant']))
     else:
         jx = J.JX().boot(44100.0, snap=False, product=True, patch=load['patch'])
     rq = lambda a: int.from_bytes(jx.uc.mem_read(a, 8), 'little')
@@ -136,7 +136,7 @@ def oracle_load(load):
 
 
 def oracle(load, evs):
-    import jx_template_export as T
+    import jx_guest_export as GX
     J, jx, modes = oracle_load(load)
     uc = jx.uc
     res = []
@@ -147,7 +147,7 @@ def oracle(load, evs):
             jx.note_on(e[1], e[2])
         else:
             jx.note_off(e[1])
-        row = {'ctl': [digest(b) for b in T.control_blobs(jx)]}
+        row = {'ctl': [digest(b) for b in GX.control_raw(jx)]}
         if (i + 1) % CHECK == 0 or i + 1 == len(evs):
             row['st'] = states_digest([bytes(uc.mem_read(jx.state[u], SNAP_V if u < 8 else STATE_END))
                                        for u in range(9)])
@@ -161,11 +161,19 @@ def port(so, load, evs, want_raw=None):
     for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_ctl'):
         getattr(lib, f).restype = ctypes.c_void_p
     lib.jx3p_bad_hook.restype = ctypes.c_ulonglong
+    lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    aux = load['aux'].encode() if 'variant' in load else g('gen/jx_master_recall.bin')
-    if not lib.jx3p_init(g('gen/jx_template.bin'), g('truth/preset_bank_1.bin'), aux):
+    if not lib.jx3p_init(g('gen/jx_guest_44k.bin'), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
-    lib.jx3p_recall(load['index'] if 'variant' in load else load['patch'])
+    if 'variant' in load:                     # the variant's records through the lifted host entry (JX-11)
+        sys.path.insert(0, HERE)
+        import jx_records
+        pr = jx_records.pairs(jx_records.variant_records(load['variant']))
+        lib.jx3p_records((ctypes.c_uint32 * (2 * len(pr)))(*[x for kv in pr for x in kv]), len(pr))
+    else:
+        lib.jx3p_recall(load['patch'])
+    if lib.jx3p_lift_error():
+        raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
     if 'setmode' in load:
         lib.jx3p_seq_set_mode(load['setmode'])
     res = []
@@ -196,7 +204,7 @@ def port(so, load, evs, want_raw=None):
 
 
 def oracle_raw(load, evs, upto):
-    import jx_template_export as T
+    import jx_guest_export as GX
     J, jx, _ = oracle_load(load)
     for e in evs[:upto + 1]:
         if e[0] == 't':
@@ -205,7 +213,7 @@ def oracle_raw(load, evs, upto):
             jx.note_on(e[1], e[2])
         else:
             jx.note_off(e[1])
-    return [b.hex() for b in T.control_blobs(jx)]
+    return [b.hex() for b in GX.control_raw(jx)]
 
 
 NAMES = ['%s%d' % (w, u) for u in range(9) for w in ('mgr', 'ns', 'asg')] + ['proc%d' % u for u in range(9)]
@@ -246,12 +254,7 @@ def main():
     # (label, load, events, seed, must play)
     runs = [('patch %d' % k, {'patch': k}, nev, seed * 1000 + k, k in PLAYS) for k in patches]
     if variants:
-        aux = os.path.join(tmp, 'variants.bin')
-        x = subprocess.run([sys.executable, os.path.join(HERE, 'jx_master_recall_export.py'), '--variants',
-                            ';'.join(variants), '--out', aux], capture_output=True, text=True)
-        if x.returncode:
-            raise SystemExit('variant export failed: ' + x.stderr[-1500:])
-        runs += [('variant %s' % sp, {'variant': sp, 'index': i, 'aux': aux}, nvar, seed * 1000 + 200 + i, True)
+        runs += [('variant %s' % sp, {'variant': sp}, nvar, seed * 1000 + 200 + i, True)
                  for i, sp in enumerate(variants)]
     runs += [('mode %d (the setter, after patch 34)' % m, {'patch': 34, 'setmode': m}, nset, seed * 1000 + 300 + m, True)
              for m in setmodes]

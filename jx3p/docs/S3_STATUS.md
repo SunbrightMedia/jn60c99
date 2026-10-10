@@ -3,6 +3,37 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (7) — THE PORT RUNS ON THE PLUGIN'S OWN MEMORY; PATCH CHANGES ARE WARM (JX-11 in the product)
+
+The port's memory IS the plugin's heap now: one block at the plugin's own guest addresses, started from the
+heap after the plugin's boot (`jx_guest_export.py` -> jx3p/gen/jx_guest_44k.bin and _96k.bin.gz, 0.49 MB
+gzipped: the nonzero runs of the 102 MB heap, the 101 image pages the lifted code reads, the factory
+patch records). Every engine object is a view into it, found by the plugin's own pointers from the HOST.
+`jx3p_recall(k)` runs patch k's 75 records through the plugin's own parameter system, lifted
+(jx3p/src/jx_lift.c, 872 functions), on the RUNNING engine -- warm, as the plugin; `jx3p_param(id, v)` is
+one host edit; the render driver takes parameter records in a block's event list (type 2). The
+transcribed parts work on the same bytes: four DSP pointer reads through JX_G2H, the note store's +0x20
+through JXS_PTR, the unit wrappers and the ramp sweep (0x3F40E0 / 0x3F4A40) on the plugin's own records,
+the gain stage on the HOST's cells, the assigner clock at [asg+0xB0], the dispatch seam per (unit, slot)
+from [proc+0x110+0x10 v]. The template and recall aux (33 MB raw) and their two exporters are retired.
+
+Found and fixed on the way (all loud traps, never silent differences): the reach missed (a) a target
+first met at a tail-call jmp (a label there, not an entry: 0x35A1A0 on variant 0:65=5), (b) a switch
+table whose image-base lea sits one block earlier (0x3EB426, effect type 4 on record 67), (c) slot 216
+of the parameter object (0x3E0ED0: ARPEGGIO switched on with a key held -- the port had skipped the
+patch's remaining records). Closed from the binary: the slot-family roots over the 47 classes live in
+the heap (RTTI), the control classes (parameter object, assigner, keyboard arpeggiator) in full
+(`jx_lift_roots.py`), MSVC's table form in `jx_lift.py`; image pages from a dynamic census
+(`jx_lift_gate.py --census/--pages`, `jx_lift_census.c`) and a static scan of the lifted source, the other
+pages of the image block no-access on Linux (a missed page crashes the gate).
+
+MEASURED: GATE 1 7/7 (every byte, pointers and vtables included); GATE 3b patches 0, 34 and 5 variants
+(0:65=5 among them); GATE 3d 6 runs EQUAL, WARM changes to 20 and to the arpeggiator patch 61 with a key
+held EQUAL through the plugin's process() (225 blocks each); the lift gate EXACTLY 0 on loads, every effect
+type on every patch (57,600 calls) and the host settings (2,624 calls); the delivered WASM == native at
+three rates (GREEN, before the last re-lift). The full make verify-jx3p on the commit: owed (a job).
+The web engine is 2.7 MB of wasm (was 0.23 MB): the lifted code.
+
 ## 2026-10-10 (6) — THE PARAMETER SYSTEM, LIFTED: EXACT AT THE ENGINE (JX-11)
 
 A patch change on a running engine and every host edit go through the engine's host entry (0x3F9A30)

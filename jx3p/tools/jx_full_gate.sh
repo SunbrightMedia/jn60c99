@@ -9,9 +9,8 @@ PATCHES="${JX_FULL_PATCHES:-0,5,20,49}"
 N="${JX_FULL_N:-12000}"   # reach past the master EFX NaN birth at 3681 (lesson 9)
 mkdir -p "$OUT"
 if [ "${JX_FULL_SKIP_DERIVE:-0}" != "1" ]; then
-echo "=== 0. regenerate the derived inputs (template + recall aux) ==="
-python3 "$HERE/jx_template_export.py"
-python3 "$HERE/jx_master_recall_export.py"
+echo "=== 0. regenerate the derived input (the guest image: the plugin's heap after its boot) ==="
+python3 "$HERE/jx_guest_export.py" --rate 44100
 else
 echo "=== 0. derivation SKIPPED (JX_FULL_SKIP_DERIVE=1) ==="
 fi

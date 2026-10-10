@@ -16,9 +16,9 @@ differing sample are listed with their values.
     python3 jx3p/tools/jx_master_bisect.py [--tooth] --variants '34:67=3;0:65=5' [N=12000]
     python3 jx3p/tools/jx_master_bisect.py --gate [N=12000]     (64 patches + VARIANTS + the tooth; ~30 min)
   --variants: patches the factory bank does not hold -- a factory patch's own patch-load records with
-  values changed (jx_master_recall_export.variant_records), loaded by the plugin through its host
-  entry; the port gets their aux from the same exporter (--variants --out). The master's two mode
-  cells (records 67 and 65) select paths no factory patch reaches.
+  values changed (jx_records.variant_records), loaded by the plugin through its host entry and by the port
+  through the lifted host entry (jx3p_records, JX-11). The master's two mode cells (records 67 and 65)
+  select paths no factory patch reaches.
   --tooth: the port built with JX_MASTER_TOOTH (the four effect-LFO sites' argument 0.0, the defect
   fixed 2026-10-10) -- every variant that reaches a site must differ.
 """
@@ -75,11 +75,11 @@ def oracle(k, n, fine=None, stop=None):
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     sys.path.insert(0, HERE)
     import jx_emu as J
-    import jx_template_export as T
+    import jx_guest_export as GX
+    import jx_records
     if os.environ.get('JX_BISECT_VARIANT'):              # a variant patch (--variants)
-        import jx_master_recall_export as X
         jx = J.JX().boot(44100.0, snap=False, product=True)
-        jx.host_records(X.variant_records(os.environ['JX_BISECT_VARIANT']))
+        jx.host_records(jx_records.variant_records(os.environ['JX_BISECT_VARIANT']))
     else:
         jx = J.JX().boot(44100.0, snap=False, product=True, patch=k)
     uc = jx.uc
@@ -100,7 +100,7 @@ def oracle(k, n, fine=None, stop=None):
         L, R = jx.render(m, CH)
         res.append([hashlib.sha256(clean(bytes(uc.mem_read(jx.state[u], SNAP_V if u < 8 else SNAP_M)))).hexdigest()[:16]
                     for u in range(9)] + [hashlib.sha256(struct.pack('<%dI' % (2 * m), *(L + R))).hexdigest()[:16]] +
-                   [hashlib.sha256(b).hexdigest()[:16] for b in T.control_blobs(jx)] +
+                   [hashlib.sha256(b).hexdigest()[:16] for b in GX.control_raw(jx)] +
                    [hashlib.sha256(bytes(uc.mem_read(jx.state[u] + HI_LO, HI_SZ))).hexdigest()[:16] for u in range(8)])
     return res
 
@@ -110,11 +110,19 @@ def port(so, k, n, fine=None, stop=None):
     lib.jx_enable_hw_ftz()
     for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_ctl', 'jx3p_vhigh'):
         getattr(lib, f).restype = ctypes.c_void_p
+    lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    aux = os.environ.get('JX_BISECT_AUX', '').encode() or g('gen/jx_master_recall.bin')
-    if not lib.jx3p_init(g('gen/jx_template.bin'), g('truth/preset_bank_1.bin'), aux):
+    if not lib.jx3p_init(g('gen/jx_guest_44k.bin'), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
-    lib.jx3p_recall(k)
+    if os.environ.get('JX_BISECT_VARIANT'):              # a variant patch: its records through the lifted entry
+        sys.path.insert(0, HERE)
+        import jx_records
+        pr = jx_records.pairs(jx_records.variant_records(os.environ['JX_BISECT_VARIANT']))
+        lib.jx3p_records((ctypes.c_uint32 * (2 * len(pr)))(*[x for kv in pr for x in kv]), len(pr))
+    else:
+        lib.jx3p_recall(k)
+    if lib.jx3p_lift_error():
+        raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
     lib.jx3p_host_stage(0)
     res = []
     for i, (note, m) in enumerate(schedule(n)):
@@ -186,13 +194,9 @@ def main():
     if a[:1] == ['--variants']:
         specs = a[1].split(';')
         n = a[2] if len(a) > 2 else '12000'
-        tmp = tempfile.mkdtemp()
-        aux = os.path.join(tmp, 'variants.bin')
-        subprocess.run([sys.executable, os.path.join(HERE, 'jx_master_recall_export.py'), '--variants', a[1],
-                        '--out', aux], check=True)
         bad = 0
         for i, sp in enumerate(specs):
-            env = dict(os.environ, JX_BISECT_VARIANT=sp, JX_BISECT_AUX=aux)
+            env = dict(os.environ, JX_BISECT_VARIANT=sp)
             r = subprocess.run([sys.executable, __file__, str(i), n], env=env, capture_output=True, text=True)
             print(('variant %s: ' % sp) + r.stdout.strip().replace('patch %d: ' % i, '', 1), flush=True)
             if r.returncode:

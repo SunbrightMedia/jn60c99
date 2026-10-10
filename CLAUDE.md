@@ -240,10 +240,15 @@ mine is a hypothesis (playbook 80).
   96 kHz engine, the JUNO's render object and render driver (the clock, records
   at their offsets), the arpeggiator's step machine (jx3p/src/jx_seq.c, all 19
   modes; the product reaches 0, 3, 6) -- graded against the plugin's own
-  process() and tick (GATES 3c / 3d; their first full verify run is owed).
+  process() and tick (GATES 3c / 3d GREEN in make verify-jx3p on 743dfb16).
   The web page plays that product path (JX-10: WASM == native at 3 rates, the
-  page checked headless). Next: the host tempo (dispatch 375 into the effects),
-  warm recall, host edits.
+  page checked headless). JX-11: the port's memory IS the plugin's heap (one
+  block at its guest addresses, jx_guest_export.py) and patch loads / host
+  edits run the plugin's own parameter system, LIFTED (jx3p/src/jx_lift.c,
+  jx_lift_gate.py GATE 3e) -- warm patch changes graded through process()
+  (GATE 3d --recall); the full verify of that commit is owed. Next: the host
+  tempo (lift root 0x3F9DD0), the patch browser for user banks, host edits
+  through process().
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

@@ -110,6 +110,10 @@ python3 "$HERE/jx_product_gate.py" --rates 32000 --patches 0 --expect-silent   #
 # polyphony: chords, up to 10 keys (more than the six voices), re-strikes, several events at one sample
 python3 "$HERE/jx_product_gate.py" --poly 1,2 --patches 0,61 --on 0.55 --secs 2.0
 python3 "$HERE/jx_product_gate.py" --tooth-voices --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.0
+# WARM patch changes (JX-11): the plugin's patch browser loads another patch on the running engine, a key held
+python3 "$HERE/jx_product_gate.py" --rates 48000,96000 --patches 0,34 --on 0.3 --off 2.0 --secs 2.4 --recall '20@0.9'
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --on 0.3 --off 2.0 --secs 2.4 --recall '61@0.9'   # to the arpeggiator, a key held
+python3 "$HERE/jx_product_gate.py" --tooth-recall --rates 48000 --patches 0 --on 0.3 --off 2.0 --secs 2.4 --recall '20@0.9'
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
@@ -117,6 +121,8 @@ echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs t
 python3 "$HERE/jx_lift_gate.py" --relift                          # warm loads of 5, 34, 40, 62 onto patch 0
 python3 "$HERE/jx_lift_gate.py" --base 34 --loads 0,61,50         # ... onto the arpeggiator patch
 python3 "$HERE/jx_lift_gate.py" --loads sweep                     # every id x 13 values, a heap checkpoint per id
+python3 "$HERE/jx_lift_gate.py" --loads modes                     # every patch at every effect type (records 65, 67)
+python3 "$HERE/jx_lift_gate.py" --loads settings                  # the host settings 0x0FFFC000..1F (quality among them)
 python3 "$HERE/jx_lift_gate.py" --loads 5 --tooth 35D29F          # one multiply made a divide: must be seen
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null

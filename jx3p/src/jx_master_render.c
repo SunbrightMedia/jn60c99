@@ -15,6 +15,16 @@
 #include <math.h>
 #include "jx_voice_helpers.h"
 
+/* JX_G2H: a pointer the plugin stored in its own memory, as a host address. In the port's guest memory
+ * (jx3p/gui/jx_bridge.c, JX-11) the cells hold the plugin's guest addresses and the bridge sets the delta;
+ * every other build leaves it 0 (the cells hold host pointers). */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((weak)) unsigned long long jx_g2h_delta;
+#else
+unsigned long long jx_g2h_delta;
+#endif
+#define JX_G2H(p) ((unsigned long long)(p) + jx_g2h_delta)
+
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
 typedef uint16_t _WORD;  typedef uint8_t _BYTE;
 typedef int64_t __int64; typedef int32_t __int32;
@@ -1107,7 +1117,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
   v23 = *(float *)(st + 129616);
   v24 = *(float *)(st + 129936);
   *(_DWORD *)(st + 130000) = *(_DWORD *)(st + 129984);
-  v25 = *(_QWORD *)(st + 136);
+  v25 = JX_G2H(*(_QWORD *)(st + 136));
   v26 = (float)(v24 * *(float *)(st + 129968)) + (float)(v23 * *(float *)(st + 129952));
   *(float *)(st + 129984) = v26;
   v27 = *(float *)(st + 129568);
@@ -1119,7 +1129,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
   *(float *)(st + 269776) = v28 * *(float *)(st + 130016);
   *(float *)(st + 269792) = v29;
   v30 = *(float *)(st + 269776);
-  v31 = **(_DWORD **)(v25 + 136);
+  v31 = *(_DWORD *)(uintptr_t)JX_G2H(*(_QWORD *)(v25 + 136));
   if ( v31 == 1 )
   {
     if ( *(_DWORD *)(st + 11191052) != 1 )
@@ -2598,11 +2608,11 @@ LABEL_96:
   if ( (float)(*(float *)(st + 270128) - v480) >= 0.0 )
     v487 = *(float *)(st + 270144);
   v488 = v487 * *(float *)(st + 270016);
-  v489 = *(_QWORD *)(st + 136);
+  v489 = JX_G2H(*(_QWORD *)(st + 136));
   *(float *)(st + 269984) = v488;
   *(float *)(st + 32) = v486;
   *(float *)(st + 36) = v488;
-  v490 = *(_DWORD **)(v489 + 112);
+  v490 = (_DWORD *)(uintptr_t)JX_G2H(*(_QWORD *)(v489 + 112));
   if ( *v490 == 1 )
   {
     v964 = *(float *)(st + 129616);

@@ -7,8 +7,9 @@ ORACLE  jx3p/tools/jx_host_emu.py: createInstance, initialize, setupProcessing(r
         initialize's records and the patch's), then process() per host block -- the render driver, the
         render object (the 96 kHz engine and the rate converter at hosts 44100 / 48000, the engine itself
         at 96000), the engine render with its voice-count sync and output gain stage, all its own code.
-PORT    jx3p/gui/jx_bridge.c: jx3p_init on the 96 kHz data (jx3p/gen/jx_template_96k.bin.gz,
-        jx_master_recall_96k.bin.gz: the plugin's boot and patch load at its engine's rate), jx3p_recall(k),
+PORT    jx3p/gui/jx_bridge.c: jx3p_init on the 96 kHz guest image (jx3p/gen/jx_guest_96k.bin.gz: the plugin's
+        heap after its boot at its engine's rate), jx3p_recall(k) (the patch's records through the plugin's own
+        parameter system, lifted -- JX-11),
         jx3p_product_open(rate) (src/juno_conv.c, the JUNO-60's render object: table and vectors equal),
         jx3p_product_process per block.
 
@@ -32,6 +33,12 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   --secs: chords, up to 10 keys held (more than the six voices: the render's voice-count sync and the
   allocator's steals), re-struck keys, note-offs, every event at its own sample, several at one sample
   (a note-off and a note-on of one key at one sample included), velocities across the range.
+  --recall 'P@T,...' (JX-11): WARM patch changes -- at the first block from T seconds the plugin's patch
+  browser loads factory patch P on the running engine (its 75 records queued between two blocks); the port
+  gets the same records (jx3p/gen/jx_patch_records.json) at offset 0 of that block, before its keys, and
+  its render driver hands them to the lifted host entry. A held note crosses the change; every change
+  mutes 0.5 s and fades in (writePatch).
+  --tooth-recall: the port loads patch P+1 where the plugin loads P -- every --recall run must differ.
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import ctypes
@@ -99,7 +106,17 @@ def schedule(nblk, blk, on, off):
     return out
 
 
-def oracle(rate, patch, nblk, blk, on, off):
+def recall_map(spec, rate, blk):
+    """--recall 'P@T,...': factory patch P loaded at host time T seconds -> {block: patch}, the block that
+    starts at or after T (a patch load is queued between two blocks)"""
+    out = {}
+    for item in filter(None, spec.split(',')):
+        p, _, t = item.partition('@')
+        out[-(-int(float(t) * rate) // blk)] = int(p)
+    return out
+
+
+def oracle(rate, patch, nblk, blk, on, off, recalls=''):
     sys.path.insert(0, HERE)
     sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
     import jx_bank as B
@@ -110,35 +127,37 @@ def oracle(rate, patch, nblk, blk, on, off):
     tail = bank[B.BANK_HEADER + patch * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (patch + 1) * B.BANK_STRIDE]
     h.load_patch(tail)
     out = []
-    for ev in schedule(nblk, blk, on, off):
+    rmap = recall_map(recalls, rate, blk)
+    for b, ev in enumerate(schedule(nblk, blk, on, off)):
+        if b in rmap:                         # the plugin's patch browser, between two blocks (WARM: JX-11)
+            p = rmap[b]
+            h.load_patch(bank[B.BANK_HEADER + p * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (p + 1) * B.BANK_STRIDE])
         L, R = h.process(blk, events=ev)
         out.append([list(L), list(R)])
     return out
 
 
-def data96(tmp):
-    """the 96 kHz engine's data: the committed .gz (jx_template_export.py 96000 --out, jx_master_recall_export.py
-    --rate 96000), inflated into tmp"""
+def guest96(tmp):
+    """the 96 kHz engine's guest image: the committed .gz (jx_guest_export.py --rate 96000), inflated into tmp"""
     import gzip
-    out = []
-    for name in ('jx_template_96k.bin', 'jx_master_recall_96k.bin'):
-        raw = os.path.join(REPO, 'jx3p', 'gen', name)
-        if not os.path.exists(raw):
-            raw = os.path.join(tmp, name)
-            with gzip.open(os.path.join(REPO, 'jx3p', 'gen', name + '.gz'), 'rb') as f:
-                open(raw, 'wb').write(f.read())
-        out.append(raw)
-    return out
+    raw = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin')
+    if not os.path.exists(raw):
+        raw = os.path.join(tmp, 'jx_guest_96k.bin')
+        with gzip.open(os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin.gz'), 'rb') as f:
+            open(raw, 'wb').write(f.read())
+    return raw
 
 
-def port(so, rate, patch, nblk, blk, on, off, tooth, tmpl96, aux96):
+def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls=''):
     lib = ctypes.CDLL(so)
     lib.jx_enable_hw_ftz()
+    lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    t, x = (g('gen/jx_template.bin'), g('gen/jx_master_recall.bin')) if tooth else (tmpl96.encode(), aux96.encode())
-    if not lib.jx3p_init(t, g('truth/preset_bank_1.bin'), x):
+    if not lib.jx3p_init(g('gen/jx_guest_44k.bin') if tooth else img96.encode(), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
     lib.jx3p_recall(patch)
+    if lib.jx3p_lift_error():
+        raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
     if tooth:
         lib.jx3p_host_stage(1)
     else:
@@ -146,6 +165,10 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, tmpl96, aux96):
         if kind < 0:
             raise SystemExit('jx3p_product_open(%d) -> %d' % (rate, kind))
     out = []
+    rmap = recall_map(recalls, rate, blk)
+    sys.path.insert(0, HERE)
+    import jx_records
+    JX_RECORDS = jx_records.records()
     Lb = (ctypes.c_float * blk)(); Rb = (ctypes.c_float * blk)()
     for b, ev in enumerate(schedule(nblk, blk, on, off)):
         if tooth:
@@ -157,19 +180,27 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, tmpl96, aux96):
             lib.jx3p_render(Lb, Rb, blk)
         else:                                 # the render driver: the records at their offsets, the clock
             recs = [x for e in ev for x in (e[1], 0 if e[0] == 'on' else 1, e[3], vel7(e[4]))]
+            nev = len(ev)
+            if b in rmap:                     # the patch load's records, queued before the block's keys
+                q = rmap[b] + (1 if os.environ.get('JX_RECALL_TOOTH') == '1' else 0)     # TOOTH: the wrong patch
+                pr = [(pid, v) for kind, pid, v in JX_RECORDS['patches'][q % 64] if kind == 2]
+                recs = [x for pid, v in pr for x in (0, 2, pid, v - (1 << 32) if v >= 1 << 31 else v)] + recs
+                nev += len(pr)
             arr = (ctypes.c_int * max(1, len(recs)))(*recs)
-            lib.jx3p_product_block(Lb, Rb, blk, arr, len(ev))
+            lib.jx3p_product_block(Lb, Rb, blk, arr, nev)
         out.append([list(struct.unpack('<%dI' % blk, bytes(Lb))), list(struct.unpack('<%dI' % blk, bytes(Rb)))])
+    if lib.jx3p_lift_error():                 # a trap in a mid-run record list: never a silent pass
+        raise SystemExit('the lifted parameter system trapped during the run: %s' % lib.jx3p_lift_error().decode())
     return out
 
 
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        json.dump(oracle(*[int(x) for x in a[1:7]]), sys.stdout)
+        json.dump(oracle(*[int(x) for x in a[1:7]], recalls=a[7] if len(a) > 7 else ''), sys.stdout)
         return 0
     if a[:1] == ['--port']:
-        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10]), sys.stdout)
+        json.dump(port(a[1], *[int(x) for x in a[2:8]], a[8] == '1', a[9], a[10] if len(a) > 10 else ''), sys.stdout)
         return 0
     opt = lambda k, d: a[a.index(k) + 1] if k in a else d
     rates = [int(x) for x in opt('--rates', '44100,48000,96000').split(',')]
@@ -177,15 +208,19 @@ def main():
     blk = int(opt('--block', '512'))
     t_on, t_off, secs = float(opt('--on', '0.6')), float(opt('--off', '1.2')), float(opt('--secs', '1.5'))
     tooth, tclock, tvc, exact = '--tooth' in a, '--tooth-clock' in a, '--tooth-voices' in a, '--exact' in a
+    trec = '--tooth-recall' in a
+    if trec:
+        os.environ['JX_RECALL_TOOTH'] = '1'
     silent = '--expect-silent' in a
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
+    recalls = opt('--recall', '')               # 'P@T,...': warm patch loads (the plugin's patch browser)
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    (['-DJX_DRV_TOOTH=1'] if tclock else []) + (['-DJX_VC_TOOTH=1'] if tvc else []) +
                    [os.path.join(REPO, s) for s in SRCS] + ['-lm'],
                    check=True)
-    tmpl96, aux96 = data96(tmp)
+    img96 = guest96(tmp)
     bad = 0
     for rate in rates:
         nblk = -(-int(secs * rate) // blk)
@@ -197,10 +232,10 @@ def main():
         plans = [(-sd - 1, int(t_on * rate)) for sd in seeds] if seeds else [(on, off)]
         for patch, (on, off) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
-            o = subprocess.run([sys.executable, __file__, '--oracle'] + args, capture_output=True, text=True)
+            o = subprocess.run([sys.executable, __file__, '--oracle'] + args + [recalls], capture_output=True, text=True)
             if o.returncode:
                 raise SystemExit('oracle failed: ' + o.stderr[-1500:])
-            p = subprocess.run([sys.executable, __file__, '--port', so] + args + ['1' if tooth else '0', tmpl96, aux96],
+            p = subprocess.run([sys.executable, __file__, '--port', so] + args + ['1' if tooth else '0', img96, recalls],
                                capture_output=True, text=True)
             if p.returncode:
                 raise SystemExit('port failed: ' + p.stderr[-1500:])
@@ -227,8 +262,9 @@ def main():
             elif not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
     n = len(rates) * len(patches) * max(1, len(seeds))
-    if tooth or tclock or tvc:
-        print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices',
+    if tooth or tclock or tvc or trec:
+        print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices'
+                                          if tvc else '--tooth-recall',
                                           'BITES (%d of %d differ)' % (bad, n) if bad == n else
                                           'DID NOT BITE on %d of %d' % (n - bad, n)))
         return 0 if bad == n else 1

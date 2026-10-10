@@ -138,21 +138,45 @@ def check_decode():
 
 
 def check_base_match():
-    """playbook 89: the shipped template and aux must share one base."""
+    """playbook 89: the shipped data must be THIS boot. The guest images (jx3p/gen/jx_guest_44k.bin and the 96 kHz
+    .gz, jx_guest_export.py): every byte of the plugin's heap after its boot at that rate, the image pages the
+    lifted code reads, the patch records -- equal to a boot made now, or RED."""
+    import gzip
+    import json as _json
+    import struct as _st
     import jx_emu as J
-    sys.path.insert(0, HERE)
-    import jx_master_recall_export as X
-    jx = J.JX().boot(44100.0, snap=False, product=True)
-    uc = jx.uc
-    clean_m = bytes(uc.mem_read(jx.state[8], X.SNAP_M))
-    clean_h = [bytes(uc.mem_read(jx.state[v] + X.HI_LO, X.HI_SZ)) for v in range(8)]
-    clean_l = [bytes(uc.mem_read(jx.state[v], 0x60000)) for v in range(8)]
-    try:
-        X.check_template_base(clean_l, clean_h, clean_m,
-                              os.path.join(REPO, "jx3p", "gen", "jx_template.bin"))
-    except SystemExit as e:
-        return fail("%s" % e)
-    print("4. base match: the shipped template IS this boot (playbook 89)")
+    for rate, name in ((44100.0, "jx_guest_44k.bin"), (96000.0, "jx_guest_96k.bin.gz")):
+        path = os.path.join(REPO, "jx3p", "gen", name)
+        b = gzip.open(path, "rb").read() if name.endswith(".gz") else open(path, "rb").read()
+        hb, hlen, host = _st.unpack_from("<3Q", b, 8)
+        jx = J.JX().boot(rate, snap=False, product=True)
+        uc = jx.uc
+        if hb != J.HEAP_BASE or host != jx.HOST or hlen != ((jx.heap + 0xFFF) & ~0xFFF) - J.HEAP_BASE:
+            return fail("%s: not this boot's heap (base, length or HOST)" % name)
+        heap = bytearray(hlen)
+        o = 8 + 56 + 8
+        n, = _st.unpack_from("<I", b, o); o += 4
+        for _ in range(n):
+            off, ln = _st.unpack_from("<II", b, o)
+            heap[off:off + ln] = b[o + 8:o + 8 + ln]; o += 8 + ln
+        if bytes(heap) != bytes(uc.mem_read(J.HEAP_BASE, hlen)):
+            return fail("%s: the heap differs from this boot's" % name)
+        n, = _st.unpack_from("<I", b, o); o += 4
+        for _ in range(n):
+            rva, ln = _st.unpack_from("<II", b, o)
+            if b[o + 8:o + 8 + ln] != bytes(uc.mem_read(J.IB + rva, ln)):
+                return fail("%s: image pages at rva 0x%x differ from this boot's" % (name, rva))
+            o += 8 + ln
+        n, = _st.unpack_from("<I", b, o); o += 4
+        recs = J.JX.records()["patches"]
+        for p in range(n):
+            k, = _st.unpack_from("<I", b, o); o += 4
+            want = [(pid, val & 0xFFFFFFFF) for kind, pid, val in recs[p] if kind == 2]
+            got = [_st.unpack_from("<II", b, o + 8 * i) for i in range(k)]; o += 8 * k
+            if got != want:
+                return fail("%s: patch %d's records differ from jx_patch_records.json" % (name, p))
+        del jx
+    print("4. base match: the shipped guest images ARE this boot, at 44100 and 96000 (playbook 89)")
     return 0
 
 

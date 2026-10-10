@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """jx_full_c.py -- C side of the FULL-CHAIN standalone gate (process B).
-The STANDALONE engine (libjx3p.so): clean-boot template + recall + the
-transcribed control plane + the proven renders. Same inputs, no pokes.
+The STANDALONE engine (libjx3p.so): the plugin's heap after its boot + the patch
+load through its own lifted parameter system + the transcribed control plane + the proven renders. Same inputs, no pokes.
 Compares the raw L/R bit streams; state divergence is reported separately
 (informative -- pointer cells and unwritten scratch differ by construction).
 exit 0 = L/R EXACTLY 0 on every patch.
@@ -23,14 +23,17 @@ def main():
         raise SystemExit("REFUSE: no jx_enable_hw_ftz -- link jx_ftz.c")
     lib.jx_enable_hw_ftz()
     for patch in patches:
-        # jx3p_init re-copies every region from the template: a full reset
+        # jx3p_init is a fresh engine: the plugin's heap after its boot (the guest image), then the patch's
+        # records through the plugin's own parameter system, lifted (JX-11)
         ok = lib.jx3p_init(
-            os.path.join(REPO, "jx3p", "gen", "jx_template.bin").encode(),
-            os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(),
-            os.path.join(REPO, "jx3p", "gen", "jx_master_recall.bin").encode())
+            os.path.join(REPO, "jx3p", "gen", "jx_guest_44k.bin").encode(),
+            os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(), None)
         if not ok:
             raise SystemExit("jx3p_init failed")
         lib.jx3p_recall(patch)
+        lib.jx3p_lift_error.restype = ctypes.c_char_p
+        if lib.jx3p_lift_error():
+            raise SystemExit("the lifted parameter system trapped: %s" % lib.jx3p_lift_error().decode())
         engine = os.environ.get("JX_FULL_ENGINE", "1") == "1"     # the modes of jx_full_emu.py
         lib.jx3p_host_stage(1 if engine else 0)
         idle = int(os.environ.get("JX_FULL_IDLE", "24000" if engine else "4096"))

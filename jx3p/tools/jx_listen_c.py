@@ -55,9 +55,8 @@ def main():
     bank = B.bank_bytes()
     fails = 0
     for patch in patches:
-        ok = lib.jx3p_init(os.path.join(REPO, "jx3p", "gen", "jx_template.bin").encode(),
-                           os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(),
-                           os.path.join(REPO, "jx3p", "gen", "jx_master_recall.bin").encode())
+        ok = lib.jx3p_init(os.path.join(REPO, "jx3p", "gen", "jx_guest_44k.bin").encode(),
+                           os.path.join(REPO, "jx3p", "truth", "preset_bank_1.bin").encode(), None)
         if not ok:
             raise SystemExit("jx3p_init failed")
         lib.jx3p_recall(patch)

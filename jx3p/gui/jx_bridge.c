@@ -1,21 +1,27 @@
-/* jx_bridge.c -- the STANDALONE JX-3P engine (charter 7b: the port must
- * play). Assembles ONLY proven parts:
- *   clean-boot template  jx3p/gen/jx_template.bin   (NaN census 0, exported
- *                        from the plugin's own BUILD+SETSR under Unicorn)
- *   recall               jx_recall.c    (64/64 EXACTLY 0)
+/* jx_bridge.c -- the STANDALONE JX-3P engine (charter 7b: the port must play).
+ *
+ * THE MEMORY IS THE PLUGIN'S (JX-11, 2026-10-10). The port holds the plugin's whole heap, in the plugin's own
+ * layout, at the plugin's own guest addresses: one block, started from the plugin's heap after its boot
+ * (jx3p/gen/jx_guest_<rate>k.bin, jx3p/tools/jx_guest_export.py). Every object of the engine -- the nine unit
+ * states, their parameter objects, note managers, note stores and assigners, the HOST -- is a view into it,
+ * found by following the plugin's own pointers from the HOST. Patch loads and host edits run the plugin's OWN
+ * parameter system on it: its host entry 0x3F9A30 and everything it reaches, lifted from the binary one C
+ * statement per instruction (jx3p/src/jx_lift.c, jx3p/tools/jx_lift.py; graded EXACTLY 0 against the plugin by
+ * jx_lift_gate.py) and run under the JP8's runtime (jp8/src/jp8_rt.c, JP8_RELOC: guest addresses kept, every
+ * access translated into the blocks below). The transcribed parts run on the same bytes:
  *   note managers        jx_alloc.c     (EXACTLY 0, 22,008 events)
  *   note store           jx_nstore.c    (EXACTLY 0)
  *   key tracker          jx_ktrack.c    (EXACTLY 0, 13,593 events)
  *   note/gate dispatch   jx_dispatch_note.c (EXACTLY 0, 2,500 dispatches)
- *   voice + master       jx_voice_render.c / jx_master_render.c
- *                        (64/64 patches EXACTLY 0 vs the plugin)
- * The one open stub: the note-store drain seam (0x3EF210) is a no-op here,
- * exactly as it was stubbed in every proof; the full-chain gate
- * (jx_full_gate.sh) is the judge of whether that ever becomes audible.
+ *   clock tick, step machine jx_seq.c   (JX-7)
+ *   voice + master       jx_voice_render.c / jx_master_render.c (64/64 patches EXACTLY 0 vs the plugin)
+ *   here: the units' wrappers and ramp sweeps (0x377080 / 0x377010, 0x3F40E0 / 0x3F4A40) and the engine
+ *   render's preamble and output gain stage (0x3F9220), on the plugin's own records and HOST cells.
+ * A pointer the plugin stored is a guest address; transcribed code reads it through JX_G2H.
  *
  * FP MODE: callers MUST run with FTZ/DAZ where the hardware has it
  * (jx_enable_hw_ftz from jx_ftz.c); WASM has no MXCSR -- the same caveat
- * the JUNO web build carries.
+ * the JUNO web build carries. The lifted calls set the plugin's MXCSR themselves and the caller's is put back.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -23,291 +29,378 @@
 #include <string.h>
 #include <stddef.h>
 
+/* ---- the guest heap's translation for transcribed code: host = guest + delta (set at init) ---- */
+unsigned long long jx_g2h_delta;
+#define JXG_H(g)       ((uint8_t *)(uintptr_t)((unsigned long long)(g) + jx_g2h_delta))
+#define JXS_PTR(ns, v) JXG_H(v)              /* jx_seq.c: the note store's +0x20 is the plugin's own pointer */
+#define JXA_UNIT_PTRS 1                      /* jx_alloc.c: each note manager is the plugin's own object */
+
 /* ---- proven modules (single-file link; see jx_full_gate.sh) ---- */
 #include "../src/jx_alloc.c"
 #include "../src/jx_nstore.c"
 #include "../src/jx_ktrack.c"
 #include "../src/jx_dispatch_note.c"
-#include "../src/jx_gc.c"
 #include "../src/jx_seq.c"
 #define JX_NS_SZ 0xFF0             /* the note store's allocation (4080 bytes, EXECUTED 2026-10-10) */
 #include "../src/jx_param_get.h"
 
-int  jx_bank_apply(unsigned char *blk, const unsigned char *bank, int idx);
+/* ---- the plugin's parameter system, lifted, and its runtime ---- */
+#define JP8_RELOC 1
+#ifndef JP8_RELOC_CHECK
+#define JP8_RELOC_CHECK 2          /* an access outside every block is diverted and reported after the call */
+#endif
+#if !(defined(__x86_64__) || defined(_M_X64)) && !defined(JP8_SOFTFP)
+#define JP8_SOFTFP 1               /* no x86 MXCSR: FTZ/DAZ in software, the oracle's semantics */
+#endif
+#include "../../jp8/src/jp8_rt.c"
+#include "../src/jx_lift.c"
+/* THE IMAGE GUARD (Linux, native): the image block holds only the pages the guest image carries
+ * (jx_guest_export.py image_pages: the census and a static scan of the lifted source); every other page of the
+ * block is made no-access, so a read the census missed crashes the gate that made it instead of reading zeros */
+#if defined(__linux__) && !defined(JX_NO_IMAGE_GUARD)
+#include <sys/mman.h>
+#define JX_IMAGE_GUARD 1
+#else
+#define JX_IMAGE_GUARD 0
+#endif
+
 uint64_t jx_voice_render(void *vstate, int v, void *pair);
 void *jx_master_render(void *mstate, void *a2, void *a3);
-
-/* A pointer stored into a plugin-layout blob: the transcribed code reads the slot as 8 bytes (the
- * plugin is x64), so the whole slot is written -- the pointer in the low bytes, 0 above it -- on a
- * 32-bit target (WebAssembly) as on x64 (jx_wasm_check.py, 2026-10-10). */
-#define JX_PTR_STORE(slot, ptr) \
-    do { uint64_t jx_p_ = (uint64_t)(uintptr_t)(ptr); memcpy((slot), &jx_p_, 8); } while (0)
 
 #define NV        8
 #define NUNITS    9
 #define SNAP_V    0x60000
 #define SNAP_M    0xAAD000
-#define PROC_SZ   0x700
-
-/* the wrapper + ramp layer (0x377080/0x377010 + 0x3F40E0/0x3F4A40) */
-typedef struct {
-    int32_t latch;               /* [st+0xAAC308] */
-    uint8_t flag;                /* [st+0x14] */
-    int32_t nids;
-    int32_t ids[512];
-    int32_t nslot;
-    jx_gc_slot *slots;           /* rebased targets */
-} jx_wrap;
+#define HOSTPARAM 0x3F9A30         /* the engine's host entry */
 
 typedef struct {
-    uint8_t *vstate[NV];
-    uint8_t *vhigh[NV];          /* [0xA60000,0xAAD000) window per voice */
-    jx_wrap  wrap[NUNITS];
+    uint8_t *vstate[NV];           /* the unit states: views into the guest heap */
+    uint8_t *vhigh[NV];            /* vstate + 0xA60000 */
     uint8_t *mstate;
-    uint8_t *proc[NUNITS];
-    jx_alloc mgr;
-    uint8_t  ns[NUNITS][JX_NS_SZ];   /* the note store's whole allocation (0xFF0); templates before 2026-10-10 hold 0xDB0 */
-    uint8_t  kt[NUNITS][0xB0];
-    /* re-linked C++ object headers (pointer cells live HERE, never in the
-     * template): voice obj 256B + two 4B cells; master obj + 4B + 256B */
-    uint8_t  vobj[NV][256], vd40[NV][4], vd64[NV][4];
-    uint8_t  mobj[256], mc136[4], mc112[256];
-    /* dispatch seam constants from the template */
+    uint8_t *proc[NUNITS];         /* the parameter objects */
+    jx_alloc mgr;                  /* the note managers */
+    uint8_t *ns[NUNITS];           /* the note stores */
+    uint8_t *kt[NUNITS];           /* the assigners (the HOST's assigner pointer and the manager's +0x520) */
+    uint8_t *host;                 /* the engine HOST */
+    uint64_t stg[NUNITS];          /* the unit states' guest addresses */
     jx_dn_cbs dn;
-    float     temper[23];
-    /* THE ENGINE HOST the render reads (2026-10-10, jx3p/docs/HOST_LAYER.md): its voice count
-     * (+0x38), its output gain stage (+0x860 gain, +0x864 step, +0x868 samples left, +0x86C delay,
-     * +0x870 the fade time in ms), the engine rate (its rate source +0x878), every voice assigner's
-     * clock ([asg+0xB0], +n per render call). host_ok = 0: a template without the HOST record (the
-     * old data): no count sync, no gain stage. */
-    int      host_ok, host_stage_off;
-    int32_t  nvoices;
-    float    gain, gstep;
-    int32_t  gleft, gdelay;
-    float    gtime, rate;
-    int64_t  ktclock[NUNITS];
-    int64_t  clock;                     /* samples rendered */
+    int      host_stage_off;
+    int64_t  clock;                /* samples rendered */
     const uint8_t *bank;
     size_t   bank_len;
-    float    vcells[16];                /* the voice->master seam */
+    float    vcells[16];           /* the voice->master seam */
+    /* the guest image */
+    uint64_t hb, hlen, hostg, ib, slo, slen, rsp;
+    uint32_t mx;
+    float    rate0;
+    uint8_t *file;                 /* the image file (the patch records point into it) */
+    uint32_t npatch;
+    const uint8_t *prec[64];
+    uint32_t nrec[64];
+    CPU      cpu;
+    int      lift_err;
+    char     lift_msg[200];
+    unsigned long lift_calls;
 } jx3p;
 
 static jx3p G;
 
-/* ---- template loading (JXT2: u32 nreg, {u32 raw,u32 z,bytes}*, links) --- */
-static uint8_t *g_tmpl_regions[64];
-static uint32_t g_tmpl_rawsz[64];
-static uint8_t *g_tmpl_links[24];
-static uint32_t g_tmpl_linksz[24];
-static int g_nreg, g_nlink, g_tmpl_v4;
-
-static void ns_load(int i);
-static int tmpl_load(const char *path)
+/* ---- guest cells ---- */
+static uint64_t gq(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+static int32_t  gi(const uint8_t *p) { int32_t v; memcpy(&v, p, 4); return v; }
+static float    gf(const uint8_t *p) { float v; memcpy(&v, p, 4); return v; }
+static void     si32(uint8_t *p, int32_t v) { memcpy(p, &v, 4); }
+static void     sf32(uint8_t *p, float v) { memcpy(p, &v, 4); }
+static void     sq64(uint8_t *p, uint64_t v) { memcpy(p, &v, 8); }
+/* a guest address in the heap block (n bytes), or NULL */
+static uint8_t *jxg_heap(uint64_t g, uint64_t n)
 {
-    FILE *f = fopen(path, "rb");
-    uint8_t hdr[8];
-    if (!f) return 0;
-    if (fread(hdr, 1, 8, f) != 8 || (memcmp(hdr, "JXT3", 4) && memcmp(hdr, "JXT4", 4))) return 0;
-    g_tmpl_v4 = !memcmp(hdr, "JXT4", 4);
-    g_nreg = (int)(uint32_t)(hdr[4] | (hdr[5] << 8) | (hdr[6] << 16) |
-                             ((uint32_t)hdr[7] << 24));
-    for (int i = 0; i < g_nreg; ++i) {
-        uint32_t raw;
-        if (fread(&raw, 4, 1, f) != 1) return 0;
-        uint8_t *rb = malloc(raw);
-        if (fread(rb, 1, raw, f) != raw) return 0;
-        g_tmpl_regions[i] = rb; g_tmpl_rawsz[i] = raw;
-    }
-    /* the links follow the regions: 8 voice links, 9 wrapper+ramp records, the dispatch seam, the
-     * master link, and (JXT4) the engine HOST record; then the 4-byte crc. */
-    g_nlink = 0;
-    for (int i = 0; i < (g_tmpl_v4 ? 20 : 19); ++i) {
-        uint32_t ln;
-        if (fread(&ln, 4, 1, f) != 1) break;
-        g_tmpl_links[g_nlink] = malloc(ln);
-        if (fread(g_tmpl_links[g_nlink], 1, ln, f) != ln) break;
-        g_tmpl_linksz[g_nlink] = ln;
-        ++g_nlink;
-    }
-    fclose(f);
-    return g_nreg >= 53 && g_nlink == (g_tmpl_v4 ? 20 : 19);
+    if (g < G.hb || g + n > G.hb + G.hlen || g + n < g) return NULL;
+    return JXG_H(g);
+}
+/* a guest address in any mapped block (the image's included), or NULL */
+static uint8_t *jxg_any(uint64_t g, uint64_t n)
+{
+    uint64_t i = g >> 28;
+    uint32_t off = (uint32_t)(g & 0x0FFFFFFFu);
+    if (i >= JP8_NBANDS || !jp8_bhi[i] || off < jp8_blo[i] || (uint64_t)off + n > jp8_bhi[i]) return NULL;
+    return (uint8_t *)(uintptr_t)(g + jp8_bdelta[i]);
 }
 
-/* THE START-MUTE COUNT (2026-10-10): the plugin decrements each unit's state word [st+0xAAC308] itself (the
- * voice units' lies in their high window); the port counts in the wrapper record and writes the word back
- * after every step, so the unit states stay the plugin's word for word (it had stayed as loaded: the gates
- * masked it, and jx_master_bisect.py's voice high windows showed it as the one word that differed) */
-#define JX_LATCH_STORE(u, w) memcpy((u) < NV ? G.vhigh[(u)] + (0xAAC308 - 0xA60000) : G.mstate + 0xAAC308, \
-                                    &(w)->latch, 4)
-
-/* the engine HOST record (template link 19, and one per patch in JXM4): voices, gain, step, samples
- * left, delay, fade time (ms), engine rate -- the plugin's own HOST after its boot / its patch load */
-static void host_record(const uint8_t *r)
+/* every block of a previous instance freed: a fresh init starts from fresh (zero) blocks */
+static void jxg_unmap_all(void)
 {
-    memcpy(&G.nvoices, r + 0, 4);
-#if JX_VC_TOOTH   /* TOOTH (jx_product_gate.py --tooth-voices): every voice unit plays, the count ignored */
-    G.nvoices = NV;
+    for (unsigned i = 0; i < JP8_NBANDS; ++i)
+        if (jp8_braw[i]) {
+#if JX_IMAGE_GUARD                                /* the guard's no-access pages opened before the block is freed */
+            mprotect((void *)(uintptr_t)((((uint64_t)i << 28) + jp8_blo[i]) + jp8_bdelta[i]),
+                     jp8_bhi[i] - jp8_blo[i], PROT_READ | PROT_WRITE);
 #endif
-    memcpy(&G.gain, r + 4, 4);
-    memcpy(&G.gstep, r + 8, 4);
-    memcpy(&G.gleft, r + 12, 4);
-    memcpy(&G.gdelay, r + 16, 4);
-    memcpy(&G.gtime, r + 20, 4);
-    memcpy(&G.rate, r + 24, 4);
-    G.host_ok = 1;
+            free(jp8_braw[i]);
+            jp8_braw[i] = NULL; jp8_bdelta[i] = 0; jp8_blo[i] = jp8_bhi[i] = 0;
+        }
+}
+
+/* ---- one call into the lifted code: rsp the image's, the plugin's MXCSR, the caller's MXCSR put back ---- */
+static int jxg_call(uint64_t rva, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9, uint64_t *rax)
+{
+    int t;
+#ifndef JP8_SOFTFP
+    unsigned int mx0 = _mm_getcsr();
+#endif
+    uint8_t *slot = jxg_any(G.rsp - 8, 8);
+    if (G.lift_err) return 1;                  /* a trapped engine is not the plugin's any more: no more calls */
+    if (slot) sq64(slot, 0x105000ULL);         /* the return address a call pushes (the oracle's sentinel) */
+    G.cpu.r[4] = G.rsp;
+    G.cpu.mxcsr = G.mx;
+    t = jp8_call(&G.cpu, rva, rcx, rdx, r8, r9);
+#ifndef JP8_SOFTFP
+    _mm_setcsr(mx0);
+#endif
+    ++G.lift_calls;
+    if (t) {
+        G.lift_err = 1;
+        snprintf(G.lift_msg, sizeof G.lift_msg, "call %lu (rva 0x%llx, rdx %llu, r8 %llu): %s", G.lift_calls,
+                 (unsigned long long)rva, (unsigned long long)rdx, (unsigned long long)r8, jp8_last_trap());
+        return 1;
+    }
+    if (rax) *rax = G.cpu.r[0];
+    return 0;
+}
+
+/* ---- the engine HOST's cells (jx3p/docs/HOST_LAYER.md 3: the render 0x3F9220 reads them) ---- */
+#define H_NVOICES 0x38
+#define H_GAIN    0x860
+#define H_GSTEP   0x864
+#define H_GLEFT   0x868
+#define H_GDELAY  0x86C
+#define H_GTIME   0x870
+#define H_RATESRC 0x878
+/* the engine rate: the HOST's rate source [HOST+0x878] -- the HOST itself -- through its vtable +0x20 (0x34ADE0:
+ * movss xmm0, [rcx+8]); init refuses an image where it is anything else */
+static float jxg_rate(void) { return gf(JXG_H(gq(G.host + H_RATESRC)) + 8); }
+static int32_t jxg_nvoices(void)
+{
+#if JX_VC_TOOTH   /* TOOTH (jx_product_gate.py --tooth-voices): every voice unit plays, the count ignored */
+    return NV;
+#else
+    return gi(G.host + H_NVOICES);
+#endif
 }
 
 /* ---- the public API ---- */
 
-static uint8_t *g_mrec; static size_t g_mrec_len; static int g_mrec_v4;
-
-/* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): it frees
- * what a previous call allocated and clears every field, the sample clock and the voice seam
- * included. Each call holds ~51 MB (template, recall aux, bank, states); without the free a 32-bit
- * WebAssembly heap ran out after a few dozen calls and the engine then wrote through NULL
- * (jx_wasm_check.py over 64 patches, 2026-10-10). A first call is unchanged: G starts zeroed. */
 static void jx_release(void)
 {
-    for (int i = 0; i < g_nreg; ++i) free(g_tmpl_regions[i]);
-    for (int i = 0; i < g_nlink; ++i) free(g_tmpl_links[i]);
-    g_nreg = g_nlink = 0;
-    free(g_mrec); g_mrec = NULL; g_mrec_len = 0;
+    jxg_unmap_all();
+    free(G.file);
     free((void *)G.bank);
-    for (int v = 0; v < NV; ++v) { free(G.vstate[v]); free(G.vhigh[v]); }
-    free(G.mstate);
-    for (int i = 0; i < NUNITS; ++i) { free(G.proc[i]); free(G.wrap[i].slots); }
     memset(&G, 0, sizeof G);
+    jx_g2h_delta = 0;
 }
 
-/* unit i's note store from its template region: its whole allocation (0xFF0) or, from a template before
- * 2026-10-10, its first 0xDB0 bytes and zeros after */
-static void ns_load(int i)
+static uint8_t *read_file(const char *path, size_t *len)
 {
-    uint32_t n = g_tmpl_rawsz[9 + 3 * i] < JX_NS_SZ ? g_tmpl_rawsz[9 + 3 * i] : JX_NS_SZ;
-    memset(G.ns[i], 0, JX_NS_SZ);
-    memcpy(G.ns[i], g_tmpl_regions[9 + 3 * i], n);
+    FILE *f = fopen(path, "rb");
+    uint8_t *b;
+    long L;
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END); L = ftell(f); rewind(f);
+    if (L <= 0 || !(b = malloc((size_t)L))) { fclose(f); return NULL; }
+    if (fread(b, 1, (size_t)L, f) != (size_t)L) { fclose(f); free(b); return NULL; }
+    fclose(f);
+    *len = (size_t)L;
+    return b;
 }
 
-int jx3p_init(const char *template_path, const char *bank_path,
-              const char *master_recall_path)
+static uint32_t crc32_le(const uint8_t *p, size_t n)
 {
-    jx_release();
-    if (!tmpl_load(template_path)) return 0;
-    {   FILE *f = fopen(master_recall_path, "rb");
-        size_t fl;
-        uint8_t *fb;
-        if (!f) return 0;
-        fseek(f, 0, SEEK_END); fl = (size_t)ftell(f); rewind(f);
-        fb = malloc(fl);
-        if (fread(fb, 1, fl, f) != fl) return 0;
-        fclose(f);
-        g_mrec = fb; g_mrec_len = fl;
-        if (memcmp(g_mrec, "JXM3", 4) && memcmp(g_mrec, "JXM4", 4)) return 0;
-        g_mrec_v4 = !memcmp(g_mrec, "JXM4", 4);
+    uint32_t c = 0xFFFFFFFFu;
+    for (size_t i = 0; i < n; ++i) {
+        c ^= p[i];
+        for (int k = 0; k < 8; ++k) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
     }
-    {   FILE *f = fopen(bank_path, "rb");
-        if (!f) return 0;
-        fseek(f, 0, SEEK_END); G.bank_len = (size_t)ftell(f); rewind(f);
-        uint8_t *b = malloc(G.bank_len);
-        if (fread(b, 1, G.bank_len, f) != G.bank_len) return 0;
-        fclose(f); G.bank = b;
+    return ~c;
+}
+
+/* the guest image (JXG1, jx_guest_export.py): the blocks mapped and filled, the patch records indexed */
+static int guest_load(const char *path)
+{
+    size_t len, o = 8;
+    uint8_t *b = read_file(path, &len);
+    uint32_t n, crc;
+    uint64_t img_lo = ~0ULL, img_hi = 0;
+#define NEED(k) do { if (o + (k) > len - 4) return 0; } while (0)
+    if (!b) return 0;
+    G.file = b;
+    if (len < 96 || memcmp(b, "JXG1", 4) || gi(b + 4) != 1) return 0;
+    memcpy(&crc, b + len - 4, 4);
+    if (crc32_le(b, len - 4) != crc) return 0;
+    memcpy(&G.hb, b + o, 8); memcpy(&G.hlen, b + o + 8, 8); memcpy(&G.hostg, b + o + 16, 8);
+    memcpy(&G.ib, b + o + 24, 8); memcpy(&G.slo, b + o + 32, 8); memcpy(&G.slen, b + o + 40, 8);
+    memcpy(&G.rsp, b + o + 48, 8); o += 56;
+    memcpy(&G.mx, b + o, 4); memcpy(&G.rate0, b + o + 4, 4); o += 8;
+    if (jp8_map(G.hb, G.hlen) || jp8_map(G.slo, G.slen)) return 0;
+    jx_g2h_delta = (unsigned long long)(uintptr_t)jp8_host(G.hb) - G.hb;
+    NEED(4); memcpy(&n, b + o, 4); o += 4;
+    for (uint32_t i = 0; i < n; ++i) {                      /* the heap's nonzero runs */
+        uint32_t off, ln;
+        NEED(8); memcpy(&off, b + o, 4); memcpy(&ln, b + o + 4, 4); o += 8;
+        NEED(ln);
+        if ((uint64_t)off + ln > G.hlen) return 0;
+        memcpy(JXG_H(G.hb + off), b + o, ln); o += ln;
     }
-    for (int v = 0; v < NV; ++v) {
-        G.vstate[v] = malloc(SNAP_V);
-        memcpy(G.vstate[v], g_tmpl_regions[v], SNAP_V);
-    }
-    G.mstate = malloc(SNAP_M);
-    memcpy(G.mstate, g_tmpl_regions[52], SNAP_M);
-    for (int v = 0; v < NV; ++v) {
-        G.vhigh[v] = malloc(0x4D000);
-        memcpy(G.vhigh[v], g_tmpl_regions[44 + v], 0x4D000);
-    }
-    for (int i = 0; i < NUNITS; ++i) {
-        memcpy(G.mgr.u[i], g_tmpl_regions[8 + 3 * i], JXA_UNIT_SZ);
-        ns_load(i);
-        memcpy(G.kt[i],    g_tmpl_regions[10 + 3 * i], 0xB0);
-        G.proc[i] = malloc(PROC_SZ);
-        memcpy(G.proc[i], g_tmpl_regions[35 + i], PROC_SZ);
-    }
-    /* relink the voice objects (links 0..7), seam (8), master (9) */
-    for (int v = 0; v < NV; ++v) {
-        const uint8_t *lk = g_tmpl_links[v];
-        memcpy(G.vobj[v], lk, 256);
-        memcpy(G.vd40[v], lk + 256, 4);
-        memcpy(G.vd64[v], lk + 260, 4);
-        /* POINTER WIRING ONLY (PORT_LESSONS 8): in the plugin obj+40 and
-         * obj+64 point INTO THE UNIT STATE, at +0xAAC1D8 / +0xAAC1DC (the
-         * DCO mode cells the per-patch recall rewrites -- FM modes 2/3 set
-         * the first to 1). Those offsets live in the captured HIGH window
-         * [0xA60000,0xAAD000), so the recall aux keeps them current. The
-         * template's copied values (vd40/vd64) are the clean-boot mirror
-         * and must NOT be what the DSP reads. */
-        JX_PTR_STORE(G.vobj[v] + 40, G.vhigh[v] + (0xAAC1D8 - 0xA60000));
-        JX_PTR_STORE(G.vobj[v] + 64, G.vhigh[v] + (0xAAC1DC - 0xA60000));
-        JX_PTR_STORE(G.vstate[v] + 136, G.vobj[v]);
-    }
-    {   const uint8_t *sm = g_tmpl_links[17];
-        G.dn.o110_58 = *(const int32_t *)(sm + 0);
-        G.dn.o110_5c = *(const int32_t *)(sm + 4);
-        memcpy(G.temper, sm + 8, 23 * 4);
-        G.dn.temper23 = G.temper;
-    }
-    {   const uint8_t *lk = g_tmpl_links[18];
-        memcpy(G.mobj, lk, 256);
-        memcpy(G.mc136, lk + 256, 4);
-        memcpy(G.mc112, lk + 260, 256);
-        /* same rule for the master (PORT_LESSONS 8): obj+136 -> state+0xAAC1E8,
-         * obj+112 -> state+0xAAC1E4 in the plugin; the master state block is
-         * the whole unit, so the aux's master runs keep them current. */
-        JX_PTR_STORE(G.mobj + 136, G.mstate + 0xAAC1E8);
-        JX_PTR_STORE(G.mobj + 112, G.mstate + 0xAAC1E4);
-        JX_PTR_STORE(G.mstate + 136, G.mobj);
-    }
-    /* wrapper + ramp records (links 8..16), targets rebased per unit */
-    for (int u = 0; u < NUNITS; ++u) {
-        const uint8_t *r = g_tmpl_links[8 + u];
-        jx_wrap *w = &G.wrap[u];
-        memcpy(&w->latch, r, 4); w->flag = r[4]; r += 8;
-        memcpy(&w->nids, r, 4); r += 4;
-        memcpy(w->ids, r, 4u * (uint32_t)w->nids); r += 4 * w->nids;
-        memcpy(&w->nslot, r, 4); r += 4;
-        w->slots = calloc((size_t)(w->nslot ? w->nslot : 1),
-                          sizeof(jx_gc_slot));
-        for (int i = 0; i < w->nslot; ++i) {
-            uint32_t off; jx_gc_slot *sl = &w->slots[i];
-            memcpy(&off, r, 4); r += 4;
-            memcpy(&sl->sign, r, 32);   /* plugin slot bytes +8..+0x27 */
-            r += 32;
-            if (off == 0xFFFFFFFFu) sl->target = NULL;
-            else if (u == 8)        sl->target = (float *)(G.mstate + off);
-            else if (off >= 0xA60000u)
-                sl->target = (float *)(G.vhigh[u] + (off - 0xA60000u));
-            else sl->target = (float *)(G.vstate[u] + off);
+    {   size_t o2 = o;                                      /* the image pages: one block over their span */
+        NEED(4); memcpy(&n, b + o2, 4); o2 += 4;
+        for (uint32_t i = 0; i < n; ++i) {
+            uint32_t rva, ln;
+            if (o2 + 8 > len - 4) return 0;
+            memcpy(&rva, b + o2, 4); memcpy(&ln, b + o2 + 4, 4); o2 += 8 + ln;
+            if (rva < img_lo) img_lo = rva;
+            if ((uint64_t)rva + ln > img_hi) img_hi = (uint64_t)rva + ln;
         }
+        if (!n || o2 > len - 4 || jp8_map(G.ib + img_lo, img_hi - img_lo)) return 0;
     }
-    G.host_ok = 0;
-    if (g_tmpl_v4) {
-        if (g_tmpl_linksz[19] < 28) return 0;
-        host_record(g_tmpl_links[19]);
+    memcpy(&n, b + o, 4); o += 4;
+    {   size_t o3 = o;
+        for (uint32_t i = 0; i < n; ++i) {
+            uint32_t rva, ln;
+            memcpy(&rva, b + o, 4); memcpy(&ln, b + o + 4, 4); o += 8;
+            memcpy(jxg_any(G.ib + rva, ln), b + o, ln); o += ln;
+        }
+#if JX_IMAGE_GUARD
+        for (uint64_t a = img_lo; a < img_hi; a += 0x1000) {
+            size_t o4 = o3;
+            int shipped = 0;
+            for (uint32_t i = 0; i < n && !shipped; ++i) {
+                uint32_t rva, ln;
+                memcpy(&rva, b + o4, 4); memcpy(&ln, b + o4 + 4, 4); o4 += 8 + ln;
+                shipped = a >= rva && a < (uint64_t)rva + ln;
+            }
+            if (!shipped) mprotect(jxg_any(G.ib + a, 0x1000), 0x1000, PROT_NONE);
+        }
+#else
+        (void)o3;
+#endif
+    }
+    NEED(4); memcpy(&G.npatch, b + o, 4); o += 4;
+    if (G.npatch > 64) return 0;
+    for (uint32_t p = 0; p < G.npatch; ++p) {               /* the factory bank's patch records */
+        NEED(4); memcpy(&G.nrec[p], b + o, 4); o += 4;
+        NEED(8 * (size_t)G.nrec[p]);
+        G.prec[p] = b + o; o += 8 * (size_t)G.nrec[p];
+    }
+#undef NEED
+    return o == len - 4;
+}
+
+/* the objects, by the plugin's own pointers from the HOST (jx_emu.build: HOST+80/+96/+0x68 + 64 u the state,
+ * the parameter object, the assigner; HOST+0x78 + 0x40 u the note manager, its +0x518 the note store, +0x520
+ * the assigner again) */
+static int guest_link(void)
+{
+    uint8_t *h = jxg_heap(G.hostg, 0x880);
+    if (!h) return 0;
+    G.host = h;
+    {   uint8_t *rs = jxg_heap(gq(h + H_RATESRC), 16), *vt, *f;
+        if (!rs || !(vt = jxg_any(gq(rs), 0x28)) || !(f = jxg_any(gq(vt) + 0x20, 8)) ||
+            gq(vt + 0x20) != G.ib + 0x34ADE0) return 0;     /* the rate getter is 0x34ADE0: [rcx+8] */
+        (void)f;
+    }
+    for (int u = 0; u < NUNITS; ++u) {
+        uint64_t st = gq(h + 80 + 64 * u), pr = gq(h + 96 + 64 * u), asg = gq(h + 0x68 + 64 * u);
+        uint8_t *un = jxg_heap(gq(h + 0x78 + 0x40 * u), JXA_UNIT_SZ);
+        if (!un || !jxg_heap(st, SNAP_M) || !jxg_heap(pr, 0x700) || !jxg_heap(asg, 0xB8)) return 0;
+        if (gq(un + 0x520) != asg || !jxg_heap(gq(un + 0x518), JX_NS_SZ)) return 0;
+        G.stg[u] = st;
+        G.proc[u] = JXG_H(pr);
+        G.mgr.u[u] = un;
+        G.ns[u] = JXG_H(gq(un + 0x518));
+        G.kt[u] = JXG_H(asg);
+        if (u < NV) { G.vstate[u] = JXG_H(st); G.vhigh[u] = JXG_H(st + 0xA60000); }
+        else G.mstate = JXG_H(st);
     }
     return 1;
 }
 
-/* dispatch a tracker post into the right unit's proc + DSP state */
+/* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): what a previous
+ * call held is freed. image_path: the guest image (jx3p/gen/jx_guest_44k.bin or _96k); bank_path: the bank
+ * file; the third argument is unused (it named the old recall data). */
+int jx3p_init(const char *image_path, const char *bank_path, const char *unused)
+{
+    (void)unused;
+    jx_release();
+    if (!guest_load(image_path) || !guest_link()) { jx_release(); return 0; }
+    {   size_t bl;
+        uint8_t *bk = read_file(bank_path, &bl);
+        if (!bk) { jx_release(); return 0; }
+        G.bank = bk; G.bank_len = bl;
+    }
+    return 1;
+}
+
+/* the last lifted call's trap (an access outside the blocks, an indirect target not lifted, an unsupported
+ * instruction), "" when none: after one, the engine stops taking parameter calls */
+const char *jx3p_lift_error(void) { return G.lift_err ? G.lift_msg : ""; }
+unsigned long jx3p_lift_calls(void) { return G.lift_calls; }
+
+/* ONE HOST EDIT: (id, value) through the plugin's own host entry, as its render driver applies a kind-2
+ * record at a block's start (the 32-bit value in r8). Returns the entry's return value, or -1 after a trap. */
+long long jx3p_param(int id, int value)
+{
+    uint64_t rax = 0;
+    if (jxg_call(HOSTPARAM, G.hostg, (uint64_t)(uint32_t)id, (uint64_t)(uint32_t)value, 0, &rax)) return -1;
+    return (long long)rax;
+}
+
+/* A PATCH LOAD: the factory patch's records -- what the plugin's patch browser queues (writePatch first, so
+ * every patch change fades as the plugin's does: 0.5 s at gain 0, then 10 ms in; MASTER TUNE; the patch
+ * tree) -- through the host entry, on the RUNNING engine, as the plugin applies them (jx3p/docs/
+ * HOST_LAYER.md 3b). A fresh jx3p_init and one jx3p_recall is the plugin booted with that patch. */
+void jx3p_recall(int idx)
+{
+    if (idx < 0 || (uint32_t)idx >= G.npatch) return;
+    for (uint32_t k = 0; k < G.nrec[idx]; ++k) {
+        uint32_t id, v;
+        memcpy(&id, G.prec[idx] + 8 * k, 4); memcpy(&v, G.prec[idx] + 8 * k + 4, 4);
+        if (jxg_call(HOSTPARAM, G.hostg, id, v, 0, NULL)) return;
+    }
+}
+
+/* A RECORD LIST: n (id, 32-bit value) pairs through the host entry in order -- a patch the factory bank does not
+ * hold (the gates' variants), or a host's edits. Returns 0, or -1 after a trap. */
+int jx3p_records(const uint32_t *idval, int n)
+{
+    for (int k = 0; k < n; ++k)
+        if (jxg_call(HOSTPARAM, G.hostg, idval[2 * k], idval[2 * k + 1], 0, NULL)) return -1;
+    return 0;
+}
+
+/* dispatch a tracker post into the right unit's proc + DSP state; the seam object for slot v is the plugin's
+ * [proc+0x110+0x10 v] (its +0x50 the temper table, +0x58, +0x5C), read when the post is made */
 static void unit_set48(void *u, int what, int pid, int val)
 {
-    int unit = (int)(intptr_t)u;
-    uint8_t *st = (unit < NV) ? G.vstate[unit] : G.mstate;
+    int unit = (int)(intptr_t)u, v;
+    uint8_t *st = (unit < NV) ? G.vstate[unit] : G.mstate, *o110, *tt;
     (void)what;
-    if (pid >= 433 && pid <= 440)
-        jx_dispatch_note_cb(&G.dn, G.proc[unit], st, pid - 433, 2, val);
-    else if (pid >= 450 && pid <= 457)
-        jx_dispatch_gate_cb(&G.dn, G.proc[unit], st, pid - 450, 2, val);
+    if (pid >= 433 && pid <= 440) v = pid - 433;
+    else if (pid >= 450 && pid <= 457) v = pid - 450;
+    else return;
+    o110 = jxg_heap(gq(G.proc[unit] + 0x110 + 0x10 * v), 0x60);
+    tt = o110 ? jxg_any(gq(o110 + 0x50) - 44, 23 * 4) : NULL;
+    if (!o110 || !tt) {                       /* not the plugin's layout: refuse loudly, as a trap */
+        if (!G.lift_err) { G.lift_err = 1; snprintf(G.lift_msg, sizeof G.lift_msg, "unit %d slot %d: no seam object", unit, v); }
+        return;
+    }
+    G.dn.o110_58 = gi(o110 + 0x58);
+    G.dn.o110_5c = gi(o110 + 0x5C);
+    G.dn.temper23 = (const float *)(const void *)tt;
+    if (pid <= 440) jx_dispatch_note_cb(&G.dn, G.proc[unit], st, v, 2, val);
+    else            jx_dispatch_gate_cb(&G.dn, G.proc[unit], st, v, 2, val);
 }
 /* the assigner's parameter read (vtable +0x50, 0x357E60): its parent's GET (the unit's parameter object,
- * vtable +0x60, 0x3E8E10) -- a dword at the id's offset in G.proc[unit] (jx_param_get.h, EXECUTED),
- * found or not. Before 2026-10-10 every read returned 0 from an array of zeros, so KEY ASSIGN (800:
- * mode 1 on 4 factory patches) and 798 (2, 10, 50 on 3) never reached the port's assigner. */
+ * vtable +0x60, 0x3E8E10) -- a dword at the id's offset in the parameter object (jx_param_get.h, EXECUTED),
+ * found or not */
 static int unit_get50(void *u, int what, int pid, int32_t *out)
 {
     int unit = (int)(intptr_t)u, lo = 0, hi = JX_PARAM_GET_N - 1;
@@ -320,11 +413,12 @@ static int unit_get50(void *u, int what, int pid, int32_t *out)
     return 0;
 }
 /* the assigner's time read (vtable +0x70, 0x357EF0): its clock [asg+0xB0] / 96, signed, truncating */
+static int64_t kt_clock(int u) { int64_t c; memcpy(&c, G.kt[u] + 0xB0, 8); return c; }
 static uint32_t unit_get70(void *u)
-{ return (uint32_t)(G.ktclock[(int)(intptr_t)u] / 96); }
-/* THE NOTE STORE'S OUTPUTS (2026-10-10, jx3p/src/jx_seq.c): its vtable +0 / +8 play into the unit's
- * assigner (+0xFD8: vtable +0x18 note-on, +0x10 note-off), and its drain seam (the tail jump to 0x3EF210
- * at a full drain) releases its 16 playing columns. Before, the seam was a stub "as in every proof". */
+{ return (uint32_t)(kt_clock((int)(intptr_t)u) / 96); }
+/* THE NOTE STORE'S OUTPUTS (jx3p/src/jx_seq.c): its vtable +0 / +8 play into the unit's assigner (+0xFD8:
+ * vtable +0x18 note-on, +0x10 note-off), and its drain seam (the tail jump to 0x3EF210 at a full drain)
+ * releases its 16 playing columns */
 static void seq_kt_on(void *user, int unit, int note, int vel)
 {   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)unit };
     (void)user; jx_ktrack_on(G.kt[unit], &c, note, vel); }
@@ -361,102 +455,59 @@ static void sink520_off(void *u, int unit, int note, int vel)
 static const jx_alloc_cbs g_acbs =
     { sink518_on, sink518_off, sink520_on, sink520_off, NULL };
 
-/* parse one wrap record at r into G.wrap[u]; returns the advanced ptr */
-static const uint8_t *wrap_parse(const uint8_t *r, int u)
-{
-    jx_wrap *w = &G.wrap[u];
-    memcpy(&w->latch, r, 4); w->flag = r[4]; r += 8;
-    memcpy(&w->nids, r, 4); r += 4;
-    memcpy(w->ids, r, 4u * (uint32_t)w->nids); r += 4 * w->nids;
-    memcpy(&w->nslot, r, 4); r += 4;
-    free(w->slots);
-    w->slots = calloc((size_t)(w->nslot ? w->nslot : 1), sizeof(jx_gc_slot));
-    for (int i = 0; i < w->nslot; ++i) {
-        uint32_t off; jx_gc_slot *sl = &w->slots[i];
-        memcpy(&off, r, 4); r += 4;
-        memcpy(&sl->sign, r, 32); r += 32;
-        if (off == 0xFFFFFFFFu) sl->target = NULL;
-        else if (u == 8)        sl->target = (float *)(G.mstate + off);
-        else if (off >= 0xA60000u)
-            sl->target = (float *)(G.vhigh[u] + (off - 0xA60000u));
-        else sl->target = (float *)(G.vstate[u] + off);
-    }
-    return r;
-}
-
-static const uint8_t *runs_apply(const uint8_t *p, uint8_t *dst, int apply)
-{
-    uint32_t nr; memcpy(&nr, p, 4); p += 4;
-    for (uint32_t r2 = 0; r2 < nr; ++r2) {
-        uint32_t off, ln; memcpy(&off, p, 4); memcpy(&ln, p + 4, 4);
-        p += 8;
-        if (apply) memcpy(dst + off, p, ln);
-        p += ln;
-    }
-    return p;
-}
-
-void jx3p_recall(int idx)
-{
-    /* EVERYTHING resets to the clean template, then the patch's own aux deltas laid on top -- the
-     * engine the plugin holds after its boot and its patch browser's load of the patch (2026-10-10:
-     * the plugin's own records through its own host entry, jx3p/tools/jx_recall_data_gate.py; before,
-     * the aux came from a pool MODEL of the recall, playbook 197). JXM4 adds, per patch, the control
-     * objects (note managers, note stores, assigners, parameter objects -- KEY ASSIGN lives there) and
-     * the engine HOST record: every patch load queues writePatch, so the output fades as the plugin's
-     * does (0.5 s at gain 0, then 10 ms in). A cold restart per patch change (scope row 9). */
-    if (g_mrec_v4)
-        for (int i = 0; i < NUNITS; ++i) {
-            memcpy(G.mgr.u[i], g_tmpl_regions[8 + 3 * i], JXA_UNIT_SZ);
-            ns_load(i);
-            memcpy(G.kt[i],    g_tmpl_regions[10 + 3 * i], 0xB0);
-            memcpy(G.proc[i],  g_tmpl_regions[35 + i], PROC_SZ);
-        }
-    for (int v = 0; v < NV; ++v) {
-        memcpy(G.vstate[v], g_tmpl_regions[v], SNAP_V);
-        JX_PTR_STORE(G.vstate[v] + 136, G.vobj[v]);
-    }
-    memcpy(G.mstate, g_tmpl_regions[52], SNAP_M);
-    JX_PTR_STORE(G.mstate + 136, G.mobj);
-    for (int v = 0; v < NV; ++v)
-        memcpy(G.vhigh[v], g_tmpl_regions[44 + v], 0x4D000);
-    {   const uint8_t *p = g_mrec + 8;
-        for (int k = 0; k <= idx; ++k) {
-            int last = (k == idx);
-            p = runs_apply(p, G.mstate, last);
-            for (int v = 0; v < NV; ++v)
-                p = runs_apply(p, G.vstate[v], last);
-            for (int v = 0; v < NV; ++v)
-                p = runs_apply(p, G.vhigh[v], last);
-            for (int u = 0; u < NUNITS; ++u) {
-                if (last) p = wrap_parse(p, u);
-                else {    /* skip the record without applying */
-                    int32_t nids, nslot;
-                    memcpy(&nids, p + 8, 4);
-                    memcpy(&nslot, p + 12 + 4 * nids, 4);
-                    p += 16 + 4 * nids + 36 * nslot;
-                }
-            }
-            if (g_mrec_v4) {
-                for (int i = 0; i < NUNITS; ++i) {
-                    p = runs_apply(p, G.mgr.u[i], last);
-                    p = runs_apply(p, G.ns[i], last);
-                    p = runs_apply(p, G.kt[i], last);
-                }
-                for (int i = 0; i < NUNITS; ++i)
-                    p = runs_apply(p, G.proc[i], last);
-                if (last) host_record(p);
-                p += 28;
-            }
-        }
-    }
-    if (g_mrec_v4)
-        for (int u = 0; u < NUNITS; ++u) G.ktclock[u] = 0;
-}
 void jx3p_note_on(int note, int vel)
 { jx_alloc_note_on(&G.mgr, &g_acbs, note, vel); }
 void jx3p_note_off(int note)
 { jx_alloc_note_off(&G.mgr, &g_acbs, note, 0x40); }
+
+/* ---- THE UNITS' WRAPPER AND RAMP RECORDS, the plugin's own (unit state +0x14 the flag, +0xAAC308 the
+ * start-mute count, +0x58 the 40-byte ramp slots, +0x70 / +0x78 the active ids' vector) ---- */
+/* 0x3F4A40 -- one ramp slot's tick: 1 while it stays active */
+static int jxg_ramp_tick(uint8_t *s)
+{
+    int32_t counter, period;
+    float a, cur, lim, sign;
+    uint8_t *t;
+    if (!s[0x1C]) return 0;
+    counter = gi(s + 0x24) + 1;                 /* inc dword [rcx+0x24] */
+    si32(s + 0x24, counter);
+    period = gi(s + 0x20);
+    if (counter < period) return 1;             /* jl */
+    sign = gf(s + 8);
+    a = sign + gf(s + 0xC);
+    t = JXG_H(gq(s));
+    si32(s + 0x24, 0);
+    sf32(s + 0xC, a);
+    sf32(t, a + gf(s + 0x10));
+    cur = gf(t); lim = gf(s + 0x14);
+    if (!(0.0f >= sign)) {                      /* comiss 0, sign; jae */
+        if (!(cur >= lim)) return 1;            /* rising, below the limit */
+    } else {
+        if (cur > lim) return 1;                /* falling, above the limit */
+    }
+    sf32(t, lim);
+    si32(s + 0xC, 0);                           /* mov [rcx+0xC], edx (= 0) */
+    s[0x1C] = 0;
+    return 0;
+}
+/* 0x3F40E0 -- the sweep: every active id's slot ticked, a dead id erased from the vector (the tail moved down,
+ * the end pointer -4) */
+static void jxg_ramp_sweep(uint8_t *st)
+{
+    uint64_t b = gq(st + 0x70);
+    if (b == gq(st + 0x78)) return;
+    for (;;) {
+        int32_t id = gi(JXG_H(b));
+        if (jxg_ramp_tick(JXG_H(gq(st + 0x58) + (uint64_t)((int64_t)id * 40)))) {
+            b += 4;
+        } else {
+            uint64_t e = gq(st + 0x78);
+            memmove(JXG_H(b), JXG_H(b + 4), (size_t)(e - (b + 4)));
+            sq64(st + 0x78, e - 4);
+        }
+        if (b == gq(st + 0x78)) break;
+    }
+}
 
 void jx3p_render(float *L, float *R, int n)
 {
@@ -470,6 +521,7 @@ void jx3p_render(float *L, float *R, int n)
     uint64_t a2[16];
     uint32_t outL, outR;
     void *a3[2] = { &outL, &outR };
+    int32_t nv = jxg_nvoices();
     for (int v = 0; v < NV; ++v) {
         pairs[v][0] = &G.vcells[2 * v];
         pairs[v][1] = &G.vcells[2 * v + 1];
@@ -477,84 +529,83 @@ void jx3p_render(float *L, float *R, int n)
         a2[2 * v + 1] = (uint64_t)(uintptr_t)&G.vcells[2 * v + 1];
     }
     /* THE ENGINE RENDER'S PREAMBLE (rva 0x3F9220, READ; 2026-10-10): per voice unit its assigner's
-     * count synced to the HOST's (the setter, jx_ktrack_set_count) and its clock advanced by the
-     * call's samples; only units below the count render -- the others' outputs are zero and their
+     * count synced to the HOST's (the setter, jx_ktrack_set_count) and its clock [asg+0xB0] advanced by
+     * the call's samples; only units below the count render -- the others' outputs are zero and their
      * wrappers do not run (six voices by default: initialize's record 0x0FFFC00E). */
-    if (G.host_ok && !G.host_stage_off)
+    if (!G.host_stage_off)
         for (int u = 0; u < NV; ++u) {
             jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)u };
-            if (jx_ktrack_count(G.kt[u]) != G.nvoices)
-                jx_ktrack_set_count(G.kt[u], &c, G.nvoices);
-            G.ktclock[u] += n;
+            int64_t clk;
+            if (jx_ktrack_count(G.kt[u]) != nv)
+                jx_ktrack_set_count(G.kt[u], &c, nv);
+            clk = kt_clock(u) + n;
+            memcpy(G.kt[u] + 0xB0, &clk, 8);
         }
     for (int s = 0; s < n; ++s) {
         /* the per-unit WRAPPER (0x377080 voice / 0x377010 master):
          * flag==0 -> untouched; latch>0 -> outputs zeroed, GC only;
          * else -> outputs zeroed, inner render, GC. */
         for (int v = 0; v < NV; ++v) {
-            jx_wrap *w = &G.wrap[v];
-            if (G.host_ok && !G.host_stage_off && v >= G.nvoices) {        /* not rendered: outputs zero */
+            uint8_t *st = G.vstate[v];
+            int32_t latch;
+            if (!G.host_stage_off && v >= nv) {        /* not rendered: outputs zero */
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
                 continue;
             }
-            if (!w->flag) continue;
-            if (w->latch > 0) {
-                --w->latch;
-                JX_LATCH_STORE(v, w);
-                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
-            } else {
-                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
-                jx_voice_render(G.vstate[v], v, pairs[v]);
-            }
-            jx_gc_sweep(w->ids, &w->nids, w->slots);
+            if (!st[0x14]) continue;
+            latch = gi(st + 0xAAC308);
+            G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
+            if (latch > 0) si32(st + 0xAAC308, latch - 1);
+            else jx_voice_render(st, v, pairs[v]);
+            jxg_ramp_sweep(st);
         }
-        {   jx_wrap *w = &G.wrap[8];
+        {   uint8_t *st = G.mstate;
             outL = outR = 0;
-            if (w->flag) {
-                if (w->latch > 0) {
-                    --w->latch;
-                    JX_LATCH_STORE(8, w);
-                } else {
-                    jx_master_render(G.mstate, a2, a3);
-                }
-                jx_gc_sweep(w->ids, &w->nids, w->slots);
+            if (st[0x14]) {
+                int32_t latch = gi(st + 0xAAC308);
+                if (latch > 0) si32(st + 0xAAC308, latch - 1);
+                else jx_master_render(st, a2, a3);
+                jxg_ramp_sweep(st);
             }
         }
-        if (G.host_ok && !G.host_stage_off) {
-            /* THE OUTPUT GAIN STAGE (rva 0x3F9731..0x3F9844, READ): while samples are left the gain
-             * moves by the step, held in [0, 1]; then a positive step holds 1.0, else the gain is 0 and
-             * the delay counts down; when it ends the fade-in starts: trunc(rate x time x 0.001)
-             * samples (at least 1), step 1 / that (in double). writePatch arms it (1 sample at -1, the
-             * delay 0.5 s, the time 10 ms). */
+        if (!G.host_stage_off) {
+            /* THE OUTPUT GAIN STAGE (rva 0x3F9731..0x3F9844, READ), on the HOST's own cells: while samples
+             * are left the gain moves by the step, held in [0, 1]; then a positive step holds 1.0, else the
+             * gain is 0 and the delay counts down; when it ends the fade-in starts: trunc(rate x time x
+             * 0.001) samples (at least 1), step 1 / that (in double). writePatch arms it (1 sample at -1,
+             * the delay 0.5 s, the time 10 ms). */
+            uint8_t *h = G.host;
             float g;
-            int32_t left = G.gleft;
-            G.gleft = (int32_t)((uint32_t)left - 1u);  /* it counts on below 0, as the asm's dec does */
+            int32_t left = gi(h + H_GLEFT);
+            si32(h + H_GLEFT, (int32_t)((uint32_t)left - 1u));  /* it counts on below 0, as the asm's dec does */
             if (left > 0) {
-                g = G.gstep + G.gain;
-                G.gain = g;
-                if (g >= 1.0f) { G.gain = 1.0f; g = 1.0f; }
-                else if (!(g > 0.0f)) { G.gain = 0.0f; g = 0.0f; }
-            } else if (!(0.0f >= G.gstep)) {         /* comiss 0, step; jae: an unordered step holds 1.0 */
-                G.gain = 1.0f; g = 1.0f;
+                g = gf(h + H_GSTEP) + gf(h + H_GAIN);
+                sf32(h + H_GAIN, g);
+                if (g >= 1.0f) { sf32(h + H_GAIN, 1.0f); g = 1.0f; }
+                else if (!(g > 0.0f)) { sf32(h + H_GAIN, 0.0f); g = 0.0f; }
+            } else if (!(0.0f >= gf(h + H_GSTEP))) {    /* comiss 0, step; jae: an unordered step holds 1.0 */
+                sf32(h + H_GAIN, 1.0f); g = 1.0f;
             } else {
-                G.gain = 0.0f; g = 0.0f;
-                if (G.gdelay > 0) {
-                    G.gdelay -= 1;
-                    if (G.gdelay <= 0) {
-                        float t = G.rate * G.gtime;
+                int32_t d;
+                sf32(h + H_GAIN, 0.0f); g = 0.0f;
+                d = gi(h + H_GDELAY);
+                if (d > 0) {
+                    si32(h + H_GDELAY, d - 1);
+                    if (d - 1 <= 0) {
+                        float t = jxg_rate() * gf(h + H_GTIME);
                         int32_t k;
                         t = t * 0.001f;
                         k = (int32_t)t;
                         if (k < 1) k = 1;
-                        G.gleft = k;
-                        G.gstep = (float)(1.0 / (double)k);
-                        g = G.gain;
+                        si32(h + H_GLEFT, k);
+                        sf32(h + H_GSTEP, (float)(1.0 / (double)k));
+                        g = gf(h + H_GAIN);
                     }
                 }
             }
             {   float l, r;
                 memcpy(&l, &outL, 4); memcpy(&r, &outR, 4);
-                l = g * l; r = G.gain * r;
+                l = g * l; r = gf(h + H_GAIN) * r;
                 memcpy(&outL, &l, 4); memcpy(&outR, &r, 4);
             }
         }
@@ -564,12 +615,7 @@ void jx3p_render(float *L, float *R, int n)
     G.clock += n;
 }
 
-/* WEB-PREVIEW DRY RENDER: the 8 proven voices, summed, master EFX network
- * BYPASSED. The master needs the host parameter initialization a DAW
- * performs at insert (its effect manager is the logged open item); without
- * it the network self-poisons. The voices -- oscillators, filters,
- * envelopes, the whole per-voice engine proven 64/64 EXACTLY 0 -- are the
- * instrument; this preview plays them directly. */
+/* WEB-PREVIEW DRY RENDER: the 8 voices, summed, the master's effect network bypassed (jx_listen_c.py) */
 void jx3p_render_dry(float *L, float *R, int n)
 {
     void *pairs[NV][2];                /* read by index: a native pointer array (jx3p_render) */
@@ -580,17 +626,14 @@ void jx3p_render_dry(float *L, float *R, int n)
     for (int s = 0; s < n; ++s) {
         float accL = 0.0f, accR = 0.0f;
         for (int v = 0; v < NV; ++v) {
-            jx_wrap *w = &G.wrap[v];
-            if (!w->flag) continue;
-            if (w->latch > 0) {
-                --w->latch;
-                JX_LATCH_STORE(v, w);
-                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
-            } else {
-                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
-                jx_voice_render(G.vstate[v], v, pairs[v]);
-            }
-            jx_gc_sweep(w->ids, &w->nids, w->slots);
+            uint8_t *st = G.vstate[v];
+            int32_t latch;
+            if (!st[0x14]) continue;
+            latch = gi(st + 0xAAC308);
+            G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
+            if (latch > 0) si32(st + 0xAAC308, latch - 1);
+            else jx_voice_render(st, v, pairs[v]);
+            jxg_ramp_sweep(st);
             accL += G.vcells[2 * v];
             accR += G.vcells[2 * v + 1];
         }
@@ -599,11 +642,15 @@ void jx3p_render_dry(float *L, float *R, int n)
     G.clock += n;
 }
 
-/* raw access for the full-chain gate and the recall data gate (jx3p/tools/jx_recall_data_gate.py) */
+/* raw access for the gates (jx_master_bisect.py, jx_recall_data_gate.py, jx_tick_gate.py, jx_lift_gate.py) */
 void *jx3p_vstate(int v) { return G.vstate[v]; }
 void *jx3p_mstate(void)  { return G.mstate; }
 void *jx3p_vhigh(int v)  { return G.vhigh[v]; }
-/* the control objects in template order: which 0 note manager, 1 note store, 2 assigner, 3 parameter object */
+/* the whole guest heap: its guest base, length and host address */
+unsigned long long jx3p_heap_base(void) { return G.hb; }
+unsigned long long jx3p_heap_len(void)  { return G.hlen; }
+void *jx3p_heap(void) { return G.hlen ? JXG_H(G.hb) : NULL; }
+/* the control objects: which 0 note manager, 1 note store, 2 assigner, 3 parameter object */
 void *jx3p_ctl(int which, int i)
 {
     switch (which) {
@@ -613,39 +660,38 @@ void *jx3p_ctl(int which, int i)
     default: return G.proc[i];
     }
 }
-/* the engine HOST record now (host_record's layout); returns host_ok */
+/* the engine HOST's record (voices, gain, step, samples left, delay, fade time, engine rate); returns 1 */
 int jx3p_host(uint8_t out[28])
 {
-    memcpy(out + 0, &G.nvoices, 4); memcpy(out + 4, &G.gain, 4); memcpy(out + 8, &G.gstep, 4);
-    memcpy(out + 12, &G.gleft, 4); memcpy(out + 16, &G.gdelay, 4); memcpy(out + 20, &G.gtime, 4);
-    memcpy(out + 24, &G.rate, 4);
-    return G.host_ok;
+    float r = jxg_rate();
+    memcpy(out + 0, G.host + H_NVOICES, 4);
+    memcpy(out + 4, G.host + H_GAIN, 20);
+    memcpy(out + 24, &r, 4);
+    return G.host != NULL;
 }
 
-/* unit u's wrapper + ramp record in the exporter's form (jx_master_recall_export.py wrap_record):
- * latch, flag, the active ids, then per slot its target as an offset in the unit (0xFFFFFFFF: none)
- * and the slot's bytes +8..+0x27. Returns the length, or -1 when cap is too small. */
+/* unit u's wrapper + ramp record in the exporter's form (jx_master_recall_export.py wrap_record): latch, flag,
+ * the active ids, then per slot its target as an offset in the unit (0xFFFFFFFF: none) and the slot's bytes
+ * +8..+0x27 -- read from the plugin's own records. Returns the length, or -1 when cap is too small. */
 int jx3p_wrap_dump(int u, uint8_t *out, int cap)
 {
-    const jx_wrap *w = &G.wrap[u];
-    int n = 16 + 4 * w->nids + 36 * w->nslot, i;
-    uint8_t *p = out;
-    if (n > cap) return -1;
-    memcpy(p, &w->latch, 4); p[4] = w->flag; p[5] = p[6] = p[7] = 0; p += 8;
-    memcpy(p, &w->nids, 4); p += 4;
-    memcpy(p, w->ids, 4u * (uint32_t)w->nids); p += 4 * w->nids;
-    memcpy(p, &w->nslot, 4); p += 4;
-    for (i = 0; i < w->nslot; ++i) {
-        const jx_gc_slot *sl = &w->slots[i];
-        const uint8_t *t = (const uint8_t *)sl->target;
-        uint32_t off;
-        if (!t) off = 0xFFFFFFFFu;
-        else if (u == 8) off = (uint32_t)(t - G.mstate);
-        else if (t >= G.vhigh[u] && t < G.vhigh[u] + 0x4D000) off = 0xA60000u + (uint32_t)(t - G.vhigh[u]);
-        else off = (uint32_t)(t - G.vstate[u]);
-        memcpy(p, &off, 4); memcpy(p + 4, &sl->sign, 32); p += 36;
+    uint8_t *st = u < NV ? G.vstate[u] : G.mstate, *p = out;
+    uint64_t b = gq(st + 0x70), e = gq(st + 0x78), arr = gq(st + 0x58);
+    int32_t nids = (int32_t)((e - b) / 4), nslot = 0, i;
+    for (i = 0; i < nids; ++i) { int32_t id = gi(JXG_H(b + 4 * (uint64_t)i)); if (id + 1 > nslot) nslot = id + 1; }
+    if (16 + 4 * nids + 36 * nslot > cap) return -1;
+    memcpy(p, st + 0xAAC308, 4); p[4] = st[0x14]; p[5] = p[6] = p[7] = 0; p += 8;
+    memcpy(p, &nids, 4); p += 4;
+    if (nids) memcpy(p, JXG_H(b), 4u * (uint32_t)nids);
+    p += 4 * nids;
+    memcpy(p, &nslot, 4); p += 4;
+    for (i = 0; i < nslot; ++i) {
+        uint8_t *sl = JXG_H(arr + 40 * (uint64_t)i);
+        uint64_t t = gq(sl);
+        uint32_t off = t ? (uint32_t)(t - G.stg[u]) : 0xFFFFFFFFu;
+        memcpy(p, &off, 4); memcpy(p + 4, sl + 8, 32); p += 36;
     }
-    return n;
+    return (int)(p - out);
 }
 
 /* gate hook: 0 renders the DSP alone (every unit, no count sync, no gain stage) -- the full-chain
@@ -673,21 +719,19 @@ void jx3p_seq_modes(unsigned long out[19]) { for (int k = 0; k < 19; ++k) out[k]
  * (jx3p/docs/HOST_LAYER.md 3e); the gate calls the plugin's own setter on its side */
 void jx3p_seq_set_mode(int mode) { for (int u = 0; u < NUNITS; ++u) jxs_3F1910(G.ns[u], (uint32_t)mode); }
 /* the assigner clock of unit u (the plugin's [assigner+0xB0]): gates and diagnostics */
-long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS) ? (long long)G.ktclock[u] : -1; }
+long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS && G.kt[u]) ? (long long)kt_clock(u) : -1; }
 
 /* THE PLUGIN'S RENDER OBJECT (JX-4, 2026-10-10): between its render driver and the engine sits the
  * JUNO-60's render object -- table and coefficient vectors byte for byte (jx3p/tools/jx_conv_tables.py,
  * EXECUTED; jx3p/docs/HOST_LAYER.md 2b) -- so the port takes src/juno_conv.c as it is. The engine runs
- * at the template's own rate (its HOST record: the automatic setting's 96000 for hosts 44100, 48000
- * and 96000, with data exported at that rate), the object is looked up for (engine, host):
- * IDENTITY renders the engine for the host block, CONVERTER renders what its filter needs and filters
- * (rva 0x343E30), SILENCE gives zeros. jx3p_product_process is one host block whose records (notes,
- * the patch) the caller gave before it: the render driver's split of a block at record offsets is not
- * ported yet (jx3p/tools/jx_product_gate.py grades blocks with their events at offset 0). */
+ * at the image's own rate (the HOST's: the automatic setting's 96000 for hosts 44100, 48000 and 96000,
+ * with the image exported at that rate), the object is looked up for (engine, host): IDENTITY renders the
+ * engine for the host block, CONVERTER renders what its filter needs and filters (rva 0x343E30), SILENCE
+ * gives zeros. */
 #include "../../src/juno_conv.c"
 /* the render driver's state (jx3p_product_block below) */
 #define JX_DRV_QMAX 256
-typedef struct { int off, on, note, vel; } jx_drv_rec;
+typedef struct { int off, on, note, vel, kind; } jx_drv_rec;   /* kind 0 a key, 2 an engine parameter record */
 static jx_drv_rec g_drv_carry[JX_DRV_QMAX]; static int g_drv_ncarry;
 static long long g_drv_ph; static int g_drv_notes, g_drv_rate;
 
@@ -698,12 +742,12 @@ static void jx_ro_engine(void *user, float *const *ptrs, int nch, int count)
     jx3p_render(ptrs[0], ptrs[1], count);
 }
 /* the object for (the engine's rate, host_rate); returns its kind (0 identity, 1 converter, 2 silence),
- * -1 without a HOST record (an old template) or when a buffer cannot be allocated */
+ * -1 without an engine or when a buffer cannot be allocated */
 int jx3p_product_open(int host_rate)
 {
-    if (!G.host_ok) return -1;
+    if (!G.host) return -1;
     if (g_ro_on) juno_ro_free(&g_ro);
-    juno_ro_init(&g_ro, (int)G.rate, host_rate);
+    juno_ro_init(&g_ro, (int)jxg_rate(), host_rate);
     g_ro_on = 1;
     g_drv_rate = host_rate; g_drv_ph = 0; g_drv_notes = 0; g_drv_ncarry = 0;   /* the driver at instance start */
     G.host_stage_off = 0;
@@ -721,10 +765,13 @@ static void prod_render(float *L, float *R, int t0, int n);
 int jx3p_product_process(float *L, float *R, int n);
 static void drv_apply(const jx_drv_rec *r)
 {
+    if (r->kind == 2) { jx3p_param(r->note, r->vel); return; }   /* the engine's host entry (JX-11) */
     if (r->on) { jx3p_note_on(r->note, r->vel); g_drv_notes++; }
     else       { jx3p_note_off(r->note); g_drv_notes--; }
 }
-/* one host block: ev[4 i ..] = { offset, type (0 note-on, 1 note-off), note, velocity 0..127 } */
+/* one host block: ev[4 i ..] = { offset, type, a, b }: type 0 a note-on (a key, b velocity 0..127), 1 a
+ * note-off (a key), 2 an engine parameter record (a the model id, b the 32-bit value) -- what the plugin's
+ * patch browser and editor queue, in queue order: a patch load's records come before the block's keys */
 int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
 {
     jx_drv_rec rec[2 * JX_DRV_QMAX];
@@ -734,6 +781,7 @@ int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
     for (i = 0; i < g_drv_ncarry; ++i) rec[nrec++] = g_drv_carry[i];
     for (i = 0; i < nev && nrec < 2 * JX_DRV_QMAX; ++i) {
         rec[nrec].off = ev[4 * i]; rec[nrec].on = ev[4 * i + 1] == 0;
+        rec[nrec].kind = ev[4 * i + 1] == 2 ? 2 : 0;
         rec[nrec].note = ev[4 * i + 2]; rec[nrec].vel = ev[4 * i + 3]; ++nrec;
     }
     g_drv_ncarry = 0;
@@ -742,7 +790,8 @@ int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
         cut = nrec;
         for (i = 0; i < nrec; ++i) {
             int off = rec[i].off;
-            if (rec[i].on) {
+            if (rec[i].kind) {                      /* a parameter record: only "offsets never go down" */
+            } else if (rec[i].on) {
                 if (off <= lastoff) { off = lastoff + 1; rec[i].off = off; }
             } else {
                 lastoff = off;
@@ -804,51 +853,4 @@ int jx3p_product_process(float *L, float *R, int n)
     return kind == JUNO_RO_SILENCE ? 0 : -1;
 }
 
-/* debug/bench: force one unit's wrapper flag */
-void jx3p_wrap_flag(int u, int f) { G.wrap[u].flag = (uint8_t)f; }
 float jx3p_vcell(int i) { return G.vcells[i]; }
-
-/* PREVIEW HOLD (documented, reversible): the chorus effect's manager (the
- * pending-page swap machine and its host rate parameter) is NOT yet
- * transcribed; with no host to set the rate, the plugin's own boot ramps
- * fade the chorus in over an unconfigured LFO and the output pins at the
- * NaN clamp (jx3p/docs/S3_STATUS.md logs the arc). Until that manager is
- * transcribed, the web preview keeps the chorus OFF by deactivating the
- * two ramps that raise its enable (st+269808) and depth (st+10928080) --
- * the same "module OFF law" precedent the JUNO CLASSIC uses. Everything
- * else is untouched and bit-exact. */
-/* WEB-PREVIEW NaN SCRUB (bridge-level; the proven DSP sources are NOT
- * touched, and no gate runs with this). The master effect network births
- * a NaN on its shared delay line when it runs without the host parameter
- * initialization a DAW performs (the effect manager's host-param init is
- * the logged open item, jx3p/docs/S3_STATUS.md). Once born, the NaN
- * circulates and the output clamp pins at full scale. The preview scrubs
- * non-finite cells back to zero the moment they appear, at the line and
- * its mirrors. */
-static void jxw_scrub_region(uint8_t *base, uint32_t off, uint32_t len)
-{
-    float *p = (float *)(base + off);
-    for (uint32_t i = 0; i < len / 4; ++i) {
-        float v = p[i];
-        if (v != v || v - v != 0.0f) p[i] = 0.0f;
-    }
-}
-void jx3p_nan_scrub(void)
-{
-    jxw_scrub_region(G.mstate, 269888, 80);       /* the mirror cells    */
-    jxw_scrub_region(G.mstate, 10927568, 0x2000); /* line head + filters */
-    jxw_scrub_region(G.mstate, 10928592, 0x40000);/* the shared line     */
-}
-
-void jx3p_efx_hold(void)
-{
-    jx_wrap *w = &G.wrap[8];
-    for (int i = 0; i < w->nslot; ++i) {
-        jx_gc_slot *sl = &w->slots[i];
-        if (!sl->target) continue;
-        {   ptrdiff_t off = (uint8_t *)sl->target - G.mstate;
-            if (off >= 269700)          /* the EFX block + chorus mirrors */
-                sl->active = 0;
-        }
-    }
-}

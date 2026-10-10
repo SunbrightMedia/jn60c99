@@ -3482,3 +3482,30 @@ reach from more starting states (patches 34, 61, 40), not a guess.
 Before hand-transcribing a wide control path, measure it (distinct instructions, allocations, imports)
 and consider the lifter. Record the dynamic reach from every state class whose transitions matter (on
 and off, every effect mode), and keep unreached indirect targets as traps the gate turns red.
+
+## 201. A REACH IS A SAMPLE; CLOSE IT FROM THE BINARY'S OWN STRUCTURE -- AND THE PORT'S MEMORY SHOULD BE THE PLUGIN'S
+Paid 2026-10-10 (JX-3P, JX-11 in the product). Moving the port onto the plugin's own heap (one block at the
+plugin's guest addresses, every engine object a view into it; the lifted parameter system and the
+transcribed DSP on the same bytes) showed three things.
+1. The reach from playing states (all 64 patches, every id at 13 values, from four bases) still missed
+paths: the variant 0:65=5 (an effect type the bank never selects) trapped at 0x35A1A0 -- a target the
+oracle HAD met, but at a tail-call jmp, where the JP8 lifter makes it a label of that function, not an
+entry another site can call. And effect type 4 on record 67 trapped at 0x3EB426: a switch table whose
+image-base lea sits one block before the table load, outside the lifter's local pattern, so only the
+oracle's cases became labels. Fixed from the binary, not from more runs: the classes live in the heap
+after the boot (47, by their RTTI) and, for each reached virtual target at slot k, slot k of every
+related class (jx_lift_roots.py: 441 roots); MSVC's table form itself (mov eA,[rB+rI*4+T]; add rA,rB; jmp
+rA) names the base (jx_lift.py). Then a gate on the mode space: every patch with each effect type
+(jx_lift_gate.py --loads modes, 57,600 calls, EXACTLY 0).
+2. Unicorn's mem_protect on part of a mapped region splits the region and COPIES all of it: on the
+oracle's 8 GB heap map that was an 8 GB transient, and MEMGUARD killed two running gates. A page census
+belongs in the native twin (mprotect + a SIGSEGV handler that opens each page once:
+jx3p/tools/jx_lift_census.c) -- it ran the 65,472-call sweep in minutes.
+3. Gates that masked pointer cells (the template zeroed them; the port relinked its own) could not see the
+port's pointer model at all. With the plugin's heap as the port's memory every byte compares: GATE 1 now
+compares the voice states with their object pointers and the 36 control objects with their vtables.
+### The rule
+Treat a dynamic reach as a sample: close it with what the binary states (live classes and their RTTI
+families, the table forms), then grade the closed reach on the mode space the sample missed. Census
+pages in the native twin, never by protecting the emulator's big maps. Make the port's memory the
+plugin's own where you can: then the gates compare every byte instead of masked windows.

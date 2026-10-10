@@ -32,8 +32,8 @@
 </head>
 <body>
 <h1>Roland JX-3P <span class="tag">bit-exact C port · clean boot proven</span></h1>
-<div class="sub">The plugin's own patch load, note managers, key tracker, arpeggiator,
-ramps and renders — every layer transcribed from the binary. Played as the plugin plays in a host:
+<div class="sub">The plugin's own memory and parameter system (lifted from the binary, one C statement
+per instruction), note managers, key tracker, arpeggiator, ramps and renders. Played as the plugin plays in a host:
 the engine at 96 kHz, the plugin's own rate converter to the audio device's rate, its render driver
 (the arpeggiator's clock at 120 BPM), six voices; graded block for block against the plugin's own
 process(). Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
@@ -45,7 +45,7 @@ process(). Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
 <div id="kbd"></div>
 <div id="status">audio off</div>
 <script type="module">
-const BUILD_VER = "c7bebdee0e65";
+const BUILD_VER = "77f549fad331";
 const Jx3pModule = (await import('./jx3p.js?v=' + BUILD_VER)).default;
 
 const mod = await Jx3pModule();
@@ -57,15 +57,13 @@ async function fetchGz(url) {
   return new Uint8Array(buf);
 }
 document.getElementById('status').textContent = 'loading engine data...';
-const [tmpl, aux, bankGz] = await Promise.all([
-  fetchGz('jx_template_96k.bin.gz'), fetchGz('jx_master_recall_96k.bin.gz'),
-  fetchGz('bank.bin.gz')]);
-mod.FS.writeFile('/jx_template.bin', tmpl);
-mod.FS.writeFile('/jx_master_recall.bin', aux);
+const [guest, bankGz] = await Promise.all([
+  fetchGz('jx_guest_96k.bin.gz'), fetchGz('bank.bin.gz')]);
+mod.FS.writeFile('/jx_guest.bin', guest);
 mod.FS.writeFile('/bank.bin', bankGz);
 const ok = mod.ccall('jx3p_init', 'number',
   ['string','string','string'],
-  ['/jx_template.bin', '/bank.bin', '/jx_master_recall.bin']);
+  ['/jx_guest.bin', '/bank.bin', '']);
 if (!ok) { document.getElementById('status').textContent =
   'ENGINE INIT FAILED'; throw new Error('init'); }
 document.getElementById('status').textContent =

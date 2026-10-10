@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """jx_wasm_check.py -- the DELIVERED JX-3P web engine (jx3p/gui/web/jx3p.{js,wasm}) against a native
-build of the same sources, on the page's own calls (JX-10: jx3p_init on the 96 kHz data, jx3p_recall,
+build of the same sources, on the page's own calls (JX-10: jx3p_init on the 96 kHz guest image, jx3p_recall,
 jx3p_product_open(host rate), jx3p_product_block per 256-sample block with that block's events at their
 offsets; jx3p/tools/jx_wasm_run.mjs runs the WASM in node). The native product path is the one
 jx_product_gate.py grades against the plugin's own process().
@@ -55,16 +55,14 @@ def fnv(b):
     return '%016x' % h
 
 
-def data96(tmp):
-    """the page's data: the 96 kHz template and recall data (jx3p/gen/*_96k.bin.gz), inflated"""
-    out = []
-    for name in ('jx_template_96k.bin', 'jx_master_recall_96k.bin'):
-        dst = os.path.join(tmp, name)
-        if not os.path.exists(dst):
-            with gzip.open(os.path.join(REPO, 'jx3p', 'gen', name + '.gz'), 'rb') as f:
-                open(dst, 'wb').write(f.read())
-        out.append(dst)
-    return out
+def guest96(tmp):
+    """the page's data: the 96 kHz guest image (jx3p/gen/jx_guest_96k.bin.gz, the plugin's heap after its boot),
+    inflated"""
+    dst = os.path.join(tmp, 'jx_guest_96k.bin')
+    if not os.path.exists(dst):
+        with gzip.open(os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin.gz'), 'rb') as f:
+            open(dst, 'wb').write(f.read())
+    return dst
 
 
 def native(so, patches, ftz, planfile):
@@ -72,14 +70,16 @@ def native(so, patches, ftz, planfile):
     if ftz:
         lib.jx_enable_hw_ftz()
     pl = json.load(open(planfile))
-    tmpl, aux = data96(os.path.dirname(planfile))
+    img = guest96(os.path.dirname(planfile))
+    lib.jx3p_lift_error.restype = ctypes.c_char_p
     out = {}
     L, R = (ctypes.c_float * N)(), (ctypes.c_float * N)()
     for p in patches:
-        if not lib.jx3p_init(tmpl.encode(), os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin').encode(),
-                             aux.encode()):
+        if not lib.jx3p_init(img.encode(), os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin').encode(), None):
             raise SystemExit('native jx3p_init failed')
         lib.jx3p_recall(p)
+        if lib.jx3p_lift_error():
+            raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
         if lib.jx3p_product_open(pl['rate']) < 0:
             raise SystemExit('native jx3p_product_open failed')
         hs = []

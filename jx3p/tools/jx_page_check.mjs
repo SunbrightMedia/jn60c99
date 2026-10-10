@@ -4,8 +4,8 @@
 // with a key held, and nothing reaches the console as an error. jx_wasm_check.py grades the engine's samples;
 // this grades the page's wiring around it (fetch + inflate, the event queue, the block call).
 //   node jx3p/tools/jx_page_check.mjs [--dir jx3p/gui/web]      exit 0 = every check passed
-//   node jx3p/tools/jx_page_check.mjs --tooth data|keys          the server breaks the page -- the recall
-//        data missing (404) | the keys queue nothing -- and the check must go RED (exit 0 = it did)
+//   node jx3p/tools/jx_page_check.mjs --tooth data|keys          the server breaks the page -- the guest
+//        image missing (404) | the keys queue nothing -- and the check must go RED (exit 0 = it did)
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
@@ -19,7 +19,7 @@ const TOOTH = ARGS.includes('--tooth') ? ARGS[ARGS.indexOf('--tooth') + 1] : nul
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.gz': 'application/gzip' };
 const srv = createServer((req, res) => {
   const f = path.join(DIR, decodeURIComponent(req.url.split('?')[0]).replace(/^\/$/, '/index.html'));
-  if (!f.startsWith(DIR) || !existsSync(f) || (TOOTH === 'data' && /jx_master_recall/.test(f))) {
+  if (!f.startsWith(DIR) || !existsSync(f) || (TOOTH === 'data' && /jx_guest/.test(f))) {
     res.statusCode = 404; res.end(); return;
   }
   res.setHeader('content-type', TYPES[path.extname(f)] || 'application/octet-stream');

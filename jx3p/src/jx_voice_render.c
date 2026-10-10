@@ -10,6 +10,16 @@
 #include <math.h>
 #include "jx_voice_helpers.h"
 
+/* JX_G2H: a pointer the plugin stored in its own memory, as a host address. In the port's guest memory
+ * (jx3p/gui/jx_bridge.c, JX-11) the cells hold the plugin's guest addresses and the bridge sets the delta;
+ * every other build leaves it 0 (the cells hold host pointers). */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((weak)) unsigned long long jx_g2h_delta;
+#else
+unsigned long long jx_g2h_delta;
+#endif
+#define JX_G2H(p) ((unsigned long long)(p) + jx_g2h_delta)
+
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
 typedef uint16_t _WORD;  typedef uint8_t _BYTE;
 typedef int64_t __int64; typedef int32_t __int32;
@@ -1987,12 +1997,12 @@ LABEL_16:
   v287 = v278 + (float)((float)(v286 * v281) - (float)(v286 * v278));
   if ( v279 >= 0.0 )
     v287 = v285;
-  v288 = *(_QWORD *)(st + 136);
+  v288 = JX_G2H(*(_QWORD *)(st + 136));
   *(float *)(st + 16160 + 16128*(v)) = v287;
   v289 = v287 * *(float *)(st + 15344 + 16128*(v));
   *(float *)(st + 16272 + 16128*(v)) = v289;
   *(float *)(st + 16288 + 16128*(v)) = v289 * *(float *)(st + 15408 + 16128*(v));
-  v290 = **(_DWORD **)(v288 + 40);
+  v290 = *(_DWORD *)(uintptr_t)JX_G2H(*(_QWORD *)(v288 + 40));
   if ( !v290 )
   {
     *(_DWORD *)(st + 4736 + 16128*(v)) = 0;
@@ -3219,7 +3229,7 @@ LABEL_435:
   v551 = *(_DWORD *)(st + 6976 + 16128*(v));
 LABEL_448:
   *(_DWORD *)(st + 3312 + 16128*(v)) = v551;
-  v725 = **(_DWORD **)(*(_QWORD *)(st + 136) + 64LL);
+  v725 = *(_DWORD *)(uintptr_t)JX_G2H(*(_QWORD *)(JX_G2H(*(_QWORD *)(st + 136)) + 64LL));
   if ( !v725 )
   {
     *(_DWORD *)(st + 8576 + 16128*(v)) = 0;
