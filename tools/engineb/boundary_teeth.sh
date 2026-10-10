@@ -11,9 +11,9 @@ REPO=$(dirname "$(dirname "$HERE")")
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-mkdir -p "$TMP/esp32s3/main" "$TMP/event" "$TMP/tools/engineb"
+mkdir -p "$TMP/esp32s3/main" "$TMP/engine_b/event" "$TMP/tools/engineb"
 cp "$REPO"/esp32s3/main/*.c "$TMP/esp32s3/main/"
-cp "$REPO"/event/juno_event.h "$TMP/event/"
+cp "$REPO"/engine_b/event/juno_event.h "$TMP/engine_b/event/"
 cp "$HERE/boundary_check.py" "$TMP/tools/engineb/"
 
 run() { python3 "$TMP/tools/engineb/boundary_check.py"; }

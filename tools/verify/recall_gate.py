@@ -37,7 +37,7 @@ import truth  # noqa: E402
 REF = truth.scratch('plugin_recall_ref.pkl')   # per bank ($JUNO_SCRATCH_TAG)
 PORT = truth.scratch('port_state.pkl')
 ICM = ROOT + '/scratchpad/index_cell_map.pkl'
-DUMP = ROOT + '/state_dump/state_t0.bin'
+DUMP = ROOT + '/refs/state_dump/state_t0.bin'
 BLOCK, STRIDE = 10512, 16
 
 
