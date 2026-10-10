@@ -133,6 +133,13 @@ static int tmpl_load(const char *path)
     return g_nreg >= 53 && g_nlink == (g_tmpl_v4 ? 20 : 19);
 }
 
+/* THE START-MUTE COUNT (2026-10-10): the plugin decrements each unit's state word [st+0xAAC308] itself (the
+ * voice units' lies in their high window); the port counts in the wrapper record and writes the word back
+ * after every step, so the unit states stay the plugin's word for word (it had stayed as loaded: the gates
+ * masked it, and jx_master_bisect.py's voice high windows showed it as the one word that differed) */
+#define JX_LATCH_STORE(u, w) memcpy((u) < NV ? G.vhigh[(u)] + (0xAAC308 - 0xA60000) : G.mstate + 0xAAC308, \
+                                    &(w)->latch, 4)
+
 /* the engine HOST record (template link 19, and one per patch in JXM4): voices, gain, step, samples
  * left, delay, fade time (ms), engine rate -- the plugin's own HOST after its boot / its patch load */
 static void host_record(const uint8_t *r)
@@ -493,6 +500,7 @@ void jx3p_render(float *L, float *R, int n)
             if (!w->flag) continue;
             if (w->latch > 0) {
                 --w->latch;
+                JX_LATCH_STORE(v, w);
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
             } else {
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
@@ -505,6 +513,7 @@ void jx3p_render(float *L, float *R, int n)
             if (w->flag) {
                 if (w->latch > 0) {
                     --w->latch;
+                    JX_LATCH_STORE(8, w);
                 } else {
                     jx_master_render(G.mstate, a2, a3);
                 }
@@ -575,6 +584,7 @@ void jx3p_render_dry(float *L, float *R, int n)
             if (!w->flag) continue;
             if (w->latch > 0) {
                 --w->latch;
+                JX_LATCH_STORE(v, w);
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
             } else {
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;

@@ -34,6 +34,12 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SNAP_V, SNAP_M, CH, IDLE = 0x60000, 0xAAD000, 256, 4096
+# each voice's high window: its ramp targets (SCOPE_AUDIT row 2) -- [0xA60000, 0xAAC320): the unit's
+# parameter object starts at state + 0xAAC320 (EXECUTED: proc - state = 0xAAC320 for all nine units), and
+# the port keeps it as its own blob (compared as proc0..8); the window's tail over it is a copy the port
+# never updates (the note-on's dispatch writes proc +0x460 / +0x480 / +0x660: seen as the only differing
+# words of the first run with the full [0xA60000, 0xAAD000))
+HI_LO, HI_SZ = 0xA60000, 0xAAC320 - 0xA60000
 # the mode values no factory patch holds (record 67 -> the master's +0xAAC1E8: the factory bank has 0, 1, 2,
 # 5; record 65 -> +0xAAC1E4: 0, 2), and two crossed; the plugin's host entry accepts 0..5
 VARIANTS = '34:67=3;34:67=4;0:67=4;0:65=1;0:65=3;0:65=4;0:65=5;34:67=4,65=5;40:65=3'
@@ -44,14 +50,12 @@ SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_rende
 
 
 def clean(b):
-    """the words the port keeps elsewhere: the object pointer (+136), the ramp id list's end pointer
-    (+0x78), and in the master the start-mute latch (+0xAAC308: the port counts it in its wrapper
-    record, G.wrap[8].latch, and leaves the state word as loaded)"""
+    """the words the port keeps elsewhere: the object pointer (+136) and the ramp id list's end pointer
+    (+0x78). (The start-mute count +0xAAC308 was masked here until 2026-10-10: the port now writes its
+    count back to the word -- jx_bridge.c JX_LATCH_STORE -- and it is compared like every other word.)"""
     b = bytearray(b)
     b[136:144] = bytes(8)
     b[0x78:0x80] = bytes(8)
-    if len(b) > 0xAAC30C:
-        b[0xAAC308:0xAAC30C] = bytes(4)
     if len(b) > STATE_END:          # past the master's own block: the plugin's next heap objects
         b[STATE_END:] = bytes(len(b) - STATE_END)
     return bytes(b)
@@ -96,14 +100,15 @@ def oracle(k, n, fine=None, stop=None):
         L, R = jx.render(m, CH)
         res.append([hashlib.sha256(clean(bytes(uc.mem_read(jx.state[u], SNAP_V if u < 8 else SNAP_M)))).hexdigest()[:16]
                     for u in range(9)] + [hashlib.sha256(struct.pack('<%dI' % (2 * m), *(L + R))).hexdigest()[:16]] +
-                   [hashlib.sha256(b).hexdigest()[:16] for b in T.control_blobs(jx)])
+                   [hashlib.sha256(b).hexdigest()[:16] for b in T.control_blobs(jx)] +
+                   [hashlib.sha256(bytes(uc.mem_read(jx.state[u] + HI_LO, HI_SZ))).hexdigest()[:16] for u in range(8)])
     return res
 
 
 def port(so, k, n, fine=None, stop=None):
     lib = ctypes.CDLL(so)
     lib.jx_enable_hw_ftz()
-    for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_ctl'):
+    for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_ctl', 'jx3p_vhigh'):
         getattr(lib, f).restype = ctypes.c_void_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
     aux = os.environ.get('JX_BISECT_AUX', '').encode() or g('gen/jx_master_recall.bin')
@@ -135,7 +140,8 @@ def port(so, k, n, fine=None, stop=None):
         res.append([hashlib.sha256(clean(ctypes.string_at(lib.jx3p_vstate(u), SNAP_V) if u < 8 else
                                          ctypes.string_at(lib.jx3p_mstate(), SNAP_M))).hexdigest()[:16]
                     for u in range(9)] + [hashlib.sha256(struct.pack('<%dI' % (2 * m), *bits)).hexdigest()[:16]] +
-                   [hashlib.sha256(b).hexdigest()[:16] for b in ctl])
+                   [hashlib.sha256(b).hexdigest()[:16] for b in ctl] +
+                   [hashlib.sha256(ctypes.string_at(lib.jx3p_vhigh(u), HI_SZ)).hexdigest()[:16] for u in range(8)])
     return res
 
 
@@ -212,7 +218,8 @@ def main():
         return 0
     start = sum(m for _, m in sched[:first])
     names = ['v%d' % u for u in range(8)] + ['master', 'L/R'] + \
-        ['%s%d' % (w, i) for i in range(9) for w in ('mgr', 'ns', 'asg')] + ['proc%d' % i for i in range(9)]
+        ['%s%d' % (w, i) for i in range(9) for w in ('mgr', 'ns', 'asg')] + ['proc%d' % i for i in range(9)] + \
+        ['vhigh%d' % u for u in range(8)]
     print('patch %d: first differing chunk %d (samples %d..%d, %s after the note): %s' % (
         k, first, start, start + sched[first][1] - 1, start - IDLE,
         ' '.join(nm for nm, x, y in zip(names, o[first], p[first]) if x != y)))

@@ -3466,3 +3466,19 @@ Compare whole allocations. "The engine's entry accepts it" is not "the product s
 product's own senders (patch records, state entries, editor widgets, initialize). Call code
 unreachable only with a static census of its writers AND a dynamic sweep of the input space; then
 grade it anyway through the plugin's own setter.
+
+## 200. LIFT WHAT IS WIDE, TRANSCRIBE WHAT IS HOT -- AND A REACH FROM ONE STATE MISSES THE TRANSITIONS OUT OF IT
+Paid 2026-10-10 (JX-3P parameter system, JX-11). The JX's host entry and parameter dispatch run 232
+functions for one warm patch load (7,102 distinct instructions; 26,432 in the full reach) -- weeks by
+hand. The JUPITER-8 track's lifter (one C statement per instruction, its runtime translating guest
+addresses into host arenas) ran on the JX binary unchanged and its twin matched the plugin's whole
+98 MB heap on the first run: code that is wide, cold and pure (no allocation, no import call --
+measure that first) is lifted; the per-sample DSP stays hand-transcribed. The lift only covers the
+indirect targets the oracle was SEEN to reach: a reach recorded from patch 0 (ARPEGGIO off) never
+switched the arpeggiator off, and the gate on a running arpeggiator patch trapped at the unlifted
+target. The trap is the design working -- a gap is loud, never a silent difference -- and the fix is a
+reach from more starting states (patches 34, 61, 40), not a guess.
+### The rule
+Before hand-transcribing a wide control path, measure it (distinct instructions, allocations, imports)
+and consider the lifter. Record the dynamic reach from every state class whose transitions matter (on
+and off, every effect mode), and keep unreached indirect targets as traps the gate turns red.

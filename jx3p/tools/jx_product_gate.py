@@ -26,6 +26,8 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   clock) -- every run must differ; give it the patches that play on the clock (34, 61).
   --tooth-voices: the port built with JX_VC_TOOTH (all eight voice units play, the HOST's count of six
   ignored) -- every --poly run must differ.
+  --expect-silent: for host rates outside the render object's table (32000: EXECUTED, the plugin's
+  process() returns silence there) -- a run passes when both outputs are equal AND silent.
   --poly SEEDS (e.g. 1,2,3): instead of the one note, a seeded polyphonic sequence per seed from --on to
   --secs: chords, up to 10 keys held (more than the six voices: the render's voice-count sync and the
   allocator's steals), re-struck keys, note-offs, every event at its own sample, several at one sample
@@ -175,6 +177,7 @@ def main():
     blk = int(opt('--block', '512'))
     t_on, t_off, secs = float(opt('--on', '0.6')), float(opt('--off', '1.2')), float(opt('--secs', '1.5'))
     tooth, tclock, tvc, exact = '--tooth' in a, '--tooth-clock' in a, '--tooth-voices' in a, '--exact' in a
+    silent = '--expect-silent' in a
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
@@ -218,7 +221,10 @@ def main():
                 f = lambda x: struct.unpack('<f', struct.pack('<I', x))[0]
                 print('  host %d %s: first difference block %d sample %d (host sample %d): plugin L %r port L %r' % (
                     rate, what, b, s, b * blk + s, f(ro[b][0][s]), f(rp[b][0][s])), flush=True)
-            if not loud:
+            if silent:
+                if loud:
+                    print('  REFUSE: --expect-silent, but the plugin sounds at host %d' % rate); bad += 1
+            elif not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
     n = len(rates) * len(patches) * max(1, len(seeds))
     if tooth or tclock or tvc:

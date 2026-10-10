@@ -109,8 +109,6 @@ def states_digest(blobs):
         b = bytearray(b)
         b[136:144] = bytes(8)
         b[0x78:0x80] = bytes(8)
-        if u == 8:
-            b[0xAAC308:0xAAC30C] = bytes(4)
         out.append(digest(bytes(b)))
     return out
 

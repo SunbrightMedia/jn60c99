@@ -242,7 +242,9 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
 
 ## 4. Next
 
-1. The host tempo (READ, 2026-10-10): the render driver computes T = round(tempo x 10) from the
+1. The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44 of the factory bank render
+   differently with T = 1200 than without -- a scratch census of the plugin's engine, 24,000 samples a
+   patch, the rest of the bank was still running): the render driver computes T = round(tempo x 10) from the
    ProcessContext and, when the host's tempo is valid and T changed, calls the engine's vt+0xB0
    (0x3F9DD0): for T in 400..3000 every unit's dispatch 375 (0x177) = T -- the parameter object's
    vt+0x650 (0x3EB7E0): 0x3E12D0, then by the effect type [obj+0x5B8] (0..5) the effect object's tempo
@@ -253,5 +255,26 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
 2. DONE (JX-10, S3_STATUS (5)): the web page plays the product path (96 kHz data, the render object,
    the render driver); WASM == native on its calls at three rates, the page checked in headless Chromium.
 3. A patch change on a running engine (warm recall, SCOPE_AUDIT row 9) and host edits beyond a patch
-   load (row 12).
+   load (row 12) -- both are the engine's host entry (0x3F9A30) and the units' parameter dispatch
+   (0x3EBB00) on a RUNNING engine. MEASURED 2026-10-10 (scratchpad census, patch 5's 75 records onto a
+   running patch 0): 705,648 instructions executed, 7,102 distinct, 232 functions; per record 50-200 new
+   instructions, record 67 (the master effect mode, dispatch 875) 1,185 new in 56 functions; writes
+   into every unit's low state, its high window, the master state and the whole parameter object
+   (0x26000 bytes from state + 0xAAC320: the ramp records live there); NO allocation and NO import
+   call through 6 warm loads over effect modes 0, 1, 2, 5 -- pure code over existing memory.
+   LIFTED AND EXACT AT THE ENGINE (2026-10-10, JX-11): `jx3p/tools/jx_lift.py` runs the JP8's lifter
+   (jp8/tools/jp8_lift.py, unchanged: one C statement per instruction) on the JX binary from the host
+   entry 0x3F9A30 and the oracle's dynamic reach (`jx_dynreach.py`: warm loads of all 64 patches and the
+   sweep of every id from patches 0 and 34, loads from 61 and 40): 472 functions, 26,432 instructions,
+   96 trap sites none of the runs reaches (AVX/FMA math variants, padding). `jx_lift_gate.py` (process A
+   the oracle, process B the lifted C twin under jp8_rt.c with JP8_RELOC -- guest addresses kept, every
+   access translated and bounds-checked): the engine running (a patch, a key held, 2048 samples), the
+   same calls through both, every return value and the WHOLE HEAP (98 MB) compared. MEASURED EXACTLY 0:
+   warm loads of 5, 34, 40, 62 onto patch 0 (300 calls); of 0, 61, 50 onto the arpeggiator patch 34
+   (225); every one of the host entry's 744 ids at 13 values (0..1000 and -1), a heap checkpoint after
+   each id (65,472 calls). Tooth: one mulss of the LFO-rate listener made a divss (0x35D29F) -- 72 words
+   differ, the 8 rate cells of each of the 9 units. A reach from patch 0 alone missed the arpeggiator's
+   switch-off: the gate trapped there ("indirect target 0x3e0210 not lifted") -- a gap is a trap, never a
+   silent difference. NOT YET IN THE PRODUCT: the port's memory is not the guest layout the lifted code
+   needs (next: its unit states, parameter objects and HOST as guest regions, the DSP reading them).
 4. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.

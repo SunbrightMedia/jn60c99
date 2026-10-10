@@ -105,6 +105,19 @@ python3 "$HERE/jx_product_gate.py" --patches 0,34,61,20
 python3 "$HERE/jx_product_gate.py" --exact --patches 34,61 --on 0.61 --off 0.93 --secs 1.2
 python3 "$HERE/jx_product_gate.py" --tooth --patches 0                 # no render object: every rate differs
 python3 "$HERE/jx_product_gate.py" --tooth-clock --patches 34,61       # the first key does not restart the clock
+python3 "$HERE/jx_product_gate.py" --rates 88200,192000 --patches 0,61  # the other rates of the render object
+python3 "$HERE/jx_product_gate.py" --rates 32000 --patches 0 --expect-silent   # outside its table: silence, both
+# polyphony: chords, up to 10 keys (more than the six voices), re-strikes, several events at one sample
+python3 "$HERE/jx_product_gate.py" --poly 1,2 --patches 0,61 --on 0.55 --secs 2.0
+python3 "$HERE/jx_product_gate.py" --tooth-voices --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.0
+echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
+# the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
+# (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
+# value and the whole heap compared
+python3 "$HERE/jx_lift_gate.py" --relift                          # warm loads of 5, 34, 40, 62 onto patch 0
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads 0,61,50         # ... onto the arpeggiator patch
+python3 "$HERE/jx_lift_gate.py" --loads sweep                     # every id x 13 values, a heap checkpoint per id
+python3 "$HERE/jx_lift_gate.py" --loads 5 --tooth 35D29F          # one multiply made a divide: must be seen
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null

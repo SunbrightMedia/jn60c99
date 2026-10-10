@@ -3,6 +3,19 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (6) — THE PARAMETER SYSTEM, LIFTED: EXACT AT THE ENGINE (JX-11)
+
+A patch change on a running engine and every host edit go through the engine's host entry (0x3F9A30)
+and the units' parameter dispatch: 232 functions and 7,102 distinct instructions for one warm patch
+load, no allocation, no import call (EXECUTED). Rather than transcribe it by hand, `jx_lift.py` runs the
+JP8's proven lifter on the JX binary (472 functions, 26,432 instructions from the host entry and the
+oracle's dynamic reach), and `jx_lift_gate.py` grades the lifted C twin against the plugin on the same
+running engine, the whole 98 MB heap and every return value: warm loads onto patch 0 and onto the
+arpeggiator patch 34, and every one of the host entry's 744 ids at 13 values with a heap checkpoint
+per id (65,472 calls) -- EXACTLY 0; the tooth (one mulss made a divss) bites on exactly the 72 cells it
+moves. In make verify-jx3p as GATE 3e. NOT YET IN THE PRODUCT: the port must hold its state as the
+plugin's guest regions for the lifted code to run on it (jx3p/docs/HOST_LAYER.md 4).
+
 ## 2026-10-10 (5) — THE WEB PAGE PLAYS THE PRODUCT PATH (JX-10)
 
 The page (jx3p/gui/web, mirrored to docs/jx3p) ran the 44.1 kHz engine with no clock: patches 34 and
