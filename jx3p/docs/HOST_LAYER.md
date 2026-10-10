@@ -258,6 +258,36 @@ The first gate compared only the end state, and a skipped release did not bite (
 same notes): playbook 202. The guest image: a bend read a page of the 64 KB curve table (0x9A4000-
 0x9B4000, read at bend + 8192) that no census run had reached; .rdata and .data now ship whole.
 
+## 3h. The note path is the plugin's own, LIFTED (EXECUTED, 2026-10-10; JX-12b)
+
+The --ctl product gate (3g) was RED at 48 / 96 kHz: a small difference after a note-on when the sustain, all
+notes off and mapped CCs came together (each group alone EQUAL). The mapped CCs were the key: the default CC map
+sends CC 5 to PORTAMENTO (0x600060) and CC 116 to LEGATO (0x600062) -- and NO factory patch sets LEGATO (three
+set PORTAMENTO). The port's note path was transcribed (jx_alloc.c, jx_nstore.c, jx_ktrack.c,
+jx_dispatch_note.c, jx_seq.c) and graded EXACTLY 0 over 22,008 events -- every one of them in the factory
+bank's note modes. The experiment that settled it: the same run with the two note entries lifted was EQUAL.
+
+So the port now runs the plugin's own code for the whole note path: the engine's note entries (vt+0x80
+0x3F9150, vt+0x78 0x3F90F0), its clock tick (vt+0xB8 0x3F84A0), the note store's mode setter (0x3F1910) and the
+assigner's count setter (CAssignB vt+0x80, 0x357CE0: the render preamble's voice-count sync) -- and with them
+the note managers, the note stores and their step machine, the assigners (assign modes, legato, portamento)
+and the posts into the voices. Roots: the engine slots 0x78..0xB8 (jx_lift_roots.py CONTROL_SLOTS) and the
+19 step functions, read from the setter's own jump table. Reach: jx_dynreach.py --notes from patches 0 and 34
+(ARPEGGIO 0 / 1 x ASSIGN MODE 0..2 x LEGATO 0 / 1 x PORTAMENTO 0 / 120, each with overlapping keys,
+re-strikes, the sustain, all notes off and ticks: 816 calls) and --tick from patch 34 (every step mode 0..18
+put into every store by the setter, keys held across the 12- and 24-tick boundaries: 1,578 calls). The
+transcribed modules keep their own gates; the port no longer includes them.
+
+MEASURED (jx_lift_gate.py, a heap checkpoint after every script step): --loads notes from patch 0 and from
+34, 816 calls each, and --loads tick from 34, 1,578 calls (1,426 checkpoints) -- every return value and every
+heap byte EXACTLY 0; the controller runs (--loads ctl, 0 and 34) still EXACTLY 0. Teeth: the twin skipping
+one legato note-on (entry 148) -- 2,574 words differ; skipping one tick of step mode 7 (entry 1,132). The tick
+gate (jx_tick_gate.py) now counts its reach on the plugin's side (code hooks on the 19 step functions and the
+assigner's note entries during the ticks); its tooth drops the step clock's `inc` (0x3EFE5E) from the lifted
+source (jx_lift.py --tooth-drop). Through process(): the --ctl runs EQUAL at 44.1 / 48 / 96 kHz; the note modes
+set at the start (jx_product_gate.py --set) EQUAL; GATE 3c 36 / 36; the full chain 4 / 4 (its key-shift tooth
+now in the port's note entries, JX_FULL_TOOTH: it had lived in the removed transcription).
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

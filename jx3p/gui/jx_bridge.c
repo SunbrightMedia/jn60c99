@@ -8,12 +8,14 @@
  * parameter system on it: its host entry 0x3F9A30 and everything it reaches, lifted from the binary one C
  * statement per instruction (jx3p/src/jx_lift.c, jx3p/tools/jx_lift.py; graded EXACTLY 0 against the plugin by
  * jx_lift_gate.py) and run under the JP8's runtime (jp8/src/jp8_rt.c, JP8_RELOC: guest addresses kept, every
- * access translated into the blocks below). The transcribed parts run on the same bytes:
- *   note managers        jx_alloc.c     (EXACTLY 0, 22,008 events)
- *   note store           jx_nstore.c    (EXACTLY 0)
- *   key tracker          jx_ktrack.c    (EXACTLY 0, 13,593 events)
- *   note/gate dispatch   jx_dispatch_note.c (EXACTLY 0, 2,500 dispatches)
- *   clock tick, step machine jx_seq.c   (JX-7)
+ * access translated into the blocks below). THE NOTE PATH IS THE PLUGIN'S OWN TOO (JX-12b, 2026-10-10): the
+ * engine's note entries (vtable +0x80 / +0x78), its clock tick (+0xB8), its CC and bend entries, the note store's
+ * mode setter and the assigner's count setter, lifted with all they reach -- the note managers, the note stores
+ * and their step machine (the arpeggiator), the assigners (assign modes, legato, portamento) and their posts into
+ * the voices (jx_lift_gate.py --loads notes / tick / ctl, jx_tick_gate.py). jx3p/src's transcriptions of that
+ * path (jx_alloc.c, jx_nstore.c, jx_ktrack.c, jx_dispatch_note.c, jx_seq.c) keep their own gates but the port
+ * no longer runs them: they had met neither legato nor portamento under the sustain and all notes off, where the
+ * product gate found them wrong (JX-12). The transcribed parts run on the same bytes:
  *   voice + master       jx_voice_render.c / jx_master_render.c (64/64 patches EXACTLY 0 vs the plugin)
  *   here: the units' wrappers and ramp sweeps (0x377080 / 0x377010, 0x3F40E0 / 0x3F4A40) and the engine
  *   render's preamble and output gain stage (0x3F9220), on the plugin's own records and HOST cells.
@@ -33,17 +35,8 @@
 /* ---- the guest heap's translation for transcribed code: host = guest + delta (set at init) ---- */
 unsigned long long jx_g2h_delta;
 #define JXG_H(g)       ((uint8_t *)(uintptr_t)((unsigned long long)(g) + jx_g2h_delta))
-#define JXS_PTR(ns, v) JXG_H(v)              /* jx_seq.c: the note store's +0x20 is the plugin's own pointer */
-#define JXA_UNIT_PTRS 1                      /* jx_alloc.c: each note manager is the plugin's own object */
-
-/* ---- proven modules (single-file link; see jx_full_gate.sh) ---- */
-#include "../src/jx_alloc.c"
-#include "../src/jx_nstore.c"
-#include "../src/jx_ktrack.c"
-#include "../src/jx_dispatch_note.c"
-#include "../src/jx_seq.c"
-#define JX_NS_SZ 0xFF0             /* the note store's allocation (4080 bytes, EXECUTED 2026-10-10) */
-#include "../src/jx_param_get.h"
+#define JX_NS_SZ  0xFF0            /* the note store's allocation (4080 bytes, EXECUTED 2026-10-10) */
+#define JX_MGR_SZ 0x7A8            /* the note manager, through its history list at +0x5A8 (jx_alloc.c) */
 
 /* ---- the plugin's parameter system, lifted, and its runtime ---- */
 #define JP8_RELOC 1
@@ -54,7 +47,11 @@ unsigned long long jx_g2h_delta;
 #define JP8_SOFTFP 1               /* no x86 MXCSR: FTZ/DAZ in software, the oracle's semantics */
 #endif
 #include "../../jp8/src/jp8_rt.c"
+#ifdef JX_LIFT_FILE                /* a TOOTH build: a lifted source with one defect put in (jx_tick_gate.py --tooth) */
+#include JX_LIFT_FILE
+#else
 #include "../src/jx_lift.c"
+#endif
 /* THE IMAGE GUARD (Linux, native): the image block holds only the pages the guest image carries
  * (jx_guest_export.py image_pages: the census and a static scan of the lifted source); every other page of the
  * block is made no-access, so a read the census missed crashes the gate that made it instead of reading zeros */
@@ -79,12 +76,11 @@ typedef struct {
     uint8_t *vhigh[NV];            /* vstate + 0xA60000 */
     uint8_t *mstate;
     uint8_t *proc[NUNITS];         /* the parameter objects */
-    jx_alloc mgr;                  /* the note managers */
+    uint8_t *mgr[NUNITS];          /* the note managers */
     uint8_t *ns[NUNITS];           /* the note stores */
     uint8_t *kt[NUNITS];           /* the assigners (the HOST's assigner pointer and the manager's +0x520) */
     uint8_t *host;                 /* the engine HOST */
     uint64_t stg[NUNITS];          /* the unit states' guest addresses */
-    jx_dn_cbs dn;
     int      host_stage_off;
     int64_t  clock;                /* samples rendered */
     const uint8_t *bank;
@@ -310,12 +306,12 @@ static int guest_link(void)
     }
     for (int u = 0; u < NUNITS; ++u) {
         uint64_t st = gq(h + 80 + 64 * u), pr = gq(h + 96 + 64 * u), asg = gq(h + 0x68 + 64 * u);
-        uint8_t *un = jxg_heap(gq(h + 0x78 + 0x40 * u), JXA_UNIT_SZ);
+        uint8_t *un = jxg_heap(gq(h + 0x78 + 0x40 * u), JX_MGR_SZ);
         if (!un || !jxg_heap(st, SNAP_M) || !jxg_heap(pr, 0x700) || !jxg_heap(asg, 0xB8)) return 0;
         if (gq(un + 0x520) != asg || !jxg_heap(gq(un + 0x518), JX_NS_SZ)) return 0;
         G.stg[u] = st;
         G.proc[u] = JXG_H(pr);
-        G.mgr.u[u] = un;
+        G.mgr[u] = un;
         G.ns[u] = JXG_H(gq(un + 0x518));
         G.kt[u] = JXG_H(asg);
         if (u < NV) { G.vstate[u] = JXG_H(st); G.vhigh[u] = JXG_H(st + 0xA60000); }
@@ -377,89 +373,27 @@ int jx3p_records(const uint32_t *idval, int n)
     return 0;
 }
 
-/* dispatch a tracker post into the right unit's proc + DSP state; the seam object for slot v is the plugin's
- * [proc+0x110+0x10 v] (its +0x50 the temper table, +0x58, +0x5C), read when the post is made */
-static void unit_set48(void *u, int what, int pid, int val)
-{
-    int unit = (int)(intptr_t)u, v;
-    uint8_t *st = (unit < NV) ? G.vstate[unit] : G.mstate, *o110, *tt;
-    (void)what;
-    if (pid >= 433 && pid <= 440) v = pid - 433;
-    else if (pid >= 450 && pid <= 457) v = pid - 450;
-    else return;
-    o110 = jxg_heap(gq(G.proc[unit] + 0x110 + 0x10 * v), 0x60);
-    tt = o110 ? jxg_any(gq(o110 + 0x50) - 44, 23 * 4) : NULL;
-    if (!o110 || !tt) {                       /* not the plugin's layout: refuse loudly, as a trap */
-        if (!G.lift_err) { G.lift_err = 1; snprintf(G.lift_msg, sizeof G.lift_msg, "unit %d slot %d: no seam object", unit, v); }
-        return;
-    }
-    G.dn.o110_58 = gi(o110 + 0x58);
-    G.dn.o110_5c = gi(o110 + 0x5C);
-    G.dn.temper23 = (const float *)(const void *)tt;
-    if (pid <= 440) jx_dispatch_note_cb(&G.dn, G.proc[unit], st, v, 2, val);
-    else            jx_dispatch_gate_cb(&G.dn, G.proc[unit], st, v, 2, val);
-}
-/* the assigner's parameter read (vtable +0x50, 0x357E60): its parent's GET (the unit's parameter object,
- * vtable +0x60, 0x3E8E10) -- a dword at the id's offset in the parameter object (jx_param_get.h, EXECUTED),
- * found or not */
-static int unit_get50(void *u, int what, int pid, int32_t *out)
-{
-    int unit = (int)(intptr_t)u, lo = 0, hi = JX_PARAM_GET_N - 1;
-    (void)what;
-    while (lo <= hi) {
-        int mid = (lo + hi) / 2;
-        if (JX_PARAM_GET[mid][0] == pid) { memcpy(out, G.proc[unit] + JX_PARAM_GET[mid][1], 4); return 1; }
-        if (JX_PARAM_GET[mid][0] < pid) lo = mid + 1; else hi = mid - 1;
-    }
-    return 0;
-}
-/* the assigner's time read (vtable +0x70, 0x357EF0): its clock [asg+0xB0] / 96, signed, truncating */
+/* the assigner clock of unit u, [assigner+0xB0] (its time read, vtable +0x70 0x357EF0, is this / 96) */
 static int64_t kt_clock(int u) { int64_t c; memcpy(&c, G.kt[u] + 0xB0, 8); return c; }
-static uint32_t unit_get70(void *u)
-{ return (uint32_t)(kt_clock((int)(intptr_t)u) / 96); }
-/* THE NOTE STORE'S OUTPUTS (jx3p/src/jx_seq.c): its vtable +0 / +8 play into the unit's assigner (+0xFD8:
- * vtable +0x18 note-on, +0x10 note-off), and its drain seam (the tail jump to 0x3EF210 at a full drain)
- * releases its 16 playing columns */
-static void seq_kt_on(void *user, int unit, int note, int vel)
-{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)unit };
-    (void)user; jx_ktrack_on(G.kt[unit], &c, note, vel); }
-static void seq_kt_off(void *user, int unit, int note, int vel)
-{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)unit };
-    (void)user; (void)vel; jx_ktrack_off_full(G.kt[unit], &c, note); }
-static uint64_t g_bad_hook;          /* a step-choice function jx_seq.c does not hold: the first one seen */
-static void seq_bad_hook(void *user, uint64_t h) { (void)user; if (!g_bad_hook) g_bad_hook = h ? h : 1; }
-static jx_seq_cbs seq_cbs(int unit)
-{   jx_seq_cbs c = { seq_kt_on, seq_kt_off, seq_bad_hook, NULL, unit }; return c; }
-static void ns_drain(void *u, int kind, int a, int b2)
-{
-    int unit = (int)(intptr_t)u;
-    jx_seq_cbs c = seq_cbs(unit);
-    (void)kind; (void)a; (void)b2;
-    jxs_3EF210(G.ns[unit], &c);                  /* the only seam kind: JXN_CB_EF210 */
-}
 
-static void sink518_on(void *u, int unit, int note, int vel)
-{   jx_nstore_cbs c = { ns_drain, (void *)(intptr_t)unit };
-    (void)u; jx_nstore_on5100(G.ns[unit], &c, note, vel); }
-static void sink518_off(void *u, int unit, int note, int vel)
-{   jx_nstore_cbs c = { ns_drain, (void *)(intptr_t)unit };
-    (void)u; jx_nstore_off(G.ns[unit], &c, note, vel); }
-static void sink520_on(void *u, int unit, int note, int vel)
-{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70,
-                        (void *)(intptr_t)unit };
-    (void)u; jx_ktrack_on(G.kt[unit], &c, note, vel); }
-static void sink520_off(void *u, int unit, int note, int vel)
-{   jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70,
-                        (void *)(intptr_t)unit };
-    (void)u; (void)vel; jx_ktrack_off_full(G.kt[unit], &c, note); }
-
-static const jx_alloc_cbs g_acbs =
-    { sink518_on, sink518_off, sink520_on, sink520_off, NULL };
-
+/* THE NOTE ENTRIES (JX-12b): the engine's vtable +0x80 (0x3F9150) and +0x78 (0x3F90F0), LIFTED -- the plugin's
+ * own note managers, note stores, assigners and posts into the voices (rcx the HOST, dl the key, r8b the
+ * velocity: jx_emu.py's note_on / note_off; a note-off's velocity 0x40, the oracle's) */
+#define JX_NOTEON   0x3F9150
+#define JX_NOTEOFF  0x3F90F0
+#define JX_TICK     0x3F84A0       /* the engine's clock tick, vtable +0xB8 */
+#define JX_SETMODE  0x3F1910       /* the note store's step-mode setter */
+#define JX_SETCOUNT 0x357CE0       /* the assigner's count setter, vtable +0x80 */
+/* TOOTH (jx_full_gate.sh, jx_wasm_check.py --tooth): every key one semitone up at the note entries -- the
+ * end-to-end gates MUST see it (it lived in the transcribed note dispatch before JX-12b) */
+#ifndef JX_FULL_TOOTH
+#define JX_FULL_TOOTH 0
+#endif
+#define JX_KEY(k) ((uint64_t)(uint32_t)((k) + JX_FULL_TOOTH))
 void jx3p_note_on(int note, int vel)
-{ jx_alloc_note_on(&G.mgr, &g_acbs, note, vel); }
+{ jxg_call(JX_NOTEON, G.hostg, JX_KEY(note), (uint64_t)(uint32_t)vel, 0, NULL); }
 void jx3p_note_off(int note)
-{ jx_alloc_note_off(&G.mgr, &g_acbs, note, 0x40); }
+{ jxg_call(JX_NOTEOFF, G.hostg, JX_KEY(note), 0x40, 0, NULL); }
 
 /* ---- THE UNITS' WRAPPER AND RAMP RECORDS, the plugin's own (unit state +0x14 the flag, +0xAAC308 the
  * start-mute count, +0x58 the 40-byte ramp slots, +0x70 / +0x78 the active ids' vector) ---- */
@@ -530,15 +464,15 @@ void jx3p_render(float *L, float *R, int n)
         a2[2 * v + 1] = (uint64_t)(uintptr_t)&G.vcells[2 * v + 1];
     }
     /* THE ENGINE RENDER'S PREAMBLE (rva 0x3F9220, READ; 2026-10-10): per voice unit its assigner's
-     * count synced to the HOST's (the setter, jx_ktrack_set_count) and its clock [asg+0xB0] advanced by
-     * the call's samples; only units below the count render -- the others' outputs are zero and their
-     * wrappers do not run (six voices by default: initialize's record 0x0FFFC00E). */
+     * count (vtable +0x88, 0x357E50: [asg+8]) synced to the HOST's through its setter (vtable +0x80, 0x357CE0,
+     * LIFTED: JX-12b) and its clock [asg+0xB0] advanced by the call's samples (0x357EA0: add qword [rcx+0xB0],
+     * edx sign-extended); only units below the count render -- the others' outputs are zero and their wrappers
+     * do not run (six voices by default: initialize's record 0x0FFFC00E). */
     if (!G.host_stage_off)
         for (int u = 0; u < NV; ++u) {
-            jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)u };
             int64_t clk;
-            if (jx_ktrack_count(G.kt[u]) != nv)
-                jx_ktrack_set_count(G.kt[u], &c, nv);
+            if (gi(G.kt[u] + 8) != nv)
+                jxg_call(JX_SETCOUNT, gq(G.host + 0x68 + 64 * u), (uint64_t)(uint32_t)nv, 0, 0, NULL);
             clk = kt_clock(u) + n;
             memcpy(G.kt[u] + 0xB0, &clk, 8);
         }
@@ -655,7 +589,7 @@ void *jx3p_heap(void) { return G.hlen ? JXG_H(G.hb) : NULL; }
 void *jx3p_ctl(int which, int i)
 {
     switch (which) {
-    case 0: return G.mgr.u[i];
+    case 0: return G.mgr[i];
     case 1: return G.ns[i];
     case 2: return G.kt[i];
     default: return G.proc[i];
@@ -699,26 +633,13 @@ int jx3p_wrap_dump(int u, uint8_t *out, int cap)
  * gate's DSP mode grades the voices and the master against the plugin's per-unit renders that way;
  * 1 (the default after jx3p_init) is the plugin's engine render. */
 void jx3p_host_stage(int on) { G.host_stage_off = !on; }
-/* THE ENGINE'S CLOCK TICK (vtable +0xB8, rva 0x3F84A0; the render driver calls it 24 times per beat): per
- * unit its note manager's counter, its tick and its note store's tick (jx3p/src/jx_seq.c) */
-void jx3p_tick(void)
-{
-    for (int u = 0; u < NUNITS; ++u) {
-        jx_nstore_cbs n = { ns_drain, (void *)(intptr_t)u };
-        jx_seq_cbs c = seq_cbs(u);
-        jx_seq_tick_unit(G.mgr.u[u], G.ns[u], &n, &c);
-    }
-}
-/* the first step-choice function the port met but does not hold (an image rva), 0 when none */
-unsigned long long jx3p_bad_hook(void) { return (unsigned long long)g_bad_hook; }
-/* the step machine's reach since the start: [0] step choices, [1] notes it played, [2] notes it released */
-void jx3p_seq_stats(unsigned long out[3]) { out[0] = g_seq_hook_calls; out[1] = g_seq_on; out[2] = g_seq_off; }
-/* how often each of the 19 modes' step functions ran since the start */
-void jx3p_seq_modes(unsigned long out[19]) { for (int k = 0; k < 19; ++k) out[k] = g_seq_mode_calls[k]; }
-/* GATE STIMULUS (jx3p/tools/jx_tick_gate.py --setmode): every unit's note store set to step mode `mode`
- * by the port's transcription of the plugin's mode setter 0x3F1910 -- the modes no patch reaches
- * (jx3p/docs/HOST_LAYER.md 3e); the gate calls the plugin's own setter on its side */
-void jx3p_seq_set_mode(int mode) { for (int u = 0; u < NUNITS; ++u) jxs_3F1910(G.ns[u], (uint32_t)mode); }
+/* THE ENGINE'S CLOCK TICK (vtable +0xB8, rva 0x3F84A0, LIFTED: JX-12b; the render driver calls it 24 times per
+ * beat): per unit its note manager's counter, its tick and its note store's step machine */
+void jx3p_tick(void) { jxg_call(JX_TICK, G.hostg, 0, 0, 0, NULL); }
+/* GATE STIMULUS (jx3p/tools/jx_tick_gate.py --setmode): every unit's note store set to step mode `mode` by the
+ * plugin's own mode setter 0x3F1910, lifted -- the modes no patch reaches (jx3p/docs/HOST_LAYER.md 3e) */
+void jx3p_seq_set_mode(int mode)
+{ for (int u = 0; u < NUNITS; ++u) jxg_call(JX_SETMODE, gq(G.mgr[u] + 0x518), (uint64_t)(uint32_t)mode, 0, 0, NULL); }
 /* the assigner clock of unit u (the plugin's [assigner+0xB0]): gates and diagnostics */
 long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS && G.kt[u]) ? (long long)kt_clock(u) : -1; }
 
@@ -811,10 +732,10 @@ static int32_t jx_midi_record_value(int e, float v)
     return (int32_t)r;
 }
 /* the engine's entries the driver calls for a MIDI message (rva 0x32113C, the status' table at 0x32193C /
- * 0x32191C, READ): 0x90 note on (vt+0x80, the transcribed note path: jx_alloc.c ...), 0x80 note off (vt+0x78,
- * the same, with the message's velocity), 0xB0 the CC entry (vt+0x88, 0x34AD50: 1 mod, 11 expression, 64
- * sustain, 123 all notes off; 10 and every other CC nothing), 0xE0 bend (vt+0x98, 0x3F91B0) with
- * data1 + ((data2 - 64) << 7) as 16 bits -- these two LIFTED (jx_lift_roots.py CONTROL_SLOTS, JX-12) --;
+ * 0x32191C, READ): 0x90 note on (vt+0x80, 0x3F9150), 0x80 note off (vt+0x78, 0x3F90F0, with the message's
+ * velocity), 0xB0 the CC entry (vt+0x88, 0x34AD50: 1 mod, 11 expression, 64 sustain, 123 all notes off; 10 and
+ * every other CC nothing), 0xE0 bend (vt+0x98, 0x3F91B0) with data1 + ((data2 - 64) << 7) as 16 bits -- all four
+ * LIFTED (jx_lift_roots.py CONTROL_SLOTS; JX-12, JX-12b) --;
  * 0xA0 (vt+0xA0), 0xC0 (vt+0x90), 0xD0 (vt+0xA8): `ret 0` (READ) */
 #define JX_CC_ENTRY   0x34AD50
 #define JX_BEND_ENTRY 0x3F91B0
@@ -829,8 +750,8 @@ static void drv_apply(const jx_drv_rec *r)
         return;
     }
     switch (r->st & 0xF0) {
-    case 0x90: jx3p_note_on(r->note, r->vel); g_drv_notes++; break;
-    case 0x80: jx_alloc_note_off(&G.mgr, &g_acbs, r->note, r->vel); g_drv_notes--; break;
+    case 0x90: jxg_call(JX_NOTEON, G.hostg, JX_KEY(r->note & 0xFF), (uint64_t)(r->vel & 0xFF), 0, NULL); g_drv_notes++; break;
+    case 0x80: jxg_call(JX_NOTEOFF, G.hostg, JX_KEY(r->note & 0xFF), (uint64_t)(r->vel & 0xFF), 0, NULL); g_drv_notes--; break;
     case 0xB0: jxg_call(JX_CC_ENTRY, G.hostg, (uint64_t)(r->note & 0xFF), (uint64_t)(r->vel & 0xFF), 0, NULL); break;
     case 0xE0: {
         uint16_t d = (uint16_t)((r->note & 0xFF) + (uint16_t)(int16_t)(((r->vel & 0xFF) - 0x40) * 0x80));

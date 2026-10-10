@@ -31,11 +31,11 @@
 #                  rates, notes at block starts and inside blocks (jx_product_gate.py).
 #
 # What this does NOT yet cover, stated so "green" is not read wider than it is
-# (jx3p/docs/SCOPE_AUDIT.md is the full table): a patch change on a running
-# engine (warm recall), audio under polyphony (the control plane is graded),
-# block sizes other than 512 through process(), rates 88200 / 192000, the
-# editor's controls through process() (their effect on the engine is graded),
-# standalone effect entries no patch reaches.
+# (jx3p/docs/SCOPE_AUDIT.md is the full table, its open rows the list): a host
+# tempo (the ProcessContext; JX-8), the engine-rate settings other than the
+# default, host block sizes other than 512 through process(), FX tails past
+# 2.4 s, the DAW state (getState / setState, MIDI learn), user banks through
+# the patch browser, the editor (no JX GUI is ported).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -95,8 +95,9 @@ echo "=== JX GATE 3b: THE MASTER, EVERY SAMPLE OF STATE (64 patches + the mode v
 python3 "$HERE/jx_master_bisect.py" --gate 12000
 echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object after every event; JX-7) ==="
 # 5 factory patches x 1,500 events, 12 variants of the plugin's own patch load (every step mode the
-# product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the
-# tooth stops the port's step clock
+# product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the port's tick,
+# note entries and setter are the plugin's own, lifted (JX-12b); the tooth drops the step clock's increment
+# (inc at 0x3EFE5E) from the lifted source
 python3 "$HERE/jx_tick_gate.py"
 python3 "$HERE/jx_tick_gate.py" --tooth --patches 34,61 --variants '34:+0x600120=8' --no-setmode \
         --events 300 --variant-events 300
@@ -127,6 +128,10 @@ python3 "$HERE/jx_product_gate.py" --tooth-law --rates 48000 --patches 0 --on 0.
 python3 "$HERE/jx_product_gate.py" --rates 48000,96000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
 python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 61,34 --poly 2 --ctl 2 --on 0.55 --secs 2.4
 python3 "$HERE/jx_product_gate.py" --tooth-ctl --rates 48000 --patches 0 --poly 1 --ctl 1 --on 0.55 --secs 2.4
+# THE NOTE MODES (JX-12b): legato (no factory patch sets it), the assign modes, portamento and the arpeggiator set
+# at the start through process(), with seeded polyphony and controllers -- the plugin's own note path, lifted
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 3 --ctl 3 --on 0.55 --secs 2.4 \
+        --set '600062=1;600064=0.5,600062=1;600064=1;600060=0.5,600062=1,600064=1;600108=1,600062=1'
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
@@ -142,6 +147,13 @@ python3 "$HERE/jx_lift_gate.py" --loads 5 --tooth 35D29F          # one multiply
 python3 "$HERE/jx_lift_gate.py" --loads ctl
 python3 "$HERE/jx_lift_gate.py" --base 34 --loads ctl
 python3 "$HERE/jx_lift_gate.py" --loads ctl --tooth-skip 86         # a sustain release dropped: must be seen
+# the note entries under every assign mode, legato, portamento and ARPEGGIO setting; the clock tick under all 19
+# step modes (JX-12b), a heap checkpoint after every script step
+python3 "$HERE/jx_lift_gate.py" --loads notes
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads notes
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads tick
+python3 "$HERE/jx_lift_gate.py" --loads notes --tooth-skip 148      # a legato note-on dropped: must be seen
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads tick --tooth-skip 1132   # one tick of step mode 7 dropped
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null

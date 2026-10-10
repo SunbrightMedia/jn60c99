@@ -3539,3 +3539,20 @@ lifted source, the dynamic census), not just a pattern; and where an index is co
 the whole region -- a sample of inputs is not a bound. Compare state after every judged step when one
 step can undo another. And the harness passes the plugin's inputs as they are; any conversion belongs
 to the port, where the gate grades it.
+
+## 203. A TRANSCRIPTION GRADED ON THE FACTORY STATES IS PROVEN ON THE FACTORY STATES -- ENUMERATE ITS MODE INPUTS, OR LIFT IT
+Paid 2026-10-10 (JX-3P, JX-12b: the note path).
+The JX-3P's note path -- note managers, note stores, the key tracker / assigner, the note dispatch, the step
+machine -- was transcribed module by module, each with a two-process gate and a tooth: EXACTLY 0 over 22,008
+events. Every one of those events ran in a FACTORY note mode. Then the MIDI-controller gate (seeded CCs through
+process()) went RED by a few ULPs after a note-on, only when the sustain, all notes off and the mapped CCs came
+together. The mapped CCs were the cause: the default CC map sends CC 5 to PORTAMENTO and CC 116 to LEGATO, and no
+factory patch sets LEGATO. The controller gate had reached a MODE of the transcribed code that no factory state
+reaches; bisecting the CC groups (each alone EQUAL) pointed at the interaction, not at a CC. The settling
+experiment took one build flag: the same run with the two note entries LIFTED was EQUAL.
+### The rule
+A module's gate proves the module on the states its inputs reach. List the module's MODE inputs (here ASSIGN
+MODE, LEGATO, PORTAMENTO, ARPEGGIO and the 19 step modes) and grade every combination, or -- where the code is
+not hot (notes and ticks, not samples) -- lift it: the plugin's own instructions under the lifted-code gate
+(every return value and the whole heap after every call) close every mode at once. Keep the transcription and
+its gate as documentation; do not ship it.

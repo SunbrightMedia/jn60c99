@@ -13,10 +13,11 @@ traps), the oracle's regions mapped at their guest addresses and loaded from the
 VERBATIM through the lifted entry -- nothing re-derived (plumbing only). Compared: every return value, the whole
 heap after the calls (byte for byte), the stack (reported).
 
-    python3 jx3p/tools/jx_lift_gate.py [--base 0] [--loads 5,34,40,62 | --loads sweep] [--tooth RVA] [--relift]
+    python3 jx3p/tools/jx_lift_gate.py [--base 0] [--loads 5,34,40,62 | --loads sweep] [--tooth RVA] [--relift [--write]]
                                        [--keep] [--reach] [--census OUT | --pages]
   The lifted source is jx3p/src/jx_lift.c (jx_lift.py on the committed reach, jx3p/gen/jx_lift_reach.json);
-  --relift lifts again and requires it byte for byte; --reach runs the oracle's reach again (jx_dynreach.py).
+  --relift lifts again and requires it byte for byte (--relift --write: writes it first -- after a new reach or
+  new roots); --reach runs the oracle's reach again (jx_dynreach.py).
   --loads sweep: every id of the host entry's map at 13 values, a heap checkpoint after each id, the base
   patch's records after it (the host edits beyond a patch load).
   --tooth RVA: lift with that one addss turned into subss (jp8_lift.py --tooth) -- the gate must FAIL.
@@ -29,10 +30,14 @@ heap after the calls (byte for byte), the stack (reported).
   --loads ctl: the render driver's kind-0 targets (JX-12): the engine's CC entry (mod, expression, sustain,
   all notes off, ignored CCs), its bend entry, the empty entries and its note entries around them
   (jx_dynreach.py ctl_script) -- each call through the plugin's entry and through the lifted one.
+  --loads notes: the note entries under every assign mode, legato, portamento and ARPEGGIO setting, the sustain
+  and all notes off and clock ticks among them (notes_script); --loads tick: the clock tick under all 19 step
+  modes, each put into every unit's note store by the plugin's own setter (tick_script) -- JX-12b.
   --census OUT: no grading but a CENSUS (jx_lift_census.c): the same replay with every region's pages armed --
   which 4 KB pages of the heap, the image and the stack the lifted calls read and write; the replay must end
   EXACT or nothing is written.
-  --pages: the census of the six reach runs (patches 0 and 34: all loads, the id sweep, the controllers) merged into
+  --pages: the census of the nine reach runs (patches 0 and 34: all loads, the id sweep, the controllers, the note
+  modes; patch 34: the tick) merged into
   jx3p/gen/jx_lift_pages.json -- the image pages the port's guest image carries (jx_guest_export.py).
 exit 0 = every return value and every heap byte equal.
 """
@@ -58,9 +63,24 @@ REACH = (('dynreach_loads.json', ['--no-sweep']), ('dynreach_sweep.json', []),
          ('dynreach_loads_b34.json', ['--base', '34', '--no-sweep']), ('dynreach_sweep_b34.json', ['--base', '34']),
          ('dynreach_loads_b61.json', ['--base', '61', '--no-sweep']), ('dynreach_loads_b40.json', ['--base', '40', '--no-sweep']),
          # the render driver's kind-0 targets (JX-12): the controller entries and the note entries around them
-         ('dynreach_ctl.json', ['--ctl']), ('dynreach_ctl_b34.json', ['--base', '34', '--ctl']))
+         ('dynreach_ctl.json', ['--ctl']), ('dynreach_ctl_b34.json', ['--base', '34', '--ctl']),
+         # the note entries under every assign mode, legato, portamento and ARPEGGIO, and the clock tick under every
+         # step mode (JX-12b: the port runs the plugin's own note path and tick)
+         ('dynreach_notes.json', ['--notes']), ('dynreach_notes_b34.json', ['--base', '34', '--notes']),
+         ('dynreach_tick.json', ['--base', '34', '--tick']))
+SCRIPTS = {'ctl': 'ctl_script', 'notes': 'notes_script', 'tick': 'tick_script',      # jx_dynreach.py's scripts
+           'tempo': 'tempo_script', 'rate': 'rate_script'}
+XMM1_OFF = 16 * 8 + 16                     # jp8_cpu.h CPU: r[16], then x[16] of 16 bytes -- xmm1
 RET = 0x100000 + 0x5000                    # jx_emu.call's return sentinel (SCRATCH + 0x5000)
 CPU_SZ, RSP_OFF, RAX_OFF, MX_OFF = 512, 4 * 8, 0, 16 * 8 + 16 * 16 + 5 * 4     # jp8_cpu.h CPU
+
+
+def lift_source(dst, extra=()):
+    """the lifter's output on the committed reach and roots -- the host entry and the slot-family roots
+    (jx_lift_roots.py: the classes live in the heap) -- written to dst; extra: lifter options (a tooth)"""
+    roots = ','.join([ROOTS] + [r.upper() for r in json.load(open(ROOTS_FILE))['roots']])
+    subprocess.run([sys.executable, os.path.join(HERE, 'jx_lift.py'), dst, roots, '--dyn', REACH_FILE] + list(extra),
+                   check=True)
 
 
 def oracle(ref, base, loads):
@@ -116,19 +136,18 @@ def oracle(ref, base, loads):
             for kind, rid, val in recs[base]:
                 if kind == 2:
                     host(rid, val)
-    elif loads == ['ctl']:
-        # the render driver's kind-0 targets, in jx_dynreach.py's order (one script for the reach and the gate); a
-        # CHECKPOINT (the heap's sha256) after EVERY call: a later call can undo an earlier one's effect (a sustain
-        # release, then another -- the end state alone hid a dropped release: --tooth-skip 36 did not bite)
+    elif loads[0] in SCRIPTS:
+        # the render driver's kind-0 targets (ctl), the note entries under every note mode (notes), the clock tick
+        # under every step mode (tick) -- jx_dynreach.py's scripts (one script for the reach and the gate); a
+        # CHECKPOINT (the heap's sha256) after EVERY script step: a later call can undo an earlier one's effect (a
+        # sustain release, then another -- the end state alone hid a dropped release: --tooth-skip 36 did not bite)
         import hashlib
         sys.path.insert(0, HERE)
         import jx_dynreach as D
-        for n, c in enumerate(D.ctl_script()):
-            rax = D.ctl_call(jx, c)
-            k = c[0]
-            fn = {'cc': D.CC_ENTRY, 'bend': D.BEND_ENTRY, 'on': J.NOTEON - J.IB, 'off': J.NOTEOFF - J.IB}.get(k, c[1] if k == 'empty' else None)
-            rdx, r8 = ((c[1], c[2]) if k in ('cc', 'on', 'off') else (c[1] & 0xFFFF, 0) if k == 'bend' else (c[2], 0))
-            calls.append(dict(fn=fn, rcx=jx.HOST, rdx=rdx, r8=r8, r9=0, mx=mx, rax=rax))
+        script = getattr(D, SCRIPTS[loads[0]])
+        for n, c in enumerate(script(base) if loads[0] in ('tempo', 'rate') else script()):
+            for fn, rcx, rdx, r8, rax, x1 in D.ctl_call(jx, c):
+                calls.append(dict(fn=fn, rcx=rcx, rdx=rdx, r8=r8, r9=0, mx=mx, rax=rax, **({} if x1 is None else {'x1': x1})))
             calls.append(dict(check=hashlib.sha256(bytes(uc.mem_read(J.HEAP_BASE, heap_end - J.HEAP_BASE))).hexdigest(),
                               id=n))
     elif loads == ['sweep']:
@@ -189,13 +208,15 @@ def ctwin(ref, so):
         if 'check' in c:                          # the oracle's heap hash after one id's sweep
             if hashlib.sha256(ctypes.string_at(H(m['heap_base']), heap_len)).hexdigest() != c['check']:
                 bad += 1
-                print('  CHECKPOINT %d: the heap differs after %s 0x%x' % (k, 'the sweep of id' if m['loads'] != ['ctl'] else
-                                                                          'controller call', c['id']))
+                print('  CHECKPOINT %d: the heap differs after %s 0x%x' % (k, 'script step' if m['loads'][0] in SCRIPTS else
+                                                                          'the sweep of id', c['id']))
                 if bad >= 3:
                     break
             continue
         ctypes.memmove(cp + RSP_OFF, struct.pack('<Q', m['rsp']), 8)
         ctypes.memmove(cp + MX_OFF, struct.pack('<I', c['mx']), 4)
+        if 'x1' in c:                             # a float argument in xmm1 (setSampleRate), as the oracle set it
+            ctypes.memmove(cp + XMM1_OFF, struct.pack('<IIII', c['x1'], 0, 0, 0), 16)
         ctypes.memmove(H(m['rsp'] - 8), struct.pack('<Q', RET), 8)
         if lib.jp8_call(cp, c['fn'], c['rcx'], c['rdx'], c['r8'], c['r9']):
             trap = '%s (call %d: id 0x%x value %d)' % (lib.jp8_last_trap().decode(), k, c['rdx'], c['r8'])
@@ -267,6 +288,8 @@ def census(ref, so, out):
             continue
         ctypes.memmove(cp + RSP_OFF, struct.pack('<Q', m['rsp']), 8)
         ctypes.memmove(cp + MX_OFF, struct.pack('<I', c['mx']), 4)
+        if 'x1' in c:
+            ctypes.memmove(cp + XMM1_OFF, struct.pack('<IIII', c['x1'], 0, 0, 0), 16)
         ctypes.memmove(H(m['rsp'] - 8), struct.pack('<Q', RET), 8)
         if lib.jp8_call(cp, c['fn'], c['rcx'], c['rdx'], c['r8'], c['r9']):
             print('  TRAP: %s (call %d)' % (lib.jp8_last_trap().decode(), k))
@@ -289,7 +312,8 @@ def census(ref, so, out):
     return 0
 
 
-CENSUS = ((0, 'all'), (34, 'all'), (0, 'sweep'), (34, 'sweep'), (0, 'ctl'), (34, 'ctl'))
+CENSUS = ((0, 'all'), (34, 'all'), (0, 'sweep'), (34, 'sweep'), (0, 'ctl'), (34, 'ctl'), (0, 'notes'), (34, 'notes'),
+          (34, 'tick'))
 
 
 def pages(outs):
@@ -301,7 +325,7 @@ def pages(outs):
         stack.update(a - c['rsp'] for a, f in c['pages']['stack'])
         if c['pages']['page0']:
             raise SystemExit('census %s: page 0 touched -- the guest image carries no page 0' % o)
-        rows.append(dict(base=c['base'], loads=c['loads'][0] if c['loads'] in (['sweep'], ['ctl']) else 'all', calls=c['calls'],
+        rows.append(dict(base=c['base'], loads=c['loads'][0] if c['loads'][0] in ('sweep',) + tuple(SCRIPTS) else 'all', calls=c['calls'],
                          heap=len(c['pages']['heap']), heap_written=sum(1 for _, f in c['pages']['heap'] if f & 2),
                          image=len(c['pages']['image'])))
     dst = os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_pages.json')
@@ -317,7 +341,7 @@ def pages(outs):
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings', 'ctl') else [int(x) for x in a[3].split(',')])
+        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings') + tuple(SCRIPTS) else [int(x) for x in a[3].split(',')])
         return 0
     if a[:1] == ['--c']:
         return 1 if ctwin(a[1], a[2]) else 0
@@ -345,11 +369,7 @@ def main():
         print('%s: %d sites, %d targets' % (REACH_FILE, len(u), sum(len(v) for v in u.values())))
         return 0
 
-    def lift(dst, extra=()):
-        # the host entry and the committed slot-family roots (jx_lift_roots.py: the classes live in the heap)
-        roots = ','.join([ROOTS] + [r.upper() for r in json.load(open(ROOTS_FILE))['roots']])
-        subprocess.run([sys.executable, os.path.join(HERE, 'jx_lift.py'), dst, roots, '--dyn', REACH_FILE] + list(extra),
-                       check=True)
+    lift = lift_source
     src = LIFTED
     if tooth:
         src = os.path.join(BUILD, 'jx_lift_tooth.c')
@@ -361,6 +381,10 @@ def main():
             return 1
         chk = os.path.join(BUILD, 'jx_lift_check.c')
         lift(chk)
+        if '--write' in a:                        # the committed source made from the committed reach and roots
+            import shutil
+            shutil.copyfile(chk, LIFTED)
+            print('jx_lift_gate --relift --write: %s written' % LIFTED)
         if open(chk, 'rb').read() != open(LIFTED, 'rb').read():
             print('jx_lift_gate --relift: %s is NOT the lifter\'s output on %s -- RED' % (LIFTED, REACH_FILE))
             return 1
@@ -406,6 +430,8 @@ def main():
         return 0 if r.returncode else 1
     print('jx_lift_gate: base %d, %s: %s' % (
         base, 'the controller and note calls through the lifted engine entries' if loads == 'ctl' else
+        'the note entries under every note mode through the lifted engine entries' if loads == 'notes' else
+        'the clock tick under every step mode through the lifted engine entries' if loads == 'tick' else
         'warm loads %s through the lifted host entry' % loads,
         'EXACTLY 0 -- every return value and heap byte' if not r.returncode else 'RED'))
     return r.returncode

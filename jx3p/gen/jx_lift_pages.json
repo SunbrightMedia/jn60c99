@@ -123,6 +123,30 @@
    "heap": 461,
    "heap_written": 101,
    "image": 21
+  },
+  {
+   "base": 0,
+   "loads": "notes",
+   "calls": 816,
+   "heap": 516,
+   "heap_written": 394,
+   "image": 26
+  },
+  {
+   "base": 34,
+   "loads": "notes",
+   "calls": 816,
+   "heap": 507,
+   "heap_written": 373,
+   "image": 20
+  },
+  {
+   "base": 34,
+   "loads": "tick",
+   "calls": 1578,
+   "heap": 292,
+   "heap_written": 132,
+   "image": 15
   }
  ]
 }

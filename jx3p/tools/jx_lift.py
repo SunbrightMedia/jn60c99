@@ -8,7 +8,7 @@ includes jp8/src/jp8_cpu.h; jp8/src/jp8_rt.c is its runtime (JP8_RELOC: guest ad
 translated into host arenas -- the JX's regions are the oracle's: page 0, image, stack, heap). One extension, here:
 a jump table whose image-base lea sits in an earlier block (find_jumptable below).
 
-    python3 jx3p/tools/jx_lift.py OUT.c ROOTS [--dyn reach.json ...] [--tooth RVA] [--name N]
+    python3 jx3p/tools/jx_lift.py OUT.c ROOTS [--dyn reach.json ...] [--tooth RVA | --tooth-drop RVA] [--name N]
       ROOTS: comma-separated rvas (hex), e.g. 3F9A30 (the engine's host entry, HOSTPARAM)
 """
 import os
@@ -63,8 +63,28 @@ def main():
             return mov.operands[1].mem.disp
         return None
     g['find_jumptable'] = find_jumptable
+    # TOOTH --tooth-drop RVA (2026-10-10, JX-12b): the instruction at RVA lifted as NOTHING -- one instruction lost,
+    # the defect class a lifted path can carry that the JP8 lifter's own --tooth (an addss made a subss) cannot
+    # reach in integer code (jx_tick_gate.py --tooth: the step clock's inc at 0x3EFE5E dropped)
+    drop = None
+    if '--tooth-drop' in sys.argv:
+        k = sys.argv.index('--tooth-drop')
+        drop = int(sys.argv[k + 1], 16)
+        del sys.argv[k:k + 2]
     sys.argv = [LIFTER] + sys.argv[1:]
-    return g['main']()
+    r = g['main']()
+    if drop is not None:
+        out = sys.argv[1]
+        lines = open(out).read().split('\n')
+        tag = '  /*%x ' % drop
+        hit = [i for i, line in enumerate(lines) if line.startswith(tag)]
+        if not hit:
+            raise SystemExit('--tooth-drop: rva 0x%x was not lifted' % drop)
+        for i in hit:
+            lines[i] = lines[i][:lines[i].index('*/ ') + 3] + '/* TOOTH: this instruction dropped */'
+        open(out, 'w').write('\n'.join(lines))
+        print('--tooth-drop: rva 0x%x dropped at %d lifted site(s)' % (drop, len(hit)))
+    return r
 
 
 if __name__ == '__main__':

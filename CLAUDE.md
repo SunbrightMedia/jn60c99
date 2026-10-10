@@ -252,9 +252,13 @@ mine is a hypothesis (playbook 80).
   --edits: the driver's id map and value law, jx3p/src/jx_midi_tables.h from
   the booted plugin) and the MIDI controllers (JX-12, --ctl: the push, the CC
   map, the engine's CC / bend entries lifted; .rdata and .data ship whole in
-  the guest image, playbook 202; OPEN: the product gate --ctl is RED). Full verify owed on the newest commit (job
-  jxverify_8a85 runs 8a8596ea). Next: the host tempo (lift root 0x3F9DD0, the
-  driver's T and tick period as the JUNO's), the patch browser for user banks.
+  the guest image, playbook 202). JX-12b: the whole NOTE PATH is the plugin's
+  own, lifted (note entries, tick, mode and count setters; the transcribed
+  jx_alloc / jx_nstore / jx_ktrack / jx_seq are out of the port: they had never
+  met LEGATO, playbook 203) -- the --ctl RED is fixed. Full verify owed on the
+  newest commit. Next (jx3p/docs/SCOPE_AUDIT.md open rows): the host tempo
+  (JX-8: lift root 0x3F9DD0), the engine-rate setting (JX-15: setSampleRate
+  0x3F9970), block sizes, long tails, the DAW state, user banks.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

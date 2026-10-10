@@ -3,6 +3,26 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (10) — THE NOTE PATH IS THE PLUGIN'S OWN, LIFTED (JX-12b)
+
+Block (9)'s open RED is found and fixed. The --ctl gate's mapped CCs reach PORTAMENTO (CC 5) and LEGATO (CC
+116), and no factory patch sets LEGATO: the port's TRANSCRIBED note path (jx_alloc / jx_nstore / jx_ktrack /
+jx_dispatch_note / jx_seq, EXACTLY 0 over 22,008 events -- all in factory note modes) had never met those
+modes. The port now runs the plugin's own code for the whole note path: the engine's note entries, its clock
+tick, the note store's mode setter and the assigner's count setter, lifted with all they reach
+(jx3p/docs/HOST_LAYER.md 3h; the transcriptions keep their own gates but the port no longer includes them).
+MEASURED (jx_lift_gate.py, a heap checkpoint after every step): the note entries under every assign mode x
+legato x portamento x ARPEGGIO setting from patches 0 and 34 (816 calls each) and the tick under all 19 step
+modes (1,578 calls) EXACTLY 0; the controller runs still EXACTLY 0; teeth: a dropped legato note-on (2,574
+words differ) and a dropped tick (252) are seen. Through process() (jx_product_gate.py): the --ctl runs that
+were RED are EQUAL (48 / 96 kHz, 225 / 450 blocks; 44.1 kHz patches 61 and 34; the tooth bites), and the note
+modes set at the start (--set: LEGATO; ASSIGN MODE 1 + legato; ASSIGN MODE 2; PORTAMENTO + legato + mode 2;
+ARPEGGIO + legato -- patches 0 and 34, seeded polyphony and controllers) EQUAL. The tick gate: 36 of 36 runs equal
+event by event, its reach counted on the plugin's side; its tooth (the step clock's inc dropped from the lifted
+source) bites 3 of 3. The full chain 4 / 4 EXACTLY 0 in both modes; its key-shift tooth moved into the port's
+note entries (it lived in the removed jx_dispatch_note.c and did NOT bite on the first run) and bites. The web
+page's WASM == native at 3 rates, its tooth bites.
+
 ## 2026-10-10 (9) — THE MIDI CONTROLLERS THROUGH process() (JX-12)
 
 A DAW's MIDI controllers reach the port as they reach the plugin. process() and the push are ported

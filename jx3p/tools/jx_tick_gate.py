@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""jx_tick_gate.py -- the engine's clock tick and the note store's step machine (jx3p/src/jx_seq.c) against
-the plugin's own code, event by event (two processes: Unicorn here, ctypes in a child).
+"""jx_tick_gate.py -- the engine's clock tick and the note store's step machine (the port: the plugin's own code,
+LIFTED -- jx3p/src/jx_lift.c, JX-12b; before it, the transcription jx3p/src/jx_seq.c) against the plugin's own
+code, event by event (two processes: Unicorn here, ctypes in a child).
 
 ORACLE  tools/verify/jx_emu.py boot(44100, product=True, patch=k): the engine after the plugin's own boot and
         patch load; then the plugin's own entries: the tick (vtable +0xB8, rva 0x3F84A0, called with the
         HOST as the render driver calls it) and the note fan-outs (0x3F9150 / 0x3F90F0).
-PORT    jx3p/gui/jx_bridge.c: jx3p_init + jx3p_recall(k), then jx3p_tick / jx3p_note_on / jx3p_note_off.
+PORT    jx3p/gui/jx_bridge.c: jx3p_init + jx3p_recall(k), then jx3p_tick / jx3p_note_on / jx3p_note_off (the same
+        entries, lifted; a trap of the lifted code -- a target the lift does not hold -- fails the run).
+REACH   counted on the PLUGIN's side (code hooks; the lifted port has no counters): the calls of each of the 19
+        step functions (the mode setter's own jump table names them) and of the assigner's note entries
+        (0x357BC0 / 0x357B20) during the ticks -- the notes the step machine played and released.
 
 A seeded sequence per run: runs of ticks (to and past the 12- and 24-tick boundaries) with note-ons and
 note-offs among them. After every event the 36 control objects (each unit's note manager, note store
@@ -28,7 +33,8 @@ factory patch 34's load: the step functions graded on states no input makes.
     python3 jx3p/tools/jx_tick_gate.py [--patches 34,61,0,38,20] [--variants 'S1;S2' | --no-variants]
                                        [--setmode 0-18 | --no-setmode] [--events 1500] [--variant-events 600]
                                        [--setmode-events 400] [--seed 1] [--tooth]
-  --tooth: the port built with JX_SEQ_TOOTH (the note store's tick skips its step clock) -- must differ.
+  --tooth: the port built on a lifted source with the note store's step-clock increment (inc ecx at 0x3EFE5E)
+  dropped (jx_lift.py --tooth-drop: the step clock stands still) -- every run must differ.
 exit 0 = every object equal after every event, every state equal at every checkpoint, every run that
 should play played, and the graded modes cover REACHABLE (product runs), ENTRY (with the SCATTER
 variants) and all 19 (the setter).
@@ -58,6 +64,8 @@ SETMODE = 0x3F1910                            # the note store's mode setter (it
 REACHABLE = {0, 3, 6}                         # the modes the product reaches (docstring; HOST_LAYER.md 3e)
 ENTRY = {0, 2, 3, 5, 6, 8, 10}                # ... and the engine's host entry, with SCATTER
 SCATTER = ('+0x600120', '+0x600128')          # a variant appending one of these is class ENTRY
+ASG_ON, ASG_OFF = 0x357BC0, 0x357B20          # the assigner's note entries (CAssignB vtable +0x18 / +0x10)
+TOOTH_DROP = '3EFE5E'                         # the note store's step clock: `inc ecx` (0x3EFD10's tail)
 # each a mode the factory bank does not hold, or the template / range values around it (printed per run)
 # (mode 0 steps only with the ARPEGGIO switch on: the factory mode-0 patches never step -- the first full
 # run's coverage check refused for exactly that, job jx7_ticks)
@@ -139,12 +147,28 @@ def oracle_load(load):
 
 def oracle(load, evs):
     import jx_guest_export as GX
+    from unicorn import UC_HOOK_CODE
     J, jx, modes = oracle_load(load)
     uc = jx.uc
+    tab = mode_table(J)
+    calls, notes, in_tick = [0] * 19, [0, 0], [False]
+
+    def step_hook(uc_, addr, size, user):
+        calls[tab[addr - J.IB]] += 1
+
+    def asg_hook(uc_, addr, size, which):
+        if in_tick[0]:
+            notes[which] += 1
+    for f in tab:
+        uc.hook_add(UC_HOOK_CODE, step_hook, begin=J.IB + f, end=J.IB + f)
+    uc.hook_add(UC_HOOK_CODE, asg_hook, 0, J.IB + ASG_ON, J.IB + ASG_ON)
+    uc.hook_add(UC_HOOK_CODE, asg_hook, 1, J.IB + ASG_OFF, J.IB + ASG_OFF)
     res = []
     for i, e in enumerate(evs):
         if e[0] == 't':
+            in_tick[0] = True
             jx.call(J.IB + TICK, rcx=jx.HOST, count=50_000_000)
+            in_tick[0] = False
         elif e[0] == 'on':
             jx.note_on(e[1], e[2])
         else:
@@ -155,6 +179,7 @@ def oracle(load, evs):
                                        for u in range(9)])
         res.append(row)
     res[0]['modes'] = modes
+    res[-1]['reach'], res[-1]['mode_calls'] = [sum(calls)] + notes, calls
     return res
 
 
@@ -162,7 +187,6 @@ def port(so, load, evs, want_raw=None):
     lib = ctypes.CDLL(so)
     for f in ('jx3p_vstate', 'jx3p_mstate', 'jx3p_ctl'):
         getattr(lib, f).restype = ctypes.c_void_p
-    lib.jx3p_bad_hook.restype = ctypes.c_ulonglong
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
     if not lib.jx3p_init(jx_guest.path(44).encode(), g('truth/preset_bank_1.bin'), None):
@@ -195,12 +219,8 @@ def port(so, load, evs, want_raw=None):
         if want_raw is not None and i == want_raw:
             row['raw'] = [b.hex() for b in ctl]
         res.append(row)
-        if i + 1 == len(evs):
-            st = (ctypes.c_ulong * 3)(); lib.jx3p_seq_stats(st)
-            md = (ctypes.c_ulong * 19)(); lib.jx3p_seq_modes(md)
-            row['reach'], row['mode_calls'] = list(st), list(md)
-        if lib.jx3p_bad_hook():
-            res[-1]['bad_hook'] = '%X' % lib.jx3p_bad_hook()
+        if lib.jx3p_lift_error():
+            row['trap'] = lib.jx3p_lift_error().decode()
             break
     return res
 
@@ -251,8 +271,14 @@ def main():
     full = not any(k in a for k in ('--patches', '--variants', '--no-variants', '--setmode', '--no-setmode'))
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
+    extra = []
+    if tooth:                                 # the lifted source with the step clock's increment dropped
+        import jx_lift_gate
+        tsrc = os.path.join(tmp, 'jx_lift_tooth.c')
+        jx_lift_gate.lift_source(tsrc, ['--tooth-drop', TOOTH_DROP])
+        extra = ['-DJX_LIFT_FILE="%s"' % tsrc, '-I', os.path.join(REPO, 'jx3p', 'src')]   # its jp8_cpu.h
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
-                   (['-DJX_SEQ_TOOTH=1'] if tooth else []) + [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
+                   extra + [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
     # (label, load, events, seed, must play)
     runs = [('patch %d' % k, {'patch': k}, nev, seed * 1000 + k, k in PLAYS) for k in patches]
     if variants:
@@ -278,13 +304,13 @@ def main():
         first = next((i for i in range(min(len(ro), len(rp))) if ro[i]['ctl'] != rp[i]['ctl'] or
                       ('st' in ro[i] and ro[i].get('st') != rp[i].get('st'))), None)
         nticks = sum(1 for e in evs if e[0] == 't')
-        if rp and 'bad_hook' in rp[-1]:
-            print('  %s (%s): the port met a step function it does not hold: rva %s (event %d)' % (
-                label, mtxt, rp[-1]['bad_hook'], len(rp) - 1))
+        if rp and 'trap' in rp[-1]:
+            print('  %s (%s): the lifted code of the port TRAPPED at event %d: %s' % (label, mtxt, len(rp) - 1, rp[-1]['trap']))
             bad += 1
+            bitten += 1
             continue
         if first is None and len(ro) == len(rp):
-            reach, calls = rp[-1].get('reach', [0, 0, 0]), rp[-1].get('mode_calls', [0] * 19)
+            reach, calls = ro[-1]['reach'], ro[-1]['mode_calls']
             ran = [m for m in range(19) if calls[m]]
             print('  %s (%s): %d events (%d ticks) -- every object equal after every event, the states at %d '
                   'checkpoints; the step machine chose %d times (modes %s), played %d notes, released %d' % (

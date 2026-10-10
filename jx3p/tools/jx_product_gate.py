@@ -58,6 +58,9 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   --tooth-ctl: the port gets no controller points -- every --ctl run must differ.
   --ctl-only N,...: only those MIDI-mapping numbers of the --ctl sequence (1 mod, 11 expression, 64 sustain,
   123 all notes off, 128 aftertouch, 129 bend, any CC) -- to bisect a difference.
+  --set 'ID=V,...;ID=V,...' (JX-12b): per ';' group a run whose first block starts with those host parameter
+  points (VST3 ids in hex, values 0..1) -- the note modes no factory patch sets: LEGATO 600062 (no patch sets
+  it), ASSIGN MODE 600064, PORTAMENTO 600060, ARPEGGIO 600108 -- with the plan's notes, edits and controllers.
 The notes reach the port as process() takes them (jx3p_product_note: the float velocity, the wrapper's
 rules); the patch loads' records as the patch browser queues them (jx3p_product_block's type-2 events).
 exit 0 = every block of every (rate, patch) equal, bit for bit.
@@ -212,18 +215,23 @@ def ctl_schedule(nblk, blk, start, seed):
 
 def points(nblk, blk, on, off, es):
     """the run's host parameter points per block: es '-1' none, 'e<seed>' --edits, 'c<seed>' --ctl, 'c<seed>:n,n'
-    --ctl with --ctl-only (only those MIDI-mapping numbers kept: a bisection of a difference)"""
+    --ctl with --ctl-only (only those MIDI-mapping numbers kept: a bisection of a difference); a '|ID=V,...' tail
+    (--set): those points first, at offset 0 of block 0"""
+    es, _, sets = es.partition('|')
     start = on if on >= 0 else off
     if es.startswith('e'):
-        return edit_schedule(nblk, blk, start, int(es[1:]))
-    if es.startswith('c'):
+        sched = edit_schedule(nblk, blk, start, int(es[1:]))
+    elif es.startswith('c'):
         seed, _, only = es[1:].partition(':')
         sched = ctl_schedule(nblk, blk, start, int(seed))
         if only:
             keep, base = {int(x) for x in only.split(',')}, midi_base()
             sched = [[p for p in b if p[0] - base in keep] for b in sched]
-        return sched
-    return [[] for _ in range(nblk)]
+    else:
+        sched = [[] for _ in range(nblk)]
+    if sets:
+        sched[0] = [(int(k, 16), 0, float(v)) for k, v in (x.split('=') for x in sets.split(','))] + sched[0]
+    return sched
 
 
 def queues(points):
@@ -350,6 +358,7 @@ def main():
     silent = '--expect-silent' in a
     seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     recalls = opt('--recall', '')               # 'P@T,...': warm patch loads (the plugin's patch browser)
+    sets = [x for x in opt('--set', '').split(';') if x]     # host parameter points at the start, one run per group
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
@@ -369,6 +378,8 @@ def main():
         plans = [(-sd - 1, int(t_on * rate), '-1') for sd in seeds] if seeds else [(on, off, '-1')]
         if eseeds:                            # host automation / controllers: each seed on the plan's notes
             plans = [(pon, poff, es) for (pon, poff, _) in plans for es in eseeds]
+        if sets:                              # the note modes set at the start: each group on every plan
+            plans = [(pon, poff, es + '|' + st) for (pon, poff, es) in plans for st in sets]
         for patch, (on, off, es) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
             o = subprocess.run([sys.executable, __file__, '--oracle'] + args + [recalls, str(es)], capture_output=True,
@@ -387,11 +398,14 @@ def main():
             if on < 0:
                 nev = sum(len(e) for e in schedule(nblk, blk, on, off))
                 what += ' (%d events)' % nev
-            if es != '-1':
-                sched = points(nblk, blk, on, off, es)
-                what += ' %s seed %s (%d points, %d records)' % ('edits' if es[0] == 'e' else 'controllers', es[1:],
+            code, _, st = es.partition('|')
+            if code != '-1':
+                sched = points(nblk, blk, on, off, code)
+                what += ' %s seed %s (%d points, %d records)' % ('edits' if code[0] == 'e' else 'controllers', code[1:],
                                                                    sum(len(x) for x in sched),
                                                                    sum(len(queues(x)) for x in sched))
+            if st:
+                what += ' set %s' % st
             if first is None:
                 print('  host %d %s: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
                     rate, what, nblk, blk, loud), flush=True)
@@ -406,7 +420,7 @@ def main():
                     print('  REFUSE: --expect-silent, but the plugin sounds at host %d' % rate); bad += 1
             elif not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
-    n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds))
+    n = len(rates) * len(patches) * max(1, len(seeds)) * max(1, len(eseeds)) * max(1, len(sets))
     if tooth or tclock or tvc or trec or tedit or tlaw:
         print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices'
                                           if tvc else '--tooth-recall' if trec else ('--tooth-ctl' if '--tooth-ctl' in a

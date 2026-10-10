@@ -10,8 +10,13 @@ of a sweep (0, 1, 2, 3, 5, 7, 9, 64, 127, 128, 255, 1000, -1), each followed by 
 Recorded: every executed instruction address, and at every indirect call/jmp site every target reached; every
 import stub reached (the parameter system calls none: EXECUTED 2026-10-10).
 
-  python3 jx3p/tools/jx_dynreach.py OUT.json [--base A] [--patches 0-63] [--no-sweep] [--ctl]
+  python3 jx3p/tools/jx_dynreach.py OUT.json [--base A] [--patches 0-63] [--no-sweep]
+                                     [--ctl | --notes | --tick | --tempo | --rate]
 
+--notes / --tick (JX-12b): the note entries under every assign mode, legato, portamento and arpeggiator setting,
+and the engine's clock tick under every step mode (notes_script / tick_script). --tempo (JX-8): the engine's
+tempo entry under every effect mode of the base patch (tempo_script). --rate (JX-15): the engine's setSampleRate
+to every rate of the setting table on the running engine (rate_script).
 --ctl: instead of the loads and the sweep, the render driver's KIND-0 targets on the running engine (JX-12):
 the engine's CC entry (vt+0x88, 0x34AD50: 1 mod, 10, 11 expression, 64 sustain, 123 all notes off, and CCs it
 ignores), its bend entry (vt+0x98, 0x3F91B0), the three empty entries (vt+0x90 / +0xA0 / +0xA8), with keys
@@ -60,18 +65,106 @@ def ctl_script():
     return out
 
 
+ASSIGN_MODE, LEGATO, PORTAMENTO, ARPEGGIO = 0x00600064, 0x00600062, 0x00600060, 0x00600108   # model ids (Script.xml
+                                                       # CTRL: PORTAMENTO 0..255, LEGATO 0..1, ASSIGN MODE 0..2; NAME1)
+TICK, SETMODE = 0x3F84A0, 0x3F1910                     # the engine's tick (vt+0xB8); the note store's mode setter
+TEMPO = 0x3F9DD0                                       # the engine's tempo entry (vt+0xB0, JX-8)
+SETSR = 0x3F9970                                       # the engine's setSampleRate (vt+0x18, JX-15: the rate in xmm1)
+
+
+def notes_script():
+    """--notes (JX-12b): the note entries under every assign mode, legato on and off, portamento off and on, the
+    arpeggiator off and on (model ids through the host entry), with overlapping keys, re-strikes, the sustain
+    and all notes off among them and clock ticks between -- the note paths no factory patch reaches (no patch
+    sets LEGATO; three set PORTAMENTO)"""
+    out = []
+    for arp in (0, 1):
+        for mode in (0, 1, 2):
+            for leg in (0, 1):
+                for porta in (0, 120):
+                    out += [('host', ARPEGGIO, arp), ('host', ASSIGN_MODE, mode), ('host', LEGATO, leg),
+                            ('host', PORTAMENTO, porta)]
+                    out += [('on', 60, 100), ('tick',), ('on', 64, 90), ('tick',), ('off', 60, 0), ('on', 67, 80),
+                            ('tick',), ('on', 64, 70), ('off', 64, 64), ('cc', 64, 127), ('off', 67, 0),
+                            ('on', 72, 110), ('tick',), ('off', 72, 0), ('cc', 64, 0), ('on', 48, 60),
+                            ('on', 52, 61), ('on', 55, 62), ('on', 59, 63), ('on', 62, 64), ('on', 65, 65),
+                            ('on', 69, 66), ('tick',), ('cc', 123, 0), ('on', 50, 100), ('off', 50, 0),
+                            ('on', 50, 101), ('tick',), ('off', 50, 0), ('off', 48, 0)]
+    return out
+
+
+def tick_script():
+    """--tick (JX-12b): every step mode 0..18 put into every unit's store by the plugin's own setter, keys held,
+    clock ticks past the 12- and 24-tick boundaries, keys changing between them"""
+    out = [('host', ARPEGGIO, 1)]
+    for m in range(19):
+        out.append(('setmode', m))
+        out += [('on', 60, 100), ('on', 64, 90), ('on', 67, 80)]
+        out += [('tick',)] * 30
+        out += [('off', 64, 0), ('on', 71, 70)] + [('tick',)] * 30 + [('off', 60, 0), ('off', 67, 0), ('off', 71, 0)]
+        out += [('tick',)] * 6
+    return out
+
+
+def tempo_script(base=0):
+    """--tempo (JX-8): the engine's tempo entry (vt+0xB0, 0x3F9DD0, READ: T = the host tempo x 10; T in 400..3000
+    reaches every unit's parameter object, vt+0x58 with id 375; other T nothing) at T inside, at and beyond its
+    ends, under every value of the two effect-mode cells (records 65 and 67: 0..5, each a variant of the base
+    patch loaded through the host entry)"""
+    sys.path.insert(0, HERE)
+    import jx_records
+    out = []
+    for rec in (65, 67):
+        for v in range(6):
+            out += [('host', pid, val) for kind, pid, val in jx_records.variant_records('%d:%d=%d' % (base, rec, v))
+                    if kind == 2]
+            out += [('tempo', t) for t in (1200, 400, 3000, 399, 3001, 1201, 777, 2999, 401, 0, -1200, 1280)]
+    return out
+
+
+def rate_script(base=0):
+    """--rate (JX-15): the engine's setSampleRate (vt+0x18, 0x3F9970: the rate a float in xmm1; on the running
+    engine it allocates nothing and calls no import -- EXECUTED 2026-10-10) to every rate of the setting table and
+    back, the same rate again (its early out), keys held across, notes and ticks between"""
+    out = [('on', 60, 100)]
+    for r in (48000.0, 44100.0, 88200.0, 32000.0, 96000.0, 96000.0, 44100.0, 48000.0, 96000.0):
+        out += [('setsr', r), ('tick',), ('on', 64, 90), ('tick',), ('off', 64, 0)]
+    return out + [('off', 60, 0)]
+
+
 def ctl_call(jx, c):
-    """one ctl_script call through the plugin's own entry"""
+    """one script call through the plugin's own entry; returns the calls it made, [(rva, rcx, rdx, r8, rax, x1)] --
+    one, or nine for a 'setmode' (the setter on every unit's note store); x1: xmm1's low 32 bits when the entry
+    takes a float there (setSampleRate), else None"""
     H, k = jx.HOST, c[0]
-    if k == 'cc':
-        return jx.call(J.IB + CC_ENTRY, rcx=H, rdx=c[1], r8=c[2], count=400_000_000)
-    if k == 'bend':
-        return jx.call(J.IB + BEND_ENTRY, rcx=H, rdx=c[1] & 0xFFFF, count=400_000_000)
-    if k == 'on':
-        return jx.call(J.NOTEON, rcx=H, rdx=c[1], r8=c[2], count=400_000_000)
-    if k == 'off':
-        return jx.call(J.NOTEOFF, rcx=H, rdx=c[1], r8=c[2], count=400_000_000)
-    return jx.call(J.IB + c[1], rcx=H, rdx=c[2], r8=0, count=400_000_000)
+    if k == 'setmode':
+        rq = lambda a: int.from_bytes(jx.uc.mem_read(a, 8), 'little')
+        out = []
+        for u in range(9):
+            ns = rq(rq(H + 0x78 + 0x40 * u) + 0x518)
+            out.append((SETMODE, ns, c[1], 0, jx.call(J.IB + SETMODE, rcx=ns, rdx=c[1], count=1_000_000), None))
+        return out
+    if k == 'setsr':
+        import struct
+        from unicorn.x86_const import UC_X86_REG_XMM1
+        x1 = struct.unpack('<I', struct.pack('<f', c[1]))[0]
+        jx.uc.reg_write(UC_X86_REG_XMM1, x1)
+        return [(SETSR, H, 0, 0, jx.call(J.IB + SETSR, rcx=H, count=2_000_000_000), x1)]
+    if k == 'host':
+        fn, rdx, r8 = J.HOSTPARAM - J.IB, c[1], c[2] & 0xFFFFFFFF
+    elif k == 'tick':
+        fn, rdx, r8 = TICK, 0, 0
+    elif k == 'tempo':
+        fn, rdx, r8 = TEMPO, c[1] & 0xFFFFFFFF, 0
+    elif k == 'cc':
+        fn, rdx, r8 = CC_ENTRY, c[1], c[2]
+    elif k == 'bend':
+        fn, rdx, r8 = BEND_ENTRY, c[1] & 0xFFFF, 0
+    elif k in ('on', 'off'):
+        fn, rdx, r8 = (J.NOTEON if k == 'on' else J.NOTEOFF) - J.IB, c[1], c[2]
+    else:                                                  # ('empty', rva, a)
+        fn, rdx, r8 = c[1], c[2], 0
+    return [(fn, H, rdx, r8, jx.call(J.IB + fn, rcx=H, rdx=rdx, r8=r8, count=400_000_000), None)]
 
 
 def main():
@@ -120,13 +213,15 @@ def main():
     uc.ctl_flush_tb()
     uc.hook_add(UC_HOOK_BLOCK, block)
     recs = J.JX.records()['patches']
-    ctl = '--ctl' in a
+    ctl = any(k in a for k in ('--ctl', '--notes', '--tick', '--tempo', '--rate'))
     if ctl:
-        for c in ctl_script():
+        script = (ctl_script() if '--ctl' in a else notes_script() if '--notes' in a else tick_script() if '--tick' in a
+                  else tempo_script(base) if '--tempo' in a else rate_script(base))
+        for c in script:
             ctl_call(jx, c)
         patches = []
-        print('[%6.1fs] %d controller calls: %d addresses, %d indirect sites' % (
-            time.time() - t0, len(ctl_script()), len(executed), len(indirect)), flush=True)
+        print('[%6.1fs] %d controller / note / tick calls: %d addresses, %d indirect sites' % (
+            time.time() - t0, len(script), len(executed), len(indirect)), flush=True)
     for p in patches:
         jx.host_records(recs[p])
     if not ctl:
@@ -143,7 +238,7 @@ def main():
                     time.time() - t0, n + 1, len(ids), len(executed), len(indirect)), flush=True)
     names = {i: str(x) for i, x in enumerate(J.IMPORTS)}
     json.dump(dict(base=base, patches=patches, sweep=list(SWEEP) if ('--no-sweep' not in a and not ctl) else [],
-                   ctl=len(ctl_script()) if ctl else 0,
+                   ctl=len(script) if ctl else 0,
                    executed=sorted('%x' % x for x in executed),
                    indirect={'%x' % s: sorted('%x' % t for t in ts) for s, ts in indirect.items()},
                    imports={str(i): [names.get(i, '?'), c] for i, c in sorted(imports.items())}), open(out, 'w'))
