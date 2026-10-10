@@ -3358,3 +3358,17 @@ and its steps reach the output only when a ramp is stepped after the mute.
 An inferred defect is measured the day it is written down, or the claim it threatens is marked
 unproven. A drive comparison covers every allocation, the HOST and the image, and renders past
 every latch and mute; a state-only comparison before rendering proves the boot, not the sound.
+
+## 195. FOUR SECTIONS AT ONCE ON A 15 GB MACHINE -- A KILL IS NOT A VERDICT, BUT IT IS A LOSS
+Paid 2026-10-10 (proof run repro4, task #62). The parallel verify (playbook 193) ran four sections at
+once; I ran JX-3P jobs beside it (about 1 GB). The kernel killed ARP SCATTER GRID's `--ref-grid`
+child after 1902 s (bash: "line 9: 3460 Killed"); its port side and teeth then failed on the missing
+reference, so the section -- and the proof run's verify stage -- went red with no defect in the
+code. Memory, not CPU, bounds the parallel verify: one host-process reference holds 4.6 GB.
+run_sections.py now (1) starts a section only while MemAvailable >= VERIFY_MIN_FREE_GIB (default
+4) or when nothing else runs, and (2) runs every section whose output shows a killed child AGAIN,
+ALONE, after the others, and fails it if it is killed again (--kill-tooth: a section that kills its
+own child once is retried and passes; seen on the real repro4 line).
+### The rule
+Nothing else runs beside a parallel verify. A kill by the kernel is retried alone and reported as a
+retry; it is never counted as a pass, and never as a gate's failure.

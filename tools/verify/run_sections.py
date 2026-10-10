@@ -24,6 +24,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# A section whose script has a child KILLED by the kernel (bash prints "line N: PID Killed  cmd") did not
+# fail a gate: it lost a race for memory. Paid 2026-10-10 (playbook 195): proof run repro4, four sections
+# in parallel plus other jobs on a 15 GB machine, ARP SCATTER GRID's --ref-grid killed after 1902 s.
+KILLED_RE = re.compile(r'^(?:bash: )?line \d+: +\d+ Killed\b', re.M)
+MIN_FREE_GIB = float(os.environ.get('VERIFY_MIN_FREE_GIB', '4'))
 REPO = os.path.dirname(os.path.dirname(HERE))
 HEAD_RE = re.compile(r'^\s*echo "=== ')
 SCRIPT_RE = re.compile(r'(?:tools|probes)/[A-Za-z0-9_/]+\.(?:py|sh)')
@@ -120,6 +125,52 @@ def audit(prelude, secs):
     return sorted((n, ks) for n, ks in seen.items() if len(ks) > 1 and not allowed(n, ks))
 
 
+def mem_free_gib():
+    """MemAvailable from /proc/meminfo (GiB); inf where there is none"""
+    try:
+        for line in open('/proc/meminfo'):
+            if line.startswith('MemAvailable:'):
+                return int(line.split()[1]) / 1048576.0
+    except OSError:
+        pass
+    return float('inf')
+
+
+def schedule(secs, head, jobs, report, free=mem_free_gib):
+    """run the sections, `jobs` at a time in the recipe's order; a new one starts only while
+    MemAvailable >= MIN_FREE_GIB (or when nothing else runs). report(k, title, rc, dt, out) per
+    section; returns the indices whose output shows a child killed by the kernel."""
+    pending, running, killed = list(range(len(secs))), {}, []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
+        while pending or running:
+            while pending and len(running) < max(1, jobs) and (not running or free() >= MIN_FREE_GIB):
+                k = pending.pop(0)
+                title, lines = secs[k]
+                running[ex.submit(run, title, script(lines, head))] = k
+            done, _ = concurrent.futures.wait(list(running), timeout=15,
+                                              return_when=concurrent.futures.FIRST_COMPLETED)
+            for f in done:
+                k = running.pop(f)
+                title, rc, dt, out = f.result()
+                if KILLED_RE.search(out):
+                    killed.append(k)
+                report(k, title, rc, dt, out)
+    return killed
+
+
+def retry(killed, secs, head, report):
+    """run each killed section again, ALONE, after the others: a kill is the machine's verdict, not the
+    gate's. A second kill fails the section."""
+    for k in killed:
+        title, lines = secs[k]
+        print('--- section %d: a child was KILLED by the kernel (memory) -- running it again, alone' % (k + 1))
+        _, rc, dt, out = run(title, script(lines, head))
+        if KILLED_RE.search(out):
+            rc = rc or 1
+            print('--- section %d: KILLED AGAIN while running alone' % (k + 1))
+        report(k, title, rc, dt, out, tag=' (retried alone)')
+
+
 def main():
     args = sys.argv[1:]
     jobs = int(args[args.index('--jobs') + 1]) if '--jobs' in args else 4
@@ -129,6 +180,19 @@ def main():
              recursive('verify-recipe:\n+\tfoo\n'.replace('+\t', '\t+')) and \
              not recursive('verify-recipe:\n\tmake -s x && y\n')
         print('run_sections --guard-tooth: %s' % ('BITES' if ok else 'DID NOT BITE'))
+        return 0 if ok else 1
+    if '--kill-tooth' in args:               # a section whose child the kernel kills must be retried alone
+        import tempfile
+        mark = os.path.join(tempfile.mkdtemp(), 'killed_once')
+        secs_t = [('tooth killed once', ['if [ ! -e %s ]; then touch %s; bash -c "kill -9 \\$\\$" || FAIL=1; fi'
+                                         % (mark, mark)]), ('tooth ok', ['true'])]
+        seen = []
+        rep = lambda k, t, rc, dt, out, tag='': seen.append((k, rc, tag))
+        killed = schedule(secs_t, [], 2, rep)
+        retry(killed, secs_t, [], rep)
+        ok = killed == [0] and sorted(seen) == [(0, 0, ' (retried alone)'), (0, 1, ''), (1, 0, '')]
+        print('run_sections --kill-tooth: %s (killed %s, results %s)' % ('BITES' if ok else 'DID NOT BITE',
+                                                                        killed, sorted(seen)))
         return 0 if ok else 1
     if '--list' in args:
         for k, (title, lines) in enumerate(secs):
@@ -154,21 +218,27 @@ def main():
     sys.stdout.write(out)
     print('--- prelude (the shared references): exit %d, %.0f s' % (rc0, dt))
     sys.stdout.flush()
-    fails = ['prelude'] if rc0 else []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
-        futs = {ex.submit(run, title, script(lines, head)): k for k, (title, lines) in enumerate(secs)}
-        done = 0
-        for f in (concurrent.futures.as_completed(futs) if jobs > 1 else futs):
-            k = futs[f]
-            title, rc, dt, out = f.result()
-            done += 1
-            sys.stdout.write(out)
-            print('--- [%d/%d] section %d: exit %d, %.0f s  (%s)' % (done, len(secs), k + 1, rc, dt, title[:70]))
-            sys.stdout.flush()
-            if rc:
-                fails.append('%d (%s)' % (k + 1, title[:60]))
-    print('=== run_sections: %d sections, %d at a time, %.0f s: %s' % (
-        len(secs), jobs, time.time() - t0, 'every section exit 0' if not fails else 'FAILED: ' + '; '.join(fails)))
+    fails = {}
+    count = [0]
+
+    def report(k, title, rc, dt, out, tag=''):
+        count[0] += 1
+        sys.stdout.write(out)
+        print('--- [%d/%d] section %d%s: exit %d, %.0f s  (%s)' % (min(count[0], len(secs)), len(secs), k + 1, tag,
+                                                                rc, dt, title[:70]))
+        sys.stdout.flush()
+        if rc:
+            fails[k] = title
+        else:
+            fails.pop(k, None)
+    killed = schedule(secs, head, jobs, report)
+    retry(killed, secs, head, report)
+    if rc0:
+        fails[-1] = 'prelude'
+    print('=== run_sections: %d sections, %d at a time (MemAvailable floor %.0f GiB), %d retried alone, %.0f s: %s' % (
+        len(secs), jobs, MIN_FREE_GIB, len(killed), time.time() - t0,
+        'every section exit 0' if not fails else
+        'FAILED: ' + '; '.join('prelude' if k < 0 else '%d (%s)' % (k + 1, t[:60]) for k, t in sorted(fails.items()))))
     return 1 if fails else 0
 
 
