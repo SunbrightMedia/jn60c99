@@ -24,8 +24,19 @@ gate could see it. It is a STRUCTURAL invariant on the source text:
      bare expf( is computing a different function. Checked for the whole
      transcended-math family.
 
-Both are seen-to-fail below (--selftest). Exit 1 on any drift, naming the fork
-and the exact divergence, so the fix is mechanical.
+  3. (2026-10-10) Every function src/<base> defines, the fork defines. Four
+     juno_driver.c forks lacked the October driver's juno_driver_unit_noise and
+     its siblings: the voices / standalone builds no longer LINKED, so make
+     engineb was RED from 2026-10-07 until the proof run found it. Checks 1-2
+     never looked at juno_driver.c or chorus_init.c forks at all.
+  4. (2026-10-10) Every fork is synced to src/<base> AS IT IS NOW: its recorded
+     base (engine_b/shim/BASES.tsv, the src/ blob it was last merged onto) must
+     equal the current src/ file. 15 forks predated October's src/ changes and
+     nothing said so; tools/engineb/resync_shims.py merges a stale fork onto the
+     current src/ and records its new base. Seen to fail on the real defect: with
+     the bases the forks had at 06697d07 it names exactly those 15.
+All four are seen-to-fail below (--selftest). Exit 1 on any drift, naming the
+fork and the exact divergence, so the fix is mechanical.
 """
 import os
 import re
@@ -37,7 +48,7 @@ SHIM = os.path.join(REPO, "engine_b", "shim")
 
 # The forked port translation units. Each shim dir may hold a fork of any of
 # these; we check whichever it has.
-FORKED_BASES = ["voice_render.c", "master_render.c"]
+FORKED_BASES = ["voice_render.c", "master_render.c", "juno_driver.c", "chorus_init.c"]
 
 # libm / CRT-math calls the port TRANSCRIBED from the plugin binary, so a fork
 # calling the bare form is calling a DIFFERENT function. The port's own name is
@@ -48,6 +59,13 @@ TRANSCRIBED = {
 }
 
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s+([<"][^>"]+[>"])', re.M)
+# a function's name where its definition or prototype starts a line (the port's
+# style): `type name(` at column 0 -- the set the fork must keep (check 3)
+FUNC_RE = re.compile(r'^[A-Za-z_][A-Za-z_0-9 \*]*[ \*]([a-z_][a-z_0-9]*)\(', re.M)
+
+
+def functions(text):
+    return set(FUNC_RE.findall(text))
 
 
 def includes(text):
@@ -87,6 +105,10 @@ def check_one(shim_dir, base, src_text):
             out.append("calls bare %s( %d time(s); src/%s calls it %d -- the "
                        "port uses %s( instead"
                        % (bare, fork_bare, base, src_bare, allowed))
+    lost = functions(src_text) - functions(fork_text)
+    if lost:
+        out.append("LACKS function(s) src/%s defines: %s -- merge it onto src/: "
+                   "python3 tools/engineb/resync_shims.py" % (base, ", ".join(sorted(lost))))
     return out
 
 
@@ -107,6 +129,13 @@ def run():
                 checked += 1
             for msg in drift:
                 problems.append("  %s/%s: %s" % (d, base, msg))
+    # check 4: every fork synced to src/ as it is now (engine_b/shim/BASES.tsv)
+    sys.path.insert(0, HERE)
+    import resync_shims
+    for fork, rec, cur in resync_shims.stale():
+        problems.append("  %s: %s" % (fork, "NOT RECORDED in engine_b/shim/BASES.tsv" if rec is None else
+                        "src/%s moved past this fork's base (synced to %s, now %s) -- merge it: "
+                        "python3 tools/engineb/resync_shims.py" % (fork.split('/')[1], rec[:10], cur[:10])))
     return checked, problems
 
 
@@ -116,10 +145,20 @@ def selftest():
     src = '#include "a.h"\n#include "juno_crt_expf.h"\nx = juno_expf_6EF740(y);\n'
     drift_inc = check_one_text(src, '#include "a.h"\nx = juno_expf_6EF740(y);\n')
     drift_call = check_one_text(src, '#include "a.h"\n#include "juno_crt_expf.h"\nx = expf(y);\n')
+    drift_fn = check_one_text('int a(void)\n{ return 0; }\nint b(void)\n{ return 1; }\n',
+                              'int a(void)\n{ return 0; }\n')
+    sys.path.insert(0, HERE)
+    import resync_shims
+    fake = dict((k, resync_shims.src_blob(k)) for k in resync_shims.forks())
+    one = sorted(fake)[0]
+    fake[one] = '0' * 40                       # a base src/ has moved past
+    drift_base = [k for k, rec, cur in resync_shims.stale(fake)]
     ok = any("MISSING include" in m for m in drift_inc) and \
-         any("bare expf" in m for m in drift_call)
-    print("SELFTEST: missing-include flagged=%s  bare-call flagged=%s -> %s"
-          % (bool(drift_inc), bool(drift_call), "PASS" if ok else "FAIL"))
+         any("bare expf" in m for m in drift_call) and \
+         any("LACKS function" in m for m in drift_fn) and drift_base == [one]
+    print("SELFTEST: missing-include flagged=%s  bare-call flagged=%s  lost-function flagged=%s  "
+          "stale-base flagged=%s -> %s"
+          % (bool(drift_inc), bool(drift_call), bool(drift_fn), drift_base == [one], "PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
 
@@ -132,6 +171,8 @@ def check_one_text(src_text, fork_text):
     for bare in TRANSCRIBED:
         if bare_calls(fork_text, bare) > bare_calls(src_text, bare):
             out.append("calls bare %s(" % bare)
+    if functions(src_text) - functions(fork_text):
+        out.append("LACKS function(s): %s" % ", ".join(sorted(functions(src_text) - functions(fork_text))))
     return out
 
 
@@ -144,8 +185,8 @@ def main():
         print("\n".join(problems))
         print("[shim drift tooth] RED -- a fork no longer tracks the port")
         sys.exit(1)
-    print("[shim drift tooth] GREEN -- %d fork(s) track src/ on includes and "
-          "transcribed-math calls" % checked)
+    print("[shim drift tooth] GREEN -- %d fork(s) track src/ on includes, "
+          "transcribed-math calls, every function, and the recorded src/ base" % checked)
     sys.exit(0)
 
 

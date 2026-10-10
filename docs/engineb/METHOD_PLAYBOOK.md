@@ -3299,3 +3299,20 @@ bare name found the second.
 After a move, search the bare old name with a negative lookbehind for the NEW prefix only
 (`(?<!refs/)state_dump`), read every hit, and run every script that a hit names -- or let the full
 proof run decide before calling the move done. Green fast checks prove only what they execute.
+
+## 191. A FORK WITHOUT A RECORDED BASE DRIFTS IN SILENCE -- RECORD IT, CHECK IT, MERGE IT
+Paid 2026-10-10 (task #62). engine_b/shim's 34 forks are verbatim copies of src/ files with one
+engine B block each. Nothing recorded which src/ version a fork copied, and the drift check looked
+only at includes and libm calls of two of the four forked files. So 15 forks predated October's
+src/ changes; the four juno_driver.c forks lacked the driver's new juno_driver_unit_noise and its
+siblings, the voices build no longer linked, null_b's teeth crashed, and make engineb was RED from
+2026-10-07 -- for three days nobody ran it. The proof run (repro3) found it. Repair:
+engine_b/shim/BASES.tsv (each fork's src/ blob), tools/engineb/resync_shims.py (a three-way merge
+onto the current src/: 10 clean, 5 resolved by hand -- every engine B block kept, checked by the
+lines each fork adds), and two new checks in shim_drift_tooth.py (every function; the recorded
+base), self-tested in make engineb and seen to fail on the real defect (the 06697d07 bases name
+exactly the 15).
+### The rule
+A copy of code that the trunk keeps changing carries the version it copied, and a gate compares
+that version with the trunk's on every run. A fast structural check that sees only some of the
+copies is a check of those copies only -- say which.

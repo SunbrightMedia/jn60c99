@@ -59,6 +59,7 @@
  * coeffs (e.g. VCA level at 101072) stay single.
  */
 #include "juno_engine.h"
+#include "recall_ramp.h"
 #include "juno_driver.h"
 #include "delay_recall.h"
 #include "effect_modes.h"
@@ -115,13 +116,13 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
         if (*mark != 0xEB0BEEF1u) { *mark = 0xEB0BEEF1u; ebsh_new_context(); }
     }
 
-    p39  = (int32_t *)(st + JUNO_PROG_DLY);
-    p551 = (int32_t *)(st + JUNO_PROG_EFX);
+    p39  = (int32_t *)JCELL(st, JUNO_PROG_DLY);
+    p551 = (int32_t *)JCELL(st, JUNO_PROG_EFX);
     memcpy(shim->params + 136, &p39,  sizeof(void *));
     memcpy(shim->params + 112, &p551, sizeof(void *));
     /* base = &shim->params, stored at state+136 (the chase's first hop) */
     base = shim->params;
-    memcpy(st + 136, &base, sizeof(void *));
+    memcpy(JCELL(st, 136), &base, sizeof(void *));
 }
 
 /* Replicate voice 0's per-voice state block [176,84272) to voices 1..7 so every
@@ -130,11 +131,21 @@ void juno_driver_attach_host(unsigned char *st, struct juno_host_shim *shim,
  * the shared/global region (>=84272) and the header (<176) are left untouched. */
 void juno_driver_seed_voices(unsigned char *st)
 {
+#ifdef EB_DEVCELLS
+    /* THE DEVICE HAS NO CONTIGUOUS VOICE BLOCK, so this memcpy would copy
+     * nothing (the tile IS voice 0 and voices 1..7 exist only as the twelve
+     * scatter cells). The rewrite lives here rather than at the call site so a
+     * future caller cannot get a silent no-op. Omitting the broadcast was
+     * MEASURED to fail 24 of 192 gate cases, first at glide[1].k592. */
+    (void)st;
+    ebdev_broadcast_scatter();
+#else
     const unsigned block = 176;                 /* per-voice block start          */
     int v;
     for (v = 1; v < JUNO_NUM_VOICES; ++v)
         memcpy(st + block + (unsigned)v * JUNO_VOICE_MAIN_STRIDE,
                st + block, JUNO_VOICE_MAIN_STRIDE);
+#endif
 }
 
 /* Shared analog-noise/LFSR block: a self-contained noise generator + one-pole
@@ -163,6 +174,80 @@ uint32_t (*juno_voice_render_fn)(unsigned char *, int, float *, float *)
 /* Same purpose, same guarantee, for the master stage's single call site. */
 float *(*juno_master_render_fn)(unsigned char *, float **, float **)
     = juno_master_render;
+
+#ifndef EB_DEVCELLS
+#define UNIT_MAGIC 0x54494E55              /* "UNIT": per-voice noise copies live */
+typedef char unit_fits[(JUNO_UNIT_END <= JUNO_STATE_BYTES && JUNO_NOISE_BLOCK_LEN <= 176u) ? 1 : -1];
+static int unit_split(const unsigned char *st)
+{
+    int32_t m;
+    memcpy(&m, st + JUNO_UNIT_BASE, 4);
+    return m == UNIT_MAGIC;
+}
+static unsigned char *unit_noise(unsigned char *st, int v)
+{
+    return st + JUNO_UNIT_BASE + 16u + 176u * (unsigned)v;
+}
+/* unit u's start-up mute (JUNO_LATCH_BASE): 1 = this sample is muted (and the
+ * counter taken), 0 = render */
+static unsigned char *latch_cell(unsigned char *st, int u)
+{
+    return u < 8 ? st + JUNO_LATCH_BASE + 4u * (unsigned)u : st + JUNO_LATCH_MASTER;
+}
+static int latch_take(unsigned char *st, int u)
+{
+    int32_t n;
+    memcpy(&n, latch_cell(st, u), 4);
+    if (n <= 0) return 0;
+    --n;
+    memcpy(latch_cell(st, u), &n, 4);
+    return 1;
+}
+#endif
+
+/* Arm every unit's start-up mute (the engine's construction: 960 samples). */
+void juno_driver_arm_latch(unsigned char *st)
+{
+#ifndef EB_DEVCELLS
+    int32_t n = JUNO_LATCH_N;
+    int u;
+    for (u = 0; u < 9; ++u) memcpy(latch_cell(st, u), &n, 4);
+#else
+    (void)st;
+#endif
+}
+
+/* Voice v's own copy of the noise block (for gates): the per-voice copy once
+ * a count below 8 has been rendered, else the one shared block. */
+const unsigned char *juno_driver_unit_noise(const unsigned char *st, int v)
+{
+#ifndef EB_DEVCELLS
+    if (unit_split(st) && v >= 0 && v < JUNO_NUM_VOICES) return unit_noise((unsigned char *)st, v);
+#endif
+    (void)v;
+    return st + JUNO_NOISE_BLOCK_OFF;
+}
+
+/* The noise-block cells the plugin's setSampleRate re-initializes in every unit's
+ * own copy (sub_1803A1300: eight, sub_1803990C0: two; EXECUTED: probes/b13b/
+ * setsr_writers.py, the same ten on every unit; CLAIMS B13b). With per-voice
+ * copies live, each copy takes them from the shared block the two constructors
+ * have just written; its other cells stay its own. */
+void juno_driver_unit_noise_reinit(unsigned char *st)
+{
+#ifndef EB_DEVCELLS
+    static const unsigned W[10] = { 84272u, 84288u, 84320u, 84336u, 84352u, 84368u, 84384u,
+                                    84400u, 84416u, 84432u };
+    int v, k;
+    if (!unit_split(st)) return;
+    for (v = 0; v < JUNO_NUM_VOICES; ++v)
+        for (k = 0; k < 10; ++k)
+            memcpy(unit_noise(st, v) + (W[k] - JUNO_NOISE_BLOCK_OFF), JCELL(st, W[k]), 4);
+#else
+    (void)st;
+#endif
+}
+
 
 /* ---- ENGINE B: the voice chain, in place of the port's eight calls -------- */
 #include "eb_engine.h"
@@ -294,10 +379,40 @@ void ebsh_dump_blob(int which, unsigned char *dst)
 }
 extern unsigned long   eb_coef_gen;    /* gui/juno_bridge.c bumps it */
 
+
+#ifndef EB_DEVCELLS
+#include <stdio.h>
+#include <stdlib.h>
+/* any unit's start-up mute still armed (src/juno_driver.c latch_cell; the nine are armed together) */
+static int voices_latched(unsigned char *st)
+{
+    int u;
+    for (u = 0; u < 9; ++u) {
+        int32_t n;
+        memcpy(&n, latch_cell(st, u), 4);
+        if (n > 0) return 1;
+    }
+    return 0;
+}
+#endif
 void juno_driver_render_voices(unsigned char *st, float *vbuf)
 {
     float ebv[JUNO_NUM_VOICES];
     int v;
+#ifndef EB_DEVCELLS
+    /* ENGINE B MODELS THE 8-VOICE PATH WITH NO START-UP MUTE, AND NOTHING ELSE. The
+     * port's driver (October: CLAIMS B10 / A21, A29) also renders a voice count below
+     * 8 -- each unit then steps its own noise copy -- and mutes every unit for its
+     * first 960 samples on the product path. Engine B's voice chain has neither, and
+     * the null harness's contexts (juno_gui_create) reach neither. A context that
+     * does is refused here, loudly, not nulled on a path engine B does not render
+     * (re-synced with src/juno_driver.c 2026-10-10, engine_b/shim/README.md). */
+    if (juno_voice_count(st) < JUNO_NUM_VOICES || unit_split(st) || voices_latched(st)) {
+        fprintf(stderr, "engine B standalone shim: voice count %d, per-unit noise %d or a start-up "
+                "mute -- not modelled by engine B\n", juno_voice_count(st), unit_split(st));
+        abort();
+    }
+#endif
 
     if (!EB_STARTED) {
         /* SEEDED ONCE, THEN OWNED. Everything free-running -- DCO phases, the
@@ -447,6 +562,9 @@ int juno_driver_render_sample(unsigned char *st, float *outL, float *outR)
         *outR = 0.0f;
     }
 
+#ifndef EB_DEVCELLS
+    juno_rr_pump(st);           /* the port's ramp table steps after the DSP, as in src/ (CLAIMS A19) */
+#endif
     /* The port's FTZ fallback still runs over the port's cells. It is a no-op
      * for engine B's own state, which is flushed by the CPU's FTZ/DAZ mode
      * that juno_enable_hw_ftz() sets for the whole process -- the same mode

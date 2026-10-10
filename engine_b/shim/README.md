@@ -194,3 +194,31 @@ TWO GATE HOLES FOUND AND REPORTED, not worked around:
 No cycle figure is taken from the shim: the cost rig measures `eb_vca_hpf.c`
 alone, and it says **1,543 cyc/sample on the S3 at 8 voices** (nominal;
 MODELED band 958..4,106).
+
+## Keeping a fork on the port's current src/ (2026-10-10)
+
+A fork is a verbatim copy of its `src/` file with engine B's block in place of
+the port's, so it must follow every later change to that `src/` file outside its
+block. `engine_b/shim/BASES.tsv` records, per fork, the git blob of the `src/`
+file it was last merged onto. `tools/engineb/shim_drift_tooth.py` (make engineb
+step 1b, its self-test first) fails when a fork lacks a function its `src/` file
+defines or when the `src/` file moved past the recorded base, and
+`tools/engineb/resync_shims.py` three-way merges a stale fork onto the current
+`src/` (a clean merge is written and recorded; a conflict is left in
+`build/shim_resync/` for a hand resolution, then `--record`). The merged fork is
+graded by its own null, never by the tool.
+
+Paid for: until 2026-10-10 nothing recorded a base, and 15 forks predated the
+October `src/` changes -- four `juno_driver.c` forks lacked the driver's new
+functions and no longer linked, so make engineb was RED from 2026-10-07 until
+the proof run found it (playbook 191). The re-sync kept every fork's engine B
+block (checked: the lines each fork adds to the current `src/` equal the lines
+it added to its old base). The `voices` and `standalone` forks now refuse, with
+an abort, a context that engine B does not model: a voice count below 8 (each
+unit then steps its own noise copy, CLAIMS B10) or a start-up mute (A29) -- the
+null harness's `juno_gui_create` contexts reach neither. The `standalone` fork
+keeps the port's ramp pump after its master (CLAIMS A19).
+
+Stated, not repaired: engine B's own `eb_delay_t1.c` keeps the decompiled
+`v437 <= 0.00012207031` compare that `src/master_render.c` corrected in October
+(a float compare, rva 0x366417); the two differ only for a NaN input.

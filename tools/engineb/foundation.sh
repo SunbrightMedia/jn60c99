@@ -80,14 +80,21 @@ python3 tools/trackb/verify_labels.py || die "a module label names the wrong src
 
 # ------------------------------------------------------------ 1b shim drift
 STEP="1b shim drift"
-say "$STEP" "every engine_b fork still tracks src/ (includes + transcribed math)"
+say "$STEP" "every engine_b fork still tracks src/ (includes, transcribed math, every function, its recorded src/ base)"
+python3 tools/engineb/shim_drift_tooth.py --selftest || die "the shim drift detector is BLIND to a planted drift" \
+    "Its four checks must each flag a synthetic defect before the tree's verdict is believed." \
+    "FIX: read the SELFTEST line -- it names the check that no longer fires."
 python3 tools/engineb/shim_drift_tooth.py || die "an engine_b shim fork has drifted from src/" \
     "A shim is a VERBATIM fork of a src/ translation unit with one block" \
     "replaced. When src/ changed and the fork did not, the fork silently" \
     "compiled a DIFFERENT function -- the 2026-08-24 juno_crt_expf.h defect," \
     "which sat for two days INSIDE the measuring apparatus and surfaced only" \
     "as a confusing 'overlapping shims' error at step 4b." \
-    "FIX: add the missing #include (same position src/ uses) and rewrite any" \
+    "FIX: a fork whose src/ file moved on (or lacks one of its functions):" \
+    "     python3 tools/engineb/resync_shims.py merges it onto src/ and records" \
+    "     its base (2026-10-10: 15 forks predated October's src/, four no" \
+    "     longer linked). Otherwise add the missing #include (same position" \
+    "     src/ uses) and rewrite any" \
     "     bare libm call the port transcribed. The tooth names the fork and" \
     "     the exact divergence. Run it here, before any build, so the class" \
     "     is caught cheaply instead of as a merge failure downstream."
