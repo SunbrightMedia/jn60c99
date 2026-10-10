@@ -71,6 +71,24 @@ samples (10 ms; 960 at 96 kHz). The factory leaves step 0, so the gain stage out
 event (READ); initialize's defaults carry writePatch (INFERRED from the JUNO's state list; to be
 EXECUTED).
 
+## 2b. The render object and the rate setting (EXECUTED + READ)
+
+`jx3p/tools/jx_conv_tables.py` boots the JX through its own entry path (jx_host_emu, two host rates),
+reads the render-object table (rva 0xC7BC30, 45 entries + the terminator), its coefficient vectors
+and the engine-rate setting table (rva 0x981B58), and compares them with the JUNO-60's
+(src/conv_tables.h, in the generator's own blob form):
+
+- **The table and the 9 vectors are the JUNO-60's, byte for byte** (sha256 of table + vectors
+  8902407066ef...86d61 on both; EXECUTED 2026-10-10, job jx_conv; `--tooth`: one flipped coefficient
+  bit is seen, job jx_conv_tooth). The JX-3P's render object is src/juno_conv.c with
+  src/conv_tables.h as they are.
+- The setting table's entries 0..5 are the JUNO-60's (96000, 88200, 48000, 44100, 32000, then the
+  word the automatic setting never reads); 81 of 128 words differ from index 6 on (the bytes after
+  the table in the image). Generated: `jx3p/src/jx_srate.h` (JX_SRATE[128]).
+- READ (`jx3p/tools/fw_map.py --pair`, the normalized streams to their ret): the setting listener
+  0x3221D0 == the JUNO's 0x3222F0; the identity render 0x344130 == 0x344270; the automatic engine
+  rate 0x34B120 == 0x34B260.
+
 ## 3. The oracle (EXECUTED)
 
 `jx3p/tools/jx_host_emu.py` runs the JUNO's host oracle (`probes/b6/wrapper_emu.py`,
@@ -84,6 +102,36 @@ render, the gain stage, the master and process() are the plugin's own instructio
 
 First run (host 48000): initialize leaves 84 queue records; the first block runs 6 worker jobs (the
 default six voices), output 0, gain 0.0.
+
+**The 84 records initialize queues (EXECUTED, `jx_boot_census.py --records 48000`, job jx_records).**
+All at offset 0, applied by the first process() before its render:
+- 72 model values of the patch tree (`fm.PATCH.*`, ids 0x0060xxxx and 0x00A0xxxx -- the JUNO-60's
+  id space, src/juno_state_tables.h): the default patch, e.g. 0x00600004 = 175, 0x00600014 = 3,
+  0x00600080..0x0060009C = 11565 each (0x2D2D, the name), 0x00A00000 = 0x3F2FAFB0 (a float, 0.687),
+  0x00A02802 = 0x3F800000 (1.0). None of them is in the controller's host map (jx_emu.host_map).
+- MASTER TUNE, host id 2 = 100 (the map sends it to engine id 20).
+- 10 host settings: 0x0FFFC000 = 0, 0x0FFFC003 = 1, **voiceCount 0x0FFFC00E = 6**, 0x0FFFC008 = 62,
+  **sampleRate 0x0FFFC015 = 0** (96000), 0x0FFFC010 = 0, 0x0FFFC014 = 0, 0x0FFFC016 = 62, edit
+  0x0FFFC01C = 0, **writePatch 0x0FFFC01D = 1**.
+- 1 kind-0 record.
+So a fresh instance arms the writePatch fade (0.5 s at gain 0, then 10 ms in) and plays six voices:
+the first block shows step -1, 1023 samples past the drop, the delay at 46977 of 48000 (READ x
+EXECUTED agree).
+
+**The voice count (READ, the render 0x3F9220 + the assigner).** Per voice unit u = 0..7 (the unit
+objects 0x40 apart from HOST+0x68): the assigner's count (vt+0x88, 0x357E50 = [asg+8]) synced to
+HOST+0x38 through vt+0x80 (0x357CE0) when it differs; the clock 0x357EA0 adds the block's engine
+samples to [asg+0xB0]; u < count: the unit's job; else its two output vectors zeroed (no wrapper
+call). The master unit's assigner is not synced. The setter 0x357CE0: 0x356E80(asg, 0) (each voice
+whose released flag +0x62 is 1: flag cleared, gate-off sweep 0x357570 over them; if +0x1C was 1, the
+sweep over all and the voice records reset), 0x355280 (with +0x18 clear: the sweep over all voices
+[asg+0xC], voice records reset, +0x44/+0x4C..+0x5F cleared; else +0x1C = 1), the store vt+0x78
+(0x356F60: count = min(n, 8), mask, mode/flags/records/order array reset, then 0x355280 again), then
+host parameter 800 (0x320) into the mode +0x10 (a change to 1 or 2 clears the held-note bitmap
++0x50..+0x5F, to 0 clears +0x44) and 799 (0x31F) into +0x14, both through vt+0x50 (0x357E60: the
+parent [asg+0xA8], its vt+0x60 with edx 0). The sweep posts a gate-off only for a gated voice: at
+boot it posts nothing. The assigner's time read vt+0x70 (0x357EF0) is [asg+0xB0] / 96 (signed); the
+port's model of it (jx_bridge.c unit_get70) is the sample clock / 48 -- to be checked against this.
 
 ## 4. Next
 

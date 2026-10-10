@@ -14,6 +14,8 @@ is matched by its first instructions up to a branch, and so labelled.
   python3 jx3p/tools/fw_map.py target.vst3 name=RVA ...   any JUNO functions
   python3 jx3p/tools/fw_map.py --tooth                     a JUNO engine function (CWaveGen build) must
                                                            NOT map, and one changed byte must break a match
+  python3 jx3p/tools/fw_map.py --pair JUNO_RVA TARGET_RVA  one known pair: the two normalized functions
+                                                           compared (seconds, no index of the target)
 Exit 1 when a function of the default table has no match or more than one.
 """
 import collections
@@ -57,7 +59,7 @@ MD = Cs(CS_ARCH_X86, CS_MODE_64)
 MD.detail = True
 
 
-def norm(img, ib, start, end, stop_at_branch=False):
+def norm(img, ib, start, end, stop_at_branch=False, stop_at_ret=False):
     """the normalized instruction stream of [start, end). A displacement that points INTO the function
     (rva-based, `[r15 + rax + table]` with r15 = the image base) is a switch table MSVC places after
     the code: it is written as its offset from the function start, and the stream stops where the
@@ -85,7 +87,7 @@ def norm(img, ib, start, end, stop_at_branch=False):
             else:
                 ops.append(ins.reg_name(op.reg))
         out.append(ins.mnemonic + ' ' + ','.join(ops))
-        if stop_at_branch and branch:
+        if (stop_at_branch and branch) or (stop_at_ret and ins.mnemonic == 'ret'):
             break
     return out
 
@@ -123,8 +125,34 @@ class Map:
         return hits, 'leaf prefix (%d instructions)' % n
 
 
+def extent(fn, rva):
+    """(end, leaf): the function's .pdata end, or for a leaf (no unwind entry) 0x400 bytes cut at its ret"""
+    for b, e in fn[2]:
+        if b == rva:
+            return e, False
+    return rva + 0x400, True
+
+
+def pair(juno_rva, target_rva, target=TARGET):
+    j, t = load(JUNO), load(target)
+    je, jleaf = extent(j, juno_rva)
+    te, tleaf = extent(t, target_rva)
+    leaf = jleaf or tleaf
+    a = norm(j[0], j[1], juno_rva, je, stop_at_ret=leaf)
+    b = norm(t[0], t[1], target_rva, te, stop_at_ret=leaf)
+    same = a == b
+    print('fw_map --pair: JUNO 0x%06X (%d instructions) %s target 0x%06X (%d)%s' % (
+        juno_rva, len(a), '==' if same else '!=', target_rva, len(b), ' (leaf, to its ret)' if leaf else ''))
+    if not same:
+        k = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+        print('  first difference at instruction %d: %s | %s' % (k, a[k] if k < len(a) else '-', b[k] if k < len(b) else '-'))
+    return 0 if same else 1
+
+
 def main():
     args = sys.argv[1:]
+    if args[:1] == ['--pair']:
+        return pair(int(args[1], 16), int(args[2], 16), args[3] if len(args) > 3 else TARGET)
     if '--tooth' in args:
         m = Map()
         eng, _ = m.find(0x3C68D0)                      # the JUNO's CWaveGen BUILD: engine code, must not map

@@ -16,8 +16,7 @@ import capstone
 def main():
     rva = int(sys.argv[1], 16)
     n = int(sys.argv[2], 0) if len(sys.argv) > 2 else 512
-    jx = J.JX().build()
-    code = bytes(jx.uc.mem_read(J.IB + rva, n))
+    code = bytes(J.IMG[rva:rva + n])        # the mapped image: code needs no boot (it was a full build)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = False
     for i in md.disasm(code, J.IB + rva):

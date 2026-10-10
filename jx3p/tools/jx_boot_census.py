@@ -6,7 +6,10 @@ block the worker jobs (the voice units rendered), the engine's rate and voice co
 stage (HOST+0x860 gain, +0x864 step, +0x868 left, +0x86C delay) and the block's peak -- with a key
 pressed at a given time. Numbers for jx3p/docs/HOST_LAYER.md section 4; it grades nothing.
 
-  python3 jx3p/tools/jx_boot_census.py [HOST_RATE=48000] [SECONDS=1.2] [KEY_AT_SECONDS=0.1]
+  python3 -u jx3p/tools/jx_boot_census.py [HOST_RATE=48000] [SECONDS=1.2] [KEY_AT_SECONDS=0.1]
+  python3 -u jx3p/tools/jx_boot_census.py --records [HOST_RATE]   every queue record (kind, offset, host
+                                                                 id, value, the engine id the controller's
+                                                                 map gives a parameter id); no render
 """
 import math
 import os
@@ -23,7 +26,28 @@ def f32(b):
     return struct.unpack('<f', struct.pack('<I', b))[0]
 
 
+def records(rate):
+    h = X.JXHost()
+    h.start(rate, 512)
+    try:
+        hmap = h.host_map()
+    except Exception as e:                                   # the map is the controller's (jx_emu.host_map)
+        hmap, why = {}, str(e)[:80]
+    else:
+        why = ''
+    q = h.queue()
+    print('host %g: %d records%s' % (rate, len(q), ('; no host map: ' + why) if why else ''))
+    for i, (kind, off, rec) in enumerate(q):
+        pid = struct.unpack_from('<I', rec, 12)[0]
+        val = struct.unpack_from('<i', rec, 20)[0]
+        eng = hmap.get(pid)
+        print('  %2d kind %d off %d id 0x%08X (%d) value %d%s  raw %s' % (
+            i, kind, off, pid, pid, val, '' if eng is None else '  -> engine %d' % eng, rec.hex()))
+
+
 def main():
+    if sys.argv[1:2] == ['--records']:
+        return records(float(sys.argv[2]) if len(sys.argv) > 2 else 48000.0)
     rate = float(sys.argv[1]) if len(sys.argv) > 1 else 48000.0
     secs = float(sys.argv[2]) if len(sys.argv) > 2 else 1.2
     key_at = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1
