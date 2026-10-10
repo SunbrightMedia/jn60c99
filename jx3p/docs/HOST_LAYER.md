@@ -250,7 +250,8 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
    [obj+0x440] = T, vt+0x8B0. Every DAW gives a tempo, so this runs at the first block of every DAW
    session; the port's driver has the fixed 120 and no tempo entry (vt+0xD0 / +0xF0, the transport,
    are `ret 0`). Port it and grade it through process() with a ProcessContext.
-2. The web app on the product path (96 kHz data, the render object, the render driver).
+2. DONE (JX-10, S3_STATUS (5)): the web page plays the product path (96 kHz data, the render object,
+   the render driver); WASM == native on its calls at three rates, the page checked in headless Chromium.
 3. A patch change on a running engine (warm recall, SCOPE_AUDIT row 9) and host edits beyond a patch
    load (row 12).
 4. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.

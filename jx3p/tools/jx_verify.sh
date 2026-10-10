@@ -110,9 +110,13 @@ python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null
 python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 0,20,49,35 48,60,72
 python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 5,20 48,60,72 --master
-echo "=== JX GATE 5/5: THE DELIVERED WEB ENGINE (WASM == native on the page's calls, playbook 196) ==="
+echo "=== JX GATE 5/5: THE DELIVERED WEB ENGINE (WASM == native on the page's product-path calls, playbook 196) ==="
 if command -v node >/dev/null 2>&1; then
-  python3 "$HERE/jx_wasm_check.py" --patches "$(seq -s, 0 63)"
+  python3 "$HERE/jx_wasm_check.py" --patches "$(seq -s, 0 63)"   # 3 host rates, events inside blocks
+  python3 "$HERE/jx_wasm_check.py" --tooth
+  node "$HERE/jx_page_check.mjs"                                 # the page itself, headless Chromium
+  node "$HERE/jx_page_check.mjs" --tooth keys
+  node "$HERE/jx_page_check.mjs" --tooth data
 else
   echo "[jx verify] FAIL -- no node: the delivered WASM cannot be graded"; exit 1
 fi

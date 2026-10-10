@@ -24,6 +24,12 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   app's path before JX-4) -- every rate must differ.
   --tooth-clock: the port built with JX_DRV_TOOTH (the render driver's first key does not restart the
   clock) -- every run must differ; give it the patches that play on the clock (34, 61).
+  --tooth-voices: the port built with JX_VC_TOOTH (all eight voice units play, the HOST's count of six
+  ignored) -- every --poly run must differ.
+  --poly SEEDS (e.g. 1,2,3): instead of the one note, a seeded polyphonic sequence per seed from --on to
+  --secs: chords, up to 10 keys held (more than the six voices: the render's voice-count sync and the
+  allocator's steals), re-struck keys, note-offs, every event at its own sample, several at one sample
+  (a note-off and a note-on of one key at one sample included), velocities across the range.
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import ctypes
@@ -49,8 +55,41 @@ def vel7(v):
     return int(f) & 0x7F
 
 
+def poly_schedule(nblk, blk, start, seed):
+    """the --poly sequence: (kind, offset, channel, pitch, velocity) per block, in sample order (the
+    order a host's event list has), from host sample `start` to the last block"""
+    import random
+    r = random.Random(seed)
+    out = [[] for _ in range(nblk)]
+    held, s, end = [], start, (nblk - 1) * blk
+    while True:
+        s += r.choice((0, 0, 1, 5, 64, 300, 1000, 2500, 5000, 9000))
+        if s >= end:
+            break
+        if r.random() < 0.6 and len(held) < 10:
+            for _ in range(r.choice((1, 1, 1, 2, 3, 4))):
+                note = r.choice(held) if held and r.random() < 0.12 else r.randrange(36, 97)
+                vel = r.choice((0.05, 0.3, 0.5, 0.8, 1.0, max(0.05, r.random())))
+                out[s // blk].append(('on', s % blk, 0, note, vel))
+                if note not in held:
+                    held.append(note)
+        elif held:
+            for _ in range(r.choice((1, 1, 2))):
+                if not held:
+                    break
+                note = held.pop(r.randrange(len(held)))
+                out[s // blk].append(('off', s % blk, 0, note, 0.0))
+                if r.random() < 0.15:                         # the same key struck again at the same sample
+                    out[s // blk].append(('on', s % blk, 0, note, 0.7))
+                    held.append(note)
+    return out
+
+
 def schedule(nblk, blk, on, off):
-    """on / off: host samples; per block its events at their offsets"""
+    """on / off: host samples; per block its events at their offsets; on < 0: the --poly sequence of
+    seed -on - 1 from host sample off"""
+    if on < 0:
+        return poly_schedule(nblk, blk, off, -on - 1)
     out = [[] for _ in range(nblk)]
     for s, e in ((on, ('on', NOTE, VEL)), (off, ('off', NOTE, 0.0))):
         if s // blk < nblk:
@@ -135,11 +174,13 @@ def main():
     patches = [int(x) for x in opt('--patches', '0,34').split(',')]
     blk = int(opt('--block', '512'))
     t_on, t_off, secs = float(opt('--on', '0.6')), float(opt('--off', '1.2')), float(opt('--secs', '1.5'))
-    tooth, tclock, exact = '--tooth' in a, '--tooth-clock' in a, '--exact' in a
+    tooth, tclock, tvc, exact = '--tooth' in a, '--tooth-clock' in a, '--tooth-voices' in a, '--exact' in a
+    seeds = [int(x) for x in opt('--poly', '').split(',') if x]
     tmp = tempfile.mkdtemp()
     so = os.path.join(tmp, 'libjx3p.so')
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
-                   (['-DJX_DRV_TOOTH=1'] if tclock else []) + [os.path.join(REPO, s) for s in SRCS] + ['-lm'],
+                   (['-DJX_DRV_TOOTH=1'] if tclock else []) + (['-DJX_VC_TOOTH=1'] if tvc else []) +
+                   [os.path.join(REPO, s) for s in SRCS] + ['-lm'],
                    check=True)
     tmpl96, aux96 = data96(tmp)
     bad = 0
@@ -149,7 +190,9 @@ def main():
             on, off = int(t_on * rate), int(t_off * rate)
         else:                                 # offset 0 of the first block from it
             on, off = (-(-int(t * rate) // blk) * blk for t in (t_on, t_off))
-        for patch in patches:
+        # (on, off) per run: the one note, or per --poly seed (-seed - 1, the sequence's first sample)
+        plans = [(-sd - 1, int(t_on * rate)) for sd in seeds] if seeds else [(on, off)]
+        for patch, (on, off) in [(p, pl) for p in patches for pl in plans]:
             args = [str(x) for x in (rate, patch, nblk, blk, on, off)]
             o = subprocess.run([sys.executable, __file__, '--oracle'] + args, capture_output=True, text=True)
             if o.returncode:
@@ -162,21 +205,26 @@ def main():
             first = next(((b, s) for b in range(nblk) for s in range(blk)
                           if ro[b][0][s] != rp[b][0][s] or ro[b][1][s] != rp[b][1][s]), None)
             loud = sum(1 for b in range(nblk) for x in ro[b][0] if x & 0x7FFFFFFF)
+            what = 'patch %d' % patch + (' poly seed %d' % (-on - 1) if on < 0 else '')
+            if on < 0:
+                nev = sum(len(e) for e in schedule(nblk, blk, on, off))
+                what += ' (%d events)' % nev
             if first is None:
-                print('  host %d patch %d: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
-                    rate, patch, nblk, blk, loud), flush=True)
+                print('  host %d %s: %d blocks of %d EQUAL (%d nonzero L samples in the plugin\'s output)' % (
+                    rate, what, nblk, blk, loud), flush=True)
             else:
                 bad += 1
                 b, s = first
                 f = lambda x: struct.unpack('<f', struct.pack('<I', x))[0]
-                print('  host %d patch %d: first difference block %d sample %d (host sample %d): plugin L %r port L %r' % (
-                    rate, patch, b, s, b * blk + s, f(ro[b][0][s]), f(rp[b][0][s])), flush=True)
+                print('  host %d %s: first difference block %d sample %d (host sample %d): plugin L %r port L %r' % (
+                    rate, what, b, s, b * blk + s, f(ro[b][0][s]), f(rp[b][0][s])), flush=True)
             if not loud:
                 print('  REFUSE: the plugin\'s output is silent -- this run graded nothing'); bad += 1
-    n = len(rates) * len(patches)
-    if tooth or tclock:
-        print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock', 'BITES (%d of %d differ)' % (
-            bad, n) if bad == n else 'DID NOT BITE on %d of %d' % (n - bad, n)))
+    n = len(rates) * len(patches) * max(1, len(seeds))
+    if tooth or tclock or tvc:
+        print('jx_product_gate %s: %s' % ('--tooth' if tooth else '--tooth-clock' if tclock else '--tooth-voices',
+                                          'BITES (%d of %d differ)' % (bad, n) if bad == n else
+                                          'DID NOT BITE on %d of %d' % (n - bad, n)))
         return 0 if bad == n else 1
     print('jx_product_gate: %d of %d (host rate, patch) runs equal to the plugin\'s process(): %s' % (
         n - bad, n, 'GREEN' if not bad else 'RED'))

@@ -32,9 +32,11 @@
 </head>
 <body>
 <h1>Roland JX-3P <span class="tag">bit-exact C port · clean boot proven</span></h1>
-<div class="sub">The plugin's own recall, note managers, key tracker, dispatch,
-ramps and renders — every layer transcribed from the binary and gated EXACTLY 0. Full master chain (chorus/delay/reverb), proven bit-exact against the plugin over idle + played samples.
-Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
+<div class="sub">The plugin's own patch load, note managers, key tracker, arpeggiator,
+ramps and renders — every layer transcribed from the binary. Played as the plugin plays in a host:
+the engine at 96 kHz, the plugin's own rate converter to the audio device's rate, its render driver
+(the arpeggiator's clock at 120 BPM), six voices; graded block for block against the plugin's own
+process(). Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
 <div class="row">
   <button id="power">Start audio</button>
   <select id="patch"></select>
@@ -43,7 +45,7 @@ Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
 <div id="kbd"></div>
 <div id="status">audio off</div>
 <script type="module">
-const BUILD_VER = "c9e8c5843dec";
+const BUILD_VER = "268d85fbae4f";
 const Jx3pModule = (await import('./jx3p.js?v=' + BUILD_VER)).default;
 
 const mod = await Jx3pModule();
@@ -56,7 +58,7 @@ async function fetchGz(url) {
 }
 document.getElementById('status').textContent = 'loading engine data...';
 const [tmpl, aux, bankGz] = await Promise.all([
-  fetchGz('jx_template.bin.gz'), fetchGz('jx_master_recall.bin.gz'),
+  fetchGz('jx_template_96k.bin.gz'), fetchGz('jx_master_recall_96k.bin.gz'),
   fetchGz('bank.bin.gz')]);
 mod.FS.writeFile('/jx_template.bin', tmpl);
 mod.FS.writeFile('/jx_master_recall.bin', aux);
@@ -82,31 +84,46 @@ sel.onchange = () => mod.ccall('jx3p_recall', null, ['number'],
 let ctx = null, node = null, octave = 4;
 const N = 256;
 const pL = mod._malloc(N * 4), pR = mod._malloc(N * 4);
+/* the host's event list for the next block: { offset, type (0 note-on, 1 note-off), key, velocity 0..127 }
+ * -- the render driver (jx3p_product_block) applies each at its offset; keys pressed between two
+ * callbacks reach the next block at offset 0, as a host's live MIDI does */
+const QMAX = 128, pEv = mod._malloc(QMAX * 16), queue = [];
+const RATES = [44100, 48000, 96000];          /* the render object's table: other rates are silent */
 document.getElementById('power').onclick = async () => {
   if (ctx) return;
-  ctx = new AudioContext({ sampleRate: 44100 });
+  ctx = new AudioContext();
+  if (!RATES.includes(ctx.sampleRate)) { await ctx.close(); ctx = new AudioContext({ sampleRate: 48000 }); }
+  const kind = mod.ccall('jx3p_product_open', 'number', ['number'], [ctx.sampleRate]);
+  if (kind < 0) { document.getElementById('status').textContent = 'RENDER OBJECT FAILED'; return; }
   node = ctx.createScriptProcessor(N, 0, 2);
   node.onaudioprocess = (e) => {
-    mod.ccall('jx3p_render', null, ['number','number','number'], [pL, pR, N]);
-    /* presentation gain only -- the ENGINE stream is bit-exact; WebAudio
-     * clips above 1.0 and the plugin's raw floats reach ~2 */
-    const g = 1.0,   /* master chain: the plugin's own level (proven) */
-          l = mod.HEAPF32.subarray(pL >> 2, (pL >> 2) + N),
+    const n = Math.min(queue.length, QMAX);
+    const v = new Int32Array(mod.HEAPF32.buffer, pEv, QMAX * 4);   /* the heap's buffer after any growth */
+    for (let i = 0; i < n; i++) v.set(queue[i], 4 * i);
+    queue.splice(0, n);
+    mod.ccall('jx3p_product_block', 'number', ['number','number','number','number','number'], [pL, pR, N, pEv, n]);
+    const l = mod.HEAPF32.subarray(pL >> 2, (pL >> 2) + N),
           r2 = mod.HEAPF32.subarray(pR >> 2, (pR >> 2) + N),
           ol = e.outputBuffer.getChannelData(0),
           or2 = e.outputBuffer.getChannelData(1);
-    for (let i = 0; i < N; i++) { ol[i] = g * l[i]; or2[i] = g * r2[i]; }
+    let pk = 0;
+    for (let i = 0; i < N; i++) {                    /* the plugin's own level */
+      ol[i] = l[i]; or2[i] = r2[i];
+      const a = Math.abs(l[i]); if (a > pk) pk = a;
+    }
+    window.__peak = Math.max(window.__peak || 0, pk); /* for jx3p/tools/jx_page_check.mjs */
   };
   node.connect(ctx.destination);
+  window.__rate = ctx.sampleRate; window.__kind = kind;
   document.getElementById('status').textContent =
-    'audio running at 44100 Hz — play';
+    'audio running at ' + ctx.sampleRate + ' Hz (engine 96000 Hz' +
+    (kind === 0 ? ')' : ', the plugin\'s rate converter)') + ' — play';
 };
 
 const KEYMAP = { a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12 };
 const held = new Set();
-function noteOn(n)  { mod.ccall('jx3p_note_on', null,
-                                ['number','number'], [n, 100]); }
-function noteOff(n) { mod.ccall('jx3p_note_off', null, ['number'], [n]); }
+function noteOn(n)  { if (ctx) queue.push([0, 0, n, 100]); }
+function noteOff(n) { if (ctx) queue.push([0, 1, n, 0]); }
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const k = e.key.toLowerCase();

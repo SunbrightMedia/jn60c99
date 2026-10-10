@@ -241,8 +241,9 @@ mine is a hypothesis (playbook 80).
   at their offsets), the arpeggiator's step machine (jx3p/src/jx_seq.c, all 19
   modes; the product reaches 0, 3, 6) -- graded against the plugin's own
   process() and tick (GATES 3c / 3d; their first full verify run is owed).
-  Next: the host tempo (dispatch 375 into the effects), the web app on the
-  product path, warm recall. The web page still runs the 44.1 kHz engine path.
+  The web page plays that product path (JX-10: WASM == native at 3 rates, the
+  page checked headless). Next: the host tempo (dispatch 375 into the effects),
+  warm recall, host edits.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

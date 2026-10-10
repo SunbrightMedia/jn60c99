@@ -138,6 +138,9 @@ static int tmpl_load(const char *path)
 static void host_record(const uint8_t *r)
 {
     memcpy(&G.nvoices, r + 0, 4);
+#if JX_VC_TOOTH   /* TOOTH (jx_product_gate.py --tooth-voices): every voice unit plays, the count ignored */
+    G.nvoices = NV;
+#endif
     memcpy(&G.gain, r + 4, 4);
     memcpy(&G.gstep, r + 8, 4);
     memcpy(&G.gleft, r + 12, 4);

@@ -3,6 +3,20 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (5) — THE WEB PAGE PLAYS THE PRODUCT PATH (JX-10)
+
+The page (jx3p/gui/web, mirrored to docs/jx3p) ran the 44.1 kHz engine with no clock: patches 34 and
+61 had no arpeggiator, and no page rate matched the plugin's engine. Now it plays what
+`jx_product_gate.py` grades against the plugin's own process(): the 96 kHz data, jx3p_product_open at
+the AudioContext's rate (44100 / 48000 / 96000; any other rate asks for 48000), the render driver per
+256-sample block with the keys queued as the block's events. Graded: `jx_wasm_check.py` -- the
+delivered WASM on the page's new calls (a chord at offset 37, a release at 200, a key re-struck where
+another is released) equals the native build at all three rates on patches 0, 5, 20, 34, 49, 61
+(FTZ on and off), tooth bites; `jx_page_check.mjs` -- the page itself in headless Chromium: it boots,
+opens the render object (44100 there: the converter), a key sounds above -40 dBFS, patch 34's
+arpeggiator sounds, no console error; teeth: the recall data missing, the keys queueing nothing (the
+first tooth run showed "peak > 0" passes on the plugin's own idle signal: the bar is now -40 dBFS).
+
 ## 2026-10-10 (4) — THE CLOCK AND THE ARPEGGIATOR (JX-7)
 
 The render driver ticks the engine 24 times per beat; on the two factory patches with ARPEGGIO on (34,
@@ -25,7 +39,8 @@ when a mode class is not covered (seen: the first full run, job jx7_ticks, had n
 stepped) and a tooth (the step clock stopped). Job jx7_gates (EXIT 0): the recall data 64/64 with the
 whole note store, the tick gate on 34, 61, 0, 38, 20, the product gate 12 of 12 (44100 / 48000 /
 96000 x 0, 34, 61, 20) and their teeth. Through process() with the notes inside their blocks
-(`--exact`): 34 and 61 at 48000 and 44100 EQUAL. The full make verify-jx3p with GATES 3c / 3d: owed.
+(`--exact`): 34 and 61 at 48000 and 44100 EQUAL. The full make verify-jx3p with GATES 3c / 3d: job
+jxverify_743d (743dfb16), running.
 
 ## ⚠ CORRECTION 2026-10-10 (3) — THE C MASTER WAS PROVEN ON ONE STATE (playbook 198)
 
