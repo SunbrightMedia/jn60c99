@@ -1344,7 +1344,7 @@ export async function boot(canvas, status) {
   });
   await files.open();
   if (setup) for (const f of setup.files) files.put(f.path, new Uint8Array(await (await fetch(f.url)).arrayBuffer()));
-  else try { files.put(DIRS.patch + "/Factory.bin", new Uint8Array(await (await fetch(BANK_URL)).arrayBuffer())); }
+  else try { files.put(DIRS.patch + "/1 Preset.bin", new Uint8Array(await (await fetch(BANK_URL)).arrayBuffer())); }
   catch (e) { status("no factory bank: " + e); }
   if (Q.get("banks") && !setup) {
     try {

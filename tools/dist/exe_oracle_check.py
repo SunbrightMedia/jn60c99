@@ -50,7 +50,7 @@ HEADER, STRIDE, NAME = 23, 20223, 16
 
 def bank_file(name):
     import truth
-    if name == 'Factory':
+    if name in ('1 Preset', 'Factory'):          # truth/presetbankog1.bin, by either name
         return truth.BANK
     udir = os.path.join(REPO, 'scratchpad', 'userbanks')
     for f in os.listdir(udir):

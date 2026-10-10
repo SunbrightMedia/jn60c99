@@ -68,7 +68,7 @@ def f64(h):
 
 
 def bank_bytes(name):
-    if name == 'Factory':
+    if name in ('1 Preset', 'Factory'):          # truth/presetbankog1.bin, by either name
         return open(truth.BANK, 'rb').read()
     udir = os.path.join(REPO, 'scratchpad', 'userbanks')
     for f in os.listdir(udir):

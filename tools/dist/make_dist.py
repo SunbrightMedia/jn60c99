@@ -140,7 +140,7 @@ def main():
             for fn in sorted(files):
                 p = os.path.join(root, fn)
                 z.write(p, os.path.relpath(p, OUT))
-    print('banks: %d user + Factory' % len(banks))
+    print('banks: %d user + 1 Preset (the factory bank)' % len(banks))
     print('wrote %s (%d bytes)' % (ZIP, os.path.getsize(ZIP)))
     return 0
 

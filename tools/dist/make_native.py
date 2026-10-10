@@ -72,7 +72,8 @@ def unrle0(code, size):
 
 
 def bank_list(with_user):
-    banks = [('Factory', truth.BANK)]
+    # the plugin names a bank by its file: the factory bank is the user's "1 Preset" (truth/presetbankog1.bin)
+    banks = [('1 Preset', truth.BANK)]
     udir = os.path.join(REPO, 'scratchpad', 'userbanks')
     if with_user and os.path.isdir(udir):
         for f in sorted(os.listdir(udir)):
