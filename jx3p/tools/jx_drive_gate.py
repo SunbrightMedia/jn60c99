@@ -137,7 +137,7 @@ def check_base_match():
     import jx_emu as J
     sys.path.insert(0, HERE)
     import jx_master_recall_export as X
-    jx = J.JX().boot(44100.0, snap=True, host_init=True)
+    jx = J.JX().boot(44100.0, snap=False, host_init=True)
     uc = jx.uc
     clean_m = bytes(uc.mem_read(jx.state[8], X.SNAP_M))
     clean_h = [bytes(uc.mem_read(jx.state[v] + X.HI_LO, X.HI_SZ)) for v in range(8)]

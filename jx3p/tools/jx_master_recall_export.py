@@ -138,7 +138,7 @@ def main():
     for patch in range(64):
         # boot per jx_emu.boot(): SETSR takes the rate as a FLOAT in xmm1
         # (ABI ledger); ramps/latch live, as the C engine replays them
-        jx = J.JX().boot(44100.0, snap=True, host_init=True); uc = jx.uc   # snapped steady base; recall re-arms its own ramps
+        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc   # the template's base: boot ramps live (playbook 194)
         if clean_m is None:
             clean_m = bytes(uc.mem_read(jx.state[8], SNAP_M))
             clean_h = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ))
@@ -167,7 +167,9 @@ def main():
     dst = os.path.join(J.REPO, "jx3p", "gen", "jx_master_recall.bin")
     open(dst, "wb").write(out)
     import gzip
-    gzip.open(dst + ".gz", "wb", 9).write(out)
+    with open(dst + ".gz", "wb") as fh, gzip.GzipFile(filename="", mode="wb", compresslevel=9,
+                                                    fileobj=fh, mtime=0) as gz:   # no name, no time:
+        gz.write(out)                                                              # equal bytes every run
     print("recall aux: %d B (%d B gz) -> %s"
           % (len(out), os.path.getsize(dst + ".gz"), dst))
 

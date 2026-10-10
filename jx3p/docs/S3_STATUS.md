@@ -28,11 +28,45 @@ allocation, the HOST and the image compared, rendered past the mute):
   at [HOST+0x38] (the factory writes 8).
 
 Every JX gate stayed EXACTLY 0 because the C engine replays the template the
-same wrong boot exported. So the claims below -- recall 64/64, the full chain
-EXACTLY 0, the listen proofs, the web app -- are UNPROVEN until the template,
-the recall aux and every reference are regenerated on the corrected drive and
-every gate re-runs green. `jx_emu.build()` now builds the HOST with the
-factory (`JX_EMU_LEGACY_HOST=1` keeps the old one for the check only).
+same wrong boot exported. `jx_emu.build()` now builds the HOST with the factory
+(`JX_EMU_LEGACY_HOST=1` keeps the old one for the check only).
+
+**RESTATED FINISH LINE (2026-10-10, the corrected drive; jobs in bench/jobs/):**
+- jx_verify2 (`make verify-jx3p`, EXIT 0): the drive gate (ABI ledger, boot
+  fingerprint, bank decode + tooth, the template IS this boot); recall 64/64 and
+  the recall model EXACTLY 0; the arm + master A/B 64/64 at 44100, 48000 and
+  96000 EXACTLY 0; the full chain 4/4 patches x 16,096 samples from sample 0
+  EXACTLY 0 (tooth bites); the listen proofs GREEN (oracle and C twin);
+  jx_host_drive_check --tooth bites.
+- jx_verify3 (the fixed bridge, below): the full chain and the C listen proofs
+  again GREEN; the web build; WASM == native on all 64 patches; fw_map 24/24
+  and its tooth; the allocator, note store, key tracker, dispatch and ramp
+  walker gates GREEN on the factory HOST. Its seeded fuzz gate was RED 19/24
+  -- its oracle stepped the wrapper's ramps like the A/B's (below); on the arms
+  (jx_fuzz2): 24/24 seeds EXACTLY 0.
+
+What the corrected drive changed (MEASURED 2026-10-10, jobs jx_master_idle, jx_regen1, jx_verify2):
+- The shipped boot needs no poke. Unsnapped, the zero HOST pinned the master at 1.981 for 12,415 of
+  16,096 samples on patches 0, 5 and 20 (the "NaN birth" / pin of MASTER_NAN_FINDING.md); the factory
+  HOST plays them finite, never pinned (max 0.62 / 0.073 / 0.70, idle -61 dBFS on 0 and 20). So the
+  template, the recall aux, the full chain and the listen proofs now boot with ramps and latch LIVE
+  (snap=False): the 09-05 snap was a band-aid over the zero HOST (playbook 101 rule 3).
+- The regenerated template carries the live boot ramps (17,171,108 B, NaN census 0); the recall aux
+  is 16.5 MB (the deltas over an unsnapped base). Both .gz files are now byte-reproducible (no name,
+  no time in the gzip header).
+- The integration A/B (GATE 2) compared the plugin's VOICE_WRAP with the port's bare arm: on the zero
+  HOST every ramp had finished after the warm-up, so the wrapper's ramp tail did nothing. On the
+  factory HOST the boot ramps still run, and the A/B failed 64/64 until its oracle side called the
+  ARMS (READ: VOICE_WRAP zeroes the pair, calls arm v with rcx = state, rdx = pair, tail-calls the
+  ramp stepper 0x3F40E0). The wrapper, latch and ramps are GATE 3's (the full chain).
+
+The web app played a WRONG MIX (MEASURED 2026-10-10, jx3p/tools/jx_wasm_check.py, playbook 196): the
+transcribed master reads its voice inputs at x64 byte offsets, and in the 32-bit WebAssembly build the
+bridge's `void *` array put them 4 bytes apart -- the page mixed voices 0, 2, 4, 6 and memory past the
+array. Every JX gate runs the x64 build and was green. Fixed in jx3p/gui/jx_bridge.c (the master's
+input array in 8-byte slots, blob pointers written as 8 bytes, a re-init frees the previous instance);
+the check runs the page's own calls through the delivered WASM and a native build: equal on all 64
+patches, 5,056 blocks, FTZ on and off (the old WASM differed from the first note's block).
 
 Also found the same day: the JX wrapper (render driver 0x320A00, converter
 0x343CF0, render-object lookup 0x343940, core setup 0x3219A0, setActive

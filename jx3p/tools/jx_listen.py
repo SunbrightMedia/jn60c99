@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """jx_listen.py -- PORT_PIPELINE step 4: the LISTEN PROOF on the oracle.
 
-Boots the plugin through jx_emu.boot() (BUILD, SETSR float-in-xmm1, FTZ,
-recall + notify, ramps snapped, latch cleared), then for each test note:
+Boots the plugin through jx_emu.boot() (the factory HOST, BUILD, SETSR
+float-in-xmm1, FTZ, recall + notify; ramps and latch live as shipped --
+--snap restores the old snap + latch clear, playbook 194), then for each
+test note:
 idle must be silent, the note's autocorrelation pitch must sit within
 25 cents of equal temper, the note's line must carry >= 10% of the
 spectrum, the release must decay. Numbers only -- never by ear.
 
-usage: jx_listen.py [patch=0] [notes=48,60,72] [--static-init] [--no-snap]
+usage: jx_listen.py [patch=0] [notes=48,60,72] [--static-init] [--snap]
        JX_LISTEN_WAVE=<n> forces DCO1 WAVEFORM (id 757) before the notes,
        so a waveform-specific defect can be isolated (2026-09-05: waves 0/1
        pass, 2..5 emit only anti-alias spikes on the unhosted boot).
@@ -45,7 +47,7 @@ def main():
     patch = int(args[0]) if args else 0
     notes = [int(x) for x in (args[1] if len(args) > 1 else "48,60,72").split(",")]
     static_init = "--static-init" in sys.argv
-    snap = "--no-snap" not in sys.argv
+    snap = "--snap" in sys.argv
     host_init = "--no-host-init" not in sys.argv
     master = "--master" in sys.argv
     jx = J.JX().boot(SR, patch=patch, static_init=static_init, snap=snap, host_init=host_init)

@@ -12,8 +12,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 import jx_emu as J
 
 SNAP_V, SNAP_M = 0x60000, 0xAAD000
-# The boot is jx_emu.boot(): BUILD -> SETSR(float in xmm1, ABI ledger) ->
-# FTZ. Ramps stay LIVE and the latch runs down as shipped (snap=False): the
+# The boot is jx_emu.boot(): the factory HOST -> BUILD -> SETSR(float in xmm1,
+# ABI ledger) -> FTZ. Ramps stay LIVE and the latch runs down as shipped
+# (snap=False; it snapped 09-05 to 10-10, playbook 194): the
 # C twin reproduces both from the template's wrap records. Recall is the
 # plugin's own pool dispatch (jx_emu.recall); notify=False keeps the oracle
 # on the same path the shipping bridge takes today.
@@ -27,7 +28,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     bank = J.bank_bytes()
     for patch in patches:
-        jx = J.JX().boot(44100.0, snap=True, host_init=True); uc = jx.uc
+        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc
         jx.recall(patch, bank=bank, notify=False)
         # IDLE PREFIX (2026-09-06): the listen proof flagged a -60 dBFS floor
         # on the master before any note. An absolute threshold cannot say

@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "..", "tools", "verify"))
 import jx_emu as J
 from ab_render_emu import (BANK, HEADER, STRIDE, BLOB_OFF, SNAP_V, SNAP_M,
-                           NOTEON, SETSR, MASTER, ACTIVE, decode)
+                           NOTEON, SETSR, MASTER, ACTIVE, ARMS, decode)
 
 RATES = [44100.0, 48000.0, 96000.0, 88200.0]
 
@@ -121,10 +121,10 @@ def run_seed(outdir, seed, bank):
     uc.mem_write(A3, struct.pack('<QQ', OUTL, OUTR))
     vins = []; louts = []
     for _ in range(s['n']):
-        for v in range(8):
-            uc.mem_write(J.PB_VOICE, struct.pack("<QQQQQ", jx.state[v], v,
-                                                 off[('m', v)], off[('s', v)], 1))
-            jx._run(jx.SVOICE)
+        for v in range(8):            # the ARMS, as ab_render_emu.py (playbook 194: the wrapper's ramp
+            uc.mem_write(off[('m', v)], b"\0" * 4)   # tail is the full chain's to grade)
+            uc.mem_write(off[('s', v)], b"\0" * 4)
+            jx.call(J.IB + ARMS[v], rcx=jx.state[v], rdx=A2 + 16 * v)
         vin = []
         for v in range(8):
             vin.append(struct.unpack('<I', uc.mem_read(off[('m', v)], 4))[0])

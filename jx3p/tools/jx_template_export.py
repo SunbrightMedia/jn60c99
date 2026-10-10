@@ -45,14 +45,14 @@ def nan_count(buf):
 
 def main():
     sr = float(sys.argv[1]) if len(sys.argv) > 1 else 44100.0
-    # BUILD -> SETSR (float in xmm1 -- the ABI ledger in jx_emu; the old
-    # rdx call never set a rate, playbook 87) -> FTZ. Ramps + latch stay
-    # live: the template carries them and the C engine replays them.
-    # snap=True (2026-09-05): the master's boot ramps 541/542 (limit 0.0,
-    # active) poison the EFX at idle sample 3681 when left live; the hosted
-    # steady state has them settled and dead. Recall re-arms per-patch ramps
-    # AFTER this, so patch machinery stays live in the aux records.
-    jx = J.JX().boot(sr, snap=True, host_init=True)
+    # the plugin's factory HOST -> BUILD -> SETSR (float in xmm1 -- the ABI
+    # ledger in jx_emu; the old rdx call never set a rate, playbook 87) ->
+    # FTZ. Ramps + latch stay LIVE, as shipped: the template carries them and
+    # the C engine replays them. (2026-09-05 to 10-10 this snapped every ramp
+    # because the master's boot ramps poisoned the EFX at idle sample 3681 --
+    # an artefact of the zero HOST's inf ramp steps, playbook 194: on the
+    # factory HOST the unsnapped boot is finite, no pin, idle -61 dBFS.)
+    jx = J.JX().boot(sr, snap=False, host_init=True)
     uc = jx.uc
 
     regions = []
@@ -150,7 +150,9 @@ def main():
     body += struct.pack("<I", zlib.crc32(body) & 0xFFFFFFFF)
     open(dst, "wb").write(body)
     import gzip
-    gzip.open(dst + ".gz", "wb", 9).write(body)
+    with open(dst + ".gz", "wb") as fh, gzip.GzipFile(filename="", mode="wb", compresslevel=9,
+                                                    fileobj=fh, mtime=0) as gz:   # no name, no time:
+        gz.write(body)                                                              # equal bytes every run
     print("template: %d regions, %d B raw file (%d B gz), %s"
           % (len(regions), len(body), os.path.getsize(dst + ".gz"), dst))
 

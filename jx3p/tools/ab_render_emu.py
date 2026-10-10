@@ -114,11 +114,16 @@ def run_patch(outdir, patch, n, warm, bank, sr=44100.0):
                       ((off[('m',v)],off[('s',v)]) for v in range(8)) for x in pair)
     uc.mem_write(A2, a2blob); uc.mem_write(A3, struct.pack('<QQ', OUTL, OUTR))
     vins = []; louts = []
+    # THE ARMS, not VOICE_WRAP (2026-10-10, playbook 194): the wrapper zeroes the pair, calls the
+    # voice's arm (rcx = state, rdx = pair; READ 0x3770EB..0x377199) and tail-calls the ramp
+    # stepper 0x3F40E0. On the factory HOST the boot ramps are still running after the warm-up, so
+    # the wrapper would step them here and the C side (the arm alone) cannot follow; on the old zero
+    # HOST every ramp had finished. This gate is the ARM + MASTER seam; the wrapper, its latch and the
+    # ramps are graded end to end by jx_full_gate.sh (GATE 3).
     for s in range(n):
         for v in range(8):
-            uc.mem_write(J.PB_VOICE, struct.pack("<QQQQQ", jx.state[v], v,
-                                                 off[('m',v)], off[('s',v)], 1))
-            jx._run(jx.SVOICE)
+            uc.mem_write(off[('m',v)], b"\0" * 4); uc.mem_write(off[('s',v)], b"\0" * 4)
+            jx.call(J.IB+ARMS[v], rcx=jx.state[v], rdx=A2 + 16*v)
         vin = []
         for v in range(8):
             vin.append(struct.unpack('<I', uc.mem_read(off[('m',v)],4))[0])

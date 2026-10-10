@@ -34,6 +34,12 @@ int  jx_bank_apply(unsigned char *blk, const unsigned char *bank, int idx);
 uint64_t jx_voice_render(void *vstate, int v, void *pair);
 void *jx_master_render(void *mstate, void *a2, void *a3);
 
+/* A pointer stored into a plugin-layout blob: the transcribed code reads the slot as 8 bytes (the
+ * plugin is x64), so the whole slot is written -- the pointer in the low bytes, 0 above it -- on a
+ * 32-bit target (WebAssembly) as on x64 (jx_wasm_check.py, 2026-10-10). */
+#define JX_PTR_STORE(slot, ptr) \
+    do { uint64_t jx_p_ = (uint64_t)(uintptr_t)(ptr); memcpy((slot), &jx_p_, 8); } while (0)
+
 #define NV        8
 #define NUNITS    9
 #define SNAP_V    0x60000
@@ -117,9 +123,28 @@ static int tmpl_load(const char *path)
 
 static uint8_t *g_mrec; static size_t g_mrec_len;
 
+/* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): it frees
+ * what a previous call allocated and clears every field, the sample clock and the voice seam
+ * included. Each call holds ~51 MB (template, recall aux, bank, states); without the free a 32-bit
+ * WebAssembly heap ran out after a few dozen calls and the engine then wrote through NULL
+ * (jx_wasm_check.py over 64 patches, 2026-10-10). A first call is unchanged: G starts zeroed. */
+static void jx_release(void)
+{
+    for (int i = 0; i < g_nreg; ++i) free(g_tmpl_regions[i]);
+    for (int i = 0; i < g_nlink; ++i) free(g_tmpl_links[i]);
+    g_nreg = g_nlink = 0;
+    free(g_mrec); g_mrec = NULL; g_mrec_len = 0;
+    free((void *)G.bank);
+    for (int v = 0; v < NV; ++v) { free(G.vstate[v]); free(G.vhigh[v]); }
+    free(G.mstate);
+    for (int i = 0; i < NUNITS; ++i) { free(G.proc[i]); free(G.wrap[i].slots); }
+    memset(&G, 0, sizeof G);
+}
+
 int jx3p_init(const char *template_path, const char *bank_path,
               const char *master_recall_path)
 {
+    jx_release();
     if (!tmpl_load(template_path)) return 0;
     {   FILE *f = fopen(master_recall_path, "rb");
         size_t fl;
@@ -169,9 +194,9 @@ int jx3p_init(const char *template_path, const char *bank_path,
          * [0xA60000,0xAAD000), so the recall aux keeps them current. The
          * template's copied values (vd40/vd64) are the clean-boot mirror
          * and must NOT be what the DSP reads. */
-        *(void **)(G.vobj[v] + 40) = G.vhigh[v] + (0xAAC1D8 - 0xA60000);
-        *(void **)(G.vobj[v] + 64) = G.vhigh[v] + (0xAAC1DC - 0xA60000);
-        *(void **)(G.vstate[v] + 136) = G.vobj[v];
+        JX_PTR_STORE(G.vobj[v] + 40, G.vhigh[v] + (0xAAC1D8 - 0xA60000));
+        JX_PTR_STORE(G.vobj[v] + 64, G.vhigh[v] + (0xAAC1DC - 0xA60000));
+        JX_PTR_STORE(G.vstate[v] + 136, G.vobj[v]);
     }
     {   const uint8_t *sm = g_tmpl_links[17];
         G.dn.o110_58 = *(const int32_t *)(sm + 0);
@@ -186,9 +211,9 @@ int jx3p_init(const char *template_path, const char *bank_path,
         /* same rule for the master (PORT_LESSONS 8): obj+136 -> state+0xAAC1E8,
          * obj+112 -> state+0xAAC1E4 in the plugin; the master state block is
          * the whole unit, so the aux's master runs keep them current. */
-        *(void **)(G.mobj + 136) = G.mstate + 0xAAC1E8;
-        *(void **)(G.mobj + 112) = G.mstate + 0xAAC1E4;
-        *(void **)(G.mstate + 136) = G.mobj;
+        JX_PTR_STORE(G.mobj + 136, G.mstate + 0xAAC1E8);
+        JX_PTR_STORE(G.mobj + 112, G.mstate + 0xAAC1E4);
+        JX_PTR_STORE(G.mstate + 136, G.mobj);
     }
     /* wrapper + ramp records (links 8..16), targets rebased per unit */
     for (int u = 0; u < NUNITS; ++u) {
@@ -301,10 +326,10 @@ void jx3p_recall(int idx)
      * byte, for every factory patch. */
     for (int v = 0; v < NV; ++v) {
         memcpy(G.vstate[v], g_tmpl_regions[v], SNAP_V);
-        *(void **)(G.vstate[v] + 136) = G.vobj[v];
+        JX_PTR_STORE(G.vstate[v] + 136, G.vobj[v]);
     }
     memcpy(G.mstate, g_tmpl_regions[52], SNAP_M);
-    *(void **)(G.mstate + 136) = G.mobj;
+    JX_PTR_STORE(G.mstate + 136, G.mobj);
     for (int v = 0; v < NV; ++v)
         memcpy(G.vhigh[v], g_tmpl_regions[44 + v], 0x4D000);
     {   const uint8_t *p = g_mrec + 8;
@@ -334,15 +359,21 @@ void jx3p_note_off(int note)
 
 void jx3p_render(float *L, float *R, int n)
 {
+    /* THE MASTER'S INPUT ARRAY IN 8-BYTE SLOTS (2026-10-10, jx_wasm_check.py): the transcribed
+     * master reads its voice inputs at the plugin's x64 byte offsets -- `**(_DWORD **)(a2 + 16 * v)`
+     * -- so each slot of a2 is a uint64_t with the pointer in its low bytes. The voice pairs and the
+     * output pair are read by index (`a2[1]`, `a3[1]`): native pointer arrays. With `void *` slots
+     * for a2 the 32-bit WebAssembly master read entries 0, 4, 8, 12 and past the array -- voices 0,
+     * 2, 4, 6 and garbage -- while the x64 build was right. */
     void *pairs[NV][2];
-    void *a2[16];
+    uint64_t a2[16];
     uint32_t outL, outR;
     void *a3[2] = { &outL, &outR };
     for (int v = 0; v < NV; ++v) {
         pairs[v][0] = &G.vcells[2 * v];
         pairs[v][1] = &G.vcells[2 * v + 1];
-        a2[2 * v] = &G.vcells[2 * v];
-        a2[2 * v + 1] = &G.vcells[2 * v + 1];
+        a2[2 * v] = (uint64_t)(uintptr_t)&G.vcells[2 * v];
+        a2[2 * v + 1] = (uint64_t)(uintptr_t)&G.vcells[2 * v + 1];
     }
     for (int s = 0; s < n; ++s) {
         /* the per-unit WRAPPER (0x377080 voice / 0x377010 master):
@@ -385,7 +416,7 @@ void jx3p_render(float *L, float *R, int n)
  * instrument; this preview plays them directly. */
 void jx3p_render_dry(float *L, float *R, int n)
 {
-    void *pairs[NV][2];
+    void *pairs[NV][2];                /* read by index: a native pointer array (jx3p_render) */
     for (int v = 0; v < NV; ++v) {
         pairs[v][0] = &G.vcells[2 * v];
         pairs[v][1] = &G.vcells[2 * v + 1];

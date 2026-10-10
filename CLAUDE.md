@@ -234,14 +234,17 @@ mine is a hypothesis (playbook 80).
   BOM v2 in docs/hardware/bom/, ordering in docs/hardware/ORDERING.md.
   The user draws every board; Claude answers at pin/net level.
 - **JX-3P (E5)**: jx3p/docs/S3_STATUS.md rules -- read its HOST DRIVE
-  correction first. The JP8 D7 defect REACHED the JX (MEASURED, playbook
-  194): the old oracle's zero HOST gave every ramp an inf step, so every JX
-  gate graded a sound the plugin never makes (the output differs from sample
-  961). jx_emu now builds the plugin's own HOST; until the JX data are
-  regenerated and every JX gate re-runs green, the JX claims (recall 64/64,
-  full chain EXACTLY 0, listen proofs, the web app) are UNPROVEN. The JX
-  wrapper is the JUNO's machine code (render driver, converter, process(),
-  patch manager): the JUNO host layer is the JX's next step.
+  correction first. The JX oracle now builds the plugin's own HOST (the zero
+  HOST gave every ramp an inf step: playbook 194); the data were regenerated on
+  it, ramps and latch live, and every JX gate is GREEN again (recall 64/64,
+  the arm + master A/B 64/64 x 3 rates, the full chain from sample 0, the
+  listen proofs, the fuzz seeds; jobs jx_verify2/3, jx_fuzz2 -- one run of the
+  five-gate `make verify-jx3p` on the commit is owed). Its web page mixed the wrong voices in
+  the 32-bit build (playbook 196): fixed; jx_wasm_check.py (GATE 5) grades the
+  delivered WASM against native on all 64 patches. Next, the plugin as a DAW
+  runs it (jx3p/docs/HOST_LAYER.md): the wrapper is the JUNO's machine code,
+  jx3p/tools/jx_host_emu.py boots it through its own process(); the product
+  is 6 voices, a 96 kHz engine, an output gain stage (the writePatch fade).
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

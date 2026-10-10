@@ -3372,3 +3372,20 @@ own child once is retried and passes; seen on the real repro4 line).
 ### The rule
 Nothing else runs beside a parallel verify. A kill by the kernel is retried alone and reported as a
 retry; it is never counted as a pass, and never as a gate's failure.
+
+## 196. A TRANSCRIPTION OF x64 CODE CARRIES ITS POINTER WIDTH -- GRADE THE 32-BIT BUILD
+Paid 2026-10-10 (JX-3P web app). The JX's transcribed master reads its eight voice inputs at the
+plugin's x64 byte offsets (`**(_DWORD **)(a2 + 16 * v)`); the bridge passed `void *a2[16]`. On x64
+the two agree. In the WebAssembly build pointers are 4 bytes, so the master read entries 0, 4, 8,
+12 and memory past the array: the published page mixed voices 0, 2, 4, 6 and garbage. Every JX gate
+was green -- all of them run the x64 build -- and no check ran the delivered WASM (the JUNO has
+one: wasm_product_gate.py). jx3p/tools/jx_wasm_check.py now runs the page's own calls through the
+delivered WASM (node) and a native build: the old WASM differed from the first note's block; the
+fixed bridge (a2 in 8-byte slots; the pairs and the output pair, read by index, as native arrays;
+every pointer stored into a plugin blob written as 8 bytes) is equal on all 64 patches, 5,056
+blocks, FTZ on and off. The same check found that a re-init leaked ~51 MB, which a 32-bit heap ran
+out of after a few dozen patches; jx3p_init now frees the previous instance and clears the clock.
+### The rule
+Every delivered build is graded on its own target, with the calls the product makes. A
+transcription's pointer arrays are read either by byte offset (x64 layout: 8-byte slots) or by
+index (native arrays) -- find which, per array, before a 32-bit build ships.
