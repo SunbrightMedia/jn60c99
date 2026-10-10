@@ -38,8 +38,9 @@ EXPECT = {
     "static_ok": 841,
     "static_fail": 0,
     "static_skipped": 3,
-    "host_map": {0: 18, 1: 19, 2: 20},
-    "host_writes": 3,
+    "host_map": {0: 18, 1: 19, 2: 20},     # jx_emu.host_map(): the ids below 0x100000 only
+    "id_map_size": 744,                     # the host entry's whole map after the static init (2026-10-10)
+    "boot_records": (84, 83),               # initialize's records, all / kind 2 (jx_patch_records.json)
     "max_faults": 8,          # a clean boot faults ~1; the guard cap is 64
 }
 
@@ -103,16 +104,20 @@ def check_boot():
     if m != EXPECT["host_map"]:
         bad += fail("controller host map = %s, expected %s (lesson 10)"
                     % (m, EXPECT["host_map"]))
-    w, wf = jx.host_init()
-    if w != EXPECT["host_writes"] or wf:
-        bad += fail("host_init wrote %d (fail %d), expected %d"
-                    % (w, wf, EXPECT["host_writes"]))
+    im = jx.id_map()
+    if len(im) != EXPECT["id_map_size"]:
+        bad += fail("the host entry's id map holds %d ids, expected %d" % (len(im), EXPECT["id_map_size"]))
+    br = J.JX.records()["boot"]
+    w = (len(br), sum(1 for r in br if r[0] == 2))
+    if w != EXPECT["boot_records"]:
+        bad += fail("boot records (all, kind 2) = %s, expected %s" % (w, EXPECT["boot_records"]))
+    jx.product_boot()
     if jx.faults > EXPECT["max_faults"]:
         bad += fail("%d stray page faults, expected <= %d -- a crash-walk is "
                     "loose (playbook 90)" % (jx.faults, EXPECT["max_faults"]))
     if not bad:
-        print("2. boot fingerprint: static %d/%d/%d, map %s, %d host writes, "
-              "%d faults" % (ok, f, skip, m, w, jx.faults))
+        print("2. boot fingerprint: static %d/%d/%d, map %s (%d ids in all), %d/%d boot records, "
+              "%d faults" % (ok, f, skip, m, len(im), w[0], w[1], jx.faults))
     return bad
 
 
@@ -137,7 +142,7 @@ def check_base_match():
     import jx_emu as J
     sys.path.insert(0, HERE)
     import jx_master_recall_export as X
-    jx = J.JX().boot(44100.0, snap=False, host_init=True)
+    jx = J.JX().boot(44100.0, snap=False, product=True)
     uc = jx.uc
     clean_m = bytes(uc.mem_read(jx.state[8], X.SNAP_M))
     clean_h = [bytes(uc.mem_read(jx.state[v] + X.HI_LO, X.HI_SZ)) for v in range(8)]

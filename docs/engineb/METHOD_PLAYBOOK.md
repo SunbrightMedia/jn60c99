@@ -3389,3 +3389,52 @@ out of after a few dozen patches; jx3p_init now frees the previous instance and 
 Every delivered build is graded on its own target, with the calls the product makes. A
 transcription's pointer arrays are read either by byte offset (x64 layout: 8-byte slots) or by
 index (native arrays) -- find which, per array, before a 32-bit build ships.
+
+## 197. A RECALL MODEL GRADED ONLY AGAINST ITSELF -- CENSUS THE PRODUCT'S OWN INPUTS
+Paid 2026-10-10 (JX-3P). The JX port's data (template + per-patch recall aux) and four of its five
+gates rested on a recall MODEL: dispatch 740 + pool for 59 "active pools", the bank's nibble pair at
+2 pool - 8, flag 1, pool order -- the harness's reading of the plugin, never the plugin's own path.
+"Recall 64/64 EXACT" meant the C port equals that model. The census of the plugin's OWN patch load
+(jx3p/tools/jx_patch_protocol.py: its patch browser's load, the queue, the render driver, the
+engine's host entry, every unit dispatch) differed for every factory patch: 17 dispatch ids the
+model sent are never sent; 20 the plugin sends -- the second half of the patch tree and the effect
+floats, varying per patch -- the model never sent; dispatch 769's value is moved by -128; flag 0, not
+1; and initialize queues a default patch and writePatch the model's "controller default push" (3
+host writes) never had. MEASURED: patches 0, 20, 49 played about 3x too loud (peak 0.63 vs 0.21).
+The fix uses no model: the engine alone, given the plugin's own records through its own host entry,
+holds what the booted plugin holds, word for word (jx_recall_product_check.py: every unit's state,
+parameter object and assigner; 5 patches; one record left out is seen). A walker filter in the
+harness (host_map keeps ids < 0x100000) had also made the 744-entry id map look like 3 entries.
+### The rule
+A harness that stands in for a plugin path is a hypothesis until a census of the PRODUCT path's
+inputs (its own queue, its own entry points) is compared with it. "C == oracle" proves nothing about
+the oracle's drive; the drive's own inputs must come from the plugin's entry path, and a check
+must compare the engine the drive builds with the engine the product builds, whole memory.
+
+## 198. A PROOF ON ONE STATE IS NOT A PROOF OF THE TRANSCRIPTION -- DRIVE EVERY MODE THE CODE BRANCHES ON
+Paid 2026-10-10 (JX-3P master). The C master was "PROVEN" in August: state and output equal to the
+plugin's for 32 samples on the default note state. With the plugin's own patch load (197) giving it
+real effect parameters, a per-sample bisect (jx3p/tools/jx_master_bisect.py: every unit's state, the
+36 control objects and L/R per 256-sample chunk, then sample by sample, then the words) found three
+defect classes of the decompile in the same function, all invisible to the old proof:
+(1) float constants printed as rounded decimals -- `v == 0.00024414062` never equals the plugin's
+ucomiss against the exact float 4/16384 (a double literal that is not the float); fixed to the
+binary's own bits (0x1p-12f, 0x1.8p-13f, 0x1p-14f x 15, 0x1p-24f, 0x1.a36e2ep-12f), each read from
+the rip-relative operand. (2) three statements it dropped -- the wraps `if (x - len >= 0) x -= len`
+of three phase accumulators (asm 0x3A0A54, 0x3A0B06); the C never had them. (3) eleven helper calls
+whose argument it lost (the effect LFO of master modes 2-5), placeholdered with 0 in August and
+"unexercised" -- written from the asm, every register's writer found by walking the control-flow
+graph back from the call (a first walker that misparsed jump targets reported "no jumps in" and was
+wrong; check the walker on a known edge). The factory bank never sets one mode cell to 3 or 4 nor
+the other to 1, 3, 4 or 5: those paths are graded on VARIANT patches -- a factory patch's own
+records with one value changed, loaded by the plugin through its own host entry (the plugin accepts
+0..5; 6 and 9 fall back to 0), the port given their recall data by the same exporter. A tooth puts
+the lost argument back and is seen on exactly the variants that reach the sites. One more harness
+lesson: the plugin's master state window ran past its own block (0xAAC310 bytes) into the next heap
+object -- the master's parameter object -- which the port keeps elsewhere; a "difference" there was
+the window, not the port.
+### The rule
+A transcription is proven on the branches its proof ran, nowhere else. Census the branch inputs of
+the function (here the two mode cells and their legal values), drive each through the product's own
+entry, and grade every sample of state, not 32 samples of output. Never trust a decompile's decimal
+constant: read the operand's bits.

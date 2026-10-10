@@ -19,6 +19,10 @@
 #
 # usage: sh tools/run_job.sh <name> <command...>
 #        sh tools/run_job.sh --list
+# A job NAME is used once. Never delete a job's directory while its wrapper may
+# live: the old wrapper then writes its EXIT into a new job of the same name, and
+# that job looks finished while it runs (paid 2026-10-10: a throwaway job and a
+# real one shared a name; the real export showed EXIT 2 at its patch 3).
 # The command is re-parsed by sh as `( $* )`: quotes are LOST. Put a compound
 # command in a script file and run that, never `sh -c '...'` (playbook 118).
 set -u

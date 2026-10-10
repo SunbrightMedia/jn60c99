@@ -3,6 +3,53 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## ⚠ CORRECTION 2026-10-10 (3) — THE C MASTER WAS PROVEN ON ONE STATE (playbook 198)
+
+"Master render nulls EXACTLY 0" (August) meant 32 samples of the default note state. Given the
+plugin's own patch load (correction 2), the master left the plugin at sample 961 of patch 0.
+`jx3p/tools/jx_master_bisect.py` (two processes: per 256-sample chunk the sha256 of every voice
+state, the master state to its block end 0xAAC310, the 36 control objects and L/R; then sample by
+sample; then the words) found three defect classes of the decompile, each fixed from the asm:
+1. **Rounded decimal constants**: `v == 0.00024414062` against the plugin's ucomiss on the exact
+   float 4/16384 is never true; 2^-14 products, 2^-24, 0.0004f -- replaced with the operands' own
+   bits (`0x1p-12f`, `0x1.8p-13f`, `0x1p-13f`, `0x1p-14f`, `0x1p-24f`, `0x1.a36e2ep-12f`; and the
+   voice's `0x1p-16f`).
+2. **Three dropped statements**: the wraps of three phase accumulators (asm 0x3A0A54, 0x3A0B06).
+3. **Eleven lost helper arguments** (the effect LFO of master modes 2-5, placeholdered with 0 since
+   August): written from the asm; every register's writer found by a backward walk of the master's
+   control-flow graph (`jx_lfo_step`).
+Coverage (MEASURED, 4,096 idle + note 60/100 + 12,000 samples, every chunk of every unit equal):
+the factory bank sets the master's mode cells (+0xAAC1E8 by record 67: 0, 1, 2, 5; +0xAAC1E4 by
+record 65: 0, 2) -- the other legal values (0..5; the plugin maps 6 and 9 to 0) are graded on
+VARIANT patches: a factory patch's own records with one value changed, loaded by the plugin through
+its host entry, the port given their recall data by the same exporter (`--variants`). 7 variants
+measured equal (two crossed ones are added in GATE 3b); the tooth (the lost argument back,
+`JX_MASTER_TOOTH`) is seen on exactly the 3 variants that reach the sites. On the code before the
+argument fix the 64-patch run (job jx_bisect64) differed on exactly the 6 factory patches that use
+master modes 2 and 5 (34, 40, 50, 51, 52, 62). `make verify-jx3p` runs it as GATE 3b (`--gate`: 64
+patches + 9 variants + tooth); its first run is owed.
+
+## ⚠ CORRECTION 2026-10-10 (2) — THE RECALL WAS A MODEL, NOT THE PATCH LOAD (playbook 197)
+
+Every JX recall claim before this line ("Recall 64/64 EXACT", the template, the recall aux, GATE 1)
+was graded against the harness's POOL MODEL of the recall (dispatch 740 + pool, 59 pools, the bank's
+nibble pair at 2 pool - 8, flag 1). The census of the plugin's OWN patch load (jx3p/tools/
+jx_patch_protocol.py; jx3p/docs/HOST_LAYER.md 3b) differs on every factory patch: 17 dispatch ids the
+model sent are never sent; 20 the plugin sends -- most of them varying per patch, the second half of
+the tree and the effect floats -- were never sent; dispatch 769 is value - 128; flag 0; initialize
+queues a default patch and writePatch, where the model's "controller default push" made 3 host
+writes. MEASURED: patches 0, 20 and 49 played about 3x too loud (peak 0.63 against 0.21 with the
+plugin's values). The "plays and sounds right" of the web app was by ear.
+
+The fix (no model left in the drive): `jx_emu.boot(product=True)` + `recall_product(k)` hand the
+plugin's own records (jx3p/gen/jx_patch_records.json, from `jx_patch_records.py`) to the engine's own
+host entry. `jx_recall_product_check.py`: that engine equals the booted plugin's at its render, word
+for word, every unit's state, parameter object and assigner (patches 0, 5, 20, 49, 63; tooth bites).
+The template and the recall aux are regenerated on it; GATE 1 is now `jx_recall_data_gate.py` (the
+port's jx3p_recall against it, every window, all 64 patches); the A/B, the fuzz seeds, the full chain
+and the listen proofs boot the same way. The old pool LUT (jx_recall.c, jx_recall_gate.sh) is the
+model's and no longer a gate.
+
 ## ⚠ CORRECTION 2026-10-10 — THE HOST DRIVE WAS WRONG (playbooks 101, 194)
 
 The JP8's D7 defect (playbook 101) was written down for the JX as INFERRED on

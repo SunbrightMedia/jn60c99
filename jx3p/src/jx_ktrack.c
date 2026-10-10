@@ -676,3 +676,111 @@ void jx_ktrack_off_full(uint8_t *b, const jx_ktrack_cbs *cb, int note)
 #endif
     jx_ktrack_off(b, cb, note);
 }
+
+/* ---- THE VOICE COUNT (2026-10-10; READ, jx3p/docs/HOST_LAYER.md) -------------------------------
+ * The engine render (rva 0x3F9220) syncs every voice unit's assigner to HOST+0x38 at each block:
+ * get (vtable +0x88, 0x357E50: [obj+8]), and when it differs the setter (vtable +0x80, 0x357CE0).
+ * The plugin plays SIX voices by default (initialize's record 0x0FFFC00E = 6); the factory builds 8. */
+
+/* the 8-voice record reset (unrolled at 0x356EEE, 0x355297, 0x357070): note byte 0xFF, gate 0,
+ * released 0 per voice, then +0x44 = 0 and +0x4C..+0x5F zeroed (the held-note bitmap with them) */
+static void jxk_records_reset(uint8_t *b)
+{
+    int i;
+    for (i = 0; i < 8; ++i) {
+        b[0x60 + 4 * i] = 0xFF;                  /* word 0x00FF */
+        b[0x61 + 4 * i] = 0x00;
+        b[0x62 + 4 * i] = 0;
+    }
+    BI(0x44) = 0;
+    memset(b + 0x4C, 0, 8);                      /* qword +0x4C */
+    memset(b + 0x54, 0, 8);                      /* qword +0x54 */
+    BI(0x5C) = 0;
+}
+
+/* 0x356E80 -- with dl set: +0x18 = 1 only. Else +0x18 = 0, every voice below the count whose
+ * released flag (+0x62) is 1 loses it and joins a mask the gate-off sweep takes; then, when +0x1C was
+ * 1, the sweep over all voices, the records reset and +0x1C = 0 */
+static void jxk_356E80(uint8_t *b, const jx_ktrack_cbs *cb, int dl)
+{
+    uint8_t mask = 0, i = 0;
+    if ((uint8_t)dl) { BI(0x18) = 1; return; }
+    BI(0x18) = 0;
+    if (BI(8) > 0) {
+        do {
+            if (b[0x62 + 4 * i] == 1) {
+                mask = (uint8_t)(mask | (1u << i));       /* bts r8d, edx (i < 8) */
+                b[0x62 + 4 * i] = 0;
+            }
+            ++i;
+        } while ((int32_t)i < BI(8));
+    }
+    jxk_357570(b, cb, (uint32_t)mask);
+    if (BI(0x1C) == 1) {
+        jxk_357570(b, cb, (uint32_t)BI(0xC));
+        jxk_records_reset(b);
+        BI(0x1C) = 0;
+    }
+}
+
+/* 0x355280 -- with +0x18 set: +0x1C = 1. Else the gate-off sweep over all voices, the records reset */
+static void jxk_355280(uint8_t *b, const jx_ktrack_cbs *cb)
+{
+    if (BI(0x18) != 0) { BI(0x1C) = 1; return; }
+    jxk_357570(b, cb, (uint32_t)BI(0xC));
+    jxk_records_reset(b);
+}
+
+/* 0x356F60 (vtable +0x78) -- the count store: count = min(n, 8), its voice mask, mode and flags
+ * cleared, the records, the order array 0..count-1 at +0x80 (its length at +0xA0), +0x20 = 0,
+ * +0x48 = -1, then 0x355280 (a tail jump) */
+static void jxk_356F60(uint8_t *b, const jx_ktrack_cbs *cb, int32_t n)
+{
+    int32_t c = n > 8 ? 8 : n, i;                /* cmp edx, 8; cmovg */
+    BI(8) = c;
+    BI(0xC) = 0;
+    if (c > 0) {
+        uint32_t m = 0;
+        for (i = 0; i < c; ++i) m |= 1u << i;
+        BI(0xC) = (int32_t)m;
+    }
+    memset(b + 0x10, 0, 8);                      /* qword +0x10: the mode and +0x14 */
+    memset(b + 0x18, 0, 8);                      /* qword +0x18 and +0x1C */
+    for (i = 0; i < 8; ++i) { b[0x60 + 4 * i] = 0xFF; b[0x61 + 4 * i] = 0; b[0x62 + 4 * i] = 0; }
+    BI(0xA0) = c;
+    for (i = 0; i < BI(0xA0); ++i) BI(0x80 + 4 * i) = i;
+    BI(0x20) = 0;
+    BI(0x48) = -1;
+    BI(0x44) = 0;
+    memset(b + 0x4C, 0, 8);
+    memset(b + 0x54, 0, 8);
+    BI(0x5C) = 0;
+    jxk_355280(b, cb);
+}
+
+/* 0x357CE0 (vtable +0x80) -- the setter: the released voices' sweep (0x356E80 with dl 0), all voices
+ * off (0x355280), the store, then host parameter 800 into the mode (+0x10; a change to 0 clears +0x44,
+ * to 1 or 2 the held-note bitmap) and 799 into +0x14, each only when the read finds it */
+void jx_ktrack_set_count(uint8_t *b, const jx_ktrack_cbs *cb, int n)
+{
+    int32_t v = 0;
+    jxk_356E80(b, cb, 0);
+    jxk_355280(b, cb);
+    jxk_356F60(b, cb, n);
+    if (cb->get50(cb->user, 4, 0x320, &v)) {
+        if (BI(0x10) != v) {
+            if (v == 0) BI(0x44) = 0;
+            else if ((uint32_t)(v - 1) <= 1u) { memset(b + 0x50, 0, 8); memset(b + 0x58, 0, 8); }
+        }
+        BI(0x10) = v;
+    }
+    if (cb->get50(cb->user, 4, 0x31F, &v)) BI(0x14) = v;
+}
+
+/* 0x357E50 (vtable +0x88) -- the count */
+int jx_ktrack_count(const uint8_t *b)
+{
+    int32_t c;
+    memcpy(&c, b + 8, 4);
+    return c;
+}

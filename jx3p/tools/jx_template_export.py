@@ -43,8 +43,42 @@ def nan_count(buf):
 
 
 
+def control_blobs(jx):
+    """the 36 control objects in template region order (8..43): per unit its note manager (0x7A8, the
+    sink pointers at +0x518 zeroed), note store (0xDB0) and assigner (0xB0), each vtable zeroed; then
+    the 9 parameter objects (0x700, vtable zeroed). The recall exporter diffs the same blobs per patch."""
+    uc = jx.uc
+    def rq(a): return int.from_bytes(uc.mem_read(a, 8), "little")
+    out = []
+    for i in range(9):
+        u = rq(jx.HOST + 0x78 + 0x40 * i)
+        mgr = bytearray(uc.mem_read(u, 0x7A8))
+        struct.pack_into("<QQ", mgr, 0x518, 0, 0)     # sink ptrs zeroed
+        ns = bytearray(uc.mem_read(rq(u + 0x518), 0xDB0))
+        struct.pack_into("<Q", ns, 0, 0)              # vtable
+        kt = bytearray(uc.mem_read(rq(u + 0x520), 0xB0))
+        struct.pack_into("<Q", kt, 0, 0)              # vtable
+        out += [bytes(mgr), bytes(ns), bytes(kt)]
+    for i in range(9):
+        pr = bytearray(uc.mem_read(jx.proc[i], 0x700))
+        struct.pack_into("<Q", pr, 0, 0)              # vtable
+        out.append(bytes(pr))
+    return out
+
+
+def host_record(jx):
+    """HOST+0x38 voices, +0x860 gain, +0x864 step, +0x868 samples left, +0x86C delay, +0x870 fade time,
+    +8 the engine rate: 28 bytes, the bridge's host_record() layout"""
+    r = lambda off, n: bytes(jx.uc.mem_read(jx.HOST + off, n))
+    return r(0x38, 4) + r(0x860, 20) + r(8, 4)
+
+
 def main():
-    sr = float(sys.argv[1]) if len(sys.argv) > 1 else 44100.0
+    a = [x for x in sys.argv[1:]]
+    out = a[a.index("--out") + 1] if "--out" in a else None     # another engine rate's template (JX-4)
+    if out:
+        del a[a.index("--out"):a.index("--out") + 2]
+    sr = float(a[0]) if a else 44100.0
     # the plugin's factory HOST -> BUILD -> SETSR (float in xmm1 -- the ABI
     # ledger in jx_emu; the old rdx call never set a rate, playbook 87) ->
     # FTZ. Ramps + latch stay LIVE, as shipped: the template carries them and
@@ -52,7 +86,7 @@ def main():
     # because the master's boot ramps poisoned the EFX at idle sample 3681 --
     # an artefact of the zero HOST's inf ramp steps, playbook 194: on the
     # factory HOST the unsnapped boot is finite, no pin, idle -61 dBFS.)
-    jx = J.JX().boot(sr, snap=False, host_init=True)
+    jx = J.JX().boot(sr, snap=False, product=True)   # the plugin's own boot records (jx_patch_records.json)
     uc = jx.uc
 
     regions = []
@@ -69,20 +103,8 @@ def main():
         struct.pack_into("<Q", buf, 136, 0)          # pointer zeroed
         regions.append(buf)
     # control-plane blobs: 9 note managers (+their nstore/ktrack objects)
-    # and the 9 proc headers + the dispatch seam constants
-    for i in range(9):
-        u = rq(jx.HOST + 0x78 + 0x40 * i)
-        mgr = bytearray(uc.mem_read(u, 0x7A8))
-        struct.pack_into("<QQ", mgr, 0x518, 0, 0)     # sink ptrs zeroed
-        ns = bytearray(uc.mem_read(rq(u + 0x518), 0xDB0))
-        struct.pack_into("<Q", ns, 0, 0)              # vtable
-        kt = bytearray(uc.mem_read(rq(u + 0x520), 0xB0))
-        struct.pack_into("<Q", kt, 0, 0)              # vtable
-        regions.append(mgr); regions.append(ns); regions.append(kt)
-    for i in range(9):
-        pr = bytearray(uc.mem_read(jx.proc[i], 0x700))
-        struct.pack_into("<Q", pr, 0, 0)              # vtable
-        regions.append(pr)
+    # and the 9 proc headers (regions 8..43)
+    regions.extend(bytearray(b) for b in control_blobs(jx))
     # WRAPPER + RAMP layer, per unit (charter 7b: a clean boot has 216 LIVE
     # ramps, latch=960, flag=1 -- measured, not assumed):
     #   u32 latch, u8 flag, pad3, u32 nids, ids..., u32 nslots,
@@ -138,11 +160,15 @@ def main():
     if nn and os.environ.get("JX_TEMPLATE_ALLOW_NAN") != "1":
         raise SystemExit("CLEAN BOOT CONTAINS NaN -- refused")
 
-    # JXT3: regions RAW (the engine parses with no zlib; the WEB fetches the
+    # the engine HOST record (link 19, JXT4; 2026-10-10): what the plugin's engine render reads from
+    # its HOST after the boot records -- the voice count, the output gain stage armed by writePatch,
+    # the engine rate (jx3p/docs/HOST_LAYER.md)
+    links.append(host_record(jx))
+    # JXT4: regions RAW (the engine parses with no zlib; the WEB fetches the
     # gzip sidecar and inflates with the browser's own DecompressionStream)
     raw = sum(len(r) for r in regions)
-    dst = os.path.join(J.REPO, "jx3p", "gen", "jx_template.bin")
-    body = b"JXT3" + struct.pack("<I", len(regions))
+    dst = out or os.path.join(J.REPO, "jx3p", "gen", "jx_template.bin")
+    body = b"JXT4" + struct.pack("<I", len(regions))
     for r in regions:
         body += struct.pack("<I", len(r)) + bytes(r)
     for lk in links:

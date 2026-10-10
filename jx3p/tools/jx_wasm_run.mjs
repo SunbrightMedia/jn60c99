@@ -13,7 +13,8 @@ const ARGS = process.argv.slice(2);
 const opt = (k) => { const i = ARGS.indexOf(k); return i >= 0 ? ARGS[i + 1] : null; };
 const DIR = path.resolve(opt('--dir') || path.join(REPO, 'jx3p/gui/web'));
 const PATCHES = (opt('--patches') || '0,5,20,49').split(',').map(Number);
-const PLAN = [['idle', 4096], ['on', 60, 100], ['render', 12032], ['off', 60], ['render', 4096]];
+// idle 24,064: past the 0.5 s start mute + 10 ms fade the plugin's writePatch arms (22,491 at 44100)
+const PLAN = [['idle', 24064], ['on', 60, 100], ['render', 12032], ['off', 60], ['render', 4096]];
 const N = 256;
 
 const wasmBytes = fs.readFileSync(path.join(DIR, 'jx3p.wasm'));

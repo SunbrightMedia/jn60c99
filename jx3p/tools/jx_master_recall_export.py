@@ -56,10 +56,10 @@ def pack_runs(runs):
 
 
 def _template_regions(path):
-    """Parse the shipped JXT3 region blocks (links/crc not needed here)."""
+    """Parse the shipped JXT3 / JXT4 region blocks (links/crc not needed here)."""
     b = open(path, "rb").read()
-    if b[:4] != b"JXT3":
-        raise SystemExit("BASE-MATCH TOOTH: %s is not JXT3" % path)
+    if b[:4] not in (b"JXT3", b"JXT4"):
+        raise SystemExit("BASE-MATCH TOOTH: %s is not JXT3 / JXT4" % path)
     n = struct.unpack_from("<I", b, 4)[0]
     off, regs = 8, []
     for _ in range(n):
@@ -130,15 +130,35 @@ def wrap_record(jx, uc, u):
     return rec
 
 
+def variant_records(spec):
+    """'34:67=3' -> factory patch 34's patch-load records with record 67's value set to 3 (several
+    'idx=val' pairs may follow, comma-separated). The records stay the plugin's own; only a value
+    changes, to one the plugin's host entry accepts (the gates print the cells it set)."""
+    import copy
+    base, _, edits = spec.partition(":")
+    recs = copy.deepcopy(J.JX.records()["patches"][int(base)])
+    for e in filter(None, edits.split(",")):
+        i, _, v = e.partition("=")
+        recs[int(i)][2] = int(v, 0)
+    return recs
+
+
 def main():
-    bank = open(os.path.join(J.REPO, "jx3p", "truth",
-                             "preset_bank_1.bin"), "rb").read()
-    out = b"JXM3" + struct.pack("<I", 64)
+    # --variants 'S1;S2;...' --out PATH: the aux of variant patches (variant_records), for a gate that
+    # reaches master paths no factory patch reaches; written to PATH, never to the shipped file
+    a = sys.argv[1:]
+    variants = a[a.index("--variants") + 1].split(";") if "--variants" in a else None
+    # --rate R --template T --out PATH: the aux of another engine rate, over that rate's template (JX-4)
+    rate = float(a[a.index("--rate") + 1]) if "--rate" in a else 44100.0
+    tmpl = a[a.index("--template") + 1] if "--template" in a else os.path.join(J.REPO, "jx3p", "gen", "jx_template.bin")
+    import jx_template_export as T
+    loads = [variant_records(v) for v in variants] if variants else list(range(64))
+    out = b"JXM4" + struct.pack("<I", len(loads))
     clean_m = clean_h = None
-    for patch in range(64):
+    for patch, load in enumerate(loads):
         # boot per jx_emu.boot(): SETSR takes the rate as a FLOAT in xmm1
         # (ABI ledger); ramps/latch live, as the C engine replays them
-        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc   # the template's base: boot ramps live (playbook 194)
+        jx = J.JX().boot(rate, snap=False, product=True); uc = jx.uc   # the template's base: the plugin's boot records
         if clean_m is None:
             clean_m = bytes(uc.mem_read(jx.state[8], SNAP_M))
             clean_h = [bytes(uc.mem_read(jx.state[v] + HI_LO, HI_SZ))
@@ -147,9 +167,14 @@ def main():
                        for v in range(8)]
             # WHY: refuse a baseline split BEFORE computing any diff -- the
             # aux only makes sense over the exact template it ships with.
-            check_template_base(clean_l, clean_h, clean_m, os.path.join(
-                J.REPO, "jx3p", "gen", "jx_template.bin"))
-        jx.recall(patch, bank=bank, notify=False)   # the plugin's own pool set
+            check_template_base(clean_l, clean_h, clean_m, tmpl)
+            clean_c = T.control_blobs(jx)       # the template's control regions 8..43 (same boot)
+        if variants:
+            jx.host_records(load)  # the same host entry, the variant's records
+            print("variant %s: mode cells +0xAAC1E8 %d, +0xAAC1E4 %d" % (variants[patch], *struct.unpack(
+                "<ii", bytes(uc.mem_read(jx.state[8] + 0xAAC1E4, 8)))[::-1]))
+        else:
+            jx.recall_product(patch)   # the plugin's own patch load records through its host entry (2026-10-10)
         out += pack_runs(sparse_diff(clean_m,
                                      bytes(uc.mem_read(jx.state[8], SNAP_M))))
         for v in range(8):
@@ -162,9 +187,17 @@ def main():
                 0))
         for u in range(9):
             out += wrap_record(jx, uc, u)
+        # JXM4 (2026-10-10): the control objects the patch load changes (the parameter objects hold
+        # KEY ASSIGN and 798 the assigner reads; the assigners hold its mode) and the engine HOST
+        # record (every patch load queues writePatch: the output fade)
+        for b0, b1 in zip(clean_c, T.control_blobs(jx)):
+            out += pack_runs(sparse_diff(b0, b1))
+        out += T.host_record(jx)
         print("p%d done (%d B so far)" % (patch, len(out)))
     out += struct.pack("<I", zlib.crc32(out) & 0xFFFFFFFF)
-    dst = os.path.join(J.REPO, "jx3p", "gen", "jx_master_recall.bin")
+    dst = a[a.index("--out") + 1] if "--out" in a else os.path.join(J.REPO, "jx3p", "gen", "jx_master_recall.bin")
+    if variants and "--out" not in a:
+        raise SystemExit("--variants needs --out: the shipped aux holds the factory patches only")
     open(dst, "wb").write(out)
     import gzip
     with open(dst + ".gz", "wb") as fh, gzip.GzipFile(filename="", mode="wb", compresslevel=9,

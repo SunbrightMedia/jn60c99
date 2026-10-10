@@ -39,9 +39,14 @@ NOTEOFF   = IB + 0x3F90F0     # (rcx=HOST, dl=note, r8b=vel)  engine vtbl 0x78
 ASG_NOTIFY= IB + 0x356BF0     # (rcx=assign obj, edx=what)    JUNO twin 0x3549B0
 HOSTPARAM = IB + 0x3F9A30     # (rcx=HOST, edx=host id, r8d=val) -- needs the
                               # controller-built id map at .data 0xCE9038
+POPULATE  = IB + 0xAD480      # fills that map (= the JUNO's 0xAD5A0, fw_map --pair; READ) -- one of the
+                              # static initializers: after run_static_init the map holds 744 ids (678
+                              # model ids 0x0060xxxx / 0x00A0xxxx), equal to the booted plugin's (EXECUTED)
+PATCH_RECORDS = os.path.join(REPO, "jx3p", "gen", "jx_patch_records.json")   # jx_patch_records.py
 FACTORY   = IB + 0x3F84E0     # the engine factory (no args): ALLOC(0x880) + ctor inline; rax = HOST (READ)
 HOST_SZ   = 0x880             # its ALLOC size (`mov ecx,0x880` at 0x3F84F4, READ)
 ENGINE_VTBL = IB + 0xA15B88   # slots: 08 BUILD 18 SETSR 38 RENDER 78 NOTEOFF
+RENDER    = IB + 0x3F9220     # the engine render (vtable 0x38): render_engine() below
                               #        80 NOTEON 70 HOSTPARAM (pe_recon vtable)
 XC_TABLE  = (0x96C660, 0x96E0C8)   # C++ static initializers (pe_recon crt_init);
                               # they fill .data's runtime tail [0xCE7800,0xCF2860)
@@ -478,17 +483,139 @@ class JX:
                 fail+=1
                 if log: log("host write hid %d (eng %d) failed: %s"%(hid,eng,str(e)[:60]))
         return ok,fail
-    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False):
+    # ------------------------------------------------------------ the plugin's own patch protocol
+    # MEASURED 2026-10-10 (jx3p/tools/jx_patch_protocol.py, jx_recall_product_check.py): the plugin's
+    # patch browser load queues records (model id, value) that the render driver hands to the engine's
+    # host entry, which maps each id (its map, from the static initializers), moves some values (dispatch 769: -128, 20: -100),
+    # checks the range and dispatches to every unit with flag 0, then the assigner notify. The pool
+    # model above (recall: 740 + pool, flag 1, the bank nibble pair) sent 17 ids the plugin never sends,
+    # never sent 20 the plugin sends (the second half of the tree, the effect floats) and moved no value:
+    # patches 0, 20, 49 played ~3x louder. The engine given the plugin's own records through its own host
+    # entry holds what the plugin holds, word for word (every unit, 5 patches; the check's tooth bites).
+    _records = None
+    @classmethod
+    def records(cls):
+        if cls._records is None:
+            import json
+            cls._records = json.load(open(PATCH_RECORDS))
+        return cls._records
+    def id_map(self):
+        """the host entry's whole id map (std::map at .data 0xCE9038, in order): {id: dispatch id}.
+        host_map() below keeps only ids < 0x100000 (the 3 host-exported ones) and filters out the 678
+        model ids -- which once made the map look like 3 entries (2026-10-10)."""
+        uc=self.uc
+        def rq(a): return int.from_bytes(uc.mem_read(a,8),'little')
+        out={}
+        def walk(n, depth=0):
+            if depth > 64 or uc.mem_read(n + 0x19, 1)[0]: return
+            walk(rq(n), depth + 1)
+            out[struct.unpack('<I', uc.mem_read(n + 0x1C, 4))[0]] = struct.unpack('<i', uc.mem_read(n + 0x20, 4))[0]
+            walk(rq(n + 0x10), depth + 1)
+        walk(rq(rq(IB + 0xCE9038) + 8))
+        return out
+    def host_records(self, recs):
+        """the kind-2 records through the engine's own host entry, in order (the render driver's
+        application at a block's start); kind-0 MIDI records are not engine parameters"""
+        for kind, pid, val in recs:
+            if kind == 2:
+                self.call(HOSTPARAM, rcx=self.HOST, rdx=pid, r8=val & 0xFFFFFFFF, count=400_000_000)
+    def product_boot(self):
+        """initialize's records (the default patch, MASTER TUNE, the host settings: voiceCount 6 and
+        writePatch reach HOST+0x38 and the output fade) through the host entry; the id map it needs is
+        the static initializers' (run_static_init)"""
+        self.host_records(self.records()["boot"])
+    def recall_product(self, patch):
+        """factory patch `patch` as the plugin's patch browser loads it: its records through the host entry"""
+        self.host_records(self.records()["patches"][patch])
+    # ------------------------------------------------------------ the plugin's own engine render
+    # RENDER (vtable 0x38, 0x3F9220; READ, jx3p/docs/HOST_LAYER.md 2): per voice unit the assigner's
+    # count synced to HOST+0x38, its clock, units below the count flagged for their worker threads, the
+    # others' outputs zeroed; the wait for the done count; the master per sample; the output gain stage
+    # (HOST+0x860..0x878, armed by writePatch). The ONE replacement is the thread transport, as in
+    # jx3p/tools/jx_host_emu.py: the render stops where it takes the done lock (JOBS_DUE), each flagged
+    # worker's own body runs from its entry until, its job done, it is back at the top of its loop with
+    # its lock released (WORKER_PARK), and the render resumes there. render() above (the stubs) runs
+    # every unit and has no count sync and no gain stage.
+    JOBS_DUE, WORKER, WORKER_PARK = IB + 0x3F9587, IB + 0x3F8C60, IB + 0x3F8CD0
+    def _engine_hooks(self):
+        if getattr(self, '_eng_hooked', False): return
+        self._eng_hooked = True; self._eng_req = None; self._eng_skip = None; self._job_w = None
+        self.jobs = []
+        def due(uc, addr, size, ud):
+            here = (addr, uc.reg_read(UC_X86_REG_RSP))
+            if self._eng_skip == here:
+                self._eng_skip = None; return
+            if self._job_w is not None: return
+            self._eng_req = (uc.context_save(), addr, here[1]); uc.emu_stop()
+        def park(uc, addr, size, ud):
+            if self._job_w is not None and struct.unpack('<i', uc.mem_read(self._job_w + 0x34, 4))[0] == 0:
+                uc.emu_stop()
+        self.uc.hook_add(UC_HOOK_CODE, due, begin=self.JOBS_DUE, end=self.JOBS_DUE)
+        self.uc.hook_add(UC_HOOK_CODE, park, begin=self.WORKER_PARK, end=self.WORKER_PARK)
+    def _engine_jobs(self):
+        uc = self.uc; RET = SCRATCH + 0x5000
+        for u in range(8):
+            w = self.HOST + 0x460 + 0x80 * u
+            if struct.unpack('<i', uc.mem_read(w + 0x34, 4))[0] != 1: continue
+            self.jobs.append((u, struct.unpack('<i', uc.mem_read(w + 0x30, 4))[0]))
+            rsp = (STACK_BASE + 0x800000) & ~0xF; rsp -= 8          # a worker's own stack, below the render's
+            uc.reg_write(UC_X86_REG_RSP, rsp); uc.reg_write(UC_X86_REG_RCX, w); uc.reg_write(UC_X86_REG_RDX, u)
+            uc.mem_write(rsp, struct.pack('<Q', RET))
+            self._job_w = w
+            try: uc.emu_start(self.WORKER, RET)
+            finally: self._job_w = None
+            rip = uc.reg_read(UC_X86_REG_RIP)
+            if rip != self.WORKER_PARK or struct.unpack('<i', uc.mem_read(w + 0x34, 4))[0] != 0:
+                raise RuntimeError('worker %d did not finish its job (rva 0x%x)' % (u, rip - IB))
+    def render_engine(self, n, block=256):
+        """n samples through the plugin's own engine render (RENDER, the args the render object passes:
+        rcx HOST, r9 the two channel pointers, 5th 2 channels, 6th the count); returns (L, R) bit lists"""
+        self._engine_hooks()
+        uc = self.uc; RET = SCRATCH + 0x5000
+        offL = BUF_BASE; offR = BUF_BASE + 4 * block; ptrs = BUF_BASE + 8 * block
+        Lout, Rout = [], []
+        done = 0
+        while done < n:
+            b = min(block, n - done)
+            uc.mem_write(ptrs, struct.pack('<QQ', offL, offR))
+            uc.reg_write(UC_X86_REG_MXCSR, getattr(self, '_mxcsr', 0x1F80))
+            rsp = (STACK_BASE + STACK_SIZE - 0x10000) & ~0xF; rsp -= 8
+            uc.mem_write(rsp, struct.pack('<Q', RET))
+            uc.mem_write(rsp + 0x28, struct.pack('<QQ', 2, b))
+            for reg, v in ((UC_X86_REG_RSP, rsp), (UC_X86_REG_RCX, self.HOST), (UC_X86_REG_RDX, 0),
+                           (UC_X86_REG_R8, 0), (UC_X86_REG_R9, ptrs)):
+                uc.reg_write(reg, v)
+            start = RENDER
+            while True:
+                self._eng_req = None
+                uc.emu_start(start, RET)
+                req = self._eng_req
+                if req is None:
+                    if uc.reg_read(UC_X86_REG_RIP) != RET:
+                        raise RuntimeError('engine render stopped at rva 0x%x' % (uc.reg_read(UC_X86_REG_RIP) - IB))
+                    break
+                self._engine_jobs()
+                uc.context_restore(req[0]); self._eng_skip = (req[1], req[2]); start = req[1]
+            Lout += list(struct.unpack('<%dI' % b, uc.mem_read(offL, 4 * b)))
+            Rout += list(struct.unpack('<%dI' % b, uc.mem_read(offR, 4 * b)))
+            done += b
+        return Lout, Rout
+    def boot(self,sr=44100.0,patch=None,static_init=False,snap=True,host_init=False,product=False):
         """THE boot recipe: [static init] -> BUILD -> SETSR(float) -> FTZ ->
-        [host_init: the controller's default push] -> [recall patch + notify]
-        -> [snap ramps + clear latch]. host_init=True implies static_init.
-        Returns self."""
-        if static_init or host_init: self.run_static_init()
+        [product: the id map's populate + initialize's records (product_boot), the plugin's own boot]
+        [host_init: the old model of the controller's default push] -> [recall patch: recall_product
+        with product=True, else the pool model + notify] -> [snap ramps + clear latch].
+        host_init and product imply static_init. Returns self."""
+        if static_init or host_init or product: self.run_static_init()
         self.build(); self.set_ftz(); self.set_sr(sr)
-        if host_init:
+        if product:
+            self.product_boot()
+        elif host_init:
             ok,fail=self.host_init()
             assert fail==0, "host_init: %d writes failed"%fail
-        if patch is not None: self.recall(patch)
+        if patch is not None:
+            if product: self.recall_product(patch)
+            else: self.recall(patch)
         if snap: self.snap_ramps(); self.clear_latch()
         return self
     def render_dry(self,n,block=256):

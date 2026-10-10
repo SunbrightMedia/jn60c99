@@ -1,8 +1,13 @@
 /* jx_master_render.c -- exact C99 transcription of the JX-3P master render
  * (sub_18039A2B0). Single unit; offsets are the decompile's own. Helpers shared
- * with the voice render (jx_voice_helpers). STATUS: PROVEN on the default note state (output + full state null EXACTLY 0,
- * 32 samples). The 11 argless helper sites are DCO-mode/effect-gated (v31<=3 via
- * the note object) and unexercised here -- placeholdered, pending a mode patch.
+ * with the voice render (jx_voice_helpers).
+ * STATUS (2026-10-10): every master state word, every voice state, the 36 control objects and L/R
+ * equal to the plugin's on every sample of 4,096 idle + a note + 12,000, on the factory patches and on
+ * variant patches that set the two effect-mode cells to every legal value (jx3p/tools/
+ * jx_master_bisect.py; its --tooth puts the lost argument back and is seen to fail). Three defect
+ * classes of the decompile, fixed from the asm the same day: decimal constants printed rounded
+ * (2^-14 compares and products), three phase wraps it dropped (0x3A0A54, 0x3A0B06), and the 11
+ * helper sites whose argument it lost (the effect LFO of master modes 2-5: jx_lfo_step).
  * Build with -ffp-contract=off -fno-strict-aliasing. */
 #include <stdint.h>
 #include <stdbool.h>
@@ -19,6 +24,26 @@ typedef int16_t __int16; typedef int8_t __int8;
 #define SLODWORD(x) (*((int32_t *)&(x)))
 static inline float    f32_from_bits(uint32_t b){ float f; memcpy(&f,&b,4); return f; }
 static inline uint32_t bits_from_f32(float f){ uint32_t b; memcpy(&b,&f,4); return b; }
+
+/* THE ARGUMENT THE DECOMPILE LOST at the four effect-LFO sites (2026-10-10; asm 0x39AF3D, 0x39B87C,
+ * 0x39C1CA, 0x39EA8F): t = the clamped rate product; t >= 4 -> t + -4.0, else t >= 2 -> t + -2.0
+ * (comiss ; jb: neither on unordered); t equal to 0 OR unordered (ucomiss x, 0 ; jne) -> t = alt;
+ * then phase + t. The constants are the binary's (rip 4.0 / -4.0 / 2.0 / -2.0, or the registers the
+ * master loads with them at its entry, 0x39A4C4..0x39A4D5: READ, every path walked). */
+static inline float jx_lfo_step(float t, float phase, float alt)
+{
+#if JX_MASTER_TOOTH
+  (void)t; (void)phase; (void)alt;
+  return 0.0f;    /* the tooth: the argument the decompile lost, back -- jx_master_bisect.py --tooth must see it */
+#endif
+  if ( t >= 4.0f )
+    t = t + -4.0f;
+  else if ( t >= 2.0f )
+    t = t + -2.0f;
+  if ( !(t < 0.0f || t > 0.0f) )
+    t = alt;
+  return phase + t;
+}
 
 float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
 {
@@ -747,7 +772,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
   float v727; // xmm8_4
   __int64 v728; // rdx
   __int64 v729; // rcx
-  double v730; // xmm0_8
+  float v730; // xmm0_4 (was double xmm0_8: the float result was converted, not kept -- 2026-10-10)
   float v731; // xmm1_4
   float v732; // xmm2_4
   float v733; // xmm8_4
@@ -845,7 +870,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
   float v825; // xmm4_4
   float v826; // xmm6_4
   float v827; // xmm6_4
-  double v828; // xmm0_8
+  float v828; // xmm0_4 (was double xmm0_8: see v730)
   float v829; // xmm8_4
   float v830; // xmm0_4
   float v831; // xmm8_4
@@ -1182,7 +1207,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
       v373 = -1.0;
     *(float *)(st + 4466224) = v373 * *(float *)(st + 4466544);
     v374 = v370 * *(float *)(st + 4466496);
-    if ( v374 <= 0.00012207031 )
+    if ( v374 <= 0x1p-13f )
       v375 = 0.0001220703125;
     else
       v375 = v374;
@@ -1474,14 +1499,14 @@ LABEL_61:
       v231 = *(_DWORD *)(st + 6564032);
       *(_DWORD *)(st + 6564048) = *(_DWORD *)(st + 6564016);
       *(_DWORD *)(st + 6564064) = v231;
-      v232 = jx_h_3A2010(0.0)/*ARGLESS*/;
+      v232 = jx_h_3A2010((double)(float)(*(float *)(st + 6564016) + *(float *)(st + 6564112)));  /* asm 0x39C188 */
       *(float *)(st + 6564080) = fmaxf(fminf(v232, 512.0), -512.0);
       v233 = *(float *)(st + 6564064);
       *(_DWORD *)(st + 6564320) = *(_DWORD *)(st + 6564304);
       v33 = 0;
-      v234 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
-      v235 = *(float *)&v234;
-      *(float *)&v234 = jx_h_3A2210(0.0f)/*ARGLESS*/;
+      v235 = jx_h_3A21E0(jx_lfo_step(*(float *)(st + 6564080) * *(float *)(st + 6564352),  /* asm 0x39C1CA..0x39C202 */
+                                     *(float *)(st + 6564304), *(float *)(st + 6564368)));
+      *(float *)&v234 = jx_h_3A2210(v235);                     /* asm 0x39C20A: its argument is 3A21E0's result */
       *(_DWORD *)(st + 6564336) = LODWORD(v234);
       *(float *)(st + 6564304) = (float)(v235 * v233) + (float)(v233 - 1.0);
       v236 = (float)(*(float *)&v234 * *(float *)(st + 6564400)) + *(float *)(st + 6564416);
@@ -1846,13 +1871,13 @@ LABEL_61:
           v91 = *(_DWORD *)(st + 10860736);
           *(_DWORD *)(st + 10860752) = *(_DWORD *)(st + 10860720);
           *(_DWORD *)(st + 10860768) = v91;
-          v92 = jx_h_3A2010(0.0)/*ARGLESS*/;
+          v92 = jx_h_3A2010((double)(float)(*(float *)(st + 10860720) + *(float *)(st + 10860816)));  /* asm 0x39AEF6 */
           *(float *)(st + 10860784) = fmaxf(fminf(v92, 512.0), -512.0);
           v93 = *(float *)(st + 10860768);
           *(_DWORD *)(st + 10861024) = *(_DWORD *)(st + 10861008);
-          v94 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
-          v95 = *(float *)&v94;
-          *(float *)&v94 = jx_h_3A2210(0.0f)/*ARGLESS*/;
+          v95 = jx_h_3A21E0(jx_lfo_step(*(float *)(st + 10860784) * *(float *)(st + 10861056),  /* asm 0x39AF3D..0x39AF7B */
+                                        *(float *)(st + 10861008), *(float *)(st + 10861072)));
+          *(float *)&v94 = jx_h_3A2210(v95);                   /* asm 0x39AF83 */
           *(_DWORD *)(st + 10861040) = LODWORD(v94);
           *(float *)(st + 10861008) = (float)(v95 * v93) + (float)(v93 - 1.0);
           v96 = (float)(*(float *)&v94 * *(float *)(st + 10861104)) + *(float *)(st + 10861120);
@@ -2063,14 +2088,14 @@ LABEL_61:
       v163 = *(_DWORD *)(st + 6598192);
       *(_DWORD *)(st + 6598208) = *(_DWORD *)(st + 6598176);
       *(_DWORD *)(st + 6598224) = v163;
-      v164 = jx_h_3A2010(0.0)/*ARGLESS*/;
+      v164 = jx_h_3A2010((double)(float)(*(float *)(st + 6598176) + *(float *)(st + 6598272)));  /* asm 0x39B83A */
       *(float *)(st + 6598240) = fmaxf(fminf(v164, 512.0), -512.0);
       v165 = *(float *)(st + 6598224);
       *(_DWORD *)(st + 6598480) = *(_DWORD *)(st + 6598464);
       v33 = 0;
-      v166 = jx_h_3A21E0(0.0f)/*ARGLESS*/;
-      v167 = *(float *)&v166;
-      *(float *)&v166 = jx_h_3A2210(0.0f)/*ARGLESS*/;
+      v167 = jx_h_3A21E0(jx_lfo_step(*(float *)(st + 6598240) * *(float *)(st + 6598512),  /* asm 0x39B87C..0x39B8B4 */
+                                     *(float *)(st + 6598464), *(float *)(st + 6598528)));
+      *(float *)&v166 = jx_h_3A2210(v167);                     /* asm 0x39B8BC */
       *(_DWORD *)(st + 6598496) = LODWORD(v166);
       *(float *)(st + 6598464) = (float)(v167 * v165) + (float)(v165 - 1.0);
       v168 = (float)(*(float *)&v166 * *(float *)(st + 6598560)) + *(float *)(st + 6598576);
@@ -2270,9 +2295,9 @@ LABEL_96:
     v411 = *(float *)(st + 11190736);
     if ( v410 < 1.0 && *(float *)(st + 10928080) > 0.0 )
     {
-      v411 = v410 + 0.00039999999;
-      *(float *)(st + 11190736) = v410 + 0.00039999999;
-      if ( (float)(v410 + 0.00039999999) > 1.0 )
+      v411 = v410 + 0x1.a36e2ep-12f;
+      *(float *)(st + 11190736) = v410 + 0x1.a36e2ep-12f;
+      if ( (float)(v410 + 0x1.a36e2ep-12f) > 1.0 )
       {
         *(_DWORD *)(st + 11190736) = 1065353216;
         v411 = 1.0;
@@ -2283,7 +2308,7 @@ LABEL_96:
   {
     if ( v410 != 0.0 )
     {
-      v410 = v410 - 0.00039999999;
+      v410 = v410 - 0x1.a36e2ep-12f;
       *(float *)(st + 11190736) = v410;
       if ( v410 < 0.0 )
       {
@@ -2739,7 +2764,7 @@ LABEL_96:
       *(_DWORD *)(st + 264736) = *(_DWORD *)(st + 264720);
       *(_DWORD *)(st + 264720) = *(_DWORD *)(st + 264704);
       v811 = *(float *)(st + 265408);
-      v812 = fminf(*(float *)(st + 264784) + 0.000061035156, v811);
+      v812 = fminf(*(float *)(st + 264784) + 0x1p-14f, v811);
       *(float *)(st + 264768) = v812;
       if ( (float)(v812 - v811) >= 0.0 )
       {
@@ -2775,8 +2800,12 @@ LABEL_216:
           *(float *)(st + 263936) = v826;
           v827 = (float)((float)(v826 * *(float *)(st + 265136)) + (float)(v825 * *(float *)(st + 265168))) + v822;
           *(float *)(st + 263968) = v827;
-          v828 = jx_h_3A2180(0.0f)/*ARGLESS2*/;
-          v829 = *(float *)&v828;
+          /* the argument the decompile lost (2026-10-10, asm 0x3A0842..0x3A085A): the effect LFO's phase
+           * ([+0x40AE0] + [+0x40790]) + [+0x407D0], the last two the previous phases moved just above.
+           * The placeholder 0 was right only while the LFO's rate was 0 (the pool-model recall). */
+          v828 = jx_h_3A2180((float)((float)(*(float *)(st + 264928) + *(float *)(st + 264080))
+                                     + *(float *)(st + 264144)));
+          v829 = v828;
           v830 = *(float *)(st + 265376);
           *(float *)(st + 264064) = v829;
           if ( v829 < 0.0 )
@@ -2799,11 +2828,11 @@ LABEL_216:
                        + (float)(v837 + *(float *)(st + 264976)));
           *(float *)(st + 264160) = 1.0 / v838;
           v840 = 1.0 / v839;
-          v841 = v839 * 0.000061035156;
+          v841 = v839 * 0x1p-14f;
           *(float *)(st + 264176) = v840;
           v842 = *(float *)(st + 263696);
           v843 = *(float *)(st + 263712);
-          v844 = (float)(v838 * 0.000061035156) + *(float *)(st + 264208);
+          v844 = (float)(v838 * 0x1p-14f) + *(float *)(st + 264208);
           v845 = *(float *)(st + 265328);
           v846 = (int)(float)(v842 * -16777216.0);
           if ( v846 )
@@ -2832,20 +2861,23 @@ LABEL_226:
           v851 = v19 | 0xFF000000;
           if ( (v849 & 0x1000000) == 0 )
             v851 = v850;
-          v852 = (float)v851 * 0.000000059604645;
+          v852 = (float)v851 * 0x1p-24f;
           *(float *)(st + 263680) = v852;
           v853 = *(float *)(st + 265008);
           v854 = (float)((float)(v842 * *(float *)(st + 265200)) + (float)(v852 * *(float *)(st + 265184)))
                + (float)(v843 * *(float *)(st + 265216));
           v855 = *(float *)(st + 263712) * *(float *)(st + 265264);
           *(float *)(st + 263696) = v854;
+          /* asm 0x3A0A54..0x3A0A6D: the wrap of v844 the decompile dropped (comiss x, xmm12=0 ; jb skip) */
+          if ( (float)(v844 - v845) >= 0.0 )
+            v844 = v844 - v845;
           if ( (float)(v848 - v845) >= 0.0 )
             v848 = v848 - v845;
           if ( v853 == 0.0 )
-            v844 = 0.000061035156;
+            v844 = 0x1p-14f;
           v856_bits = *(uint32_t *)(st + 265312); v856 = f32_from_bits(v856_bits);
           if ( v853 == 0.0 )
-            v848 = 0.000061035156;
+            v848 = 0x1p-14f;
           v857 = (float)((float)((float)(v855 * *(float *)(st + 265248)) + (float)(v854 * *(float *)(st + 265232)))
                        + (float)(*(float *)(st + 263728) * *(float *)(st + 265264)))
                + (float)((float)(*(float *)(st + 265280) * *(float *)(st + 263744))
@@ -2856,6 +2888,11 @@ LABEL_226:
           *(float *)(st + 263728) = v857;
           *(float *)(st + 264192) = v844;
           *(float *)(st + 264224) = v848;
+          /* asm 0x3A0B06..0x3A0B33: the wraps of v856 and v858 the decompile dropped (comiss x, xmm12=0 ; jb skip) */
+          if ( (float)(v856 - v845) >= 0.0 )
+            v856 = v856 - v845;
+          if ( (float)(v858 - v845) >= 0.0 )
+            v858 = v858 - v845;
           v859 = *(float *)(st + 264272);
           v860 = v856;
           v860 = v856 * 16384.0;
@@ -2864,7 +2901,7 @@ LABEL_226:
             v860 = (float)(v861 - (int)((bits_from_f32(v860) >> 31) & 1u));
           *(_DWORD *)(st + 264400) = bits_from_f32(v856);
           *(_DWORD *)(st + 264560) = bits_from_f32(v858);
-          v862 = v860 * 0.000061035156;
+          v862 = v860 * 0x1p-14f;
           v858 = v858 * 16384.0;
           *(float *)(st + 264256) = v862;
           v863 = v862 - v859;
@@ -2872,7 +2909,7 @@ LABEL_226:
           *(float *)(st + 264464) = v863;
           if ( (int)v858 != 0x80000000 && (float)v864 != v858 )
             v858 = (float)(v864 - (int)((bits_from_f32(v858) >> 31) & 1u));
-          *(float *)(st + 264288) = v858 * 0.000061035156;
+          *(float *)(st + 264288) = v858 * 0x1p-14f;
           if ( v863 == 0.0 )
           {
             v865 = *(_DWORD *)(st + 264336);
@@ -2901,7 +2938,7 @@ LABEL_264:
             v872 = v872 + v870;
           *(float *)(st + 264464) = v872;
           v866 = *(float *)(st + 264400);
-          if ( v872 == 0.00024414062 )
+          if ( v872 == 0x1p-12f )
           {
             v873 = *(float *)(st + 264320);
             v874 = *(float *)(st + 264336);
@@ -2926,9 +2963,9 @@ LABEL_264:
           }
           else
           {
-            if ( v872 != 0.00018310547 )
+            if ( v872 != 0x1.8p-13f )
             {
-              if ( v872 != 0.00012207031 )
+              if ( v872 != 0x1p-13f )
               {
                 v889 = *(_DWORD *)(st + 264320);
                 *(_DWORD *)(st + 264352) = v889;
@@ -2976,7 +3013,7 @@ LABEL_266:
             v891 = (float)(v892 - (int)((bits_from_f32(v891) >> 31) & 1u));
           v893 = *(float *)(st + 197872);
           v894 = *(float *)(st + 265328);
-          v895 = v891 * 0.000061035156;
+          v895 = v891 * 0x1p-14f;
           v890 = v890 * 16384.0;
           v896 = (int)v890;
           *(_DWORD *)(st
@@ -2986,7 +3023,7 @@ LABEL_266:
           v897_bits = *(uint32_t *)(st + 264432); v897 = f32_from_bits(v897_bits);
           if ( (int)v890 != 0x80000000 && (float)v896 != v890 )
             v890 = (float)(v896 - (int)((bits_from_f32(v890) >> 31) & 1u));
-          v898 = v890 * 0.000061035156;
+          v898 = v890 * 0x1p-14f;
           v897 = v897 * 16384.0;
           v899 = (int)v897;
           *(_DWORD *)(st
@@ -2996,7 +3033,7 @@ LABEL_266:
           v900_bits = *(uint32_t *)(st + 264448); v900 = f32_from_bits(v900_bits);
           if ( (int)v897 != 0x80000000 && (float)v899 != v897 )
             v897 = (float)(v899 - (int)((bits_from_f32(v897) >> 31) & 1u));
-          v901 = v897 * 0.000061035156;
+          v901 = v897 * 0x1p-14f;
           v900 = v900 * 16384.0;
           v902 = (int)v900;
           *(_DWORD *)(st
@@ -3005,7 +3042,7 @@ LABEL_266:
                     + 132320) = *(_DWORD *)(st + 264368);
           if ( (int)v900 != 0x80000000 && (float)v902 != v900 )
             v900 = (float)(v902 - (int)((bits_from_f32(v900) >> 31) & 1u));
-          v903 = v900 * 0.000061035156;
+          v903 = v900 * 0x1p-14f;
           *(_DWORD *)(st
                     + 4
                     * ((*(int *)(st + 197860) - 1LL) & (*(_DWORD *)(st + 197856) - (int)(float)(v903 * -16384.0) + 1LL))
@@ -3057,7 +3094,7 @@ LABEL_266:
               v904 = v904 + v911;
             *(float *)(st + 264624) = v904;
             v906 = *(float *)(st + 264560);
-            if ( v904 == 0.00024414062 )
+            if ( v904 == 0x1p-12f )
             {
               v912 = *(float *)(st + 264480);
               v913 = *(float *)(st + 264496);
@@ -3081,7 +3118,7 @@ LABEL_266:
               *(float *)(st + 264592) = v919;
               goto LABEL_312;
             }
-            if ( v904 == 0.00018310547 )
+            if ( v904 == 0x1.8p-13f )
             {
               v920 = *(float *)(st + 264480);
               v921 = *(float *)(st + 264496) * 0.67 + v920 * 0.33;
@@ -3101,7 +3138,7 @@ LABEL_266:
               *(float *)(st + 264592) = v906;
               goto LABEL_312;
             }
-            if ( v904 != 0.00012207031 )
+            if ( v904 != 0x1p-13f )
             {
               v929 = *(_DWORD *)(st + 264480);
               *(_DWORD *)(st + 264512) = v929;
@@ -3119,7 +3156,7 @@ LABEL_312:
                 v931 = (float)(v932 - (int)((bits_from_f32(v931) >> 31) & 1u));
               v933 = *(float *)(st + 263440);
               v934 = *(float *)(st + 265328);
-              v935 = v931 * 0.000061035156;
+              v935 = v931 * 0x1p-14f;
               v930 = v930 * 16384.0;
               v936 = (int)v930;
               *(_DWORD *)(st
@@ -3130,7 +3167,7 @@ LABEL_312:
               v937_bits = *(uint32_t *)(st + 264592); v937 = f32_from_bits(v937_bits);
               if ( (int)v930 != 0x80000000 && (float)v936 != v930 )
                 v930 = (float)(v936 - (int)((bits_from_f32(v930) >> 31) & 1u));
-              v938 = v930 * 0.000061035156;
+              v938 = v930 * 0x1p-14f;
               v937 = v937 * 16384.0;
               v939 = (int)v937;
               *(_DWORD *)(st
@@ -3141,7 +3178,7 @@ LABEL_312:
               v940_bits = *(uint32_t *)(st + 264608); v940 = f32_from_bits(v940_bits);
               if ( (int)v937 != 0x80000000 && (float)v939 != v937 )
                 v937 = (float)(v939 - (int)((bits_from_f32(v937) >> 31) & 1u));
-              v941 = v937 * 0.000061035156;
+              v941 = v937 * 0x1p-14f;
               v940 = v940 * 16384.0;
               v942 = (int)v940;
               *(_DWORD *)(st
@@ -3151,7 +3188,7 @@ LABEL_312:
                         + 197888) = *(_DWORD *)(st + 264528);
               if ( (int)v940 != 0x80000000 && (float)v942 != v940 )
                 v940 = (float)(v942 - (int)((bits_from_f32(v940) >> 31) & 1u));
-              v943 = v940 * 0.000061035156;
+              v943 = v940 * 0x1p-14f;
               *(_DWORD *)(st
                         + 4
                         * ((*(int *)(st + 263428) - 1LL)
@@ -3571,7 +3608,7 @@ LABEL_312:
                    * *(float *)(st + 267744))
            - v725;
       *(float *)(st + 267104) = (float)(v727 * *(float *)(st + 267504)) + v725;
-      v730 = jx_h_3A2180(0.0f)/*ARGLESS2*/;
+      v730 = jx_h_3A2180(v726);   /* asm 0x39FB4C: xmm0 = xmm6 = v726 (2026-10-10; was a placeholder 0) */
       *(_DWORD *)(st + 266880) = LODWORD(v730);
       if ( v726 < 1.0 )
         v727 = *(float *)(st + 267152);
@@ -3750,7 +3787,7 @@ LABEL_355:
   v543 = *(_DWORD *)(st + 268368);
   *(_DWORD *)(st + 268384) = *(_DWORD *)(st + 268352);
   *(_DWORD *)(st + 268400) = v543;
-  v544 = jx_h_3A2010(0.0)/*ARGLESS*/;
+  v544 = jx_h_3A2010((double)(float)(*(float *)(st + 268352) + *(float *)(st + 268448)));  /* asm 0x39EA2E */
   *(float *)(st + 268416) = fmaxf(fminf(v544, 512.0), -512.0);
   v545 = *(float *)(st + 268640);
   *(float *)(st + 268656) = v545;
@@ -3758,21 +3795,10 @@ LABEL_355:
   v547 = *(float *)(st + 268672);
   *(float *)(st + 268688) = v547;
   v548 = v546 * *(float *)(st + 268720);
-  if ( v548 < 4.0 )
-  {
-    if ( v548 >= 2.0 )
-      v548 = v548 + -2.0;
-  }
-  else
-  {
-    v548 = v548 + -4.0;
-  }
-  if ( v548 == 0.0 )
-    v548 = *(float *)(st + 268736);
-  v549 = v547 + v548;
+  v549 = jx_lfo_step(v548, v547, *(float *)(st + 268736));   /* asm 0x39EA97..0x39EAC5 (its == 0 test is unordered-true) */
   if ( v549 > 1.0 )
     v549 = fmodf(v549 + 1.0, 2.0) - 1.0;
-  v550 = jx_h_3A2210(0.0f)/*ARGLESS*/;
+  v550 = jx_h_3A2210(v549);                                 /* asm 0x39EAED: xmm0 = xmm6 = v549 */
   *(float *)(st + 268704) = v550;
   *(float *)(st + 268672) = (float)(v549 * v545) + (float)(v545 - 1.0);
   *(float *)(st + 268752) = (float)(v550 * *(float *)(st + 268768)) + *(float *)(st + 268784);

@@ -26,7 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_render.c',
         'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
-PLAN = [('idle', 4096), ('on', 60, 100), ('render', 12032), ('off', 60), ('render', 4096)]   # = jx_wasm_run.mjs
+PLAN = [('idle', 24064), ('on', 60, 100), ('render', 12032), ('off', 60), ('render', 4096)]   # = jx_wasm_run.mjs
+# (idle past the 0.5 s start mute + 10 ms fade: a plan inside it compares zeros)
 N = 256
 
 

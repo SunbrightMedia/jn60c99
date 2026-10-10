@@ -28,18 +28,25 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     bank = J.bank_bytes()
     for patch in patches:
-        jx = J.JX().boot(44100.0, snap=False, host_init=True); uc = jx.uc
-        jx.recall(patch, bank=bank, notify=False)
+        jx = J.JX().boot(44100.0, snap=False, product=True); uc = jx.uc   # the plugin's boot records
+        jx.recall_product(patch)        # its patch browser's records through its host entry (2026-10-10)
         # IDLE PREFIX (2026-09-06): the listen proof flagged a -60 dBFS floor
         # on the master before any note. An absolute threshold cannot say
         # whether that is a defect or the instrument -- only EQUALITY WITH THE
         # PLUGIN can. So the gate now renders `idle` samples BEFORE note-on and
         # compares them too: whatever the plugin's own idle floor is, the port
         # must reproduce it bit-for-bit.
-        idle = int(os.environ.get("JX_FULL_IDLE", "4096"))
-        Li, Ri = jx.render(idle) if idle else ([], [])
+        # JX_FULL_ENGINE=1 (2026-10-10): the plugin's own engine render (jx_emu.render_engine: its
+        # count sync -- six voices --, its assigner clocks, its output gain stage with the boot's
+        # writePatch fade), 256-sample calls as the C side makes them; the idle prefix then defaults to
+        # 24,000 samples, past the 0.5 s mute and the 10 ms fade (22,491 at 44100), so the note itself
+        # is heard. JX_FULL_ENGINE=0: the per-unit renders (every unit, no gain stage).
+        engine = os.environ.get("JX_FULL_ENGINE", "1") == "1"
+        rend = (lambda k: jx.render_engine(k, 256)) if engine else jx.render
+        idle = int(os.environ.get("JX_FULL_IDLE", "24000" if engine else "4096"))
+        Li, Ri = rend(idle) if idle else ([], [])
         jx.note_on(60, 100)
-        L, R = jx.render(n)
+        L, R = rend(n)
         L, R = list(Li) + list(L), list(Ri) + list(R)
         d = os.path.join(outdir, "p%d" % patch)
         os.makedirs(d, exist_ok=True)

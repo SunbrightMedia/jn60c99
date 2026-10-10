@@ -64,7 +64,10 @@ def main():
         rng = B.pool_value(B.patch_blob(bank, patch), 20)
         shift = 12 * (rng - 3)
         print("== patch %d (DCO1 RANGE %d -> %+d semitones) ==" % (patch, rng, shift))
-        idle = render(lib, 4096)
+        # --master is the plugin's engine render (jx3p_render): the boot and every patch load queue
+        # writePatch, so the output is 0 for 0.5 s and fades in over 10 ms (22,491 samples at 44100,
+        # 2026-10-10). The idle stretch covers that before any note is judged.
+        idle = render(lib, 24000 if MASTER else 4096)
         # THE IDLE LAW (corrected 2026-09-06): silence is not an absolute
         # threshold. Patches with effects idle at a real -60 dBFS floor --
         # PROVEN to be the plugin's own: the full-chain gate compares 1024

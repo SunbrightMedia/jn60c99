@@ -17,8 +17,8 @@ here: the render flags each unit's job (worker+0x34 = 1) and signals the worker'
 thread (rva 0x3F8C60, READ) runs the job -- VOICE_WRAP per sample over the block, then the done count
 HOST+0x410 under its lock -- and the render waits for the count. This module stops the render where it
 is about to wait (the done lock's acquire, rva 0x3F9587), runs the worker function itself, from its
-entry, for every flagged unit until the worker comes back to its wait (rva 0x3F7010), and resumes the
-render at the same instruction. No plugin logic is reimplemented: the worker, the render and process()
+entry, for every flagged unit until the worker, its job done, comes back to the top of its loop (rva
+0x3F8CD0, its lock released), and resumes the render at the same instruction. No plugin logic is reimplemented: the worker, the render and process()
 are the plugin's own instructions; this module only decides WHEN a worker runs.
 
 USE (separate process from any ctypes port: two-process rule)
@@ -39,7 +39,12 @@ import jx_emu as J                                           # noqa: E402
 from unicorn.x86_const import UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RCX, UC_X86_REG_RDX  # noqa: E402
 
 WORKER = 0x3F8C60          # a voice unit's worker thread body (rcx = worker, edx = unit; READ)
-WORKER_WAIT = 0x3F7010     # its condition wait: where a worker parks between jobs (READ)
+WORKER_PARK = 0x3F8CD0     # where a worker parks between jobs: the top of its loop (the acquire of its lock),
+                           # reached again after a job -- flag +0x34 cleared, the done count raised, the lock
+                           # released (0x3F8DBC; READ). The first version parked at the condition wait's entry
+                           # (0x3F7010) with the lock still held, and the next block's render spun on the lock
+                           # forever: every second process() hung (2026-10-10). Inside the wait the plugin uses
+                           # the Concurrency Runtime's semaphores; parking before it needs none of them.
 JOBS_DUE = 0x3F9587        # in the engine render: the done lock's acquire before the wait (READ)
 WORKER_BASE, WORKER_STRIDE = 0x460, 0x80    # worker u = HOST + 0x460 + 0x80 u (the render's r12 - 0x38)
 
@@ -80,7 +85,8 @@ class JXHost(H.HostProcess):
         self._skip = None              # (rip, rsp) the render resumes at: its stop fires once
         self._in_job = False
         self.jobs = []                 # (unit, block) of every worker job run, in order
-        self.uc.hook_add(H.UC_HOOK_CODE, self._on_wait, begin=IB + WORKER_WAIT, end=IB + WORKER_WAIT)
+        self._job_w = None             # the worker object of the job running
+        self.uc.hook_add(H.UC_HOOK_CODE, self._on_park, begin=IB + WORKER_PARK, end=IB + WORKER_PARK)
 
     # ------------------------------------------------------------ the render's stop and the workers
     def _on_render(self, uc, addr, size, ud):
@@ -92,8 +98,9 @@ class JXHost(H.HostProcess):
                          engine=self.HOST if hasattr(self, 'HOST') else None)
         uc.emu_stop()
 
-    def _on_wait(self, uc, addr, size, ud):
-        if self._in_job:
+    def _on_park(self, uc, addr, size, ud):
+        # the first pass (flag 1: the job is due) runs on; the pass after the job (flag 0) parks
+        if self._in_job and struct.unpack('<i', uc.mem_read(self._job_w + 0x34, 4))[0] == 0:
             uc.emu_stop()
 
     def _run_jobs(self, req):
@@ -113,13 +120,13 @@ class JXHost(H.HostProcess):
                 uc.reg_write(UC_X86_REG_RCX, w)
                 uc.reg_write(UC_X86_REG_RDX, u)
                 uc.mem_write(rsp, struct.pack('<Q', J.SCRATCH + 0x5000))
-                self._in_job = True
+                self._in_job, self._job_w = True, w
                 try:
                     uc.emu_start(IB + WORKER, J.SCRATCH + 0x5000, count=0)
                 finally:
-                    self._in_job = False
+                    self._in_job, self._job_w = False, None
                 rip = uc.reg_read(UC_X86_REG_RIP)
-                if rip != IB + WORKER_WAIT or i32(w + 0x34) != 0:
+                if rip != IB + WORKER_PARK or i32(w + 0x34) != 0:
                     raise RuntimeError('worker %d did not finish its job (stopped at rva 0x%x, flag %d)'
                                        % (u, rip - IB, i32(w + 0x34)))
         finally:

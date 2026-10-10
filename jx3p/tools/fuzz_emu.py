@@ -61,20 +61,9 @@ def script_for(seed):
 
 def run_seed(outdir, seed, bank):
     s = script_for(seed)
-    jx = J.JX().build(); jx.set_ftz(); uc = jx.uc
-    rsp = (J.STACK_BASE + J.STACK_SIZE - 0x10000) & ~0xF; rsp -= 8
-    uc.reg_write(J.UC_X86_REG_RSP, rsp)
-    uc.reg_write(J.UC_X86_REG_RCX, jx.HOST)
-    uc.reg_write(J.UC_X86_REG_XMM1, struct.unpack(
-        '<Q', struct.pack('<f', float(s['sr'])) + b'\0\0\0\0')[0])
-    RET = J.SCRATCH + 0x5000
-    uc.mem_write(rsp, struct.pack('<Q', RET))
-    uc.emu_start(J.IB + SETSR, RET)
-
-    rec = bank[HEADER + s['patch'] * STRIDE:]; blob = rec[BLOB_OFF:]
-    for u in range(J.N_UNITS):
-        for pool in ACTIVE:
-            jx.dispatch(u, pool + 740, decode(blob, pool))
+    # the plugin's own boot and patch-load records through its host entry (2026-10-10,
+    # jx3p/tools/jx_recall_product_check.py); the pool model it replaced was not the patch load
+    jx = J.JX().boot(float(s['sr']), snap=False, product=True, patch=s['patch']); uc = jx.uc
 
     for pitch, vel in s['notes']:
         jx.call(J.IB + NOTEON, rcx=jx.HOST, rdx=pitch, r8=vel)

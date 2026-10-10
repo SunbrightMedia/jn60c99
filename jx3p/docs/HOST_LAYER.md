@@ -108,7 +108,8 @@ All at offset 0, applied by the first process() before its render:
 - 72 model values of the patch tree (`fm.PATCH.*`, ids 0x0060xxxx and 0x00A0xxxx -- the JUNO-60's
   id space, src/juno_state_tables.h): the default patch, e.g. 0x00600004 = 175, 0x00600014 = 3,
   0x00600080..0x0060009C = 11565 each (0x2D2D, the name), 0x00A00000 = 0x3F2FAFB0 (a float, 0.687),
-  0x00A02802 = 0x3F800000 (1.0). None of them is in the controller's host map (jx_emu.host_map).
+  0x00A02802 = 0x3F800000 (1.0). All are in the host entry's id map (744 ids from the static
+  initializers; jx_emu.host_map() lists only ids < 0x100000, which once made it look like 3).
 - MASTER TUNE, host id 2 = 100 (the map sends it to engine id 20).
 - 10 host settings: 0x0FFFC000 = 0, 0x0FFFC003 = 1, **voiceCount 0x0FFFC00E = 6**, 0x0FFFC008 = 62,
   **sampleRate 0x0FFFC015 = 0** (96000), 0x0FFFC010 = 0, 0x0FFFC014 = 0, 0x0FFFC016 = 62, edit
@@ -132,6 +133,26 @@ host parameter 800 (0x320) into the mode +0x10 (a change to 1 or 2 clears the he
 parent [asg+0xA8], its vt+0x60 with edx 0). The sweep posts a gate-off only for a gated voice: at
 boot it posts nothing. The assigner's time read vt+0x70 (0x357EF0) is [asg+0xB0] / 96 (signed); the
 port's model of it (jx_bridge.c unit_get70) is the sample clock / 48 -- to be checked against this.
+
+## 3b. The patch protocol (EXECUTED, 2026-10-10)
+
+A patch load through the plugin's patch browser (rva 0x335730) queues 75 records, the same order for
+every patch: writePatch (so EVERY patch change mutes 0.5 s and fades in 10 ms), MASTER TUNE 100, then
+the patch tree. The next block's render driver hands them to the engine's host entry (0x3F9A30): the
+id map gives the dispatch id; dispatch 769 takes value - 128, 20 (MASTER TUNE) value - 100 (READ:
+also 22: -12, 0x299 / 0x2C3: -100, 0x2F4 and 0x33F..0x343 their own calls), the range check
+(0x3DD7E0), then every unit's dispatch (0x3EBB00) with flag 0 and its assigner notify (4). Census over
+all 64 factory patches (`jx_patch_protocol.py`, scratchpad/jx/patch_protocol.pkl): 62 dispatch kinds
+(69 with the arp's 312..318 on two patches), against the port's old pool model: 17 model-only ids
+(all constant over the bank), 20 product-only ids (most of them varying per patch: 855..861,
+873..878, 1028, 1029, 1058, the effect floats), 769 off by 128, flag 1 instead of 0. MEASURED effect:
+patches 0, 20, 49 about 3x louder in the port than with the plugin's values.
+
+The engine-level oracle now drives the plugin's own records (`jx_emu.boot(product=True)`:
+initialize's records, then `recall_product(k)`: patch k's records, through the host entry;
+records in jx3p/gen/jx_patch_records.json from `jx_patch_records.py`). `jx_recall_product_check.py`:
+that engine equals the booted plugin's at its render, word for word, every unit's state, parameter
+object and assigner (patches 0, 5, 20, 49, 63; tooth: one record left out, 81 words differ).
 
 ## 4. Next
 

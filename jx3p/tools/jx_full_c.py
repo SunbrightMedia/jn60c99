@@ -31,13 +31,20 @@ def main():
         if not ok:
             raise SystemExit("jx3p_init failed")
         lib.jx3p_recall(patch)
-        idle = int(os.environ.get("JX_FULL_IDLE", "4096"))
+        engine = os.environ.get("JX_FULL_ENGINE", "1") == "1"     # the modes of jx_full_emu.py
+        lib.jx3p_host_stage(1 if engine else 0)
+        idle = int(os.environ.get("JX_FULL_IDLE", "24000" if engine else "4096"))
+
+        def rend(k):                  # 256-sample calls: the oracle's render_engine block (clock, sync)
+            Lb = (ctypes.c_float * k)(); Rb = (ctypes.c_float * k)()
+            for o in range(0, k, 256):
+                m = min(256, k - o)
+                lib.jx3p_render(ctypes.byref(Lb, 4 * o), ctypes.byref(Rb, 4 * o), m)
+            return Lb, Rb
         if idle:                      # idle prefix -- see jx_full_emu.py
-            Li = (ctypes.c_float * idle)(); Ri = (ctypes.c_float * idle)()
-            lib.jx3p_render(Li, Ri, idle)
-        L = (ctypes.c_float * n)(); R = (ctypes.c_float * n)()
+            Li, Ri = rend(idle)
         lib.jx3p_note_on(60, 100)
-        lib.jx3p_render(L, R, n)
+        L, R = rend(n)
         # WHY a separate name: mutating the loop-invariant `n` here made the
         # SECOND patch render idle+n_of_the_first_patch samples and overrun
         # the reference buffer (caught by the gate, 2026-09-06).

@@ -1286,7 +1286,7 @@ LABEL_16:
   v43 = *(_DWORD *)(st + 992 + 16128*(v));
   v44 = *(_DWORD *)(st + 1024 + 16128*(v));
   v45 = *(_DWORD *)(st + 129344);
-  v46 = v42 * 0.000015258789;
+  v46 = v42 * 0x1p-16f;   /* asm 0x3A27E0: mulss by the float 2^-16 (the decompile printed it rounded) */
   *(_DWORD *)(st + 1552 + 16128*(v)) = *(_DWORD *)(st + 1536 + 16128*(v));
   *(_DWORD *)(st + 1536 + 16128*(v)) = *(_DWORD *)(st + 1520 + 16128*(v));
   *(_DWORD *)(st + 1520 + 16128*(v)) = *(_DWORD *)(st + 1504 + 16128*(v));

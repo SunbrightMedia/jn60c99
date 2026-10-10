@@ -29,6 +29,7 @@
 #include "../src/jx_ktrack.c"
 #include "../src/jx_dispatch_note.c"
 #include "../src/jx_gc.c"
+#include "../src/jx_param_get.h"
 
 int  jx_bank_apply(unsigned char *blk, const unsigned char *bank, int idx);
 uint64_t jx_voice_render(void *vstate, int v, void *pair);
@@ -72,9 +73,18 @@ typedef struct {
     /* dispatch seam constants from the template */
     jx_dn_cbs dn;
     float     temper[23];
-    /* host params the tracker queries (id 798 observed; default 0) */
-    int32_t  hostp[1024];
-    int64_t  clock;                     /* get70 tape source: samples/48 */
+    /* THE ENGINE HOST the render reads (2026-10-10, jx3p/docs/HOST_LAYER.md): its voice count
+     * (+0x38), its output gain stage (+0x860 gain, +0x864 step, +0x868 samples left, +0x86C delay,
+     * +0x870 the fade time in ms), the engine rate (its rate source +0x878), every voice assigner's
+     * clock ([asg+0xB0], +n per render call). host_ok = 0: a template without the HOST record (the
+     * old data): no count sync, no gain stage. */
+    int      host_ok, host_stage_off;
+    int32_t  nvoices;
+    float    gain, gstep;
+    int32_t  gleft, gdelay;
+    float    gtime, rate;
+    int64_t  ktclock[NUNITS];
+    int64_t  clock;                     /* samples rendered */
     const uint8_t *bank;
     size_t   bank_len;
     float    vcells[16];                /* the voice->master seam */
@@ -87,14 +97,15 @@ static uint8_t *g_tmpl_regions[64];
 static uint32_t g_tmpl_rawsz[64];
 static uint8_t *g_tmpl_links[24];
 static uint32_t g_tmpl_linksz[24];
-static int g_nreg, g_nlink;
+static int g_nreg, g_nlink, g_tmpl_v4;
 
 static int tmpl_load(const char *path)
 {
     FILE *f = fopen(path, "rb");
     uint8_t hdr[8];
     if (!f) return 0;
-    if (fread(hdr, 1, 8, f) != 8 || memcmp(hdr, "JXT3", 4)) return 0;
+    if (fread(hdr, 1, 8, f) != 8 || (memcmp(hdr, "JXT3", 4) && memcmp(hdr, "JXT4", 4))) return 0;
+    g_tmpl_v4 = !memcmp(hdr, "JXT4", 4);
     g_nreg = (int)(uint32_t)(hdr[4] | (hdr[5] << 8) | (hdr[6] << 16) |
                              ((uint32_t)hdr[7] << 24));
     for (int i = 0; i < g_nreg; ++i) {
@@ -104,10 +115,10 @@ static int tmpl_load(const char *path)
         if (fread(rb, 1, raw, f) != raw) return 0;
         g_tmpl_regions[i] = rb; g_tmpl_rawsz[i] = raw;
     }
-    /* exactly 19 links follow the regions: 8 voice links, 9 wrapper+ramp
-     * records, the dispatch seam, the master link; then the 4-byte crc. */
+    /* the links follow the regions: 8 voice links, 9 wrapper+ramp records, the dispatch seam, the
+     * master link, and (JXT4) the engine HOST record; then the 4-byte crc. */
     g_nlink = 0;
-    for (int i = 0; i < 19; ++i) {
+    for (int i = 0; i < (g_tmpl_v4 ? 20 : 19); ++i) {
         uint32_t ln;
         if (fread(&ln, 4, 1, f) != 1) break;
         g_tmpl_links[g_nlink] = malloc(ln);
@@ -116,12 +127,26 @@ static int tmpl_load(const char *path)
         ++g_nlink;
     }
     fclose(f);
-    return g_nreg >= 53 && g_nlink == 19;
+    return g_nreg >= 53 && g_nlink == (g_tmpl_v4 ? 20 : 19);
+}
+
+/* the engine HOST record (template link 19, and one per patch in JXM4): voices, gain, step, samples
+ * left, delay, fade time (ms), engine rate -- the plugin's own HOST after its boot / its patch load */
+static void host_record(const uint8_t *r)
+{
+    memcpy(&G.nvoices, r + 0, 4);
+    memcpy(&G.gain, r + 4, 4);
+    memcpy(&G.gstep, r + 8, 4);
+    memcpy(&G.gleft, r + 12, 4);
+    memcpy(&G.gdelay, r + 16, 4);
+    memcpy(&G.gtime, r + 20, 4);
+    memcpy(&G.rate, r + 24, 4);
+    G.host_ok = 1;
 }
 
 /* ---- the public API ---- */
 
-static uint8_t *g_mrec; static size_t g_mrec_len;
+static uint8_t *g_mrec; static size_t g_mrec_len; static int g_mrec_v4;
 
 /* jx3p_init is a FRESH instance every time it is called (the gates call it once per patch): it frees
  * what a previous call allocated and clears every field, the sample clock and the voice seam
@@ -155,7 +180,8 @@ int jx3p_init(const char *template_path, const char *bank_path,
         if (fread(fb, 1, fl, f) != fl) return 0;
         fclose(f);
         g_mrec = fb; g_mrec_len = fl;
-        if (memcmp(g_mrec, "JXM3", 4)) return 0;
+        if (memcmp(g_mrec, "JXM3", 4) && memcmp(g_mrec, "JXM4", 4)) return 0;
+        g_mrec_v4 = !memcmp(g_mrec, "JXM4", 4);
     }
     {   FILE *f = fopen(bank_path, "rb");
         if (!f) return 0;
@@ -237,6 +263,11 @@ int jx3p_init(const char *template_path, const char *bank_path,
             else sl->target = (float *)(G.vstate[u] + off);
         }
     }
+    G.host_ok = 0;
+    if (g_tmpl_v4) {
+        if (g_tmpl_linksz[19] < 28) return 0;
+        host_record(g_tmpl_links[19]);
+    }
     return 1;
 }
 
@@ -251,14 +282,24 @@ static void unit_set48(void *u, int what, int pid, int val)
     else if (pid >= 450 && pid <= 457)
         jx_dispatch_gate_cb(&G.dn, G.proc[unit], st, pid - 450, 2, val);
 }
+/* the assigner's parameter read (vtable +0x50, 0x357E60): its parent's GET (the unit's parameter object,
+ * vtable +0x60, 0x3E8E10) -- a dword at the id's offset in G.proc[unit] (jx_param_get.h, EXECUTED),
+ * found or not. Before 2026-10-10 every read returned 0 from an array of zeros, so KEY ASSIGN (800:
+ * mode 1 on 4 factory patches) and 798 (2, 10, 50 on 3) never reached the port's assigner. */
 static int unit_get50(void *u, int what, int pid, int32_t *out)
 {
-    (void)u; (void)what;
-    if (pid >= 0 && pid < 1024) { *out = G.hostp[pid]; return 1; }
+    int unit = (int)(intptr_t)u, lo = 0, hi = JX_PARAM_GET_N - 1;
+    (void)what;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (JX_PARAM_GET[mid][0] == pid) { memcpy(out, G.proc[unit] + JX_PARAM_GET[mid][1], 4); return 1; }
+        if (JX_PARAM_GET[mid][0] < pid) lo = mid + 1; else hi = mid - 1;
+    }
     return 0;
 }
+/* the assigner's time read (vtable +0x70, 0x357EF0): its clock [asg+0xB0] / 96, signed, truncating */
 static uint32_t unit_get70(void *u)
-{ (void)u; return (uint32_t)(G.clock / 48); }
+{ return (uint32_t)(G.ktclock[(int)(intptr_t)u] / 96); }
 static void ns_drain(void *u, int kind, int a, int b2)
 { (void)u; (void)kind; (void)a; (void)b2; }  /* stubbed as in every proof */
 
@@ -317,13 +358,20 @@ static const uint8_t *runs_apply(const uint8_t *p, uint8_t *dst, int apply)
 
 void jx3p_recall(int idx)
 {
-    /* EVERYTHING resets to the clean template, then the patch's own aux
-     * deltas (JXM3, derived order-true from the binary) laid on top. The
-     * jx_bank_apply LUT stays in the tree but is NOT the gate path: the two
-     * harness pool models disagree (13 pools each way, order-dependent
-     * writes) and the resolution of the TRUE host recall protocol is the
-     * logged follow-up; the deltas ARE the oracle's own recall, byte for
-     * byte, for every factory patch. */
+    /* EVERYTHING resets to the clean template, then the patch's own aux deltas laid on top -- the
+     * engine the plugin holds after its boot and its patch browser's load of the patch (2026-10-10:
+     * the plugin's own records through its own host entry, jx3p/tools/jx_recall_data_gate.py; before,
+     * the aux came from a pool MODEL of the recall, playbook 197). JXM4 adds, per patch, the control
+     * objects (note managers, note stores, assigners, parameter objects -- KEY ASSIGN lives there) and
+     * the engine HOST record: every patch load queues writePatch, so the output fades as the plugin's
+     * does (0.5 s at gain 0, then 10 ms in). A cold restart per patch change (scope row 9). */
+    if (g_mrec_v4)
+        for (int i = 0; i < NUNITS; ++i) {
+            memcpy(G.mgr.u[i], g_tmpl_regions[8 + 3 * i], JXA_UNIT_SZ);
+            memcpy(G.ns[i],    g_tmpl_regions[9 + 3 * i], 0xDB0);
+            memcpy(G.kt[i],    g_tmpl_regions[10 + 3 * i], 0xB0);
+            memcpy(G.proc[i],  g_tmpl_regions[35 + i], PROC_SZ);
+        }
     for (int v = 0; v < NV; ++v) {
         memcpy(G.vstate[v], g_tmpl_regions[v], SNAP_V);
         JX_PTR_STORE(G.vstate[v] + 136, G.vobj[v]);
@@ -349,8 +397,21 @@ void jx3p_recall(int idx)
                     p += 16 + 4 * nids + 36 * nslot;
                 }
             }
+            if (g_mrec_v4) {
+                for (int i = 0; i < NUNITS; ++i) {
+                    p = runs_apply(p, G.mgr.u[i], last);
+                    p = runs_apply(p, G.ns[i], last);
+                    p = runs_apply(p, G.kt[i], last);
+                }
+                for (int i = 0; i < NUNITS; ++i)
+                    p = runs_apply(p, G.proc[i], last);
+                if (last) host_record(p);
+                p += 28;
+            }
         }
     }
+    if (g_mrec_v4)
+        for (int u = 0; u < NUNITS; ++u) G.ktclock[u] = 0;
 }
 void jx3p_note_on(int note, int vel)
 { jx_alloc_note_on(&G.mgr, &g_acbs, note, vel); }
@@ -375,12 +436,27 @@ void jx3p_render(float *L, float *R, int n)
         a2[2 * v] = (uint64_t)(uintptr_t)&G.vcells[2 * v];
         a2[2 * v + 1] = (uint64_t)(uintptr_t)&G.vcells[2 * v + 1];
     }
+    /* THE ENGINE RENDER'S PREAMBLE (rva 0x3F9220, READ; 2026-10-10): per voice unit its assigner's
+     * count synced to the HOST's (the setter, jx_ktrack_set_count) and its clock advanced by the
+     * call's samples; only units below the count render -- the others' outputs are zero and their
+     * wrappers do not run (six voices by default: initialize's record 0x0FFFC00E). */
+    if (G.host_ok && !G.host_stage_off)
+        for (int u = 0; u < NV; ++u) {
+            jx_ktrack_cbs c = { unit_set48, unit_get50, unit_get70, (void *)(intptr_t)u };
+            if (jx_ktrack_count(G.kt[u]) != G.nvoices)
+                jx_ktrack_set_count(G.kt[u], &c, G.nvoices);
+            G.ktclock[u] += n;
+        }
     for (int s = 0; s < n; ++s) {
         /* the per-unit WRAPPER (0x377080 voice / 0x377010 master):
          * flag==0 -> untouched; latch>0 -> outputs zeroed, GC only;
          * else -> outputs zeroed, inner render, GC. */
         for (int v = 0; v < NV; ++v) {
             jx_wrap *w = &G.wrap[v];
+            if (G.host_ok && !G.host_stage_off && v >= G.nvoices) {        /* not rendered: outputs zero */
+                G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
+                continue;
+            }
             if (!w->flag) continue;
             if (w->latch > 0) {
                 --w->latch;
@@ -400,6 +476,44 @@ void jx3p_render(float *L, float *R, int n)
                     jx_master_render(G.mstate, a2, a3);
                 }
                 jx_gc_sweep(w->ids, &w->nids, w->slots);
+            }
+        }
+        if (G.host_ok && !G.host_stage_off) {
+            /* THE OUTPUT GAIN STAGE (rva 0x3F9731..0x3F9844, READ): while samples are left the gain
+             * moves by the step, held in [0, 1]; then a positive step holds 1.0, else the gain is 0 and
+             * the delay counts down; when it ends the fade-in starts: trunc(rate x time x 0.001)
+             * samples (at least 1), step 1 / that (in double). writePatch arms it (1 sample at -1, the
+             * delay 0.5 s, the time 10 ms). */
+            float g;
+            int32_t left = G.gleft;
+            G.gleft = (int32_t)((uint32_t)left - 1u);  /* it counts on below 0, as the asm's dec does */
+            if (left > 0) {
+                g = G.gstep + G.gain;
+                G.gain = g;
+                if (g >= 1.0f) { G.gain = 1.0f; g = 1.0f; }
+                else if (!(g > 0.0f)) { G.gain = 0.0f; g = 0.0f; }
+            } else if (!(0.0f >= G.gstep)) {         /* comiss 0, step; jae: an unordered step holds 1.0 */
+                G.gain = 1.0f; g = 1.0f;
+            } else {
+                G.gain = 0.0f; g = 0.0f;
+                if (G.gdelay > 0) {
+                    G.gdelay -= 1;
+                    if (G.gdelay <= 0) {
+                        float t = G.rate * G.gtime;
+                        int32_t k;
+                        t = t * 0.001f;
+                        k = (int32_t)t;
+                        if (k < 1) k = 1;
+                        G.gleft = k;
+                        G.gstep = (float)(1.0 / (double)k);
+                        g = G.gain;
+                    }
+                }
+            }
+            {   float l, r;
+                memcpy(&l, &outL, 4); memcpy(&r, &outR, 4);
+                l = g * l; r = G.gain * r;
+                memcpy(&outL, &l, 4); memcpy(&outR, &r, 4);
             }
         }
         memcpy(&L[s], &outL, 4);
@@ -442,9 +556,60 @@ void jx3p_render_dry(float *L, float *R, int n)
     G.clock += n;
 }
 
-/* raw access for the full-chain gate */
+/* raw access for the full-chain gate and the recall data gate (jx3p/tools/jx_recall_data_gate.py) */
 void *jx3p_vstate(int v) { return G.vstate[v]; }
 void *jx3p_mstate(void)  { return G.mstate; }
+void *jx3p_vhigh(int v)  { return G.vhigh[v]; }
+/* the control objects in template order: which 0 note manager, 1 note store, 2 assigner, 3 parameter object */
+void *jx3p_ctl(int which, int i)
+{
+    switch (which) {
+    case 0: return G.mgr.u[i];
+    case 1: return G.ns[i];
+    case 2: return G.kt[i];
+    default: return G.proc[i];
+    }
+}
+/* the engine HOST record now (host_record's layout); returns host_ok */
+int jx3p_host(uint8_t out[28])
+{
+    memcpy(out + 0, &G.nvoices, 4); memcpy(out + 4, &G.gain, 4); memcpy(out + 8, &G.gstep, 4);
+    memcpy(out + 12, &G.gleft, 4); memcpy(out + 16, &G.gdelay, 4); memcpy(out + 20, &G.gtime, 4);
+    memcpy(out + 24, &G.rate, 4);
+    return G.host_ok;
+}
+
+/* unit u's wrapper + ramp record in the exporter's form (jx_master_recall_export.py wrap_record):
+ * latch, flag, the active ids, then per slot its target as an offset in the unit (0xFFFFFFFF: none)
+ * and the slot's bytes +8..+0x27. Returns the length, or -1 when cap is too small. */
+int jx3p_wrap_dump(int u, uint8_t *out, int cap)
+{
+    const jx_wrap *w = &G.wrap[u];
+    int n = 16 + 4 * w->nids + 36 * w->nslot, i;
+    uint8_t *p = out;
+    if (n > cap) return -1;
+    memcpy(p, &w->latch, 4); p[4] = w->flag; p[5] = p[6] = p[7] = 0; p += 8;
+    memcpy(p, &w->nids, 4); p += 4;
+    memcpy(p, w->ids, 4u * (uint32_t)w->nids); p += 4 * w->nids;
+    memcpy(p, &w->nslot, 4); p += 4;
+    for (i = 0; i < w->nslot; ++i) {
+        const jx_gc_slot *sl = &w->slots[i];
+        const uint8_t *t = (const uint8_t *)sl->target;
+        uint32_t off;
+        if (!t) off = 0xFFFFFFFFu;
+        else if (u == 8) off = (uint32_t)(t - G.mstate);
+        else if (t >= G.vhigh[u] && t < G.vhigh[u] + 0x4D000) off = 0xA60000u + (uint32_t)(t - G.vhigh[u]);
+        else off = (uint32_t)(t - G.vstate[u]);
+        memcpy(p, &off, 4); memcpy(p + 4, &sl->sign, 32); p += 36;
+    }
+    return n;
+}
+
+/* gate hook: 0 renders the DSP alone (every unit, no count sync, no gain stage) -- the full-chain
+ * gate's DSP mode grades the voices and the master against the plugin's per-unit renders that way;
+ * 1 (the default after jx3p_init) is the plugin's engine render. */
+void jx3p_host_stage(int on) { G.host_stage_off = !on; }
+
 
 /* debug/bench: force one unit's wrapper flag */
 void jx3p_wrap_flag(int u, int f) { G.wrap[u].flag = (uint8_t)f; }

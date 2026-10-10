@@ -4,8 +4,13 @@
 # for what it covers; the coverage is stated plainly at the end.
 #
 # Two proven halves, tied together:
-#   A. RECALL   -- jx_recall_gate.sh: C recall == oracle dispatch, EXACTLY 0,
-#                  all 64 factory patches (patch bytes -> coefficient state).
+#   A. RECALL   -- the plugin's OWN patch load (2026-10-10, playbook 197): the
+#                  oracle drive (initialize's and the patch browser's records
+#                  through the engine's own host entry) equals the booted plugin
+#                  word for word (jx_recall_product_check.py), and the port's
+#                  recall equals that drive in every window, all 64 patches
+#                  (jx_recall_data_gate.py). The old pool-model LUT gate
+#                  (jx_recall_gate.sh) graded a model and is no gate.
 #   B. RENDER   -- integration A/B: recall(oracle) -> note-on(oracle) -> the
 #                  FULL per-sample chain (8 voice arms + master) in C vs the
 #                  plugin's own arms+master, byte-exact on the seam, L/R, and
@@ -40,8 +45,11 @@ echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="
 # recorded value, the bank decode census (with its tooth), and that the
 # shipped template and aux come from ONE boot.
 python3 "$HERE/jx_drive_gate.py"
-echo "=== JX GATE 1/5: RECALL (C == oracle, 64/64 EXACTLY 0) ==="
-sh "$HERE/jx_recall_gate.sh"
+echo "=== JX GATE 1/5: RECALL ON THE PLUGIN'S OWN PATCH LOAD (playbook 197) ==="
+python3 "$HERE/jx_recall_product_check.py" 0 49          # the drive == the booted plugin, every unit, word for word
+python3 "$HERE/jx_recall_product_check.py" --tooth       # one record left out must be seen
+python3 "$HERE/jx_recall_data_gate.py"                   # the port's recall == the drive, every window, 64/64
+python3 "$HERE/jx_recall_data_gate.py" --patches 0,20 --tooth
 
 echo "=== JX GATE 2/5: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
 cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC \
@@ -71,6 +79,11 @@ if [ "$fails" -ne 0 ]; then
 fi
 echo "=== JX GATE 3/5: FULL CHAIN (shipping entry path, reach 12000) ==="
 JX_FULL_SKIP_DERIVE=1 sh "$HERE/jx_full_gate.sh"
+echo "=== JX GATE 3b: THE MASTER, EVERY SAMPLE OF STATE (64 patches + the mode variants + tooth; playbook 198) ==="
+# every unit's state, the 36 control objects and L/R per 256-sample chunk over 4,096 idle + a note +
+# 12,000, against the plugin; the variants set the two effect-mode cells to the values no factory
+# patch holds, through the plugin's own host entry; the tooth puts the decompile's lost argument back
+python3 "$HERE/jx_master_bisect.py" --gate 12000
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null
