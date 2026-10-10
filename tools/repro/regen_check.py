@@ -90,13 +90,16 @@ def main():
         raise SystemExit('regen_check: the generated files have uncommitted changes here -- run it in a fresh clone:\n' + dirty)
     os.makedirs(os.path.join(REPO, 'scratchpad', 'b6'), exist_ok=True)
     log = os.path.join(REPO, 'scratchpad', 'regen_check.log')
-    # the port library first: some generators load it (teensy_golden), and a fresh clone has none
-    if subprocess.run(['make', '-s', 'libjuno.so'], cwd=REPO).returncode:
-        raise SystemExit('regen_check: make libjuno.so failed')
     bad = 0
     for name, files, cmds in ENTRIES:
         if only and name not in only:
             continue
+        # the port library before EVERY entry: some generators load it (teensy_golden), a fresh
+        # clone has none, and the entries before rewrite src/ headers (identical bytes, new times),
+        # so a library built once at the start is older than its sources and the generators'
+        # stale-guard refuses it (proof run repro3, 2026-10-10). make rebuilds only when needed.
+        if subprocess.run(['make', '-s', 'libjuno.so'], cwd=REPO).returncode:
+            raise SystemExit('regen_check: make libjuno.so failed before ' + name)
         t, fail = 0.0, None
         for c in cmds:
             rc, dt = run(c, log)
