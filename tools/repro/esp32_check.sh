@@ -109,11 +109,13 @@ fi
 # (paramclass_gate reads its measured positions). The device-recall gate itself is red at that commit
 # (docs/REPRODUCE.md: its record list is stale, its scatter tooth parses a list the generator no
 # longer has); only its scan's measurement is used, and its verdict is printed.
-# Tooth: ESP32_CHECK_TOOTH=noboot skips the boot image -- the suites must then go RED (chunk, held).
+# Tooth: ESP32_CHECK_TOOTH=noboot deletes the boot image instead of building it (chain_gate.sh above
+# leaves its own in build/devboot/, so skipping make_boot alone removes nothing -- that first tooth
+# did not bite) -- the suites must then go RED (chunk, held).
 if [ -d "$T/hist" ]; then
   t0=$(date +%s)
   boot="python3 tools/engineb/devboot/make_boot.py"
-  [ "${ESP32_CHECK_TOOTH:-}" = noboot ] && boot=true
+  [ "${ESP32_CHECK_TOOTH:-}" = noboot ] && boot="rm -f build/devboot/ebdev_boot.bin"
   if ( cd "$T/hist" && $boot \
        && { python3 tools/engineb/devrecall_gate.py --patch-scan --no-teeth; [ -s build/devrecall/recall_positions.txt ]; } \
        && sh tools/engineb/o3_gates.sh ) > "$T/osuites.log" 2>&1 && grep -q "O3 GATES: ALL GREEN" "$T/osuites.log"; then
