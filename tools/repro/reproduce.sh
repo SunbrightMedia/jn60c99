@@ -17,8 +17,9 @@
 #                juno.dll and WASM equal to the build
 #   pi           the Pi track's gate (pi/run_qemu.sh) when its toolchain is present (doctor: opt)
 #   esp32        tools/repro/esp32_check.sh when ESP-IDF is present (doctor: opt): the retired device
-#                JUNO gate at its own commit; the firmware builds with the pinned IDF and the MINISYNTH
-#                self-test in QEMU; reproducible images equal from two paths
+#                JUNO gate and its O1-O3 suites at its own commit; the firmware builds with the pinned IDF
+#                and the MINISYNTH self-test in QEMU; reproducible images equal from two paths. Without
+#                the IDF: stage device, the history part alone (host cc), and esp32 reported skipped
 #   tree         no committed file changed by any stage above
 # Exit 0 only when every stage passed (a skipped optional stage is reported, not failed).
 #
@@ -95,8 +96,9 @@ else
 fi
 if [ -f "${IDF_PATH:-/home/user/esp-idf}/export.sh" ]; then
   stage esp32 bash tools/repro/esp32_check.sh
-else
-  skip esp32 "no ESP-IDF (CLAUDE.md BUILD & GIT: clone v6.1 + ./install.sh esp32s3)"
+else                       # the device track's own proofs need only the host compiler
+  stage device env ESP32_CHECK_ONLY=history bash tools/repro/esp32_check.sh
+  skip esp32 "the firmware builds: no ESP-IDF (CLAUDE.md BUILD & GIT: clone v6.1 + ./install.sh esp32s3)"
 fi
 stage tree sh -c "git status --porcelain --untracked-files=no | tee /dev/stderr | wc -l | grep -qx 0"
 echo
