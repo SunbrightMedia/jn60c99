@@ -609,7 +609,51 @@ int jx3p_wrap_dump(int u, uint8_t *out, int cap)
  * gate's DSP mode grades the voices and the master against the plugin's per-unit renders that way;
  * 1 (the default after jx3p_init) is the plugin's engine render. */
 void jx3p_host_stage(int on) { G.host_stage_off = !on; }
+/* the assigner clock of unit u (the plugin's [assigner+0xB0]): gates and diagnostics */
+long long jx3p_ktclock(int u) { return (u >= 0 && u < NUNITS) ? (long long)G.ktclock[u] : -1; }
 
+/* THE PLUGIN'S RENDER OBJECT (JX-4, 2026-10-10): between its render driver and the engine sits the
+ * JUNO-60's render object -- table and coefficient vectors byte for byte (jx3p/tools/jx_conv_tables.py,
+ * EXECUTED; jx3p/docs/HOST_LAYER.md 2b) -- so the port takes src/juno_conv.c as it is. The engine runs
+ * at the template's own rate (its HOST record: the automatic setting's 96000 for hosts 44100, 48000
+ * and 96000, with data exported at that rate), the object is looked up for (engine, host):
+ * IDENTITY renders the engine for the host block, CONVERTER renders what its filter needs and filters
+ * (rva 0x343E30), SILENCE gives zeros. jx3p_product_process is one host block whose records (notes,
+ * the patch) the caller gave before it: the render driver's split of a block at record offsets is not
+ * ported yet (jx3p/tools/jx_product_gate.py grades blocks with their events at offset 0). */
+#include "../../src/juno_conv.c"
+static juno_ro g_ro; static int g_ro_on;
+static void jx_ro_engine(void *user, float *const *ptrs, int nch, int count)
+{
+    (void)user; (void)nch;
+    jx3p_render(ptrs[0], ptrs[1], count);
+}
+/* the object for (the engine's rate, host_rate); returns its kind (0 identity, 1 converter, 2 silence),
+ * -1 without a HOST record (an old template) or when a buffer cannot be allocated */
+int jx3p_product_open(int host_rate)
+{
+    if (!G.host_ok) return -1;
+    if (g_ro_on) juno_ro_free(&g_ro);
+    juno_ro_init(&g_ro, (int)G.rate, host_rate);
+    g_ro_on = 1;
+    G.host_stage_off = 0;
+    if (juno_ro_lookup(&g_ro) < 0) return -1;
+    return juno_ro_kind(&g_ro);
+}
+/* one host block of n samples through the render object */
+int jx3p_product_process(float *L, float *R, int n)
+{
+    int kind = g_ro_on ? juno_ro_kind(&g_ro) : -1;
+    if (n <= 0) return 0;
+    if (kind == JUNO_RO_IDENTITY) { jx3p_render(L, R, n); return 0; }
+    if (kind == JUNO_RO_CONVERTER) {
+        float *out[2] = { L, R };
+        if (juno_ro_convert(&g_ro, out, 2, n, jx_ro_engine, NULL) == 0) return 0;
+    }
+    memset(L, 0, (size_t)n * sizeof(float));          /* SILENCE, or a buffer that could not grow */
+    memset(R, 0, (size_t)n * sizeof(float));
+    return kind == JUNO_RO_SILENCE ? 0 : -1;
+}
 
 /* debug/bench: force one unit's wrapper flag */
 void jx3p_wrap_flag(int u, int f) { G.wrap[u].flag = (uint8_t)f; }

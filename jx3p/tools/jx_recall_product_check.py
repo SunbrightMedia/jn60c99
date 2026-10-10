@@ -6,7 +6,8 @@ PRODUCT (jx3p/tools/jx_host_emu.py): the plugin booted as a DAW boots it (initia
 records), its patch browser's load of factory patch k (75 more records), then one process(): the render
 driver applies all of them at offset 0 through the engine's host entry (rva 0x3F9A30) and calls the
 engine render (rva 0x3F9220) -- where this check stops it and reads the engine: per unit u = 0..8 its
-state (0xAAC310 bytes), its parameter object (0x700) and its assigner (0xB8), from the HOST's unit table.
+state (0xAAC310 bytes), its parameter object (0x700), its assigner (0xB8), its note manager (0x7A8) and
+its note store (0xDB0), from the HOST's unit table.
 
 MODEL (tools/verify/jx_emu.py, the engine alone): static init (it fills the host entry's id map: 744
 ids), BUILD on the factory HOST, then the plugin's own host entry called with the same kind-2 records in
@@ -35,15 +36,20 @@ sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 import jx_bank as B                                    # noqa: E402
 
 RENDER = 0x3F9220                  # the engine render (vtable 0x38)
-SIZES = {'state': 0xAAC310, 'proc': 0x700, 'assign': 0xB8}
+TICK = 0x3F84A0                    # the engine's clock tick (vtable 0xB8; the render driver calls it, rva 0x320F52)
+SIZES = {'state': 0xAAC310, 'proc': 0x700, 'assign': 0xB8, 'mgr': 0x7A8, 'nstore': 0xDB0}
 
 
 def snapshot(emu, host):
+    """per unit its state, parameter object and assigner (the HOST's unit table +80/+96/+104) and, since
+    2026-10-10, its note manager (+120) and the note store the manager holds (+0x518): a KEY ASSIGN
+    patch (34) played differently through the product while the first three were equal"""
     q = lambda a: struct.unpack('<Q', emu.uc.mem_read(a, 8))[0]
     out = {}
     for u in range(9):
-        for k, off in (('state', 80), ('proc', 96), ('assign', 104)):
+        for k, off in (('state', 80), ('proc', 96), ('assign', 104), ('mgr', 120)):
             out[(k, u)] = bytes(emu.uc.mem_read(q(host + off + 64 * u), SIZES[k]))
+        out[('nstore', u)] = bytes(emu.uc.mem_read(q(q(host + 120 + 64 * u) + 0x518), SIZES['nstore']))
     return out
 
 
@@ -105,6 +111,9 @@ def model(recs, skip=None):
         if kind != 2 or i == skip:
             continue
         jx.call(J.HOSTPARAM, rcx=jx.HOST, rdx=pid, r8=val & 0xFFFFFFFF, count=400_000_000)
+    # the render driver's first clock tick: its phase starts at 0, so sample 0 of the first block ticks before
+    # the engine renders (EXECUTED, jx3p/docs/HOST_LAYER.md 3c) -- the engine's own tick entry, vtable +0xB8
+    jx.call(J.IB + TICK, rcx=jx.HOST, count=50_000_000)
     return snapshot(jx, jx.HOST), J
 
 

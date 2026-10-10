@@ -93,3 +93,5 @@ esp32s3/build_*/
 tests/test_rate_laws
 tests/test_multi_instance
 .snapshot_tree
+# the 96 kHz engine data ride as .gz only (jx3p/tools/jx_product_gate.py inflates them)
+jx3p/gen/*_96k.bin

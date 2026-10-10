@@ -154,11 +154,42 @@ records in jx3p/gen/jx_patch_records.json from `jx_patch_records.py`). `jx_recal
 that engine equals the booted plugin's at its render, word for word, every unit's state, parameter
 object and assigner (patches 0, 5, 20, 49, 63; tooth: one record left out, 81 words differ).
 
+## 3c. The render driver's clock tick (EXECUTED + READ, 2026-10-10)
+
+The render driver (the JUNO-60's machine code) ticks the engine 24 times per beat at the host tempo,
+120 when the host gives none: one tick per 1,000 samples at 48 kHz, the first at sample 0 of the first
+block, before the engine renders. A tick is the engine's vtable +0xB8 (rva 0x3F84A0, called at
+0x320F52): per unit its note manager's counter +0x0 += 1, the manager's tick (0x3F5910) and the note
+store's tick (0x3EFD10). The manager's tick does nothing until the flag +6 is set -- the KEY ASSIGN
+setter sets it at a patch load (0x3F2C28) -- and then, at the next 12- (or 24-) tick boundary, clears
+it and plays its note lists again through the note store; the note store's tick runs its step machine
+(+0x2C state, +0x14 / +0x18 counters, 16 slots of 12 bytes at +0x326) and plays notes through its own
+output (vtable +8, the hook at +0xD98). MEASURED through process() at 48000: on a KEY ASSIGN 1 patch
+(800 = 1: factory 34, 38, 59, 60) the note plays on the clock -- 2 samples after its block starts the
+plugin's output and the port's differ; patch 0 (no KEY ASSIGN) is equal. Not ported yet: ~1,400
+instructions (0x3F84A0, 0x3F5910, 0x3EFD10 and its graph: 0x3EF210, 0x3EF3B0, 0x3EF910, 0x3EFBF0,
+0x3F1650, 0x3F1B10, 0x3F1EA0, 0x3F2120, 0x3F56E0, ...; jx_nstore.c's seam at 0x3EF210 is a stub) and
+the driver's tick timing inside a block (the JUNO-60's drv_block in gui/juno_bridge.c).
+jx_recall_product_check.py now compares the note managers and note stores too, with the first tick on
+the model side.
+
+## 3d. The product path, stage 1 (EXECUTED, 2026-10-10)
+
+`jx3p_product_open(host_rate)` / `jx3p_product_process(L, R, n)` (jx3p/gui/jx_bridge.c): the engine at
+the template's own rate -- 96000, the automatic setting's at hosts 44100, 48000 and 96000 (EXECUTED:
+[HOST+8] after setupProcessing) -- on 96 kHz data (`jx_template_export.py 96000 --out`,
+`jx_master_recall_export.py --rate 96000 --template --out`; committed as .gz), through src/juno_conv.c
+(the render object, equal to the JX's). `jx3p/tools/jx_product_gate.py` grades it against the plugin's
+own process() (jx_host_emu: its patch browser's load, its render driver, its render object): patch 0
+EQUAL at 44100 (130 blocks of 512), 48000 (141) and 96000 (282), a note from 0.6 s to 1.2 s; the tooth
+(the 44.1 kHz data, no render object: the web app's path) differs at every rate. Patch 34 (KEY ASSIGN
+1) differs: 3c.
+
 ## 4. Next
 
-1. EXECUTE (`jx3p/tools/jx_boot_census.py RATE`): the first second of a fresh instance (the 0.5 s
-   mute and the 10 ms fade-in), a note through process() at host 48000 / 44100 (converter) and
-   96000 (identity), the 84 records.
-2. A JX gate in the JUNO's shape (host_process_gate.py): the plugin's process() vs the port.
-3. The C side: the JUNO's host layer (src/juno_conv.c, the render driver, the state, the patch
-   manager) on the JX engine, the gain stage and the writePatch fade in the JX bridge.
+1. The clock tick (3c): the driver's tick timing and split of a block, the engine's tick entry and
+   the note store's step machine, transcribed and graded by jx_product_gate.py on patches 34, 38, 59,
+   60 (and a gate of the tick alone, model against port, every state word).
+2. Records at offsets inside a block (notes at any sample), the render driver's split; then the web
+   app on the product path.
+3. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.
