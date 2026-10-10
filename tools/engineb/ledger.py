@@ -56,8 +56,17 @@ TSV = os.path.join(REPO, "docs", "trackb", "EQUIVALENCE.tsv")
 
 S3_BUDGET = 3500.0          # docs/engineb/SCOPE.md -- ESP32-S3, 240 MHz, 48 kHz
 S3_HARD = 5000.0
-XTENSA_BIN = (os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/") +
-              "xtensa-esp-elf/bin")
+def _xtensa_bin():
+    """the newest installed ESP32-S3 toolchain's bin directory (was one hard-coded version until
+    2026-10-10: a container with another IDF had none, and the S3 probe crashed; playbook 192)"""
+    import glob
+    for d in sorted(glob.glob(os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")), reverse=True):
+        if os.path.exists(os.path.join(d, "xtensa-esp32s3-elf-gcc")):
+            return d
+    return ""
+
+
+XTENSA_BIN = _xtensa_bin()
 
 COLUMNS = [
     "row_id", "module", "file", "replaces", "status",
@@ -126,8 +135,11 @@ def env_path():
 
 
 def run(cmd, cwd=REPO, timeout=7200):
-    p = subprocess.run(cmd, cwd=cwd, env=env_path(), timeout=timeout,
-                       capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, cwd=cwd, env=env_path(), timeout=timeout,
+                           capture_output=True, text=True)
+    except FileNotFoundError as e:          # a toolchain not installed: reported ABSENT, never a crash
+        return 127, str(e)
     return p.returncode, p.stdout + p.stderr
 
 

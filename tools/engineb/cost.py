@@ -65,11 +65,20 @@ BASE_CFLAGS = ["-std=c99", "-O2", "-ffp-contract=off", "-fno-strict-aliasing",
 
 
 def find_s3_gcc():
-    for pat in (os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")):
+    # A TUPLE of patterns. From 2026-10-05 to 2026-10-10 this was one string in parentheses (no
+    # trailing comma), so the loop walked the string's CHARACTERS, never found the toolchain, and
+    # every S3 cost read "TOOLCHAIN ABSENT" -- reported, never failed (playbook 192).
+    pats = [os.path.expanduser("~/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin")]
+    if os.environ.get("IDF_TOOLS_PATH"):
+        pats.append(os.path.join(os.environ["IDF_TOOLS_PATH"], "tools/xtensa-esp-elf/*/xtensa-esp-elf/bin"))
+    for pat in pats:
         for d in sorted(glob.glob(pat)):
             gcc = os.path.join(d, "xtensa-esp32s3-elf-gcc")
             if os.path.exists(gcc):
                 return gcc, os.path.join(d, "xtensa-esp32s3-elf-objdump")
+    gcc = shutil.which("xtensa-esp32s3-elf-gcc")        # an exported ESP-IDF puts it on PATH
+    if gcc:
+        return gcc, os.path.join(os.path.dirname(gcc), "xtensa-esp32s3-elf-objdump")
     return None, None
 
 

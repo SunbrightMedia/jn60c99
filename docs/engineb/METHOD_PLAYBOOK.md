@@ -3316,3 +3316,27 @@ exactly the 15).
 A copy of code that the trunk keeps changing carries the version it copied, and a gate compares
 that version with the trunk's on every run. A fast structural check that sees only some of the
 copies is a check of those copies only -- say which.
+
+## 192. A ONE-STRING "TUPLE" AND A SKIP THAT IS NOT A FAILURE HID THE S3 FOR FIVE DAYS
+Paid 2026-10-10 (task #62). The 2026-10-05 path clean-up turned cost.py's two-pattern tuple into
+`for pat in (os.path.expanduser("..."))` -- one string in parentheses, no comma -- so the loop walked
+its characters and never found the ESP32-S3 compiler; ledger.py hard-coded one toolchain version that a
+newer container no longer had and crashed on the bare compiler name. The cost rig reported "s3
+TOOLCHAIN ABSENT" and went on: a skip, never a failure. Every S3 cost read n/a, and the ledger's four
+live rows were STALE from that day (make engineb step 8; found when the shim re-sync re-ran it).
+### The rule
+A check that skips must fail when the thing it skipped is present: make engineb step 7 now dies when an
+S3 toolchain is installed but the rig cannot find it (seen red on the 10-05 cost.py). And a 1-tuple
+needs its comma -- write a list.
+
+## 193. `$(MAKE)` IN A RECIPE MAKES `make -n` RUN IT -- AND THE VERIFY RECIPE IS ONE LINE
+Paid 2026-10-10 (task #62). The parallel runner reads the gate list with `make -n verify-recipe`. One
+line of that recipe built a helper with `$(MAKE) -s ...`; GNU make executes any recipe line holding
+`$(MAKE)` even under -n, and the whole recipe is ONE logical line (backslash-continued), so the dry run
+started the full verify in the working tree. Stopped within a minute (two scratch references rebuilt,
+nothing else). The recipe now calls plain `make` there, and run_sections.py refuses a verify-recipe
+holding `$(MAKE)` / `${MAKE}` / a '+' line (its --guard-tooth bites).
+### The rule
+Before asking make to print a recipe, check that make will not run it. And a static audit that names
+"everything" sees nothing: the runner's first audit was blind because the prelude's dependency list
+names every script (its tooth caught it).

@@ -226,6 +226,13 @@ fi
 # ---------------------------------------------------------------- 7 cost
 STEP="7 cost rig"
 say "$STEP" "the cycle model's own calibration"
+# An installed S3 toolchain the rig cannot find costs every row "n/a" and reads as a skip, not a
+# failure: from 2026-10-05 to 2026-10-10 a one-string "tuple" in cost.py did exactly that (playbook 192).
+if ls "$HOME"/.espressif/tools/xtensa-esp-elf/*/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc > /dev/null 2>&1; then
+    python3 -c "import sys; sys.path.insert(0, 'tools/engineb'); import cost; sys.exit(0 if 's3' in cost.targets() else 1)" \
+        || die "an ESP32-S3 toolchain is installed, but the cost rig cannot find it" \
+               "Every S3 cost would read TOOLCHAIN ABSENT. FIX: tools/engineb/cost.py find_s3_gcc()."
+fi
 python3 tools/engineb/cost.py calibrate || die "the cost rig failed its calibration" \
     "Every S3 number in the ledger comes out of this model." \
     "FIX: read which anchor moved. If a silicon anchor changed, update the" \

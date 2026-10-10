@@ -23,7 +23,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify static completeness engineb engineb-quick verify-jx3p webapp native reproduce
+.PHONY: all test clean gui provenance verify verify-seq verify-recipe static completeness engineb engineb-quick verify-jx3p webapp native reproduce
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -77,7 +77,19 @@ static: libjuno.so
 	{ cc -O2 -std=c99 -ffp-contract=off -DTOOTH -o $(SCRATCH)/pi_log10_tooth tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_tooth > /dev/null 2>&1; } || { echo "  RED  pi_log10_check tooth DID NOT BITE"; FAIL=1; }; \
 	exit $$FAIL
 
+# make verify: the gate list below (verify-recipe) four sections at a time, its prelude (the shared
+# references) first (tools/verify/run_sections.py; the user, 2026-10-10). VERIFY_JOBS=1, or make
+# verify-seq, runs the sections one by one in this order, as before.
+VERIFY_JOBS ?= 4
 verify: test libjuno.so
+	@python3 tools/verify/run_sections.py --jobs $(VERIFY_JOBS)
+
+verify-seq: test libjuno.so
+	@$(MAKE) -s --no-print-directory verify-recipe
+
+# THE GATE LIST: one shell recipe, no prerequisites (make -n prints only it; run_sections.py splits it
+# at its "=== ... ===" lines). tools/repro/claims_census.py reads the scripts it names.
+verify-recipe:
 	@FAIL=0; \
 	mkdir -p $(SCRATCH); \
 	python3 tools/verify/pathcheck.py || FAIL=1; \
@@ -157,7 +169,7 @@ verify: test libjuno.so
 	done; \
 	echo "=== PILLAR-3: exhaustive fine-FX (port applier vs plugin's own setter, every byte x 18 rates x 9 contexts) ==="; \
 	fresh $(SCRATCH)/finefx_cellsweep_ref.pkl || python3 tools/verify/finefx_cellsweep.py || FAIL=1; \
-	$(MAKE) -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
+	make -s tools/verify/finefx_port_dump && python3 tools/verify/finefx_pillar3_gate.py || FAIL=1; \
 	echo "=== ET-MODE A/B: synthetic EFFECT TYPE 0..5 recall (port vs plugin; no factory patch reaches modes 2-5) ==="; \
 	fresh $(SCRATCH)/etmode_ref.pkl || python3 tools/verify/etmode_ab.py --ref || FAIL=1; \
 	python3 tools/verify/etmode_ab.py --port || FAIL=1; \
