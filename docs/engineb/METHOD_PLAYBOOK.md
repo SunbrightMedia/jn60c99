@@ -3286,3 +3286,16 @@ missing run and a wrong commit, re-runs a failed stage, survives a second resume
 ### The rule
 A pipeline longer than the environment's quiet life is staged, each stage's verdict on disk, and
 resumable at a stage boundary. A stage is the unit of proof: kept whole or run again whole.
+
+## 190. A MOVED PATH IS SEARCHED IN EVERY SPELLING, AND ONLY THE RUN THAT READS IT PROVES IT
+Paid 2026-10-10 (task #62). The repository cleanup moved state_dump/ to refs/state_dump/ and event/
+to engine_b/event/, and its search for old paths required the name NOT to follow a '/' (to skip the
+new spelling refs/state_dump). So `ROOT + '/state_dump/state_t0.bin'` (recall_gate.py) and
+`"$REPO"/event/juno_event.h` (boundary_teeth.sh) escaped it; make test and make static were green,
+because neither runs those scripts. The proof run found the first (LIVE GATE 1/7: the dump not
+found, 3 cells unexplained, GATE: REVIEW, make verify RED after 7.7 hours); a direct search for the
+bare name found the second.
+### The rule
+After a move, search the bare old name with a negative lookbehind for the NEW prefix only
+(`(?<!refs/)state_dump`), read every hit, and run every script that a hit names -- or let the full
+proof run decide before calling the move done. Green fast checks prove only what they execute.
