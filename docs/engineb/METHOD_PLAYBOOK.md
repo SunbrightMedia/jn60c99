@@ -3556,3 +3556,69 @@ MODE, LEGATO, PORTAMENTO, ARPEGGIO and the 19 step modes) and grade every combin
 not hot (notes and ticks, not samples) -- lift it: the plugin's own instructions under the lifted-code gate
 (every return value and the whole heap after every call) close every mode at once. Keep the transcription and
 its gate as documentation; do not ship it.
+
+## 204. A STATE CAPTURED AFTER A STEP HIDES THAT STEP'S ORDER -- CAPTURE BEFORE IT AND QUEUE IT AS THE PLUGIN DOES
+Paid 2026-10-10 (JX-3P, JX-15b: the fresh start).
+The JX port's guest image was the plugin's heap after initialize's 83 records (BUILD, setSampleRate 96000, the
+records through the host entry). Every gate passed -- until a host set the engine-rate setting before the first
+block: ~1 ULP apart from block 47 on. The plugin's first process() switches the engine's rate (setSampleRate to the
+new rate) and THEN applies initialize's records (EXECUTED: a hook on setSampleRate and the host entry over start()
+and the first block). The image had the records applied at 96000; no switch afterwards could undo the order. The
+image is now captured BEFORE initialize (version 2); jx3p_product_init queues the records for the first block, as
+initialize does, and jx3p_init applies them at once for the gates that drive the engine directly.
+### The rule
+A snapshot of the plugin's memory freezes the order of everything before it. Snapshot at the last point where
+nothing order-dependent has happened yet (here: what setActive leaves), and replay the rest through the same
+queue the plugin uses. Probe the order first: hook the entries and run the plugin's own first block.
+
+## 205. A CENSUS'S CRAFTED INPUTS CAN COLLIDE -- SEED RANDOM BYTES BESIDE THE PATTERNS
+Paid 2026-10-10 (JX-3P, JX-16: the patch browser's decode).
+The JUNO's patch-load census made each record offset distinct with three position patterns, (i x mul + add +
+(i >> 8) x 17) & 0xFF for mul 29, 53, 197. On the JX two offsets fitted LEGATO's value in every load: 126 and
+8414. 8288 x mul + 544 = 0 (mod 256) for all three multipliers (they are equal mod 8, and 96 x 8 = 3 x 256), so
+the patterns repeat 8288 bytes apart. The JUNO's fields never sat on such a pair; the JX's did. Three records of
+seeded random bytes made every one of the 75 decodes unique.
+### The rule
+A structured probe input has structure an adversary (or plain bad luck) can hit. Add seeded random inputs to any
+census that identifies positions, and make the generator refuse a field with more than one fit -- it is that
+refusal, not the patterns, that caught this.
+
+## 206. THE DISK IS PART OF THE PROOF -- A GATE DELETES WHAT IT MAKES
+Paid 2026-10-10 (JX-3P).
+The JX gates inflated a 44 MB guest image into a fresh temporary folder per process and never deleted it: 724
+folders, 3 GB, then the session's disk allowance was spent. A full verify run then failed a compile inside GATE 3b
+("patch 60: NO OUTPUT") -- a defect of the harness, not of the port -- and the run was void. Every JX gate now
+registers its temporary folder for deletion at exit (atexit + shutil.rmtree; jx_guest.path does the same for its
+own), and old snapshot worktrees are removed when their job has its verdict.
+### The rule
+Before a long job, look at free disk; a gate that writes must clean up after itself. "No space" shows up as a
+random failure deep in a gate -- a verdict from such a run is not a verdict.
+
+## 207. READ THE INSTRUCTION, NOT THE NEIGHBOUR'S NUMBER -- AND THE CRT RUNS TOO
+Paid 2026-10-10 (JX-3P, JX-15 / JX-17).
+Two facts carried over from the JUNO port were wrong for the JX. (1) setState's field-width limit: the JUNO's is
+(95 + 128) x 64 / 5 = 2854; taking the JX's state list (82) gave 2688 -- RED; the count is the CC map's record count,
+83 on the JX (READ at 0x322210 / 0x319B00): 2700, GREEN. (2) setSampleRate, lifted, trapped on "guest access 0x10":
+its large frames call the CRT's stack probe (__chkstk, 0x6AC420), which reads the thread block's stack limit at
+gs:[0x10]. The oracle's GS base is 0 and its page 0 is zero, so the limit reads 0 and nothing is probed. The port
+maps 4 KB of zeros at address 0; the page census allows reads there and refuses any write.
+### The rule
+A constant shared by two plugins' code is shared only where the instruction that loads it is the same: read the
+load in the target. And a lifted function runs the compiler's runtime too -- its environment (the thread block,
+the stack probe) is part of what the census must find.
+
+## 208. A MUTATION'S GATE MUST LOOK WHERE THE SLIP LANDS -- A SURVIVOR IS EXPLAINED BY MEASUREMENT, NOT BY ARGUMENT
+Paid 2026-10-10 (JX-3P, JX-19: the first mutation reach of the JX port).
+Eleven slips, one per part of the port, in lines a gcov run showed executing (225 k to 4.7 M times). Two
+survived. (1) A clock constant + 1 moved each tick by 1e-8 sample: no run of seconds can show it -- an
+equivalent slip in practice, replaced by a real one (23 ticks a beat: KILLED). (2) A voice filter term x
+1.0000001: MEASURED, 6 voice words differ and the audio is bit-identical -- its output reaches the sound only
+through a mix coefficient that is 0 on the patch. No audio gate can see it; and the unit-state gate (GATE 3b,
+every voice word per chunk) never ran that branch, because it drives the 44.1 kHz engine while the product runs
+96 kHz. The state gate now also runs at 96 kHz (jx_master_bisect.py --rate 96000): clean, five patches equal in
+every word; with the slip, RED. The survivor was a real gap -- the product's own rate had no state-level gate.
+### The rule
+A survivor is a question, not a verdict: measure what the slip changes (state, audio, both) before calling it
+equivalent or a blind spot. Choose each mutation's gate by where the slip lands -- an audio gate for audio, a
+state gate for state -- and run state gates at the rates the PRODUCT runs, not only the rate the oracle started
+with.

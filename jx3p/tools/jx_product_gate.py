@@ -36,9 +36,12 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   (a note-off and a note-on of one key at one sample included), velocities across the range.
   --recall 'P@T,...' (JX-11): WARM patch changes -- at the first block from T seconds the plugin's patch
   browser loads factory patch P on the running engine (its 75 records queued between two blocks); the port
-  gets the same records (jx3p/gen/jx_patch_records.json) at offset 0 of that block, before its keys, and
-  its render driver hands them to the lifted host entry. A held note crosses the change; every change
-  mutes 0.5 s and fades in (writePatch).
+  queues the same load (jx3p_product_load_patch: the records the image holds, the store, the KEY HOLD
+  release), after a setState of the same gap, before the block's keys, and its render driver hands them to
+  the lifted host entry. Loads that land on one block queue in their order (changes in fast succession). A
+  held note crosses the change; every change mutes 0.5 s and fades in (writePatch). 'rS@T': a record of seeded
+  random bytes (jx_patch_gate.py record: a user's bank) -- the plugin's load of its bytes, the port's
+  jx3p_product_load_record (JX-16).
   --tooth-recall: the port loads patch P+1 where the plugin loads P -- every --recall run must differ.
   --edits SEEDS (e.g. 1,2): HOST AUTOMATION -- per seed a run whose blocks, from the note-on on, carry
   seeded host parameter points (VST3 parameter queues) through the plugin's process(): ids from the id map
@@ -69,9 +72,11 @@ render driver's split of the block at the record: jx3p_product_block, JX-7).
   the port: jx3p_state_load. --tooth-state: the port misses the setState -- every run must differ.
   --set 'ID=V,...;ID=V,...' (JX-12b): per ';' group a run whose first block starts with those host parameter
   points (VST3 ids in hex, values 0..1) -- the note modes no factory patch sets: LEGATO 600062 (no patch sets
-  it), ASSIGN MODE 600064, PORTAMENTO 600060, ARPEGGIO 600108 -- with the plan's notes, edits and controllers.
+  it), ASSIGN MODE 600064, PORTAMENTO 600060, ARPEGGIO 600108 -- with the plan's notes, edits and controllers;
+  'ID=V@T': that point at host time T seconds, at its own sample inside its block (e.g. ARPEGGIO switched on
+  and off while keys are held).
 The notes reach the port as process() takes them (jx3p_product_note: the float velocity, the wrapper's
-rules); the patch loads' records as the patch browser queues them (jx3p_product_block's type-2 events).
+rules); the patch loads' records as the patch browser queues them (jx3p_product_load_patch).
 exit 0 = every block of every (rate, patch) equal, bit for bit.
 """
 import atexit
@@ -142,13 +147,22 @@ def schedule(nblk, blk, on, off):
 
 
 def recall_map(spec, rate, blk):
-    """--recall 'P@T,...': factory patch P loaded at host time T seconds -> {block: patch}, the block that
-    starts at or after T (a patch load is queued between two blocks)"""
+    """--recall 'P@T,...': factory patch P loaded at host time T seconds -> {block: [patch, ...]}, the block that
+    starts at or after T (a patch load is queued between two blocks; loads that land on one block queue in
+    their order: changes in fast succession)"""
     out = {}
     for item in filter(None, spec.split(',')):
         p, _, t = item.partition('@')
-        out[-(-int(float(t) * rate) // blk)] = int(p)
+        out.setdefault(-(-int(float(t) * rate) // blk), []).append(('r', int(p[1:])) if p[0] == 'r' else int(p))
     return out
+
+
+def rec_bytes(p):
+    """('r', seed): a bank record of seeded random bytes (jx_patch_gate.record: a user's bank as the patch browser
+    reads it -- JX-16); the whole record, its name first"""
+    sys.path.insert(0, HERE)
+    import jx_patch_gate
+    return jx_patch_gate.record('rnd', p[1])
 
 
 def edit_ids():
@@ -241,9 +255,26 @@ def points(nblk, blk, on, off, es):
             sched = [[p for p in b if p[0] - base in keep] for b in sched]
     else:
         sched = [[] for _ in range(nblk)]
-    if sets:
-        sched[0] = [(int(k, 16), 0, float(v)) for k, v in (x.split('=') for x in sets.split(','))] + sched[0]
+    if sets:                                  # 'ID=V' at offset 0 of block 0; 'ID=V@S' at host sample S (its block,
+        first = [[] for _ in range(nblk)]     # its offset) -- each block's set points before its seeded ones
+        for x in sets.split(','):
+            k, _, v = x.partition('=')
+            v, at, smp = v.partition('@')
+            b, o = divmod(int(smp), blk) if at else (0, 0)
+            if b < nblk:
+                first[b].append((int(k, 16), o, float(v)))
+        sched = [first[b] + sched[b] for b in range(nblk)]
     return sched
+
+
+def timed(group, rate):
+    """a --set group with its 'ID=V@T' points (T in seconds) given as 'ID=V@S' (S the host sample at the rate)"""
+    out = []
+    for x in group.split(','):
+        k, _, v = x.partition('=')
+        v, at, t = v.partition('@')
+        out.append('%s=%s' % (k, v) + ('@%d' % int(float(t) * rate) if at else ''))
+    return ','.join(out)
 
 
 def tempo_blocks(spec, rate, blk, nblk):
@@ -320,8 +351,10 @@ def oracle(rate, patch, nblk, blk, on, off, recalls='', edits='-1'):
         if b in sts:                          # the host's setState between two blocks (JX-17)
             if h.set_state(sts[b]) not in (0, 1):
                 raise SystemExit('setState refused')
-        if b in rmap:                         # the plugin's patch browser, between two blocks (WARM: JX-11)
-            p = rmap[b]
+        for p in rmap.get(b, ()):            # the plugin's patch browser, between two blocks (WARM: JX-11)
+            if isinstance(p, tuple):          # a user's record (JX-16)
+                h.load_patch(rec_bytes(p)[B.BANK_BLOB_OFF:])
+                continue
             h.load_patch(bank[B.BANK_HEADER + p * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (p + 1) * B.BANK_STRIDE])
         valid, bpm = tmp[b]                   # the ProcessContext: a valid tempo, or none (JX-8)
         L, R = h.process(blk, events=ev, params=par[b], ctx={'tempo': bpm} if valid else None)
@@ -364,9 +397,6 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
     lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
     lib.jx3p_product_tempo.argtypes = [ctypes.c_int, ctypes.c_double]
     lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
-    sys.path.insert(0, HERE)
-    import jx_records
-    JX_RECORDS = jx_records.records()
     Lb = (ctypes.c_float * blk)(); Rb = (ctypes.c_float * blk)()
     for b, ev in enumerate(schedule(nblk, blk, on, off)):
         if tooth:
@@ -380,12 +410,16 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
             if b in sts and os.environ.get('JX_STATE_TOOTH_RUN') != '1':     # TOOTH: the port misses the setState
                 d = sts[b]
                 lib.jx3p_state_load((ctypes.c_ubyte * len(d)).from_buffer_copy(d), len(d))
+            for q in rmap.get(b, ()):         # the patch browser's loads, queued before process() runs, after a
+                if isinstance(q, tuple):      # setState of the same gap (as the oracle's); a user's record (JX-16)
+                    r = rec_bytes(q if os.environ.get('JX_RECALL_TOOTH') != '1' else ('r', q[1] + 1))
+                    if lib.jx3p_product_load_record((ctypes.c_ubyte * len(r)).from_buffer_copy(r), len(r)) < 0:
+                        raise SystemExit('jx3p_product_load_record refused')
+                    continue
+                if os.environ.get('JX_RECALL_TOOTH') == '1':
+                    q = (q + 1) % 64                                  # TOOTH: the wrong patch
+                lib.jx3p_product_load_patch(q)
             recs, nev = [], 0
-            if b in rmap:                     # the patch load's records, queued before process() runs
-                q = rmap[b] + (1 if os.environ.get('JX_RECALL_TOOTH') == '1' else 0)     # TOOTH: the wrong patch
-                pr = [(pid, v) for kind, pid, v in JX_RECORDS['patches'][q % 64] if kind == 2]
-                recs = [x for pid, v in pr for x in (0, 2, pid, v - (1 << 32) if v >= 1 << 31 else v)]
-                nev = len(pr)
             for e in ev:                      # process(): the host's note events, as the oracle gets them
                 if lib.jx3p_product_note(0 if e[0] == 'on' else 1, e[1], e[2], e[3], e[4]) != 0:
                     raise SystemExit('jx3p_product_note refused')
@@ -458,8 +492,8 @@ def main():
         plans = [(-sd - 1, int(t_on * rate), '-1') for sd in seeds] if seeds else [(on, off, '-1')]
         if eseeds:                            # host automation / controllers: each seed on the plan's notes
             plans = [(pon, poff, es) for (pon, poff, _) in plans for es in eseeds]
-        if sets:                              # the note modes set at the start: each group on every plan
-            plans = [(pon, poff, es + '|' + st) for (pon, poff, es) in plans for st in sets]
+        if sets:                              # host points at the start (or at '@T'): each group on every plan
+            plans = [(pon, poff, es + '|' + timed(st, rate)) for (pon, poff, es) in plans for st in sets]
         if tempos:                            # the host tempo: each group on every plan
             plans = [(pon, poff, es + ('' if '|' in es else '|') + '|' + tg) for (pon, poff, es) in plans for tg in tempos]
         if states:                            # setState loads: each group on every plan

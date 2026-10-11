@@ -1,6 +1,13 @@
 {
 "note": "the union of the indirect call/jump targets the oracle reached (jx_dynreach.py: warm loads of all 64 patches and the id sweep from patches 0 and 34, loads from 61 and 40) -- the lifter's --dyn input (jp8_lift.py reads only \"indirect\")",
 "runs": [
+"dynreach_boot.json",
+"dynreach_boot31.json",
+"dynreach_boot32_b34.json",
+"dynreach_boot44.json",
+"dynreach_boot48_b34.json",
+"dynreach_boot88.json",
+"dynreach_bootat44.json",
 "dynreach_ctl.json",
 "dynreach_ctl_b34.json",
 "dynreach_loads.json",

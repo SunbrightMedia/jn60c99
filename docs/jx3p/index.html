@@ -36,16 +36,19 @@
 per instruction), note managers, key tracker, arpeggiator, ramps and renders. Played as the plugin plays in a host:
 the engine at 96 kHz, the plugin's own rate converter to the audio device's rate, its render driver
 (the arpeggiator's clock at 120 BPM), six voices; graded block for block against the plugin's own
-process(). Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave.</div>
+process(). Keyboard: A–K white keys, W/E/T/Y/U black, Z/X octave. A bank file of the plugin's own format
+(its patch browser's .bin) loads through the plugin's own patch decode.</div>
 <div class="row">
   <button id="power">Start audio</button>
   <select id="patch"></select>
+  <label><button id="bankbtn" type="button">Load bank…</button>
+    <input id="bankfile" type="file" accept=".bin" hidden></label>
   <span id="pname"></span>
 </div>
 <div id="kbd"></div>
 <div id="status">audio off</div>
 <script type="module">
-const BUILD_VER = "15ef28da79bf";
+const BUILD_VER = "b81ed94c63e3";
 const Jx3pModule = (await import('./jx3p.js?v=' + BUILD_VER)).default;
 
 const mod = await Jx3pModule();
@@ -61,23 +64,51 @@ const [guest, bankGz] = await Promise.all([
   fetchGz('jx_guest_96k.bin.gz'), fetchGz('bank.bin.gz')]);
 mod.FS.writeFile('/jx_guest.bin', guest);
 mod.FS.writeFile('/bank.bin', bankGz);
-const ok = mod.ccall('jx3p_init', 'number',
-  ['string','string','string'],
-  ['/jx_guest.bin', '/bank.bin', '']);
-if (!ok) { document.getElementById('status').textContent =
-  'ENGINE INIT FAILED'; throw new Error('init'); }
 document.getElementById('status').textContent =
-  'engine ready — press Start audio';
+  'engine data loaded — press Start audio';
 
 const sel = document.getElementById('patch');
-for (let i = 0; i < 64; i++) {
-  const o = document.createElement('option');
-  o.value = i; o.textContent = 'Patch ' + (i + 1);
-  sel.appendChild(o);
+/* a bank file (the plugin's format: a 23-byte "KoaBankFile..." header, records of 20223 bytes, each named by
+ * its first 16 bytes): its names in the list; null when the bytes are not such a file */
+const HDR = 23, REC = 20223;
+function bankNames(b) {
+  const tag = new TextDecoder('latin1').decode(b.subarray(0, 11));
+  if (tag !== 'KoaBankFile' || b.length < HDR + REC || (b.length - HDR) % REC) return null;
+  const out = [];
+  for (let i = 0; i < (b.length - HDR) / REC; i++)
+    out.push(new TextDecoder('latin1').decode(b.subarray(HDR + i * REC, HDR + i * REC + 16)).trim());
+  return out;
 }
-mod.ccall('jx3p_recall', null, ['number'], [0]);
-sel.onchange = () => mod.ccall('jx3p_recall', null, ['number'],
-                               [sel.value | 0]);
+function fillPatches(names) {
+  sel.textContent = '';
+  names.forEach((nm, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = String(i + 1).padStart(2, '0') + '  ' + nm;
+    sel.appendChild(o);
+  });
+}
+let bankPath = '/bank.bin';
+fillPatches(bankNames(bankGz) || Array.from({ length: 64 }, (_, i) => 'Patch ' + (i + 1)));
+/* the plugin's patch browser: the patch's records queued for the next block (jx3p_product_load_patch) */
+sel.onchange = () => { if (ctx) mod.ccall('jx3p_product_load_patch', null, ['number'], [sel.value | 0]); };
+/* a user's bank: the patch browser opening another file of its format (jx3p_bank_open); the engine decodes each
+ * record as the plugin does (jx3p/src/jx_patch_tables.h) */
+document.getElementById('bankbtn').onclick = () => document.getElementById('bankfile').click();
+document.getElementById('bankfile').onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const b = new Uint8Array(await f.arrayBuffer());
+  const names = bankNames(b);
+  if (!names) { document.getElementById('status').textContent = f.name + ': not a bank file of the plugin\'s format'; return; }
+  mod.FS.writeFile('/user_bank.bin', b);
+  bankPath = '/user_bank.bin';
+  fillPatches(names);
+  if (ctx) {
+    mod.ccall('jx3p_bank_open', 'number', ['string'], [bankPath]);
+    mod.ccall('jx3p_product_load_patch', null, ['number'], [0]);
+  }
+  document.getElementById('status').textContent = f.name + ': ' + names.length + ' patches';
+};
 
 let ctx = null, node = null, octave = 4;
 const N = 256;
@@ -91,8 +122,12 @@ document.getElementById('power').onclick = async () => {
   if (ctx) return;
   ctx = new AudioContext();
   if (!RATES.includes(ctx.sampleRate)) { await ctx.close(); ctx = new AudioContext({ sampleRate: 48000 }); }
-  const kind = mod.ccall('jx3p_product_open', 'number', ['number'], [ctx.sampleRate]);
-  if (kind < 0) { document.getElementById('status').textContent = 'RENDER OBJECT FAILED'; return; }
+  /* a fresh instance at the host rate, as a DAW makes one: initialize's records queued for the first block, then
+   * the selected patch's (jx3p_product_init, JX-15b) */
+  const kind = mod.ccall('jx3p_product_init', 'number', ['string','string','number'],
+                         ['/jx_guest.bin', bankPath, ctx.sampleRate]);
+  if (kind < 0) { document.getElementById('status').textContent = 'ENGINE INIT FAILED'; return; }
+  mod.ccall('jx3p_product_load_patch', null, ['number'], [sel.value | 0]);
   node = ctx.createScriptProcessor(N, 0, 2);
   node.onaudioprocess = (e) => {
     const n = Math.min(queue.length, QMAX);

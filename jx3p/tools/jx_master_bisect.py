@@ -12,7 +12,7 @@ compared directly, as jx_recall_data_gate.py does) and the chunk's L/R bits. The
 is then rendered again sample by sample on both sides, and the master words that differ after its first
 differing sample are listed with their values.
 
-    python3 jx3p/tools/jx_master_bisect.py [patch=0] [N=12000]
+    python3 jx3p/tools/jx_master_bisect.py [--rate 44100|96000] [patch=0] [N=12000]
     python3 jx3p/tools/jx_master_bisect.py [--tooth] --variants '34:67=3;0:65=5' [N=12000]
     python3 jx3p/tools/jx_master_bisect.py --gate [N=12000]     (64 patches + VARIANTS + the tooth; ~30 min)
   --variants: patches the factory bank does not hold -- a factory patch's own patch-load records with
@@ -21,6 +21,8 @@ differing sample are listed with their values.
   select paths no factory patch reaches.
   --tooth: the port built with JX_MASTER_TOOTH (the four effect-LFO sites' argument 0.0, the defect
   fixed 2026-10-10) -- every variant that reaches a site must differ.
+  --rate 96000: the engine at the product's rate (the 96 kHz guest image): the voices take branches the 44.1 kHz
+  engine does not (JX-19: a voice filter's history, invisible in the audio, is compared here and nowhere else).
 """
 import atexit
 import ctypes
@@ -81,11 +83,12 @@ def oracle(k, n, fine=None, stop=None):
     import jx_emu as J
     import jx_guest_export as GX
     import jx_records
+    rate = float(os.environ.get('JX_BISECT_RATE', '44100'))     # --rate: the engine's rate (44100 or 96000)
     if os.environ.get('JX_BISECT_VARIANT'):              # a variant patch (--variants)
-        jx = J.JX().boot(44100.0, snap=False, product=True)
+        jx = J.JX().boot(rate, snap=False, product=True)
         jx.host_records(jx_records.variant_records(os.environ['JX_BISECT_VARIANT']))
     else:
-        jx = J.JX().boot(44100.0, snap=False, product=True, patch=k)
+        jx = J.JX().boot(rate, snap=False, product=True, patch=k)
     uc = jx.uc
     res = []
     for i, (note, m) in enumerate(schedule(n)):
@@ -116,7 +119,8 @@ def port(so, k, n, fine=None, stop=None):
         getattr(lib, f).restype = ctypes.c_void_p
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
-    if not lib.jx3p_init(jx_guest.path(44).encode(), g('truth/preset_bank_1.bin'), None):
+    rk = 96 if os.environ.get('JX_BISECT_RATE', '44100') == '96000' else 44
+    if not lib.jx3p_init(jx_guest.path(rk).encode(), g('truth/preset_bank_1.bin'), None):
         raise SystemExit('jx3p_init failed')
     if os.environ.get('JX_BISECT_VARIANT'):              # a variant patch: its records through the lifted entry
         sys.path.insert(0, HERE)
@@ -159,6 +163,12 @@ def port(so, k, n, fine=None, stop=None):
 
 def main():
     a = sys.argv[1:]
+    if '--rate' in a:                                    # the engine at 96000 too: the product's rate (the children
+        i = a.index('--rate')                            # inherit it through the environment)
+        os.environ['JX_BISECT_RATE'] = a[i + 1]
+        a = a[:i] + a[i + 2:]
+    if os.environ.get('JX_BISECT_RATE', '44100') not in ('44100', '96000'):
+        raise SystemExit('--rate: 44100 or 96000 (the guest images)')
     if a[:1] == ['--oracle']:
         r = oracle(int(a[1]), int(a[2]), int(a[3]) if len(a) > 3 else None, int(a[4]) if len(a) > 4 else None)
         if r is not None:

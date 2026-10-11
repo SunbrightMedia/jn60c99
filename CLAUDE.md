@@ -255,10 +255,15 @@ mine is a hypothesis (playbook 80).
   the guest image, playbook 202). JX-12b: the whole NOTE PATH is the plugin's
   own, lifted (note entries, tick, mode and count setters; the transcribed
   jx_alloc / jx_nstore / jx_ktrack / jx_seq are out of the port: they had never
-  met LEGATO, playbook 203) -- the --ctl RED is fixed. Full verify owed on the
-  newest commit. Next (jx3p/docs/SCOPE_AUDIT.md open rows): the host tempo
-  (JX-8: lift root 0x3F9DD0), the engine-rate setting (JX-15: setSampleRate
-  0x3F9970), block sizes, long tails, the DAW state, user banks.
+  met LEGATO, playbook 203) -- the --ctl RED is fixed. Since (JX-8 .. JX-18,
+  HOST_LAYER.md 3i-3n): the host tempo, the engine-rate setting, a FRESH
+  instance in the plugin's order (the guest image is the heap before
+  initialize; jx3p_product_init queues its records -- playbook 204), the DAW
+  state, UI timer, KEY HOLD and MIDI learn (jx_state_tables.h), the patch
+  browser on ANY bank (jx_patch_tables.h, random records graded; the web page
+  loads bank files), the editor's set and the host's round trip
+  (performEdit) -- every SCOPE_AUDIT row closed but the visible panel (no JX
+  art in truth/). Full verify-jx3p owed on the newest commit.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

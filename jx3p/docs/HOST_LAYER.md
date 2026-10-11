@@ -288,6 +288,113 @@ source (jx_lift.py --tooth-drop). Through process(): the --ctl runs EQUAL at 44.
 set at the start (jx_product_gate.py --set) EQUAL; GATE 3c 36 / 36; the full chain 4 / 4 (its key-shift tooth
 now in the port's note entries, JX_FULL_TOOTH: it had lived in the removed transcription).
 
+## 3i. The host tempo (READ + EXECUTED, 2026-10-10; PORTED, JX-8)
+
+The render driver (0x320AE4 = the JUNO's 0x320C04, fw_map) takes the ProcessContext's tempo: T = round(tempo x
+10), half away from zero (0x428460), clamped to an int. When the host's tempo is valid and T changed (core+580)
+it calls the engine's vt+0xB0 (0x3F9DD0) with T: for T in 400..3000 every unit's dispatch 375 -- the effect
+objects' tempo setters by the effect type (4. item 1 below has the chain). The clock's period is (60e9 x host
+rate / T) / 24 in 1e-8 host samples, 120 without a valid tempo. PORTED: jx3p_product_tempo(valid, tempo) per
+block, the driver's T and period, the tempo entry LIFTED (root 0x3F9DD0). MEASURED: jx_lift_gate.py --loads
+tempo from patches 0 and 34 -- the tempo entry at 12 values of T (inside, at and past 400..3000, 0, negative)
+under every effect mode (records 65 and 67 at 0..5) -- EXACTLY 0, every return value and heap byte; tooth: one
+tempo call dropped (entry 152). Through process() (GATE 3d --tempo): patches 33 and 34 at a fixed 120, at
+95.5 then 140 inside the run, and with no valid tempo, then 200, then none; tooth --tooth-tempo.
+
+## 3j. The engine-rate setting (READ + EXECUTED, 2026-10-10; PORTED, JX-15)
+
+The rate setting (vm.vs.sampleRate, state id 0x0FFFC015, & 0x7F) reaches the core's listener (0x3221D0): the
+requested engine rate is JX_SRATE[v] (jx3p/src/jx_srate.h, the image's table at 0x981B58: 96000, 88200, 48000,
+44100, 32000; 5 = the automatic setting, the current rate; 6..127 the bytes after the table). At the next
+block's start the driver compares it with the render object's engine rate and, when they differ, calls the
+engine's setSampleRate (vt+0x18, 0x3F9970: the rate a float in xmm1) and looks the render object up again;
+found, the tick phase and the note count start again -- before the tempo and before the block's records.
+setSampleRate on the running engine allocates nothing and calls no import (EXECUTED); its large frames call
+the CRT's stack probe (__chkstk 0x6AC420), which reads gs:[0x10] -- 0 in the oracle (GS base 0, page 0 zero),
+so the port maps 4 KB of zeros at 0 (the page census allows reads there and refuses writes). PORTED: the
+listener, the driver's switch, setSampleRate LIFTED. MEASURED: jx_lift_gate.py --loads rate from patches 0 and
+34 (48000, 44100, 88200, 32000, 96000 twice -- its early out --, keys held, notes and ticks between) EXACTLY 0;
+tooth: one setSampleRate dropped (entry 12). Through process() (GATE 3d --state 'rV@T'): the setting at
+48 kHz to 48000 and 44100 and back to 96000 on the running engine, at 44.1 kHz to 88200 -- EQUAL; index 6 (a
+byte past the five rates: 31 Hz) silences the plugin and the port alike (--expect-silent).
+
+## 3k. A fresh instance: the plugin's order (EXECUTED, 2026-10-10; PORTED, JX-15b)
+
+The plugin calls setSampleRate(96000) while it is activated and applies nothing else; initialize's 83
+records (the 82 state defaults in list order, writePatch = 1) and its all-sound-off message (CC 120) wait in
+the queue. The first process() switches the engine's rate when the setting asks for another one, THEN
+applies the queue (EXECUTED: hooks on setSampleRate and the host entry over start() and the first block). A
+guest image taken after the records cannot follow that order: a setState holding the rate setting before
+the first block was ~1 ULP off from block 47 on (playbook 204). The guest image (JXG1 version 2,
+jx_guest_export.py) is now the heap as setActive leaves it. jx3p_product_init(image, bank, host rate) is a
+fresh instance on the product path -- the render object for (96000, host rate) and initialize's records
+queued (jx3p/src/jx_state_tables.h: the defaults, writePatch, JX_STATE_BOOT_MIDI); a patch load, a setState
+and the first block's events queue after them, as the plugin's do. jx3p_init applies the records at once,
+through the lifted host entry (the engine of the oracle's boot(product=True): the gates that drive the engine
+directly keep it). MEASURED: jx_lift_gate.py --loads boot / boot48 / boot44 / boot88 / boot32 / boot31 /
+bootat44 (the engine as setActive leaves it at 96000 -- bootat44: 44100 --, the switch to each rate of the
+table and to 31 Hz, the records, CC 120 through the CC entry, a patch load, a key and a tick) EXACTLY 0;
+tooth: initialize's writePatch dropped (entry 164). Through process(): the setting at 0..4 before the first
+block at 48 kHz, at 2 and 3 at 44.1 kHz -- EQUAL (2 and 3 were the RED cases); the state gate (3l), the
+product runs and the web check all start from jx3p_product_init.
+
+## 3l. The DAW state, the UI timer, KEY HOLD, MIDI learn (READ + EXECUTED, 2026-10-10; PORTED, JX-17, JX-17b)
+
+The JUNO's wrapper code (fw_map: getState 0x349EA0, setState 0x34AAA0, its deserializer, the CC map, the UI
+timer 0x320000, the learn 0x31A920 / 0x319B70 / 0x3191C0) on the JX's tables: jx3p/src/jx_state_tables.h,
+generated from the booted plugin (jx_state_census.py: initialize's queue, getState, setState of every entry at
+14 test values, shuffled and partial payloads, the CC map assigned, moved and freed; jx_gen_state_tables.py).
+getState: a big-endian byte count, the 82 parameter entries (id, value) in list order, the 128 CC map entries
+0x10000000 + n (the model id CC n drives, -1 none). setState: writePatch (0x0FFFC01D) = 126, the payload's known
+parameters in payload order at their storage laws (& 0xFF 45 entries, & 0x7F 6, & 0xFFFF 11, as given 20),
+writePatch = 127; a count of 0 queues nothing; the CC map emptied and refilled; entries of 8 bytes when the
+stream is longer than (83 + 128) x 64 / 5 = 2700 bytes (83: the CC map's records, READ at 0x322210 --
+playbook 207); LFO RATE and VCF CUTOFF also set their host-only floats (byte x 1/255). The push queues, besides
+the engine's records, the UI timer's: a mapped CC's value (the last one stays; KEY HOLD's in order) and every
+note; the drain sets the store, the keyboard's note value (per key the last velocity, minus a note-off's) and
+a waiting MIDI learn's CC. KEY HOLD at 0 -- a setState entry, a patch load (before ARPEGGIO's record: KEY
+HOLD's tree node begins with it), a drained CC -- releases the keys the UI timer has seen: a note-off record
+per key. MEASURED: jx_state_gate.py, six chains (state paths, stream framing, the CC map, the storage laws,
+KEY HOLD, MIDI learn): every save (155) and every queued record equal to the plugin's, on jx3p_product_init's
+boot; mutants -- no float link, the limit from the state list (2688), the store unmasked, KEY HOLD releasing
+nothing -- each RED (4 of 4).
+
+## 3m. The patch browser: any bank (EXECUTED, 2026-10-10; PORTED, JX-16)
+
+A JX bank file has the JUNO-60's geometry: a 23-byte header ("KoaBankFile00003PG-JX3P"), then records of 20,223
+bytes -- a 16-byte name, then the bytes the patch browser's load (0x335730 = the JUNO's 0x335850) reads into the
+model, which queues one record per value for the engine. The port had only the factory bank's RECORDED loads;
+now it decodes any record as the plugin does: jx3p/src/jx_patch_tables.h (jx_patch_census.py: the plugin's own
+load of the 64 factory records and 11 crafted ones -- each byte OR-ed with 0x10 / 0x30 / 0x70 / 0xF0 / 0x80, three
+position patterns, three of seeded random bytes; jx_gen_patch_tables.py: the ONE decode per record that
+reproduces every load, or it stops). 75 records per load: 45 two-nibble fields, 20 eight-nibble, 8 four-nibble,
+2 constants (writePatch = 0 first) -- the bytes OR-ed in 4 bits apart, nothing masked (the JUNO's law). The
+JUNO's three position patterns repeat 8,288 bytes apart and fitted LEGATO at two offsets; the random records
+made every decode unique (playbook 205). PORTED: jx3p_product_load_record(record) -- the records queued in
+order, the store takes each value as decoded, KEY HOLD at 0 releases the drained keys before ARPEGGIO's record
+--, jx3p_product_load_patch(i) on the bank init read, jx3p_bank_open(path) for another bank of the format,
+jx3p_bank_patches(). MEASURED (jx_patch_gate.py): the 64 factory records, 24 records of random bytes (12 of
+nibbles, 12 of whole bytes), keys drained then factory and random loads, a bank file of 5 random records loaded
+by index -- every queued record (7,281), every save and every block after each load equal to the plugin's;
+tooth: a two-nibble field's high nibble masked -- RED. Through process() (GATE 3d --recall 'rS@T'): random
+records loaded with keys held, the audio after the mutes graded.
+
+## 3n. The editor's set: the host's round trip (EXECUTED, 2026-10-10; PORTED, JX-18)
+
+A panel control sets the model (0x283C90 = the JUNO's 0x283DB0). EXECUTED on every record of the CC map at 14
+values (jx_model_census.py, 1,162 sets): the model keeps the value at the entry's storage law (getState); then
+for 63 of the 82 state entries the plugin queues NO engine record -- it calls the host: beginEdit,
+performEdit(id, (float)(stored - min) / (float)(max - min), both operands unsigned 32-bit: 882 of 882 sets
+fit), endEdit; the host sends the value back through process() like automation. The other 19 -- the patch
+name's 8 words, the two linked floats, the host settings (voices, the rate setting ...) -- and writePatch
+(& 0x7F) queue one engine record with the stored value, no host call. jx3p/src/jx_state_tables.h
+JX_STATE_EDIT_HOST holds the routing (jx_gen_state_tables.py checks every set against it). PORTED:
+jx3p_model_set(id, value), jx3p_host_edits (what the host receives, in order), jx3p_model_commit (the
+control's commit: the keyboard's change list). MEASURED (jx_state_gate.py chain 'editor', 38 steps): every
+save, queued record and host edit equal to the plugin's -- the round trips through process(), values past the
+ranges, a bipolar range, KEY HOLD at 0 with drained keys, the rate setting through the editor; mutant: the
+performEdit value as stored / max -- RED (the bipolar entry).
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md
@@ -334,7 +441,7 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
 
 ## 4. Next
 
-1. The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44, 48 and 54 of the factory bank (6 of
+1. DONE (JX-8, 3i). The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44, 48 and 54 of the factory bank (6 of
    64) render differently with T = 1200 than without -- a census of the plugin's engine, 24,000 samples a
    patch, every patch): the render driver computes T = round(tempo x 10) from the
    ProcessContext and, when the host's tempo is valid and T changed, calls the engine's vt+0xB0

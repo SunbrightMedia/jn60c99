@@ -876,9 +876,11 @@ typedef char jx_cc_rec_fits[(JX_MIDI_PARAM_N <= 127) ? 1 : -1];
 static void jx_cc_clear(void) { memset(g_cc.map, 0xFF, sizeof g_cc.map); memset(g_cc.rec, 0xFF, sizeof g_cc.rec); }
 /* the instance as the plugin creates it: the store at initialize's defaults, the boot's CC assignment, no learn */
 static void jx_ks_boot(void);
+static int g_nedit;                                  /* the editor's host edits pending (JX-18) */
 static void jx_state_boot(void)
 {
     jx_ks_boot();
+    g_nedit = 0;
     for (int k = 0; k < JX_STATE_N; ++k) g_store[k] = JX_STATE_ENT[k].dflt;
     jx_cc_clear();
     for (int cc = 0; cc < 128; ++cc)
@@ -1092,6 +1094,59 @@ int jx3p_cc_forget(uint32_t id)
     g_cc.rec[e] = -1;
     return 1;
 }
+/* ---- THE EDITOR'S SET (JX-18): a panel control's value through the model (rva 0x283C90 = the JUNO-60's
+ * 0x283DB0, fw_map --pair), EXECUTED on every record at 14 values (jx_model_census.py; jx_state_tables.h
+ * JX_STATE_EDIT_HOST): the model keeps the value at its storage law (getState), LFO RATE and VCF CUTOFF set their
+ * floats too, KEY HOLD at 0 releases the keys the UI timer has seen; then either the HOST's automation round trip
+ * -- beginEdit, performEdit(id, (float)(stored - min) / (float)(max - min), both unsigned 32-bit), endEdit, and no
+ * engine record: the host sends the value back through process() (jx3p_product_param) -- or, for the 19 entries
+ * a host never automates (the patch name, the two floats, the host settings) and writePatch, one engine record
+ * (id, the stored value) for the next block. ---- */
+#ifndef JX_EDIT_TOOTH    /* MUTANT (jx_state_gate.py --mutants): 1 performEdit's value is the stored value / max */
+#define JX_EDIT_TOOTH 0
+#endif
+#define JX_EDIT_MAX 64
+static struct { uint32_t id; double v; } g_edit[JX_EDIT_MAX];     /* g_nedit: with the state's boot */
+int jx3p_model_set(uint32_t id, int32_t v)
+{
+    int k = jx_state_index(id), e;
+    int32_t st;
+    float f;
+    if (id == JX_STATE_WRITEPATCH) {
+        drv_pend(2, 0, 0, (int)id, (int32_t)((uint32_t)v & JX_STATE_WRITEPATCH_MASK));
+        return 1;
+    }
+    if (k < 0) return 0;
+    st = JX_STATE_ENT[k].mask ? (int32_t)((uint32_t)v & JX_STATE_ENT[k].mask) : v;
+    jx_store_put(k, st);
+    if (id == JX_KEY_HOLD && st == 0) jx_ks_release();
+    if (!JX_STATE_EDIT_HOST[k]) {
+        drv_pend(2, 0, 0, (int)id, st);
+        return 1;
+    }
+    e = jx_midi_entry(id);
+    if (e < 0 || g_nedit >= JX_EDIT_MAX) return 0;
+#if JX_EDIT_TOOTH == 1
+    f = (float)st / (float)JX_MIDI_PARAM[e].max;
+#else
+    f = (float)(int64_t)(uint32_t)(st - JX_MIDI_PARAM[e].min) /
+        (float)(int64_t)(uint32_t)(JX_MIDI_PARAM[e].max - JX_MIDI_PARAM[e].min);
+#endif
+    g_edit[g_nedit].id = id; g_edit[g_nedit].v = (double)f; ++g_nedit;
+    return 1;
+}
+/* the host edits (performEdit's id and value) the editor's sets made since the last call, in order; returns the
+ * count -- what a host receives, and sends back through process() (jx3p_product_param) */
+int jx3p_host_edits(uint32_t *ids, double *vals, int cap)
+{
+    int n = g_nedit < cap ? g_nedit : cap;
+    for (int i = 0; i < n; ++i) { ids[i] = g_edit[i].id; vals[i] = g_edit[i].v; }
+    g_nedit = 0;
+    return n;
+}
+/* a panel control's commit after its set (the model's notifies and commit, rva 0x285200 / 0x2852A0 / 0x283000):
+ * the keyboard's change list empties */
+void jx3p_model_commit(void) { jx_ks_commit(); }
 /* rva 0x319B70, a CC message the drain reads: none waits or cc >= 120 -> 0; else the waiting record's old CC
  * leaves the map, the CC's old record loses its CC, CC `cc` drives the waiting record, none waits */
 static int jx_cc_learn_done(int cc)
@@ -1180,28 +1235,80 @@ int jx3p_product_pending(int *out, int cap)
     }
     return g_drv_npend;
 }
-/* THE PATCH BROWSER'S LOAD of factory patch `idx` (rva 0x335730) for the next block: its records queued (kind 2,
- * in order), and the store takes each record's value for the ids the state lists */
-void jx3p_product_load_patch(int idx)
+/* ---- THE PATCH BROWSER'S LOAD (JX-16): a bank record's bytes to the records its load queues -- the plugin's own
+ * load (rva 0x335730 = the JUNO-60's 0x335850, fw_map) as jx3p/src/jx_patch_tables.h states it (EXECUTED through
+ * the plugin's load: jx_patch_census.py, the factory records and crafted ones; jx_patch_gate.py grades seeded
+ * records of random bytes and the factory bank, record for record, the store and the audio after each) ---- */
+#include "../src/jx_patch_tables.h"
+#ifndef JX_PATCH_TOOTH   /* MUTANT (jx_patch_gate.py --tooth): 1 a two-nibble field's high nibble masked to 3 bits */
+#define JX_PATCH_TOOTH 0
+#endif
+/* the model's set-from-bytes (the JUNO-60's law): the bytes OR-ed in 4 bits apart, nothing masked */
+static int32_t jx_patch_value(const uint8_t *r, const jx_patch_ev *e)
 {
-    uint32_t hold = 1;
-    if (idx < 0 || (uint32_t)idx >= G.npatch) return;
-    for (uint32_t r = 0; r < G.nrec[idx]; ++r) {
-        uint32_t id;
-        memcpy(&id, G.prec[idx] + 8 * r, 4);
-        if (id == JX_KEY_HOLD) memcpy(&hold, G.prec[idx] + 8 * r + 4, 4);
+    uint32_t v = 0;
+    int i, n;
+    switch (e->dec) {
+    case JX_DEC_CONST:  return e->value;
+    case JX_DEC_INT1X7: return r[e->roff];
+#if JX_PATCH_TOOTH == 1
+    case JX_DEC_INT2X4: return ((r[e->roff] & 7) << 4) | r[e->roff + 1];
+#else
+    case JX_DEC_INT2X4: return (r[e->roff] << 4) | r[e->roff + 1];
+#endif
+    case JX_DEC_INT8X4: n = 8; break;
+    default:            n = 4; break;
     }
-    for (uint32_t r = 0; r < G.nrec[idx]; ++r) {
-        uint32_t id, v;
-        int k;
-        memcpy(&id, G.prec[idx] + 8 * r, 4); memcpy(&v, G.prec[idx] + 8 * r + 4, 4);
-        /* the tree's sets reach the model's handler node by node, each node's records after it; KEY HOLD's node
-         * begins with ARPEGGIO (0x00600108): KEY HOLD at 0 releases the keys there (EXECUTED: the note-offs come
-         * just before 0x00600108's record, jx_keyhold_census.py; the JUNO's rule). No commit: the next drain does */
+    for (i = 0; i < n; ++i) v |= (uint32_t)r[e->roff + i] << (4 * (n - 1 - i));
+    return (int32_t)v;
+}
+/* THE PATCH BROWSER'S LOAD of one bank record (JX_PATCH_REC_BYTES bytes, its 16-byte name first) for the next
+ * block: its records queued in the load's order (kind 2), the store takes each record's value for the ids the
+ * state lists (as decoded), and a KEY HOLD of 0 releases the keys the UI timer has seen just before ARPEGGIO's
+ * record (KEY HOLD's tree node begins with 0x00600108: EXECUTED, jx_keyhold_census.py; the JUNO's rule) -- no
+ * commit: the next drain does. Returns the records queued, -1 for a record of another size. */
+int jx3p_product_load_record(const unsigned char *rec, int len)
+{
+    int32_t hold = 1;
+    int k;
+    if (!rec || len != (int)JX_PATCH_REC_BYTES) return -1;
+    for (k = 0; k < JX_PATCH_EV_N; ++k)
+        if (JX_PATCH_EV[k].id == JX_KEY_HOLD) hold = jx_patch_value(rec, &JX_PATCH_EV[k]);
+    for (k = 0; k < JX_PATCH_EV_N; ++k) {
+        uint32_t id = JX_PATCH_EV[k].id;
+        int32_t v = jx_patch_value(rec, &JX_PATCH_EV[k]);
+        int sk;
         if (id == 0x00600108u && hold == 0) jx_ks_release();
-        if ((k = jx_state_index(id)) >= 0) jx_store_put(k, (int32_t)v);
-        drv_pend(2, 0, 0, (int)id, (int)v);
+        if ((sk = jx_state_index(id)) >= 0) jx_store_put(sk, v);
+        drv_pend(2, 0, 0, (int)id, v);
     }
+    return JX_PATCH_EV_N;
+}
+/* the number of records in the bank file jx3p_init / jx3p_product_init read (the factory bank, or a user's bank of
+ * the same format: a 23-byte header, then records of JX_PATCH_REC_BYTES) */
+int jx3p_bank_patches(void)
+{
+    return G.bank && G.bank_len >= JX_PATCH_BANK_HEADER ?
+        (int)((G.bank_len - JX_PATCH_BANK_HEADER) / JX_PATCH_REC_BYTES) : 0;
+}
+/* the patch browser's load of record `idx` of that bank; returns the records queued, -1 for no such record */
+int jx3p_product_load_patch(int idx)
+{
+    if (idx < 0 || idx >= jx3p_bank_patches()) return -1;
+    return jx3p_product_load_record(G.bank + JX_PATCH_BANK_HEADER + (size_t)idx * JX_PATCH_REC_BYTES,
+                                    (int)JX_PATCH_REC_BYTES);
+}
+/* a bank file of the same format in place of the one init read (the patch browser opening a user's bank): the
+ * next jx3p_product_load_patch reads it. Returns its record count, -1 when it is not such a file. */
+int jx3p_bank_open(const char *path)
+{
+    size_t bl;
+    uint8_t *bk = read_file(path, &bl);
+    if (!bk || bl < JX_PATCH_BANK_HEADER + JX_PATCH_REC_BYTES ||
+        (bl - JX_PATCH_BANK_HEADER) % JX_PATCH_REC_BYTES) { free(bk); return -1; }
+    free((void *)G.bank);
+    G.bank = bk; G.bank_len = bl;
+    return jx3p_bank_patches();
 }
 
 /* the push (rva 0x31F3C0): a CC the core's CC map assigns (none while a MIDI learn waits) first queues its

@@ -1,7 +1,8 @@
 // jx_page_check.mjs -- the DELIVERED JX-3P page (jx3p/gui/web/index.html with its jx3p.js / .wasm and data) in
 // headless Chromium: it loads its data ('engine data loaded'), Start audio boots a fresh instance on the product path
 // (jx3p_product_init at the AudioContext's rate), a held key sounds (the page's peak > 0), patch 35 (factory 34: the arpeggiator) plays
-// with a key held, and nothing reaches the console as an error. jx_wasm_check.py grades the engine's samples;
+// with a key held, a user's bank file loads through the page's file input and plays, and nothing reaches the console
+// as an error. jx_wasm_check.py grades the engine's samples;
 // this grades the page's wiring around it (fetch + inflate, the event queue, the block call).
 //   node jx3p/tools/jx_page_check.mjs [--dir jx3p/gui/web]      exit 0 = every check passed
 //   node jx3p/tools/jx_page_check.mjs --tooth data|keys          the server breaks the page -- the guest
@@ -67,6 +68,23 @@ try {
   const pk2 = await page.evaluate(() => window.__peak);
   await page.keyboard.up('d'); await page.keyboard.up('g');
   check(pk2 > LOUD, `patch 34 (the arpeggiator) sounds with two keys held (peak ${pk2})`);
+  // A USER'S BANK (JX-16): a bank file of three factory records in another order, opened through the page's file
+  // input -- the list shows their names, the second (factory 34) plays
+  const bank = readFileSync(path.join(HERE, '../truth/preset_bank_1.bin'));
+  const rec = (i) => bank.subarray(23 + i * 20223, 23 + (i + 1) * 20223);
+  const ub = Buffer.concat([bank.subarray(0, 23), rec(5), rec(34), rec(0)]);
+  await page.setInputFiles('#bankfile', { name: 'user.bin', mimeType: 'application/octet-stream', buffer: ub });
+  await page.waitForFunction(() => document.getElementById('patch').options.length === 3, null, { timeout: 5000 });
+  const names = await page.evaluate(() => [...document.getElementById('patch').options].map(o => o.textContent));
+  check(/SQ Ranger/.test(names[1]), `a user's bank: ${names.length} patches (${names.join(' | ')})`);
+  await page.selectOption('#patch', '1');
+  await page.waitForTimeout(800);                            // its patch load mutes 0.5 s
+  await page.evaluate(() => { window.__peak = 0; });
+  await page.keyboard.down('d'); await page.keyboard.down('g');
+  await page.waitForTimeout(800);
+  const pk3 = await page.evaluate(() => window.__peak);
+  await page.keyboard.up('d'); await page.keyboard.up('g');
+  check(pk3 > LOUD, `the user's bank's patch 2 sounds with two keys held (peak ${pk3})`);
 } catch (e) {
   fails.push(String(e)); console.log('  FAIL ' + e);
 }

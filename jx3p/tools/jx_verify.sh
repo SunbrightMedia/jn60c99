@@ -30,11 +30,16 @@
 #                  against the port's product path, block for block at three host
 #                  rates, notes at block starts and inside blocks (jx_product_gate.py).
 #
-# What this does NOT yet cover, stated so "green" is not read wider than it is
-# (jx3p/docs/SCOPE_AUDIT.md is the full table, its open rows the list): a host
-# tempo (the ProcessContext; JX-8), the engine-rate settings other than the
-# default, MIDI learn and the UI timer's model updates, user banks through
-# the patch browser, the editor (no JX GUI is ported).
+#   D. HOST LAYER (2026-10-10, JX-8 .. JX-18) -- the host tempo, the engine-rate
+#                  setting, a fresh instance in the plugin's order, the DAW state
+#                  (getState / setState, the CC map), the UI timer, KEY HOLD, MIDI
+#                  learn, the patch browser on any bank, the editor's set and the
+#                  host's round trip: each against the booted plugin's own calls
+#                  (GATES 3d, 3e, 3f).
+#
+# What this does NOT cover, stated so "green" is not read wider than it is
+# (jx3p/docs/SCOPE_AUDIT.md is the full table): the editor's GRAPHICS -- the
+# panel is not drawn (no JX art in truth/); its parameter path is graded (3f).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -92,6 +97,9 @@ echo "=== JX GATE 3b: THE MASTER, EVERY SAMPLE OF STATE (64 patches + the mode v
 # 12,000, against the plugin; the variants set the two effect-mode cells to the values no factory
 # patch holds, through the plugin's own host entry; the tooth puts the decompile's lost argument back
 python3 "$HERE/jx_master_bisect.py" --gate 12000
+# the same at the product's 96 kHz engine (JX-19): the voices take branches the 44.1 kHz engine does not -- a voice
+# filter's history that no audio gate sees (the mutation reach found it: playbook 208)
+python3 "$HERE/jx_master_bisect.py" --rate 96000 --gate 4000
 echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object after every event; JX-7) ==="
 # 5 factory patches x 1,500 events, 12 variants of the plugin's own patch load (every step mode the
 # product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the port's tick,
@@ -139,6 +147,28 @@ python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 40 --on 0.55 --off 5.
 # at the start through process(), with seeded polyphony and controllers -- the plugin's own note path, lifted
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 3 --ctl 3 --on 0.55 --secs 2.4 \
         --set '600062=1;600064=0.5,600062=1;600064=1;600060=0.5,600062=1,600064=1;600108=1,600062=1'
+# THE ARPEGGIATOR SWITCHED BY THE HOST WITH KEYS HELD (a point at its own sample inside its block), on and off
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 2 --on 0.55 --secs 2.4 \
+        --set '600108=1@0.9,600108=0@1.6;600108=0@0.9,600108=1@1.6'
+# PATCH CHANGES IN FAST SUCCESSION (JX-16): three loads between two blocks, at the block of the key's note-on
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --on 0.9 --off 2.0 --secs 2.4 --recall '20@0.9,61@0.9,5@0.9'
+python3 "$HERE/jx_product_gate.py" --rates 96000 --patches 34 --on 0.6 --off 2.0 --secs 2.4 --recall '61@0.9,0@0.95,34@1.0'
+# A USER'S BANK (JX-16): records of random bytes loaded through the patch browser with keys held -- the audio graded
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.4 --recall 'r3@0.7,r14@1.4'
+python3 "$HERE/jx_product_gate.py" --tooth-recall --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.4 --recall 'r3@0.7'
+# THE HOST TEMPO (JX-8): the ProcessContext's tempo -- the render driver's clock period and the engine's tempo entry
+# (vt+0xB0, LIFTED: every unit's dispatch 375) -- fixed, changing inside the run, and no valid tempo
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 33,34 --on 0.55 --off 2.0 --secs 2.4 \
+        --tempo '120;95.5@0,140@1.2;x@0,200@0.7,x@1.5'
+python3 "$HERE/jx_product_gate.py" --tooth-tempo --rates 48000 --patches 34 --on 0.55 --off 2.0 --secs 2.4 --tempo '95.5@0,140@1.2'
+# THE DAW STATE through process() (JX-17): seeded setState payloads between blocks; THE ENGINE-RATE SETTING (JX-15) on
+# the running engine (setSampleRate, LIFTED) and before the first block -- the plugin switches the rate BEFORE
+# initialize's records (JX-15b: the guest image holds none, jx3p_product_init queues them)
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.0 \
+        --state '2@0.3,3@1.2;r2@0.8;r3@0.8,r0@1.4;5@0,6@0.9;r2@0;r3@0;r1@0;r0@0;r4@0'
+python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 34 --poly 1 --on 0.55 --secs 2.0 --state 'r3@0;r2@0;r1@0.6'
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --on 0.55 --secs 1.0 --state 'r6@0' --expect-silent  # a setting past the rates
+python3 "$HERE/jx_product_gate.py" --tooth-state --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.0 --state '2@0.3;r2@0'
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
@@ -161,6 +191,38 @@ python3 "$HERE/jx_lift_gate.py" --base 34 --loads notes
 python3 "$HERE/jx_lift_gate.py" --base 34 --loads tick
 python3 "$HERE/jx_lift_gate.py" --loads notes --tooth-skip 148      # a legato note-on dropped: must be seen
 python3 "$HERE/jx_lift_gate.py" --base 34 --loads tick --tooth-skip 1132   # one tick of step mode 7 dropped
+# the tempo entry under every effect mode (JX-8), setSampleRate on the running engine (JX-15), and a FRESH instance's
+# first block -- the rate switch the setting asks for, initialize's records, the patch load (JX-15b) -- at the
+# product's 96 kHz engine and the 44.1 kHz one
+python3 "$HERE/jx_lift_gate.py" --loads tempo
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads tempo
+python3 "$HERE/jx_lift_gate.py" --loads rate
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads rate
+for b in boot boot44 boot88 boot31 bootat44; do python3 "$HERE/jx_lift_gate.py" --loads $b; done
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads boot48
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads boot32
+python3 "$HERE/jx_lift_gate.py" --loads tempo --tooth-skip 152      # a tempo call dropped: must be seen
+python3 "$HERE/jx_lift_gate.py" --loads rate --tooth-skip 12        # a setSampleRate dropped: must be seen
+python3 "$HERE/jx_lift_gate.py" --loads boot --tooth-skip 164       # initialize's writePatch dropped: must be seen
+echo "=== JX GATE 3f: THE DAW STATE, THE UI TIMER, THE PATCH BROWSER (JX-16, JX-17) ==="
+# the tables from the booted plugin again (Unicorn, each its own process) and the committed ones equal to them
+python3 "$HERE/jx_state_census.py" >/dev/null
+python3 "$HERE/jx_model_census.py" >/dev/null                     # the editor's set (JX-18)
+python3 "$HERE/jx_gen_state_tables.py" --check
+python3 "$HERE/jx_patch_census.py" >/dev/null
+python3 "$HERE/jx_gen_patch_tables.py" --check
+# getState / setState, the CC map, the UI timer's drain, KEY HOLD, MIDI learn, the editor's set and the host's
+# round trip: every save, queued record and host edit
+python3 "$HERE/jx_state_gate.py"
+python3 "$HERE/jx_state_gate.py" --mutants
+# the patch browser's load of any record (the factory bank, random bytes, a bank file): records, saves, samples
+python3 "$HERE/jx_patch_gate.py"
+python3 "$HERE/jx_patch_gate.py" --tooth --chains 0,1
+echo "=== JX GATE 3g: THE MUTATION REACH (docs/PORT_COMPLETENESS_CHARTER.md section 4) ==="
+# one plausible slip per part of the port, in lines that run (gcov), the library rebuilt, one fast gate on the
+# mutated tree: every mutation must be KILLED. It edits the tree it runs in (one file at a time, restored):
+# run make verify-jx3p from a snapshot (tools/snap_tree.sh)
+python3 "$HERE/jx_mutation_gate.py"
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null

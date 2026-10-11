@@ -3,6 +3,47 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-10 (12) — ANY BANK, THE EDITOR'S PATH, THE MUTATION REACH (JX-16, JX-18, JX-19): EVERY SCOPE ROW CLOSED
+
+The PATCH BROWSER decodes any record of the plugin's bank format as the plugin does (HOST_LAYER.md 3m:
+jx3p/src/jx_patch_tables.h from the plugin's own loads -- the JUNO's crafted patterns collided at offsets 8288
+apart, seeded random records made all 75 decodes unique, playbook 205); jx3p_product_load_record, jx3p_bank_open;
+the web page lists the bank's names and opens bank files. The EDITOR'S SET (3n): for 63 entries the host's round
+trip (performEdit, value law exact on 882 of 882 sets), for 19 and writePatch an engine record; jx3p_model_set,
+jx3p_host_edits. MEASURED: jx_patch_gate.py 4 chains (factory, random bytes, KEY HOLD, a bank file), 7,281 records
+and every save equal, tooth RED; through process(): random records with keys held, three loads between two blocks,
+changes 50 ms apart, ARPEGGIO switched by the host with keys held (4 runs) -- EQUAL; the state gate's chain
+'editor' (38 steps, the round trips through process()) equal, its mutant RED. jx3p/docs/SCOPE_AUDIT.md: every row
+CLOSED (rows 4-9, 12, 15 this day; the visible panel is not a row: no JX art in truth/). The MUTATION REACH
+(docs/PORT_COMPLETENESS_CHARTER.md section 4; jx3p/tools/jx_mutation_gate.py): one slip per part of the port in
+lines that run (gcov), each against one fast gate -- 11 of 11 KILLED: the voice DSP, the master, a voice helper,
+the rate converter, the driver's clock, the value law, the state law, the patch decode, the rate table, the id
+map's range, initialize's records. Two survived the first run and were MEASURED, not excused (playbook 208): a
+clock constant + 1 moves a tick by 1e-8 sample (replaced by a real slip); a voice-filter slip changes 6 voice words
+and no audio at all -- and the unit-state gate had never run that branch, because it drove the 44.1 kHz engine
+while the product runs 96 kHz. The unit-state gate now runs at 96 kHz too (jx_master_bisect.py --rate 96000):
+patches 5, 0, 34, 20, 49 equal in every voice word, the master and the control objects; the slip RED.
+The full verify of this commit is owed.
+
+## 2026-10-10 (11) — THE HOST TEMPO, THE RATE SETTING, A FRESH INSTANCE, THE DAW STATE (JX-8, JX-15, JX-15b, JX-17)
+
+Four parts of the plugin's host layer are now the port's (jx3p/docs/HOST_LAYER.md 3i-3l). The HOST TEMPO: the
+render driver's T = round(tempo x 10) and clock period, the engine's tempo entry LIFTED. The ENGINE-RATE
+SETTING: the listener and the driver's switch, setSampleRate LIFTED (its stack probe reads page 0: the port
+maps 4 KB of zeros there -- playbook 207). A FRESH INSTANCE in the plugin's order: the plugin switches the
+rate at the first block BEFORE initialize's records, so a guest image taken after them was ~1 ULP off when a
+host set the rate before the first block (playbook 204); the image (version 2) is now the heap as setActive
+leaves it, jx3p_product_init queues initialize's records, jx3p_init applies them at once for the gates that
+drive the engine directly. The DAW STATE: getState / setState, the CC map, the UI timer's drain, the keyboard's
+note value, KEY HOLD's release, MIDI learn (the JUNO's wrapper code on the JX's tables, generated from the
+booted plugin: jx3p/src/jx_state_tables.h). MEASURED: the lifted tempo entry (12 T values x every effect mode,
+patches 0 and 34), setSampleRate on the running engine (5 rates, keys held) and a fresh instance's first block
+(7 runs: each rate switch of the table and 31 Hz, at 96 and 44.1 kHz engines) EXACTLY 0, teeth seen; through
+process(): the rate setting before the first block at 48 kHz (settings 0-4) and 44.1 kHz (2, 3) EQUAL -- the
+two that were RED --, on the running engine EQUAL, a setting past the table silent in both; jx_state_gate.py
+six chains, 155 saves and every queued record equal, on the new boot path; mutants 4 of 4 RED. The JX gates
+now delete their temporary folders (724 of them filled the disk and voided a verify run: playbook 206).
+
 ## 2026-10-10 (10) — THE NOTE PATH IS THE PLUGIN'S OWN, LIFTED (JX-12b)
 
 Block (9)'s open RED is found and fixed. The --ctl gate's mapped CCs reach PORTAMENTO (CC 5) and LEGATO (CC

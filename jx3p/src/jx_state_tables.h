@@ -6,6 +6,10 @@
  *                 value & mask, 0 = as given: what setState queues and getState gives back),
  *                 the default (initialize's record). 82 entries; then the 128 CC map entries
  *                 0x10000000 + n (the model id CC n drives, -1 none).
+ *   JX_STATE_EDIT_HOST  the editor's set of each entry (the model's set, rva 0x283C90; jx_model_census.py):
+ *                 1 the host's automation round trip (beginEdit, performEdit(id, (float)(stored - min) /
+ *                 (float)(max - min), unsigned 32-bit operands), endEdit -- no engine record; 0 one engine
+ *                 record (id, the stored value). writePatch: a record, its value & JX_STATE_WRITEPATCH_MASK.
  *   setState queues writePatch (0x0FFFC01D) = 126, the payload's known parameters in payload
  *   order, writePatch = 127; initialize queues the defaults in list order, writePatch = 1, then
  *   one MIDI record, JX_STATE_BOOT_MIDI (the all-sound-off message).
@@ -106,6 +110,15 @@ static const jx_state_ent JX_STATE_ENT[JX_STATE_N] = {
     { 0x0FFFC01Cu, 0x7Fu, 0 },
 };
 /* the CC map at the boot as getState gives it (the model id of CC n, -1 none) */
+/* the editor's set: 1 the host's round trip (performEdit), 0 an engine record */
+static const uint8_t JX_STATE_EDIT_HOST[JX_STATE_N] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0,
+};
+#define JX_STATE_WRITEPATCH_MASK 0x7Fu
 static const int32_t JX_STATE_CC_BOOT[128] = {
     -1, -1, -1, 6291514, -1, 6291552, -1, -1,
     -1, 6291518, -1, -1, 6291544, 6291550, -1, 6291976,
