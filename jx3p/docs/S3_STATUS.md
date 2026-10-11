@@ -3,7 +3,7 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
-## 2026-10-11 (17) — THE ORACLE GRADED BY THE REAL CPU; THE CRT'S FMA3 CODE; ROW 24 FOR THE USER
+## 2026-10-11 (17) — THE ORACLE GRADED BY THE REAL CPU; THE CRT'S FMA3 CODE; EVERY CPU QUESTION; ROW 24 FOR THE USER
 
 Unicorn is a model of a CPU (playbooks 226, 227). Two places where it is not the user's:
 - NaN MEETS NaN. Where both operands of an add / multiply are NaN, x86 returns the FIRST operand's (SDM Table 4-7);
@@ -21,6 +21,10 @@ alone (1416 scenes, three NaNs each; 6 reach: the JX's live cells are rewritten 
 modes. The JUNO's two single-source meeting sites (the phase adds of two LFOs: a NaN met the copy `-v` negated, GCC
 put the other operand first) were checked here: the JX's same LFO keeps the plugin's order in the add where the
 negated copy meets (GCC's output read; that LFO does not run in any factory patch).
+EVERY CPU QUESTION (tools/verify/cpu_census.py, playbook 228; HOST_LAYER.md 3v): each cpuid / xgetbv, the globals it
+sets, every reader the port reaches -- graded on the static answers (the engine oracle skips DllMain), Unicorn's and
+this CPU's: the render driver's ISA tests unreached with 2 channels, memmove / memset equal on both paths, the FMA3
+math above. The reach lost false roots on the way (displacements in the lifted code's comments).
 ROW 24 (OPEN, the user decides): two DIFFERENT NaNs meeting in one operation keep the compiler's operand order --
 the ISO C99 limit, exact only if every such operation tests its operands.
 RESULT (2026-10-11, before the full verify): the JUNO sweep on its real CPU -- every single-source NaN scene of

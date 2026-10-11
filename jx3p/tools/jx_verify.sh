@@ -359,6 +359,13 @@ python3 "$HERE/jx_native_replay.py" --sweep --tooth --patch 5 --seeds 1 --cells 
 # the oracle runs, for every function the port reaches; the tooth moves the flag address and must lose expf's one
 python3 "$REPO/tools/verify/crt_fma_gate.py" --port-of jx
 python3 "$REPO/tools/verify/crt_fma_gate.py" --port-of jx --tooth
+# every question the plugin asks the CPU (cpuid, xgetbv) and every reader of an answer the port reaches, graded:
+# the same decision on Unicorn's answers and this CPU's, a CRT routine proven alike on both paths, the render driver's
+# ISA tests unreached (2 channels), the FMA3 math above (playbook 228); the teeth: the answers written off their
+# globals (no path moves: refused), memory-operand displacements in the lifted code's comments taken as names
+python3 "$REPO/tools/verify/cpu_census.py" --port-of jx
+python3 "$REPO/tools/verify/cpu_census.py" --port-of jx --tooth
+python3 "$REPO/tools/verify/cpu_census.py" --tooth-roots
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
 sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"

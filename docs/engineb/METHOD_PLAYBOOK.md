@@ -3934,3 +3934,30 @@ bites both gates (18 of 68 cells; the CPU sweep).
 Grade the oracle against the real CPU wherever the CPU, not the model, is what the user runs. A tooth counts only
 when it fails on its OWN mutation while the gate is otherwise green -- a tooth that "bites" next to a red gate has
 shown nothing.
+
+## 228. EVERY QUESTION THE PLUGIN ASKS THE CPU, EVERY READER OF THE ANSWER -- AND AN ORACLE THAT NEVER ASKED
+Paid 2026-10-11 (after 226: the FMA3 flag was one answer; nobody had listed the others). tools/verify/cpu_census.py
+lists, in each image, every function holding cpuid / xgetbv (7 in each plugin, plus OpenSSL's OPENSSL_ia32_cpuid
+before .pdata), the globals each writes, every instruction that reads one, and which of those the port reaches. It
+runs the CRT's own inits three ways: natively here (__isa_available 5, __favor 2, the FMA3 flag 1), in Unicorn (2, 2,
+0) and not at all -- the image's static values (1, 0, 0). Found:
+- AN ORACLE THAT NEVER ASKED. The process() oracles run DllMain, so the CRT init sets Unicorn's answers; the engine
+  oracles (e2e_emu, jx_emu) skip DllMain and keep the static values: __isa_available 1, which no PC has. Every
+  reached test on it is graded on all three answer sets, not on the one the oracle happens to hold.
+- A CRT ROUTINE WHOSE PATHS DISAGREE. The CRT's strrchr (JUNO rva 0x6B079C): its SSE4.2 path compares
+  `movsx byte` with the int argument in its unaligned head, so a character 128-255 passed as a positive int is
+  missed there; its SSE2 path finds it. The one call the port reaches passes 'e'. The JX's wcsstr disagrees between
+  its paths too (no reached call). So a "path-invariant" CRT routine is proven over the arguments its reached
+  callers pass, never assumed.
+- FALSE ROOTS. The reach takes every hex number in the port's sources as a possible function address; the JX's
+  lifted code comments carry memory-operand displacements (`[rip + 0x79fb9d]`, `[rcx + 0x12a60]`) -- one fell in
+  JUCE's CPU-info getter, others in OpenSSL. A bracketed operand names no function (the census's --tooth-roots puts
+  them back and must fail).
+- The render driver's four ISA tests sit behind `cmp r13d, 8` (8+ channel pointers); with the plugin's 2 channels
+  the process() oracle reaches them 0 times while its loads of __isa_available run every block.
+Every reached reader is graded: the same decision on every answer set, a CRT routine run in Unicorn on both paths
+with equal results (memmove, memset, strrchr with 'e'; the code run must differ, or the proof refuses -- its tooth
+writes the answers 4 bytes off), the driver's tests unreached, or the FMA3 math crt_fma_gate.py grades.
+### The rule
+List every question the plugin asks the machine and every place an answer is read on the port's reach; grade each
+read on every answer set an oracle or a user can hold -- including "never asked".

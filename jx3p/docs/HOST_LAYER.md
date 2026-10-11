@@ -642,7 +642,7 @@ ARPEGGIO / TYPE / STEP changed (product states, modes 0, 3, 6), SCATTER appended
 modes 2, 5, 8, 10); and every one of the 19 modes put into every store by the plugin's own setter after
 patch 34's load (the port: its transcription), the 12 no input reaches included.
 
-## 3v. The oracle graded by the real CPU (EXECUTED, 2026-10-11; rows 23, 24; playbooks 226, 227)
+## 3v. The oracle graded by the real CPU (EXECUTED, 2026-10-11; rows 23, 24; playbooks 226, 227, 228)
 
 - THE NATIVE REPLAY (jx3p/tools/jx_native_replay.py, tools/verify/native_replay.c). The oracle builds the scene --
   the plugin's product boot at 44.1 kHz, its own patch load, a note-on 60 / 105, NaNs if asked -- and its memory
@@ -662,6 +662,16 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
   7 meter inputs by 2.2e-16, under the meter's 1e-12 margin). Unicorn reports no FMA and cannot decode VEX: these
   runs are native, the image mapped at its base, the functions called through ms_abi. Tooth: the flag address moved
   4 bytes loses expf's difference.
+- EVERY CPU QUESTION (tools/verify/cpu_census.py, playbook 228). Seven JX functions hold cpuid / xgetbv (two that
+  fill JUCE's CPU info, the CRT's __isa_available_init and FMA3 init, three that keep no answer) and OpenSSL's
+  OPENSSL_ia32_cpuid; of every reader of their answers the port reaches: the render driver (rva 0x320A00: its four
+  ISA tests sit behind `cmp r13d, 8`, reached 0 times with 2 channels while its loads run every block), the CRT's
+  memmove (0x6E4010) and memset (0x6E5870) -- run in Unicorn on both paths, equal results, the code run differs --
+  and the four FMA3 math functions above. The answers: static (the engine oracle jx_emu skips DllMain: 1, 0, 8239),
+  Unicorn (JXHost runs DllMain: 2, 2, no limit), this CPU (5, 2, no limit). The census also found false roots: the
+  lifted code's comments carry memory-operand displacements (`[rip + 0x79fb9d]` fell in JUCE's CPU-info getter);
+  a bracketed operand names no function. Teeth: the answers written off their globals (no path moves: refused);
+  displacements taken as names (ungraded readers: the census fails).
 - ROW 24. Two DIFFERENT NaNs meeting in one add / multiply keep the compiler's operand order: the ISO C99 limit
   (exact only if every such operation tests its operands), the user's decision.
 
