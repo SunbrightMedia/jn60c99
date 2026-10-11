@@ -3867,7 +3867,12 @@ site. The census now fails any float compare / min-max instruction that ran and 
 taken out, its very instruction must be reported UNCLAIMED). Two matcher rules came with it: an equality takes a
 candidate whose flags a je / jne reads, a relation one read by jb / ja / jae / jbe (JUNO voice line 723, an equality
 whose values three relational compares also saw); and a compare of two C integers is graded by its C types before
-any value match (JX master line 2619, `*v490 == 1`, had matched a ucomiss on (1, 1) and graded "wrong").
+any value match (JX master line 2619, `*v490 == 1`, had matched a ucomiss on (1, 1) and graded "wrong"). And the
+census found the oracle half-blind: it looked for a compare's flag consumers in the next 12 instructions only, but
+SSE arithmetic leaves EFLAGS, so MSVC schedules up to 15+ instructions between a compare and its jump (JUNO voice
+rva 0x36B64E: je 13 later; 0x369757 and 0x36B886 likewise) -- those compares had no consumer, so the equality rule
+dropped them and a parity test there would have gone unseen. The scan now follows both ways of every jcc until an
+instruction writes the flags.
 ### The rule
 A NaN's bits are the compiler's choice wherever C leaves them open; a port that promises bit-exact NaNs pins the
 compiler (flags) and proves the generated code, not the source. A map that grades sites must also account for every

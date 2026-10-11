@@ -92,6 +92,11 @@ REL = ('<', '<=', '>', '>=', '==', '!=')
 SELECTS = tuple('%s_%s%s' % (p, m, w) for p in ('jx', 'juno') for m in ('min', 'max') for w in ('ss', 'sd'))
 EQS = tuple('%s_f%s' % (p, e) for p in ('jx', 'juno') for e in ('eq', 'ne'))   # ucomiss + je / jne, no parity test
 MMNAMES = ('fminf', 'fmaxf', 'fmin', 'fmax') + SELECTS + EQS  # the selects: the instruction's own, written out
+# instructions that write EFLAGS (a compare's flags end there); SSE arithmetic, moves, lea and conversions do not
+FLAG_WRITERS = set(CMP) | {'cmp', 'test', 'add', 'sub', 'and', 'or', 'xor', 'inc', 'dec', 'neg', 'shl', 'shr', 'sar',
+                           'sal', 'rol', 'ror', 'rcl', 'rcr', 'imul', 'mul', 'div', 'idiv', 'adc', 'sbb', 'bt', 'bts',
+                           'btr', 'btc', 'bsf', 'bsr', 'popcnt', 'lzcnt', 'tzcnt', 'sahf', 'popf', 'popfq', 'ptest',
+                           'xadd', 'cmpxchg', 'shld', 'shrd', 'andn', 'blsi', 'blsr', 'blsmsk', 'bzhi'}
 ZF_USERS = ('je', 'jne', 'jz', 'jnz', 'sete', 'setne', 'setz', 'setnz', 'cmove', 'cmovne', 'cmovz', 'cmovnz')
 CF_USERS = ('jb', 'jbe', 'ja', 'jae', 'jnb', 'jnbe', 'jna', 'jnae', 'jc', 'jnc', 'setb', 'setbe', 'seta', 'setae',
             'setnb', 'setnbe', 'setna', 'setnae', 'cmovb', 'cmovbe', 'cmova', 'cmovae', 'cmovnb', 'cmovnbe', 'cmovna',
@@ -546,18 +551,32 @@ def oracle(port, func, scn, frames, release):
         e.note_off(60)
         e.render(release)
     jumps = {}
-    for a, x in sites.items():                    # the flags' consumers up to the next flag writer
-        seq, b = [], a + x.size
-        for _ in range(12):
-            y = ins.get(b)
-            if y is None:
-                break
-            if (y.mnemonic.startswith(('j', 'set', 'cmov')) and y.mnemonic != 'jmp') or y.mnemonic == 'lahf':
-                seq.append(y.mnemonic)
-            if y.mnemonic in CMP or y.mnemonic in ('cmp', 'test', 'sub', 'add', 'and', 'or', 'xor', 'dec', 'inc'):
-                break
-            b = y.address + y.size
-        jumps[a] = seq
+    for a, x in sites.items():
+        # the flags' consumers on every path until an instruction writes the flags: SSE arithmetic leaves them, so the
+        # compiler may put many instructions between a compare and its jump (JUNO voice rva 0x36B64E: its je is 13
+        # instructions later; a 12-instruction window saw none, playbook 225); both ways of a jcc are followed
+        seq, seen, work, budget = [], set(), [a + x.size], 256
+        while work and budget > 0:
+            b = work.pop()
+            while b not in seen and budget > 0:
+                seen.add(b)
+                budget -= 1
+                y = ins.get(b)
+                if y is None:
+                    break
+                m = y.mnemonic
+                if (m.startswith(('j', 'set', 'cmov')) and m != 'jmp') or m == 'lahf':
+                    seq.append(m)
+                if m in FLAG_WRITERS or m.startswith(('ret', 'call', 'int3')):
+                    break
+                if m == 'jmp':
+                    if y.operands and y.operands[0].type == 2:
+                        work.append(y.operands[0].imm)
+                    break
+                if m.startswith('j') and y.operands and y.operands[0].type == 2:
+                    work.append(y.operands[0].imm)
+                b = y.address + y.size
+        jumps[a] = sorted(set(seq))
     # the constant registers: written in the function only by a constant load (xorps r, r / a load from rip-relative
     # data); Win64 keeps xmm6..xmm15 across calls, and a call-clobbered register written by a call is no constant
     writes = {}
