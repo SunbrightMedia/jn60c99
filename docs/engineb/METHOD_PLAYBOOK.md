@@ -3718,3 +3718,13 @@ silent in the plugin 3 s after a key (EXECUTED), so the table alone does not say
 ### The rule
 A silent / sounding expectation names the plugin's behavior: derive the list from the generated table, then run
 each rate once without the expectation and keep what the plugin's own output says.
+
+## 217. A PROOF STEP NOBODY RAN IS A CLAIM -- THE SNAPSHOT'S TREE ID HAD NEVER EQUALLED HEAD
+Paid 2026-10-11 (job jxverify_d). Playbook 178 says `git rev-parse HEAD^{tree}` equal to a snapshot's
+.snapshot_tree proves a job graded the committed files. The first time anyone compared, they differed: the id
+was written from an EMPTY scratch index, and a fresh worktree does not check out the submodule pi/circle, so its
+gitlink was missing from every snapshot's id since the mechanism began (2026-10-09). tools/snap_tree.sh now seeds
+the index from HEAD (read-tree) before `add -A`; a snapshot with one working file now equals the tree that file's
+commit has (5708c4b7 both). The jobs before it graded their commits' files -- only the id was wrong.
+### The rule
+A provenance step is a gate: run it once and see it equal, and once with a planted change and see it differ.

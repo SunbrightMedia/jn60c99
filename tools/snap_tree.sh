@@ -25,7 +25,10 @@ done
 # the snapshot's content as a git tree id (a scratch index, the worktree's own untouched): after the
 # commit, `git rev-parse HEAD^{tree}` equal to it proves the job graded exactly the committed files
 I=$(mktemp); rm -f "$I"
-T=$(GIT_INDEX_FILE=$I git -C "$W" add -A && GIT_INDEX_FILE=$I git -C "$W" write-tree); rm -f "$I"
+# seeded from HEAD: a submodule (pi/circle) is a gitlink a fresh worktree does not check out -- an empty
+# index lost it, and the id never equalled HEAD^{tree} (2026-10-11, playbook 217)
+T=$(GIT_INDEX_FILE=$I git -C "$W" read-tree HEAD && GIT_INDEX_FILE=$I git -C "$W" add -A &&
+    GIT_INDEX_FILE=$I git -C "$W" write-tree); rm -f "$I"
 echo "$T" > "$W/.snapshot_tree"
 rm -rf "$W/scratchpad"; ln -s "$R/scratchpad" "$W/scratchpad"
 mkdir -p "$W/bench"; rm -rf "$W/bench/jobs"; ln -s "$R/bench/jobs" "$W/bench/jobs"
