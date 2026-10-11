@@ -14,6 +14,8 @@ src/ file) and records the new base.
                                                       build/shim_resync/ (diff3 markers) and reported --
                                                       resolve it there, copy it in, then record it:
   python3 tools/engineb/resync_shims.py --record D/F  record fork D/F as synced to src/F as it is now
+After a merge or a --record it runs `ledger.py check` and names every equivalence-ledger row the move made STALE,
+with the `ledger.py emit` that re-earns them (playbook 229).
 
 Why: until 2026-10-10 nothing recorded a fork's base, so 15 forks silently predated the October src/
 changes and four of them no longer linked: make engineb was RED from 2026-10-07 until the proof run
@@ -94,6 +96,18 @@ def merge(fork, base_sha):
     return r.returncode, r.stdout
 
 
+def ledger_after():
+    """a fork that moved can be the proof source of an equivalence-ledger row (docs/trackb/EQUIVALENCE.tsv): that
+    row is STALE now, and make engineb fails at its step 8 hours later (2026-10-11: the chorus fork followed a src/
+    fix, its row went stale, playbook 229). So say it here, with the command that re-earns the rows."""
+    r = subprocess.run([sys.executable, os.path.join(HERE, 'ledger.py'), 'check'], capture_output=True, text=True)
+    st = sorted(set(l.split('@')[0].strip('[ ') for l in r.stdout.splitlines() if 'STALE' in l or 'FORGED' in l))
+    if st:
+        print('resync_shims: equivalence-ledger row(s) now STALE: %s -- re-run their proofs:\n'
+              '    python3 tools/engineb/ledger.py emit %s' % (', '.join(st), ' '.join(st)))
+    return 1 if st else 0
+
+
 def main():
     args = sys.argv[1:]
     if args[:1] == ['--check']:
@@ -113,6 +127,7 @@ def main():
             b[k] = src_blob(k)
             print('recorded %s at src blob %s' % (k, b[k][:10]))
         write_bases(b)
+        ledger_after()
         return 0
     b = read_bases()
     bad = 0
@@ -136,6 +151,7 @@ def main():
     write_bases(b)
     print('resync_shims: %s' % ('every stale fork merged; grade them: make engineb' if not bad else
                                 'resolve the reported forks, copy them in, --record them, then make engineb'))
+    ledger_after()
     return bad
 
 

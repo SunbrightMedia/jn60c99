@@ -3978,3 +3978,14 @@ the port's product mode does.
 ### The rule
 List every question the plugin asks the machine and every place an answer is read on the port's reach; grade each
 read on every answer set an oracle or a user can hold -- including "never asked".
+
+## 229. A FORK THAT FOLLOWS src/ CAN MAKE ITS LEDGER ROW STALE -- SAY SO AT THE RESYNC, NOT HOURS LATER
+Paid 2026-10-11. The second LFO operand-order fix (playbook 227) changed src/master_render.c; resync_shims.py
+merged it into the nine master_render forks, cleanly. One of them, engine_b/shim/chorus, is the proof source of
+the equivalence ledger's chorus row (docs/trackb/EQUIVALENCE.tsv), so that row went STALE -- and nothing said so
+until make engineb reached its step 8 (ledger integrity) in the final product job, hours later: RED. The fix was
+mechanical (`ledger.py emit chorus`: 36/36 scenarios, every residual EXACTLY 0); the cost was a wasted product
+run. resync_shims.py now runs `ledger.py check` after every merge or --record and names each STALE row with the
+`ledger.py emit` that re-earns it.
+### The rule
+A tool that moves a proof's source runs that proof's staleness check itself, in the same step.
