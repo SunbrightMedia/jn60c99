@@ -3955,9 +3955,18 @@ runs the CRT's own inits three ways: natively here (__isa_available 5, __favor 2
   them back and must fail).
 - The render driver's four ISA tests sit behind `cmp r13d, 8` (8+ channel pointers); with the plugin's 2 channels
   the process() oracle reaches them 0 times while its loads of __isa_available run every block.
+- LEAF FUNCTIONS. MSVC writes no .pdata entry for code that never touches the stack; a reach built on .pdata alone
+  never saw them. Counting each call target outside .pdata as a function found three more readers in each plugin:
+  the CRT's strnlen, wcslen and wcsnlen take an AVX2 path for __isa_available >= 5 -- code the PC runs and Unicorn
+  cannot. Proven natively (cpu_census_native.c --path): an int3 on the AVX2 path's first instruction fires under
+  this CPU's answer only, and 3000 random strings give the same lengths on both paths.
 Every reached reader is graded: the same decision on every answer set, a CRT routine run in Unicorn on both paths
 with equal results (memmove, memset, strrchr with 'e'; the code run must differ, or the proof refuses -- its tooth
-writes the answers 4 bytes off), the driver's tests unreached, or the FMA3 math crt_fma_gate.py grades.
+writes the answers 4 bytes off), an AVX2 routine run natively on both paths (the same tooth: the trap never fires),
+the driver's tests unreached, or the FMA3 math crt_fma_gate.py grades. MXCSR, the other machine state the plugin
+reads: in the reached code the CRT saves and restores it around its argument reductions, and its math error paths
+read and set it (its _controlfp); the plugin's own ScopedNoDenormals (rva 0x34AC70) sets FTZ + DAZ in process(), as
+the port's product mode does.
 ### The rule
 List every question the plugin asks the machine and every place an answer is read on the port's reach; grade each
 read on every answer set an oracle or a user can hold -- including "never asked".

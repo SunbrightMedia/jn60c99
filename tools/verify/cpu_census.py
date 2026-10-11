@@ -24,12 +24,19 @@ run different code. crt_fma_gate.py grades one such answer (the CRT's FMA3 flag)
             argument in its unaligned head, so a character 128-255 passed as a positive int is missed there -- the
             SSE2 path finds it; the one reached call passes 'e'. The JX's wcsstr, which no reached call uses, gives
             different results on its two paths too: the plugin's CRT, outside the port)
+    NATIVE  a leaf CRT routine whose path for __isa_available >= 5 is AVX2 code (strnlen, wcslen, wcsnlen: Unicorn
+            cannot run it), run NATIVELY under the oracles' answers and this CPU's (cpu_census_native.c --path):
+            3000 random strings each, equal results, and an int3 on the AVX2 path's first instruction must fire
+            under this CPU's answer only
     The DRIVER count's control: the driver's loads of __isa_available (each block) must be seen by the same hooks.
+    A leaf function (no .pdata entry: MSVC writes none for code that never touches the stack) starts at each direct
+    call target outside .pdata: without them these string routines' reads were invisible (playbook 228).
     any other reached reader FAILS the census until it is graded here.
 
     python3 tools/verify/cpu_census.py [--port-of juno|jx|both] [--no-driver]
-    python3 tools/verify/cpu_census.py --tooth          the PATH proof with __favor's address 4 bytes off: memset's
-                                                        path must NOT change, and the proof must refuse
+    python3 tools/verify/cpu_census.py --tooth          the PATH and NATIVE proofs with the answers written 4 bytes
+                                                        off their globals: no path may move, and the proofs must
+                                                        refuse
     python3 tools/verify/cpu_census.py --tooth-roots    memory-operand displacements admitted as names again (the
                                                         lifted code's comments): the JX reaches JUCE's CPU-info
                                                         getter and OpenSSL, ungraded readers -- the census must fail
@@ -51,11 +58,13 @@ sys.path.insert(0, HERE)
 
 PORTS = {   # READ from each image: the CRT inits and the CRT routines the port's reach reads an answer in
     'juno': dict(pe=None, srcs=('src', 'gui'), isa_init=0x676080, fma_init=0x713C70, driver=0x320B20,
-                 routines={0x6ADC00: 'memmove', 0x6AF460: 'memset', 0x6B079C: 'strrchr'}),
+                 routines={0x6ADC00: 'memmove', 0x6AF460: 'memset', 0x6B079C: 'strrchr'},
+                 native={0x6F54D0: 'strnlen', 0x6F5620: 'wcslen', 0x6F574C: 'wcsnlen'}),
     'jx': dict(pe=os.path.join(REPO, 'jx3p', 'truth', 'JX3P.vst3'), srcs=('jx3p/src', 'jx3p/gui'), isa_init=0x6AC490,
                fma_init=0x74A920, driver=0x320A00,
-               routines={0x6E4010: 'memmove', 0x6E5870: 'memset', 0x6E6BAC: 'strrchr', 0x6E6990: 'wcsstr'}),
-}
+               routines={0x6E4010: 'memmove', 0x6E5870: 'memset', 0x6E6BAC: 'strrchr', 0x6E6990: 'wcsstr'},
+               native={0x72B2B0: 'strnlen', 0x72B400: 'wcslen', 0x72B52C: 'wcsnlen'}),
+}   # native: leaf routines (no .pdata entry) whose path for __isa_available >= 5 is AVX2 code Unicorn cannot run
 
 
 def pe_path(port):
@@ -75,25 +84,51 @@ def census(port, tooth_roots=False):
     rf = sorted((e.struct.BeginAddress, e.struct.EndAddress) for e in pe.DIRECTORY_ENTRY_EXCEPTION)
     starts = [b for b, _ in rf]
 
-    def fn_of(a):
+    def fn_pd(a):
         i = bisect.bisect_right(starts, a) - 1
         return rf[i] if i >= 0 and rf[i][0] <= a < rf[i][1] else None
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.skipdata = True
-    ins = []
+    ins, lo, hi = [], None, None
     for s in pe.sections:
         if s.Name.startswith(b'.text'):
             ins += list(md.disasm(s.get_data(), base + s.VirtualAddress))
+            lo, hi = s.VirtualAddress, s.VirtualAddress + s.Misc_VirtualSize
+    # a leaf function needs no .pdata entry (MSVC writes none for code that never touches the stack): each direct
+    # call target outside .pdata, and each jump target outside .pdata jumped to from a .pdata function, starts one,
+    # which runs to the next start -- without them a read in a small helper (the CRT's MXCSR accessors, playbook
+    # 228) and every call into one would be invisible
+    leaf_starts = set()
+    for x in ins:
+        if (x.mnemonic == 'call' or x.mnemonic.startswith('j')) and x.op_str.startswith('0x'):
+            t = int(x.op_str, 16) - base
+            if lo <= t < hi and fn_pd(t) is None and (x.mnemonic == 'call' or fn_pd(x.address - base)):
+                leaf_starts.add(t)
+    bounds = sorted(set(starts) | set(e for _, e in rf) | leaf_starts | {hi})
+    lst = sorted(leaf_starts)
+
+    def fn_of(a):
+        f = fn_pd(a)
+        if f:
+            return f
+        i = bisect.bisect_right(lst, a) - 1
+        if i < 0:
+            return None
+        t = lst[i]
+        end = bounds[bisect.bisect_right(bounds, t)]
+        return (t, end) if a < end else None
 
     def rip(x):
         m = re.search(r'rip ([+-]) (0x[0-9a-f]+)', x.op_str)
         return None if not m else x.address - base + x.size + int(m.group(2), 16) * (1 if m.group(1) == '+' else -1)
     # (1) the questions
     qf = collections.OrderedDict()
+    first = rf[0][0]
     for x in ins:
         if x.mnemonic in ('cpuid', 'xgetbv'):
-            f = fn_of(x.address - base) or (x.address - base, None)
-            qf.setdefault(f, []).append(x.address - base)
+            a = x.address - base
+            f = fn_pd(a) or ((a, None) if a < first else fn_of(a) or (a, None))
+            qf.setdefault(f, []).append(a)
     leaf = [f for f in qf if f[1] is None]
     edges, callers = collections.defaultdict(set), collections.defaultdict(set)
     for x in ins:
@@ -102,7 +137,6 @@ def census(port, tooth_roots=False):
             if f and g and f != g:
                 edges[f].add(g)
                 callers[g].add(f)
-    first = rf[0][0]
     targets = sorted(set(int(x.op_str, 16) - base for x in ins if x.mnemonic == 'call' and x.op_str.startswith('0x')
                          and int(x.op_str, 16) - base < first))
     entries = set()     # each question site before .pdata: the nearest call target at or below it is its function
@@ -371,6 +405,38 @@ def path_proof(port, C, need, tooth=False):
     return bad, refused
 
 
+def native_proof(port, C, entries, ans, tooth=False):
+    """each leaf routine whose AVX2 path Unicorn cannot run, NATIVELY (cpu_census_native.c --path): random strings
+    under the oracles' answers (static, Unicorn) and this CPU's, the results compared; an int3 on the first
+    instruction of the path the test `cmp eax, k; jl` selects must fire under this CPU's answer only"""
+    p = PORTS[port]
+    static, uni, cpu = ans
+    d = tempfile.mkdtemp(prefix='cpun_')
+    exe = os.path.join(d, 'cpu_census_native')
+    subprocess.run(['cc', '-O1', '-o', exe, os.path.join(HERE, 'cpu_census_native.c')], check=True)
+    ins, base = C['ins'], C['base']
+    idx = {x.address - base: k for k, x in enumerate(ins)}
+    bad, refused = 0, 0
+    for rva in sorted(entries):
+        kind = p['native'][rva]
+        k = idx[rva]
+        g = C['ins'][k].address - base + C['ins'][k].size + int(re.search(r'rip \+ (0x[0-9a-f]+)', ins[k].op_str).group(1), 16)
+        j = next(j for j in range(k, k + 8) if ins[j].mnemonic in ('jl', 'jb'))
+        trap = ins[j + 1].address - base      # the fall-through: the path taken when the answer is high enough
+        for a in (static[g], uni[g]):
+            out = subprocess.run([exe, C['path'], '--path', kind, '%#x' % rva, '%#x' % (g + 4 if tooth else g),
+                                  str(a), str(cpu[g]), '3000', '7', '%#x' % trap],
+                                 capture_output=True, text=True).stdout
+            moved = ('trap %d no' % a) in out and ('trap %d yes' % cpu[g]) in out
+            same = 'differ 0' in out
+            print('  NATIVE %s %x (%s): __isa_available %d vs %d, 3000 inputs: the AVX2 path %s; the results %s' % (
+                port, rva, kind, a, cpu[g], 'runs under this CPU\'s answer only' if moved else 'is NOT the one that '
+                'moved', 'equal' if same else 'DIFFER'))
+            bad |= not same
+            refused |= not moved
+    return bad, refused
+
+
 def driver_count(port, C):
     """the render driver's ISA tests in the process() oracle over a chain: reached how often"""
     from unicorn import UC_HOOK_CODE
@@ -418,7 +484,7 @@ def run(port, tooth=False, tooth_roots=False, no_driver=False):
     print('  answers (global: static / Unicorn / this CPU): %s' % ', '.join('%x: %d / %d / %d' % (
         g, static[g], uni[g], cpu[g]) for g in gl))
     fma = set(F.PORTS[port]['expect'])
-    ungraded, path_needed, drv = [], [], False
+    ungraded, path_needed, native_needed, drv = [], [], [], False
     for f in sorted(C['reads']):
         if f not in C['reach']:
             continue
@@ -431,6 +497,11 @@ def run(port, tooth=False, tooth_roots=False, no_driver=False):
                 f[0], f[1], sum(1 for d in decisions(C, f) if d[2] == 'cmp')))
             continue
         ds = decisions(C, f)
+        if ds and all(C['ins'][k].address - C['base'] in PORTS[port]['native'] for k, _ in C['reads'][f]):
+            native_needed.extend(C['ins'][k].address - C['base'] for k, _ in C['reads'][f])
+            print('  NATIVE %x-%x (%s)' % (f[0], f[1], ', '.join(PORTS[port]['native'][a] for a in sorted(set(
+                C['ins'][k].address - C['base'] for k, _ in C['reads'][f])))))
+            continue
         nxt = lambda k: C['ins'][k + 1].mnemonic
         same = ds and all(d[2] in ('cmp', 'bt') and decide(d[2], d[3], static[d[1]], nxt(d[0])) ==
                    decide(d[2], d[3], uni[d[1]], nxt(d[0])) == decide(d[2], d[3], cpu[d[1]], nxt(d[0])) for d in ds)
@@ -451,9 +522,10 @@ def run(port, tooth=False, tooth_roots=False, no_driver=False):
         print('  the tooth needs a reached PATH routine -- REFUSE')
         return 0
     pb, pr = path_proof(port, C, path_needed, tooth)
+    nb, nr = native_proof(port, C, set(native_needed), (static, uni, cpu), tooth) if native_needed else (0, 0)
     if tooth:
-        return pr
-    bad += pb + pr
+        return pr and (nr or not native_needed)
+    bad += pb + pr + nb + nr
     if drv and not no_driver:
         nt, nh, nd, nl = driver_count(port, C)
         print('  DRIVER in the process() oracle (2 channels): the driver ran %d times, its loads of __isa_available '

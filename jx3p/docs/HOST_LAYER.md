@@ -666,8 +666,11 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
   fill JUCE's CPU info, the CRT's __isa_available_init and FMA3 init, three that keep no answer) and OpenSSL's
   OPENSSL_ia32_cpuid; of every reader of their answers the port reaches: the render driver (rva 0x320A00: its four
   ISA tests sit behind `cmp r13d, 8`, reached 0 times with 2 channels while its loads run every block), the CRT's
-  memmove (0x6E4010) and memset (0x6E5870) -- run in Unicorn on both paths, equal results, the code run differs --
-  and the four FMA3 math functions above. The answers: static (the engine oracle jx_emu skips DllMain: 1, 0, 8239),
+  memmove (0x6E4010), memset (0x6E5870) and strrchr (0x6E6BAC; its one reached call passes 'e') -- run in Unicorn on
+  both paths, equal results, the code run differs --, its strnlen / wcslen / wcsnlen (0x72B2B0, 0x72B400, 0x72B52C:
+  leaf functions with no .pdata entry, an AVX2 path for __isa_available >= 5) run NATIVELY on both paths (an int3 on
+  the AVX2 path fires under this CPU's answer only; 3000 random strings, equal lengths), and the four FMA3 math
+  functions above. The answers: static (the engine oracle jx_emu skips DllMain: 1, 0, 8239),
   Unicorn (JXHost runs DllMain: 2, 2, no limit), this CPU (5, 2, no limit). The census also found false roots: the
   lifted code's comments carry memory-operand displacements (`[rip + 0x79fb9d]` fell in JUCE's CPU-info getter);
   a bracketed operand names no function. Teeth: the answers written off their globals (no path moves: refused);
