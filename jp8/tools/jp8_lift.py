@@ -326,32 +326,32 @@ class Lifter:
         if m == "imul":
             sz = op[0].size * 8
             if len(op) == 1:
-                if sz == 64: return "{ __int128 p=(__int128)(int64_t)R(0)*(int64_t)%s; R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(p!=(__int128)(int64_t)R(0)); }" % rd_int(ins, op[0])
+                if sz == 64: return "{ uint64_t h, l=jp8_muls64(R(0),%s,&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=((l>>63)?~0ULL:0ULL)); }" % rd_int(ins, op[0])
                 if sz == 32: return "{ int64_t p=(int64_t)(int32_t)R(0)*(int64_t)(int32_t)%s; R(0)=(uint64_t)p&0xFFFFFFFFULL; R(2)=((uint64_t)p>>32)&0xFFFFFFFFULL; c->cf=c->of=(p!=(int64_t)(int32_t)p); }" % rd_int(ins, op[0])
                 return None
             if len(op) == 2: return wr_int(ins, op[0], "op_imul2(c,%d,%s,%s)" % (sz, rd_int(ins, op[0]), rd_int(ins, op[1], sz)))
             return wr_int(ins, op[0], "op_imul2(c,%d,%s,0x%xULL)" % (sz, rd_int(ins, op[1]), op[2].imm & ((1 << sz) - 1)))
         if m == "mul":
             sz = op[0].size * 8
-            if sz == 64: return "{ unsigned __int128 p=(unsigned __int128)R(0)*%s; R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }" % rd_int(ins, op[0])
+            if sz == 64: return "{ uint64_t h, l=jp8_mulu64(R(0),%s,&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }" % rd_int(ins, op[0])
             if sz == 32: return "{ uint64_t p=(R(0)&0xFFFFFFFFULL)*%s; R(0)=p&0xFFFFFFFFULL; R(2)=p>>32; c->cf=c->of=(R(2)!=0); }" % rd_int(ins, op[0])
             return None
         if m in ("div", "idiv"):
             sz = op[0].size * 8; s = rd_int(ins, op[0])
             if m == "div":
-                if sz == 64: return "{ unsigned __int128 n=((unsigned __int128)R(2)<<64)|R(0); uint64_t d=%s; if(!d) jp8_trap(c,0x%x,\"div0\"); R(0)=(uint64_t)(n/d); R(2)=(uint64_t)(n%%d); }" % (s, rva)
+                if sz == 64: return "{ uint64_t d=%s, r, q; if(!d) jp8_trap(c,0x%x,\"div0\"); q=jp8_divu128(R(2),R(0),d,&r); R(0)=q; R(2)=r; }" % (s, rva)
                 if sz == 32: return "{ uint64_t n=((R(2)&0xFFFFFFFFULL)<<32)|(R(0)&0xFFFFFFFFULL); uint64_t d=%s; if(!d) jp8_trap(c,0x%x,\"div0\"); R(0)=(n/d)&0xFFFFFFFFULL; R(2)=(n%%d)&0xFFFFFFFFULL; }" % (s, rva)
             else:
-                if sz == 64: return "{ __int128 n=((__int128)(int64_t)R(2)<<64)|(unsigned __int128)R(0); int64_t d=(int64_t)%s; if(!d) jp8_trap(c,0x%x,\"div0\"); R(0)=(uint64_t)(int64_t)(n/d); R(2)=(uint64_t)(int64_t)(n%%d); }" % (s, rva)
+                if sz == 64: return "{ uint64_t d=%s, r, q; if(!d) jp8_trap(c,0x%x,\"div0\"); q=jp8_divs128(R(2),R(0),d,&r); R(0)=q; R(2)=r; }" % (s, rva)
                 if sz == 32: return "{ int64_t n=(int64_t)(((R(2)&0xFFFFFFFFULL)<<32)|(R(0)&0xFFFFFFFFULL)); int64_t d=(int64_t)(int32_t)%s; if(!d) jp8_trap(c,0x%x,\"div0\"); R(0)=((uint64_t)(n/d))&0xFFFFFFFFULL; R(2)=((uint64_t)(n%%d))&0xFFFFFFFFULL; }" % (s, rva)
             return None
         if m in ("bsr", "bsf"):
             sz = op[0].size * 8; src = rd_int(ins, op[1], sz)
-            body = "(63-__builtin_clzll(a0))" if m == "bsr" else "__builtin_ctzll(a0)"
+            body = "(63-jp8_clz64(a0))" if m == "bsr" else "jp8_ctz64(a0)"
             return "a0=%s; c->zf=(a0==0); if (a0) { %s }" % (src, wr_int(ins, op[0], body))
         if m in ("tzcnt", "lzcnt", "popcnt"):
             sz = op[0].size * 8; src = rd_int(ins, op[1], sz)
-            body = {"tzcnt": "(a0?__builtin_ctzll(a0):%d)" % sz, "lzcnt": "(a0?__builtin_clzll(a0)-(64-%d):%d)" % (sz, sz), "popcnt": "__builtin_popcountll(a0)"}[m]
+            body = {"tzcnt": "(a0?jp8_ctz64(a0):%d)" % sz, "lzcnt": "(a0?jp8_clz64(a0)-(64-%d):%d)" % (sz, sz), "popcnt": "jp8_popcount64(a0)"}[m]
             return "a0=%s; c->zf=(a0==0); c->cf=(a0==0); %s" % (src, wr_int(ins, op[0], body))
         if m in ("bt", "bts", "btr", "btc"):
             sz = op[0].size * 8; bit = rd_int(ins, op[1], 8) if op[1].type != x86.X86_OP_IMM else "%d" % op[1].imm

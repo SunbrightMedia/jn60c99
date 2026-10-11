@@ -1189,7 +1189,7 @@ L_b8319:
   /*b831d mov rcx, r8*/ R(1)=(uint64_t)(R(8));
   /*b8320 shr rcx, 1*/ R(1)=(uint64_t)(op_shr(c,64,R(1),(unsigned)(1)));
   /*b8323 movabs rax, 0xaaaaaaaaaaaaaaab*/ R(0)=(uint64_t)(0xaaaaaaaaaaaaaaabULL);
-  /*b832d mul rdi*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(7); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*b832d mul rdi*/ { uint64_t h, l=jp8_mulu64(R(0),R(7),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*b8330 shr rdx, 1*/ R(2)=(uint64_t)(op_shr(c,64,R(2),(unsigned)(1)));
   /*b8333 cmp rcx, rdx*/ op_sub(c,64,R(1),R(2));
   /*b8336 jbe 0x1800b834e*/ if (CC_BE) goto L_b834e;
@@ -7276,7 +7276,7 @@ static void f_357ef0(CPU *c) {
   goto L_357ef0;   /* the entry: blocks reached by backward jumps sort BEFORE it (paid 2026-09-22, note-off) */
 L_357ef0:
   /*357ef0 movabs rax, 0x2aaaaaaaaaaaaaab*/ R(0)=(uint64_t)(0x2aaaaaaaaaaaaaabULL);
-  /*357efa imul qword ptr [rcx + 0xb0]*/ { __int128 p=(__int128)(int64_t)R(0)*(int64_t)M64((R(1)+0xb0ULL)); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(p!=(__int128)(int64_t)R(0)); }
+  /*357efa imul qword ptr [rcx + 0xb0]*/ { uint64_t h, l=jp8_muls64(R(0),M64((R(1)+0xb0ULL)),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=((l>>63)?~0ULL:0ULL)); }
   /*357f01 sar rdx, 4*/ R(2)=(uint64_t)(op_sar(c,64,R(2),(unsigned)(4)));
   /*357f05 mov rax, rdx*/ R(0)=(uint64_t)(R(2));
   /*357f08 shr rax, 0x3f*/ R(0)=(uint64_t)(op_shr(c,64,R(0),(unsigned)(63)));
@@ -65240,7 +65240,7 @@ L_3f43c3:
   /*3f43d6 xor r10d, r10d*/ R(10)=((uint64_t)(op_xor(c,32,(R(10)&0xffffffffULL),(R(10)&0xffffffffULL))))&0xFFFFFFFFULL;
   /*3f43d9 mov rdx, qword ptr [rcx + 0x60]*/ R(2)=(uint64_t)(M64((R(1)+0x60ULL)));
   /*3f43dd sub rdx, r9*/ R(2)=(uint64_t)(op_sub(c,64,R(2),R(9)));
-  /*3f43e0 imul rdx*/ { __int128 p=(__int128)(int64_t)R(0)*(int64_t)R(2); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(p!=(__int128)(int64_t)R(0)); }
+  /*3f43e0 imul rdx*/ { uint64_t h, l=jp8_muls64(R(0),R(2),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=((l>>63)?~0ULL:0ULL)); }
   /*3f43e3 sar rdx, 4*/ R(2)=(uint64_t)(op_sar(c,64,R(2),(unsigned)(4)));
   /*3f43e7 mov rax, rdx*/ R(0)=(uint64_t)(R(2));
   /*3f43ea shr rax, 0x3f*/ R(0)=(uint64_t)(op_shr(c,64,R(0),(unsigned)(63)));
@@ -70936,11 +70936,11 @@ L_724cc0:
   /*724cf7 bts rcx, 0x34*/ op_bt(c,64,R(1),52); R(1)=(uint64_t)((R(1))|(1ULL<<((52)&63)));
   /*724cfc add r10, 8*/ R(10)=(uint64_t)(op_add(c,64,R(10),0x8ULL));
   /*724d00 vmovdqu xmm0, xmmword ptr [r9 + r10]*/ jp8_trap(c, 0x724d00, "vmovdqu xmm0, xmmword ptr [r9 + r10]");
-  /*724d06 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*724d06 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*724d09 mov r8, rax*/ R(8)=(uint64_t)(R(0));
   /*724d0c mov r10, rdx*/ R(10)=(uint64_t)(R(2));
   /*724d0f vmovq rax, xmm0*/ jp8_trap(c, 0x724d0f, "vmovq rax, xmm0");
-  /*724d14 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*724d14 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*724d17 and r11, 7*/ R(11)=(uint64_t)(op_and(c,64,R(11),0x7ULL));
   /*724d1b psrldq xmm0, 8*/ { t0=c->x[0]; memset(&c->x[0],0,16); if(8<16) memcpy(c->x[0].b,t0.b+8,16-8); }
   /*724d20 add rax, r10*/ R(0)=(uint64_t)(op_add(c,64,R(0),R(10)));
@@ -70948,7 +70948,7 @@ L_724cc0:
   /*724d27 mov r9, rax*/ R(9)=(uint64_t)(R(0));
   /*724d2a mov r10, rdx*/ R(10)=(uint64_t)(R(2));
   /*724d2d vmovq rax, xmm0*/ jp8_trap(c, 0x724d2d, "vmovq rax, xmm0");
-  /*724d32 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*724d32 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*724d35 add r10, rax*/ R(10)=(uint64_t)(op_add(c,64,R(10),R(0)));
   /*724d38 mov rcx, 0x36*/ R(1)=(uint64_t)(0x36ULL);
   /*724d3f mov rax, r10*/ R(0)=(uint64_t)(R(10));
@@ -70971,13 +70971,13 @@ L_724d60:
   /*724d76 shr r10, cl*/ R(10)=(uint64_t)(op_shr(c,64,R(10),(unsigned)((R(1)&0xffULL))));
   /*724d79 sub rcx, 0x40*/ R(1)=(uint64_t)(op_sub(c,64,R(1),0x40ULL));
   /*724d7d mov r11, rcx*/ R(11)=(uint64_t)(R(1));
-  /*724d80 bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-__builtin_clzll(a0))); }
+  /*724d80 bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-jp8_clz64(a0))); }
   /*724d84 jne 0x180724d9b*/ if (CC_NE) goto L_724d9b;
 L_724d86:
   /*724d86 mov r10, r9*/ R(10)=(uint64_t)(R(9));
   /*724d89 mov r9, r8*/ R(9)=(uint64_t)(R(8));
   /*724d8c mov r8, 0*/ R(8)=(uint64_t)(0x0ULL);
-  /*724d93 bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-__builtin_clzll(a0))); }
+  /*724d93 bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-jp8_clz64(a0))); }
   /*724d97 sub r11, 0x40*/ R(11)=(uint64_t)(op_sub(c,64,R(11),0x40ULL));
 L_724d9b:
   /*724d9b add r11, rcx*/ R(11)=(uint64_t)(op_add(c,64,R(11),R(1)));
@@ -71462,7 +71462,7 @@ L_746840:
 L_746851:
   /*746851 xor edx, edx*/ R(2)=((uint64_t)(op_xor(c,32,(R(2)&0xffffffffULL),(R(2)&0xffffffffULL))))&0xFFFFFFFFULL;
   /*746853 lea rax, [rdx - 0x20]*/ R(0)=(uint64_t)((R(2)+0xffffffffffffffe0ULL));
-  /*746857 div rbx*/ { unsigned __int128 n=((unsigned __int128)R(2)<<64)|R(0); uint64_t d=R(3); if(!d) jp8_trap(c,0x746857,"div0"); R(0)=(uint64_t)(n/d); R(2)=(uint64_t)(n%d); }
+  /*746857 div rbx*/ { uint64_t d=R(3), r, q; if(!d) jp8_trap(c,0x746857,"div0"); q=jp8_divu128(R(2),R(0),d,&r); R(0)=q; R(2)=r; }
   /*74685a cmp rax, r8*/ op_sub(c,64,R(0),R(8));
   /*74685d jb 0x1807468a2*/ if (CC_B) goto L_7468a2;
 L_74685f:
@@ -72350,11 +72350,11 @@ L_74d4b0:
   /*74d509 bts rcx, 0x34*/ op_bt(c,64,R(1),52); R(1)=(uint64_t)((R(1))|(1ULL<<((52)&63)));
   /*74d50e add r10, 8*/ R(10)=(uint64_t)(op_add(c,64,R(10),0x8ULL));
   /*74d512 movdqu xmm0, xmmword ptr [r9 + r10]*/ jp8_ldx(&c->x[0],(R(9)+R(10)*1+0x0ULL));
-  /*74d518 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*74d518 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*74d51b mov r8, rax*/ R(8)=(uint64_t)(R(0));
   /*74d51e mov r10, rdx*/ R(10)=(uint64_t)(R(2));
   /*74d521 movq rax, xmm0*/ R(0)=(uint64_t)(XQ(0,0));
-  /*74d526 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*74d526 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*74d529 and r11, 7*/ R(11)=(uint64_t)(op_and(c,64,R(11),0x7ULL));
   /*74d52d psrldq xmm0, 8*/ { t0=c->x[0]; memset(&c->x[0],0,16); if(8<16) memcpy(c->x[0].b,t0.b+8,16-8); }
   /*74d532 add rax, r10*/ R(0)=(uint64_t)(op_add(c,64,R(0),R(10)));
@@ -72362,7 +72362,7 @@ L_74d4b0:
   /*74d539 mov r9, rax*/ R(9)=(uint64_t)(R(0));
   /*74d53c mov r10, rdx*/ R(10)=(uint64_t)(R(2));
   /*74d53f movq rax, xmm0*/ R(0)=(uint64_t)(XQ(0,0));
-  /*74d544 mul rcx*/ { unsigned __int128 p=(unsigned __int128)R(0)*R(1); R(0)=(uint64_t)p; R(2)=(uint64_t)(p>>64); c->cf=c->of=(R(2)!=0); }
+  /*74d544 mul rcx*/ { uint64_t h, l=jp8_mulu64(R(0),R(1),&h); R(0)=l; R(2)=h; c->cf=c->of=(h!=0); }
   /*74d547 add r10, rax*/ R(10)=(uint64_t)(op_add(c,64,R(10),R(0)));
   /*74d54a mov rcx, 0x36*/ R(1)=(uint64_t)(0x36ULL);
   /*74d551 mov rax, r10*/ R(0)=(uint64_t)(R(10));
@@ -72386,12 +72386,12 @@ L_74d580:
   /*74d594 shr r10, cl*/ R(10)=(uint64_t)(op_shr(c,64,R(10),(unsigned)((R(1)&0xffULL))));
   /*74d597 sub rcx, 0x40*/ R(1)=(uint64_t)(op_sub(c,64,R(1),0x40ULL));
   /*74d59b mov r11, rcx*/ R(11)=(uint64_t)(R(1));
-  /*74d59e bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-__builtin_clzll(a0))); }
+  /*74d59e bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-jp8_clz64(a0))); }
   /*74d5a2 jne 0x18074d5c0*/ if (CC_NE) goto L_74d5c0;
 L_74d5a4:
   /*74d5a4 mov r10, r9*/ R(10)=(uint64_t)(R(9));
   /*74d5a7 mov r9, r8*/ R(9)=(uint64_t)(R(8));
-  /*74d5aa bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-__builtin_clzll(a0))); }
+  /*74d5aa bsr rcx, r10*/ a0=R(10); c->zf=(a0==0); if (a0) { R(1)=(uint64_t)((63-jp8_clz64(a0))); }
   /*74d5ae sub r11, 0x40*/ R(11)=(uint64_t)(op_sub(c,64,R(11),0x40ULL));
   /*74d5b2 nop word ptr [rax + rax]*/ ;
 L_74d5c0:

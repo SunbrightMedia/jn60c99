@@ -19,6 +19,12 @@ Labels: PROVEN = executed under Unicorn on the plugin's own code; READ = static 
 | 5 | Transcribe (layer 3: the hosted boot) | GREEN 2026-09-22 (logs/lift_gate_layer3_boot.log, job jp8_L3gate3): from the POST-STATIC-INIT image the C twin runs the lifted BUILD 0x445020 -> SETSR 0x4464F0 (float xmm1, 44100) -> host_init through HOSTPARAM 0x4465B0 -> recall of patch 5 through DISPATCH (flag 0) + ASG_NOTIFY -> 2200 samples (no snap: the plugin's own walker settles) -> NOTEON 60 / 64 / NOTEOFF / 64, on boot patches 2 and 63: 167,616 output words and the whole heap EXACTLY 0. Lift: 762 functions, 156,488 instructions, 280 trap sites (none reached). TOOTH (FINE TUNE setter + 0.0003 at 0x38633e): FAILS with 432 differences, first at state[0]+0x1480. Two harness defects paid on the way (PORT_LESSONS 12): the stack is state (BUILD copies static-init stack residue into 8 voice records) and the C side entered every call 8 bytes below the oracle's rsp. | PROVEN (EXACTLY 0) |
 
 ## ⚑ RESUME HERE (written 2026-09-28 when the chat was retired; everything below this block is the dated record)
+**2026-10-11 (from the JX-3P track, JX-26a, playbook 213): `jp8_lift.py` now emits ISO C99** -- the 64-bit mul /
+imul / div through jp8_cpu.h's exact helpers (jp8_mulu64, jp8_muls64, jp8_divu128, jp8_divs128) and the bit scans
+through jp8_clz64 / jp8_ctz64 / jp8_popcount64, no __int128, no builtins (20 M operands equal to __int128's; the
+JX's lifted source re-lifted: 14 lines changed, its lift gate EXACTLY 0). The committed jp8/src/jp8_lift.c is
+still the old output (this container has no build/jp8_lift/dynreach_*.json to lift from): the next
+jp8_lift_gate.sh run rewrites it -- then check it with tools/verify/c99_gate.py's scan.
 **Where it stands (each line has its log):**
 - ORACLE = DRIVE2 (`jp8_emu.JP8()` default; `legacy=True` only reproduces old logs): HOST from the FACTORY 0x444FE0
   (ALLOC 0x8D0 + ctor 0x444000), BUILD, FTZ, SETSR(float xmm1), host_init (host ids 0,1,2 through HOSTPARAM), recall through

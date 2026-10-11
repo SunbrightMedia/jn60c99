@@ -23,6 +23,11 @@
 
 #include "jx_voice_helpers.h"
 
+/* the guest-to-host delta of JX_G2H (jx_voice_render.c, jx_master_render.c, jx3p/gui/jx_bridge.c): defined here,
+ * once -- ISO C99 allows one external definition, and every build of the renders links this file. 0 (the cells
+ * hold host pointers) unless the bridge sets it for its guest memory (JX-11). */
+unsigned long long jx_g2h_delta;
+
 /* dword_1809C1300 / dword_1809C137C @ rva 0x1809C1300 (.rdata, 256 contiguous
  * bytes = 64 x f32): [0..30] = 2^-1..2^-31, [31] = 2^-32 (this element sits at
  * 0x1809C137C, IDA's second label), [32..63] = 2^1..2^32.
@@ -698,8 +703,10 @@ float jx_h_3A21E0(float result)
  * oracle executes a fresh image, so the ground truth is the NON-FMA path,
  * transcribed here instruction by instruction. System libm differs by 1 ulp
  * on some inputs (seen to fail: patches 30/43/53/54/56/62 before this).
- * STATUS: READ until the A/B gate is EXACTLY 0 again.
- * Host-only for now: uses unsigned __int128 (the Payne-Hanek path). */
+ * STATUS: PROVEN -- the render A/B (GATE 2: 64 patches x 3 rates EXACTLY 0) and every product gate run them.
+ * ISO C99 (2026-10-11, docs/GATE_PARITY.tsv c99): the conversions are the portable twins of cvtsd2si /
+ * cvttsd2si on every target (the WASM build ran them against the x86 asm before: GATE 5), and the
+ * Payne-Hanek path's 64 x 64 products are exact on 32-bit halves (jxm_mulu64), no __int128. */
 #include <stdint.h>
 #include <string.h>
 
@@ -739,16 +746,11 @@ float jx_h_expf_722EA0(float a1)
   double z  = 92.33248261689366 * xd;         /* 64/ln2, @0xAC5DF0 */
   if (z >= 8192.0)  return jxm_asf(0x7f800000u);  /* overflow  -> +inf */
   if (z < -9600.0)  return 0.0f;                  /* underflow -> +0   */
-  /* cvtpd2dq: round to nearest even */
-#if defined(__x86_64__)
-  int32_t n; { double t = z; __asm__("cvtsd2si %1, %0" : "=r"(n) : "x"(t)); }
-#else
-  /* portable twin of cvtsd2si (round-to-nearest-even; invalid -> INT_MIN).
-   * WASM path only; the x86 asm stays the proven form. */
-  int32_t n; { double t = z;
-    if (t != t || t >= 2147483648.0 || t < -2147483648.5) n = (int32_t)0x80000000;
-    else { double r = __builtin_rint(t); n = (int32_t)r; } }
-#endif
+  /* cvtsd2si: the current rounding (the plugin's MXCSR: to nearest, ties to even); a result past int32 or a NaN
+   * gives the integer indefinite, INT_MIN -- rint() rounds in the same mode (z is in [-9600, 8192) here) */
+  int32_t n; { double t = z, r = rint(t);
+    if (!(r >= -2147483648.0 && r <= 2147483647.0)) n = (int32_t)0x80000000u;
+    else n = (int32_t)r; }
   double kd = (double)n;
   double r  = xd - kd * 0.010830424696249145;     /* ln2/64, @0xAC5E00 */
   uint32_t idx = (uint32_t)n & 63u;
@@ -776,6 +778,27 @@ static const uint8_t jxm_inv_pio4[176] = {
 0x00,0x18,0x2d,0x44,0x54,0xfb,0x21,0xf9,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 static inline uint64_t jxm_ld64(const uint8_t *p){ uint64_t v; memcpy(&v,p,8); return v; }
+/* a x b: the low 64 bits, *hi the high (exact, 32-bit halves) */
+static inline uint64_t jxm_mulu64(uint64_t a, uint64_t b, uint64_t *hi)
+{
+  uint64_t al = a & 0xFFFFFFFFULL, ah = a >> 32, bl = b & 0xFFFFFFFFULL, bh = b >> 32;
+  uint64_t ll = al * bl, lh = al * bh, hl = ah * bl, hh = ah * bh;
+  uint64_t md = (ll >> 32) + (lh & 0xFFFFFFFFULL) + (hl & 0xFFFFFFFFULL);
+  *hi = hh + (lh >> 32) + (hl >> 32) + (md >> 32);
+  return (md << 32) | (ll & 0xFFFFFFFFULL);
+}
+/* the leading zero bits of x != 0 (bsr's 63 - index) */
+static inline unsigned jxm_clz64(uint64_t x)
+{
+  unsigned n = 0;
+  if (!(x >> 32)) { n += 32; x <<= 32; }
+  if (!(x >> 48)) { n += 16; x <<= 16; }
+  if (!(x >> 56)) { n += 8; x <<= 8; }
+  if (!(x >> 60)) { n += 4; x <<= 4; }
+  if (!(x >> 62)) { n += 2; x <<= 2; }
+  if (!(x >> 63)) { n += 1; }
+  return n;
+}
 
 /* rational tan kernel + odd-quadrant reciprocal, @0x725416..0x72547B */
 static double jxm_tan_poly(double z, uint32_t q)
@@ -813,15 +836,10 @@ float jx_h_tanf_725150(float a1)
   if ((int64_t)ax < (int64_t)0x4160000000000000ULL) {    /* |x| < 2^23 */
     double xa = jxm_asd(ax);
     double zn = 0.6366197723675814 * xa + 0.5;           /* 2/pi @0xAC7350 */
-#if defined(__x86_64__)
-    int32_t n; { double t = zn; __asm__("cvttsd2si %1, %0" : "=r"(n) : "x"(t)); }
-#else
-    /* portable twin of cvttsd2si (truncate; invalid -> INT_MIN) */
+    /* cvttsd2si: truncated; past int32 or a NaN, INT_MIN (the integer indefinite) */
     int32_t n; { double t = zn;
-      if (t != t || t >= 2147483648.0 || t <= -2147483649.0)
-          n = (int32_t)0x80000000;
+      if (!(t < 2147483648.0 && t > -2147483649.0)) n = (int32_t)0x80000000u;
       else n = (int32_t)t; }
-#endif
     q = (uint32_t)n & 3u;
     double kd = (double)n;
     double r  = xa - kd * 1.5707963267341256;            /* pio2_1  */
@@ -836,13 +854,15 @@ float jx_h_tanf_725150(float a1)
     uint64_t m1 = jxm_ld64(jxm_inv_pio4 + off + 8);
     uint64_t m2 = jxm_ld64(jxm_inv_pio4 + off + 16);
     uint64_t e7 = (uint64_t)e & 7u;
-    unsigned __int128 p0 = (unsigned __int128)m0 * frac;
-    unsigned __int128 p1 = (unsigned __int128)m1 * frac;
-    unsigned __int128 p2 = (unsigned __int128)m2 * frac;
-    uint64_t lo  = (uint64_t)p0;
-    uint64_t mid = (uint64_t)p1 + (uint64_t)(p0 >> 64);
-    uint64_t hi  = (uint64_t)(p1 >> 64) + (mid < (uint64_t)p1);
-    hi += (uint64_t)p2;
+    uint64_t p0h, p1h, p2h;
+    uint64_t p0l = jxm_mulu64(m0, frac, &p0h);
+    uint64_t p1l = jxm_mulu64(m1, frac, &p1h);
+    uint64_t p2l = jxm_mulu64(m2, frac, &p2h);
+    uint64_t lo  = p0l;
+    uint64_t mid = p1l + p0h;
+    uint64_t hi  = p1h + (mid < p1l);
+    (void)p2h;
+    hi += p2l;
     unsigned cl = (unsigned)(0x36 - e7);
     uint64_t sh  = hi >> cl;
     uint64_t cf  = (hi >> (cl - 1)) & 1u;
@@ -853,8 +873,8 @@ float jx_h_tanf_725150(float a1)
     hi = (hi << c2) >> c2;
     int64_t ebase = (int64_t)c2 - 0x40;
     unsigned b;
-    if (hi != 0) { b = 63u - (unsigned)__builtin_clzll(hi); }
-    else { hi = mid; mid = lo; lo = 0; b = 63u - (unsigned)__builtin_clzll(hi);
+    if (hi != 0) { b = 63u - jxm_clz64(hi); }
+    else { hi = mid; mid = lo; lo = 0; b = 63u - jxm_clz64(hi);
            ebase -= 0x40; }
     ebase += b;
     int64_t sc = (int64_t)b - 0x34;

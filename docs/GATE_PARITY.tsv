@@ -8,44 +8,72 @@
 # SCOPE_AUDIT row 5 said so in writing and nothing acted on it. A note in a
 # document is not a mechanism. This ledger is the mechanism.
 #
-# status: OK      -- the JX file exists and runs in the JX suite
+# status: OK      -- each JX file named exists AND jx3p/tools/jx_verify.sh runs it (a file that exists
+#                    but no suite runs is not a gate: on 2026-10-11 five "OK" rows named such files)
 #         MISSING -- owed; the tooth is RED until it exists or is waived
 #         WAIVED  -- deliberately not needed; the reason column must say why
+#         BLOCKED -- owed, but it needs an input the project does not have; the note names the input
+#                    (printed as NOT DONE; tools/status.sh lists it under "AM I DONE?")
+# A JX column may name several files joined by ' + '. Re-mapped 2026-10-11 (JX-26) after the JX moved to
+# the plugin's own code, lifted: many old "owed" names were closed by gates with other names; the rest are
+# owed below, each with the option of an existing gate that will close it.
 #
 # class	juno_gate	jx_gate	status	note
-seeded_random_diff	tools/verify/fuzz_diff.py	jx3p/tools/fuzz_gate.sh	OK	built 2026-08-26; ALREADY FOUND seed 2 diverging (jx3p/docs/FUZZ_SEED2_OPEN.md)
-random_state_ab	tools/verify/random_state_ab.py	jx3p/tools/random_state_ab.py	MISSING	random ENGINE STATE, not random patches
-cold_start	tools/verify/coldstate_ab.py	jx3p/tools/coldstate_ab.py	MISSING	SCOPE_AUDIT row 8; JX has no C init at all yet
-warm_recall	tools/verify/warm_recall_gate.py	jx3p/tools/warm_recall_gate.py	MISSING	patch change on a RUNNING engine; SCOPE_AUDIT row 9
-note_velocity_exhaust	tools/verify/notevel_exhaust.py	jx3p/tools/notevel_exhaust.py	MISSING	note-off, polyphony, velocity spread; SCOPE_AUDIT row 5
-voice_assigner	tools/verify/assigner_ab.py	jx3p/tools/assigner_ab.py	MISSING	the note allocator; SCOPE_AUDIT row 13
-block_size_invariance	tools/verify/renderstruct_ab.py	jx3p/tools/blocksize_ab.py	MISSING	JUNO gates 1/64/128/512/600; JX renders single samples only
-rate_scan	tools/verify/rate_fullscan.py	jx3p/tools/jx_verify.sh	OK	JX covers 44100/48000/96000; 88200+192000 still owed (row 7)
-host_role_params	tools/verify/hostpath_roles.py	jx3p/tools/hostpath_roles.py	MISSING	params a host reaches that recall never touches; SCOPE_AUDIT row 12
-approx_audit	tools/verify/approx_audit.py	jx3p/tools/approx_audit.py	MISSING	ZERO approximations rule must bind the JX too
-mutation_reach	tools/verify/mutation_gate.py	tools/verify/mutation_gate.py	OK	shared harness; JX dimensions still to be added
-census_parameters	tools/verify/juno_scope_probe.py	jx3p/tools/probe_pools.py	OK	57 pools, cross-checked against the host count
-recall_exhaustive	tools/verify/recall_exhaustive_gate.py	jx3p/tools/recall_completeness_gate.py	OK	64/64 patches EXACTLY 0
-unordered_compare	tools/verify/unordered_audit.py	tools/verify/unordered_audit.py	OK	shared; run over the JX master, 277 compares / 104 RISK
-nan_reachability	tools/verify/nan_ab.py	tools/verify/nan_ab.py	OK	shared; the JX defect it found is fixed
-user_bank_parity	tools/verify/userbank_parity.py	jx3p/tools/userbank_parity.py	MISSING	the user's own banks as INPUT; JX has run two banks by hand only
-ramp_smoothing	tools/verify/ramp_ab_gate.sh	jx3p/tools/ramp_walk_gate.sh	OK	JUNO gate written 2026-08-26; found 4 real defects (docs/RAMP_AB_FINDINGS.md)
-fp_mode	src/juno_ftz.c	jx3p/src/jx_ftz.c	OK	FTZ/DAZ; mandatory in ab_render_c.py, refuses if unlinked
-provenance	tools/verify/provenance_check.py	jx3p/tools/provenance_check.py	MISSING	PROVENANCE.tsv equivalent for the JX constants
-pipeline_audit	tools/verify/dejuno_audit.py	tools/verify/dejuno_audit.py	OK	shared; E5 proves it by traversal
-census_exhaustive	tools/verify/census_exhaustive_gate.py	jx3p/tools/recall_completeness_gate.py	OK	full-state exhaustive recall sweep; JX equivalent covers its census
-leaf_completeness	tools/verify/completeness_gate.py	jx3p/tools/coverage_audit.py	OK	every leaf enumerated from the binary, not a hand list
-fx_param_sweep	tools/verify/fxsweep_gate.py	jx3p/tools/probe_pools.py	OK	JUNO sweeps 4 FX params x 256 values; JX FX pools are in the 57-pool census
-recall_gate	tools/verify/recall_gate.py	jx3p/tools/jx_recall_gate.sh	OK	patch bytes -> coefficient state, EXACTLY 0
-integration_render_ab	tools/verify/recall_render_ab.py	jx3p/tools/ab_render_c.py	OK	recall + note-on + full chain, plugin vs port
-effect_param_sweep	tools/verify/effect_param_gate.py	jx3p/tools/effect_param_gate.py	MISSING	every byte of each FX parameter under every FX type, whole object + render (JUNO 2026-10-05)
-fx_leaf_sweep	tools/verify/fx_leaf_gate.py	jx3p/tools/fx_leaf_gate.py	MISSING	every byte of each FX leaf family by fresh recall (JUNO flanger, 2026-10-05)
-all_voice_state	tools/verify/note_bcast_gate.py	jx3p/tools/note_bcast_gate.py	MISSING	every voice whole state after every note event, from the unit that renders it
-host_rate_sweep	tools/verify/rate_sweep_gate.py	jx3p/tools/rate_sweep_gate.py	MISSING	whole object + renders at 18 host rates; JX covers 3
-seeded_leaf_recall	tools/verify/seed_recall_gate.py	jx3p/tools/seed_recall_gate.py	MISSING	every recalled leaf random from its declared range; found 2 JUNO defects
-voice_steal	tools/verify/steal_gate.py	jx3p/tools/steal_gate.py	MISSING	more held notes than voices, audio + every voice state
-warm_chain	tools/verify/warm_chain_gate.py	jx3p/tools/warm_chain_gate.py	MISSING	chains of recalls through ONE engine, whole object after every step; found the JUNO slot-1 patch-change sequence
-warm_render	tools/verify/warm_render_gate.py	jx3p/tools/warm_render_gate.py	MISSING	patch changes on a RUNNING engine with notes and renders; found 3 JUNO assigner defects
+seeded_random_diff	tools/verify/fuzz_diff.py	jx3p/tools/fuzz_gate.sh	MISSING	seeded patch x rate x warm x notes A/B of the render (built 2026-08-26) -- no suite runs it since the JX verify was rebuilt: owed in jx_verify.sh
+random_state_ab	tools/verify/random_state_ab.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads random -- records of random values through the host entry, the whole heap after each (today: random records graded by their queued records, store and audio only: jx_patch_gate.py, jx_product_gate.py --recall r)
+cold_start	tools/verify/coldstate_ab.py	jx3p/tools/jx_drive_gate.py + jx3p/tools/jx_lift_gate.py	OK	the port starts from the plugin's own boot image (GATE 0: the guest image IS this boot's heap); a fresh instance's first block through the lifted entries (--loads boot*: 7 runs)
+warm_recall	tools/verify/warm_recall_gate.py	jx3p/tools/jx_lift_gate.py + jx3p/tools/jx_product_gate.py	OK	warm loads onto a running engine, the whole heap (--relift, --base 34 --loads); through process() with keys held (--recall)
+note_velocity_exhaust	tools/verify/notevel_exhaust.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads notevel -- every note x every velocity through the lifted note entry, the heap after each (today: 816 note calls of the notes script)
+voice_assigner	tools/verify/assigner_ab.py	jx3p/tools/jx_lift_gate.py + jx3p/tools/jx_product_gate.py	OK	the note path is the plugin's own, lifted: every assign mode x legato x portamento x ARPEGGIO, a heap checkpoint after every call (--loads notes); through process() (--set)
+block_size_invariance	tools/verify/renderstruct_ab.py	jx3p/tools/jx_product_gate.py	OK	host blocks 512, 64, 600, 128 and 1 through process() (--block)
+rate_scan	tools/verify/rate_fullscan.py	jx3p/tools/jx_product_gate.py	OK	the render object's five rates (44100, 48000, 88200, 96000, 192000) through process(); 32000 silent on both sides
+host_role_params	tools/verify/hostpath_roles.py	jx3p/tools/jx_lift_gate.py + jx3p/tools/jx_product_gate.py	OK	the JX's patch load IS the host entry (one role: records through HOSTPARAM 0x3F9A30): every id of its map x 13 values and the host settings, the whole heap (--loads sweep, settings); host automation through process() (--edits)
+approx_audit	tools/verify/approx_audit.py	tools/verify/approx_audit.py	OK	--jx: the audit over jx3p/src, jx3p/gui and jp8/src (it read src/ only; its first run found three stale markers, fixed 2026-10-11)
+mutation_reach	tools/verify/mutation_gate.py	jx3p/tools/jx_mutation_gate.py	OK	11 mutations, each in a line that runs, all KILLED (GATE 3g)
+census_parameters	tools/verify/juno_scope_probe.py	jx3p/tools/jx_gen_midi_tables.py + jx3p/tools/jx_gen_state_tables.py	OK	the host's id map and the DAW state's entries rebuilt from the booted plugin every run (--check); the lift's sweep walks every id of the host entry's map (744)
+recall_exhaustive	tools/verify/recall_exhaustive_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads exhaustive -- every id x every value of its range, the heap after each value (today: 13 values per id)
+unordered_compare	tools/verify/unordered_audit.py	tools/verify/unordered_audit.py	MISSING	owed: no suite runs the audit over the JX's transcribed DSP (the master and the voices); the JX master's three unordered compares were found by hand (playbook 198)
+nan_reachability	tools/verify/nan_ab.py	tools/verify/nan_ab.py	MISSING	owed: no suite runs a NaN-injection A/B on the JX
+user_bank_parity	tools/verify/userbank_parity.py	jx3p/tools/jx_patch_gate.py + jx3p/tools/jx_product_gate.py	BLOCKED	input: the user's own JX-3P banks (scratchpad/userbanks/ holds JUNO-60 banks only). Graded meanwhile: records of seeded random bytes and a bank file of them through the patch browser (jx_patch_gate.py chains 1, 3) and their audio with keys held (jx_product_gate.py --recall r)
+ramp_smoothing	tools/verify/ramp_ab_gate.sh	jx3p/tools/ramp_walk_gate.sh	MISSING	the walk grades jx3p/src/jx_ramp.c, which the product no longer builds: the product's ramp tick and sweep are jx_bridge.c's (0x3F4A40 / 0x3F40E0); owed: the seeded walk on the bridge's code, in jx_verify.sh
+fp_mode	src/juno_ftz.c	jx3p/src/jx_ftz.c	OK	FTZ/DAZ; built into every port library
+provenance	tools/verify/provenance_check.py	jx3p/tools/jx_provenance.py	MISSING	owed: every file of jx3p/src and jx3p/gen with its role (product, generated, retired) and the proof that runs it
+pipeline_audit	tools/verify/dejuno_audit.py	-	WAIVED	one audit serves both ports: it reads the shared item-7 tools for JUNO constants, and make static runs it
+census_exhaustive	tools/verify/census_exhaustive_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads exhaustive (as recall_exhaustive)
+leaf_completeness	tools/verify/completeness_gate.py	jx3p/tools/jx_lift_gate.py	OK	the recall is the plugin's own code, lifted: --relift requires the committed source equal to a fresh lift of the committed reach; a branch to a block not lifted traps
+fx_param_sweep	tools/verify/fxsweep_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads exhaustive (every effect parameter x every value)
+recall_gate	tools/verify/recall_gate.py	jx3p/tools/jx_recall_data_gate.py + jx3p/tools/jx_recall_product_check.py	OK	64/64 patches, every window equal to the plugin's patch load (GATE 1)
+integration_render_ab	tools/verify/recall_render_ab.py	jx3p/tools/ab_render_c.py	OK	GATE 2: 64 patches x 3 rates EXACTLY 0
+effect_param_sweep	tools/verify/effect_param_gate.py	jx3p/tools/jx_lift_gate.py + jx3p/tools/jx_master_bisect.py	MISSING	owed: every effect parameter x every value under every effect type -- the object (--loads exhaustive) and the render (bisect variants); today: the types on every patch (--loads modes, the bisect's mode variants)
+fx_leaf_sweep	tools/verify/fx_leaf_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads exhaustive
+all_voice_state	tools/verify/note_bcast_gate.py	jx3p/tools/jx_master_bisect.py	MISSING	owed: --script SEED -- seeded polyphony, every unit's window and the control objects after every event (today: one note per run)
+host_rate_sweep	tools/verify/rate_sweep_gate.py	jx3p/tools/jx_product_gate.py	MISSING	owed: the JUNO's 18 host rates through process() (today 6: the table's five and 32000)
+seeded_leaf_recall	tools/verify/seed_recall_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: --loads random (as random_state_ab)
+voice_steal	tools/verify/steal_gate.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_master_bisect.py	MISSING	the audio is graded (--poly: up to 10 keys, steals); owed: every voice's state through steals (bisect --script)
+warm_chain	tools/verify/warm_chain_gate.py	jx3p/tools/jx_lift_gate.py	MISSING	owed: a heap checkpoint after EVERY patch of a warm chain (today: the whole heap after the last only)
+warm_render	tools/verify/warm_render_gate.py	jx3p/tools/jx_product_gate.py	OK	patch changes on a running engine with keys held, in fast succession, random records (--recall)
+bank_product	tools/verify/bank_product_gate.py	jx3p/tools/jx_product_gate.py	MISSING	owed: all 64 factory patches through the plugin's process() (today 6 patches; GATE 2 covers 64 at the engine, GATE 5 the WASM against native)
+boot	tools/verify/boot_gate.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_lift_gate.py	OK	every product run compares from the first host sample; a fresh instance's first block lifted (--loads boot*)
+cc_menu_model	tools/verify/cc_menu_gate.py	jx3p/tools/jx_state_gate.py	OK	the menu's model: every record's CC-of after every step of 7 chains, learn / forget (JX-23)
+panel_drawn	tools/verify/skin_check.mjs	-	BLOCKED	input: the JX-3P panel art (its Script folder of PNG files: SCOPE_AUDIT row 20) -- the drawn panel, the CC menu's search on the panel tree (sizes from the art), the bank name control's presses (PM teeth 18, 19)
+ccmap_state	tools/verify/ccmap_state_gate.py	jx3p/tools/jx_state_gate.py	OK	CC maps from setState emptied and refilled (JX-17)
+edit_cover	tools/verify/edit_cover_gate.py	-	WAIVED	the JUNO's host edit copies a scratch state, and the gate proves the copy covers every cell the edit writes; the JX's edit has no copy: the lifted host entry writes the plugin's heap in place (jx3p/gui/jx_bridge.c)
+host_edit	tools/verify/host_edit_gate.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_lift_gate.py	OK	host automation through process() (--edits: the driver's id map and value law), every id through the host entry (--loads sweep)
+host_process	tools/verify/host_process_gate.py	jx3p/tools/jx_product_gate.py	OK	the plugin's own process(): render driver, render object, 96 kHz engine (GATE 3d)
+host_rate_change	tools/verify/host_rate_gate.py	jx3p/tools/jx_product_gate.py	MISSING	owed: setupProcessing with a new host rate on a running instance (today: each run one host rate)
+keyhold	tools/verify/keyhold_gate.py	jx3p/tools/jx_state_gate.py	OK	KEY HOLD and the UI timer's keyboard (chains 4, 5; JX-17b)
+led_meter	tools/verify/led_meter_gate.py	jx3p/tools/jx_meter_gate.py	OK	the two meters (the JX has no LFO LED): the engine's peaks, read, tick, draw (JX-22)
+midi_ctl	tools/verify/midi_ctl_gate.py	jx3p/tools/jx_product_gate.py	OK	bend, mod, expression, the CC map, sustain, all notes off through process() (--ctl)
+patch_manager	tools/verify/patch_manager_gate.py	jx3p/tools/jx_patch_manager_gate.py	OK	the JUNO's gate on the JX plugin's own manager; 17 of 19 teeth (18, 19: panel_drawn)
+rate_switch	tools/verify/rate_switch_gate.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_lift_gate.py	OK	the engine-rate setting on a running engine through process() (--state rV) and lifted (--loads rate)
+script_ab	tools/verify/script_ab.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_master_bisect.py	MISSING	owed: TEMPO SYNC engaged and released under a held note on every factory patch (A5's twin; --set); every discrete voice mode no factory patch selects, rendered (A6's twin; bisect variants -- today only the two effect-mode cells)
+state_load	tools/verify/state_load_gate.py	jx3p/tools/jx_state_gate.py	OK	setState: the payload's host edits and records in the plugin's order (JX-17)
+state_save	tools/verify/state_save_gate.py	jx3p/tools/jx_state_gate.py	OK	getState byte for byte, the UI-timer drain, MIDI learn (JX-17)
+voice_count	tools/verify/voice_count_gate.py	jx3p/tools/jx_product_gate.py	MISSING	owed: the voice count changed while notes sound, through process() (today: the default six; --tooth-voices)
+wasm_product	tools/verify/wasm_product_gate.py	jx3p/tools/jx_wasm_check.py	OK	WASM == native on the page's product-path calls, 64 patches, 3 rates (GATE 5)
+wrapper_velocity	tools/verify/wrapper_velocity_gate.py	jx3p/tools/jx_product_gate.py	MISSING	owed: the velocity switch (0x0FFFC003) off through process() (today: its default, on)
+zoom_fit	tools/verify/zoom_fit_gate.py	jx3p/tools/jx_zoom_fit_gate.py	OK	16 screens, both windows (JX-25)
+c99	tools/verify/c99_gate.py	tools/verify/c99_gate.py	OK	both ports ISO C99: gcc -std=c99 -pedantic-errors + the live code scanned in a generic and the native configuration; its first run found __int128, builtins, x86 asm and a weak symbol in the JX (fixed 2026-10-11); make static and GATE S run it, with its tooth
 #
 # PARITY RUNS BOTH WAYS. ramp_smoothing was built for the JX first, so the
 # JUNO now owes an equivalent: does the JUNO port step ITS parameter ramps, or

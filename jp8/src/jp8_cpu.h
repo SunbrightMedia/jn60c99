@@ -158,12 +158,83 @@ static inline uint64_t op_rcr(CPU *c, int sz, uint64_t a, unsigned n) {
 static inline uint64_t op_rcl(CPU *c, int sz, uint64_t a, unsigned n) {
     n %= (sz + 1); a &= jp8_mask(sz); while (n--) { int cf = (a >> (sz - 1)) & 1; a = ((a << 1) | (uint64_t)c->cf) & jp8_mask(sz); c->cf = cf; } return a;
 }
+/* ---- the 64-bit multiply, divide and bit scans in ISO C99 (2026-10-11, docs/GATE_PARITY.tsv c99): no __int128 and
+ * no compiler builtins -- exact integer arithmetic on 32-bit halves, the same results on every compiler and target */
+static inline uint64_t jp8_mulu64(uint64_t a, uint64_t b, uint64_t *hi) {      /* a x b: the low half, *hi the high */
+    uint64_t al = a & 0xFFFFFFFFULL, ah = a >> 32, bl = b & 0xFFFFFFFFULL, bh = b >> 32;
+    uint64_t ll = al * bl, lh = al * bh, hl = ah * bl, hh = ah * bh;
+    uint64_t mid = (ll >> 32) + (lh & 0xFFFFFFFFULL) + (hl & 0xFFFFFFFFULL);
+    *hi = hh + (lh >> 32) + (hl >> 32) + (mid >> 32);
+    return (mid << 32) | (ll & 0xFFFFFFFFULL);
+}
+static inline uint64_t jp8_muls64(uint64_t a, uint64_t b, uint64_t *hi) {      /* the same, a and b two's complement */
+    uint64_t lo = jp8_mulu64(a, b, hi);
+    if (a >> 63) *hi -= b;                    /* (a - 2^64)(b - 2^64 [b<0]) mod 2^128: the high half less b, less a */
+    if (b >> 63) *hi -= a;
+    return lo;
+}
+/* (nh:nl) / d, d != 0: the quotient's low 64 bits (x86 faults when it needs more; the lifted code never meets that)
+ * and *rem the remainder -- the high word first, then 64 steps of shift and subtract */
+static inline uint64_t jp8_divu128(uint64_t nh, uint64_t nl, uint64_t d, uint64_t *rem) {
+    uint64_t r = nh % d, q = 0; int i;
+    for (i = 63; i >= 0; --i) {
+        uint64_t top = r >> 63;
+        r = (r << 1) | ((nl >> i) & 1u);
+        q <<= 1;
+        if (top || r >= d) { r -= d; q |= 1u; }
+    }
+    *rem = r;
+    return q;
+}
+/* the signed form (idiv): the quotient truncated toward zero, the remainder with the dividend's sign */
+static inline uint64_t jp8_divs128(uint64_t nh, uint64_t nl, uint64_t d, uint64_t *rem) {
+    int nneg = (int)(nh >> 63), dneg = (int)(d >> 63);
+    uint64_t q, r, ad = dneg ? (uint64_t)0 - d : d;
+    if (nneg) { nl = (uint64_t)0 - nl; nh = ~nh + (nl == 0); }
+    q = jp8_divu128(nh, nl, ad, &r);
+    *rem = nneg ? (uint64_t)0 - r : r;
+    return (nneg != dneg) ? (uint64_t)0 - q : q;
+}
+static inline unsigned jp8_clz64(uint64_t x) {     /* x != 0 */
+    unsigned n = 0;
+    if (!(x >> 32)) { n += 32; x <<= 32; }
+    if (!(x >> 48)) { n += 16; x <<= 16; }
+    if (!(x >> 56)) { n += 8; x <<= 8; }
+    if (!(x >> 60)) { n += 4; x <<= 4; }
+    if (!(x >> 62)) { n += 2; x <<= 2; }
+    if (!(x >> 63)) { n += 1; }
+    return n;
+}
+static inline unsigned jp8_ctz64(uint64_t x) {     /* x != 0 */
+    unsigned n = 0;
+    if (!(x & 0xFFFFFFFFULL)) { n += 32; x >>= 32; }
+    if (!(x & 0xFFFFULL)) { n += 16; x >>= 16; }
+    if (!(x & 0xFFULL)) { n += 8; x >>= 8; }
+    if (!(x & 0xFULL)) { n += 4; x >>= 4; }
+    if (!(x & 0x3ULL)) { n += 2; x >>= 2; }
+    if (!(x & 0x1ULL)) { n += 1; }
+    return n;
+}
+static inline unsigned jp8_popcount64(uint64_t x) {
+    x = x - ((x >> 1) & 0x5555555555555555ULL);
+    x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+    x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+    return (unsigned)((x * 0x0101010101010101ULL) >> 56);
+}
 static inline uint64_t op_imul2(CPU *c, int sz, uint64_t a, uint64_t b) {   /* signed, sets CF=OF on overflow */
-    __int128 p = (__int128)(int64_t)(sz == 64 ? (int64_t)a : sz == 32 ? (int64_t)(int32_t)a : sz == 16 ? (int64_t)(int16_t)a : (int64_t)(int8_t)a)
-               * (int64_t)(sz == 64 ? (int64_t)b : sz == 32 ? (int64_t)(int32_t)b : sz == 16 ? (int64_t)(int16_t)b : (int64_t)(int8_t)b);
-    uint64_t r = (uint64_t)p & jp8_mask(sz);
-    int64_t s = (sz == 64) ? (int64_t)r : (sz == 32) ? (int64_t)(int32_t)r : (sz == 16) ? (int64_t)(int16_t)r : (int64_t)(int8_t)r;
-    c->cf = c->of = (p != (__int128)s); return r;
+    uint64_t r, hi;
+    if (sz == 64) {                           /* the full product: overflow iff its high half is not the low's sign */
+        r = jp8_muls64(a, b, &hi);
+        c->cf = c->of = (hi != ((r >> 63) ? ~0ULL : 0ULL)); return r;
+    }
+    {   /* 8, 16, 32 bits: the product of the sign-extended operands fits in 64 bits */
+        int64_t p = (sz == 32 ? (int64_t)(int32_t)a : sz == 16 ? (int64_t)(int16_t)a : (int64_t)(int8_t)a)
+                  * (sz == 32 ? (int64_t)(int32_t)b : sz == 16 ? (int64_t)(int16_t)b : (int64_t)(int8_t)b);
+        int64_t s;
+        r = (uint64_t)p & jp8_mask(sz);
+        s = (sz == 32) ? (int64_t)(int32_t)r : (sz == 16) ? (int64_t)(int16_t)r : (int64_t)(int8_t)r;
+        c->cf = c->of = (p != s); return r;
+    }
 }
 static inline int op_bt(CPU *c, int sz, uint64_t a, uint64_t bit) { bit &= (sz - 1); c->cf = (a >> bit) & 1; return c->cf; }
 static inline uint64_t sext(int sz, uint64_t v) { return sz == 64 ? v : sz == 32 ? (uint64_t)(int64_t)(int32_t)v : sz == 16 ? (uint64_t)(int64_t)(int16_t)v : (uint64_t)(int64_t)(int8_t)v; }

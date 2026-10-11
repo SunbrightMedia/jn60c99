@@ -3663,3 +3663,30 @@ Before a module runs another plugin, grep it for EVERY `IB + 0x...` and every li
 route each through the profile; a profile's "none" is None, never an empty table. Then run the FIRST plugin's
 gate again with a fresh reference: its plugin side must run through the changed module (the JUNO's patch
 manager gate, a new 60-command reference: GREEN).
+
+## 212. A LEDGER ROW THAT CHECKS A FILE EXISTS IS NOT A GATE THAT RUNS
+Paid 2026-10-11 (JX-3P, JX-26: the JUNO vs JX gate-parity ledger, docs/GATE_PARITY.tsv).
+Five rows were "OK" because their JX file existed (the seeded fuzz gate, the ramp walk, the recall completeness
+gate, the leaf coverage audit, the pool census); since the JX verify was rebuilt no suite ran any of them, and the
+walk graded a ramp source the product no longer built. Eighteen "MISSING" rows were stale the other way: closed by
+gates with other names. And twenty JUNO gates written after August were in no row at all. The ledger read
+"15 OK" for two months while nothing checked what it claimed.
+### The rule
+A parity row is OK only when each file it names is invoked by the suite (gate_parity.py rule 4: a non-comment
+line of jx3p/tools/jx_verify.sh), and the checker's own --self-test must turn a planted unrun row RED. When a
+port changes its architecture (the JX moved to the plugin's own code, lifted), re-map every row the same day:
+say for each class which running gate grades its SPACE, or name the option that will.
+
+## 213. "IT IS C99" IS A CLAIM, AND -std=c99 DOES NOT CHECK IT
+Paid 2026-10-11 (JX-3P, JX-26a). Every JX build said -std=c99; the lifted 64-bit mul / imul / div used
+`unsigned __int128`, the bit scans `__builtin_clzll`, the voice helpers' expf / tanf x86 inline asm (cvtsd2si /
+cvttsd2si) on the path every gate ran, and the renders a weak symbol -- none of them ISO C, all accepted by gcc in
+-std=c99 mode. A portable twin sat in the asm's #else, so "it is portable" also looked true; the code that ran was
+not the twin.
+### The rule
+Grade the language like any other claim: tools/verify/c99_gate.py -- gcc -std=c99 -pedantic-errors on every
+product unit, and the LIVE code (a small preprocessor: each #if evaluated) scanned for extensions in two
+configurations: GENERIC (a C99 compiler on an unknown platform: nothing may be found) and NATIVE (the gates' own
+build: only the FTZ / DAZ mode glue C99 has no words for). Replace an extension with exact C99 (64 x 64 products
+on 32-bit halves, a 128 / 64 long division, a binary-search clz, rint() for cvtsd2si), test the helper against the
+extension on millions of operands, and see the gate RED on the old tree before it is believed.

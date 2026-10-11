@@ -42,9 +42,10 @@
 #                  (GATE 3h).
 #
 # What this does NOT cover, stated so "green" is not read wider than it is
-# (jx3p/docs/SCOPE_AUDIT.md is the full table, rows 18-20 open): the CC assign
-# menu, the patch window, and the editor's GRAPHICS -- the panel is not drawn
-# (no JX art in truth/); its parameter path is graded (3f).
+# (jx3p/docs/SCOPE_AUDIT.md is the full table, row 20 open; docs/GATE_PARITY.tsv
+# the gate classes still owed): the editor's GRAPHICS -- the panel is not drawn
+# (no JX art in truth/), so neither the CC assign menu's search on the panel nor
+# the bank name control's presses run; their models are graded (3f, 3h).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -55,6 +56,13 @@ N=${JX_VERIFY_N:-64}          # samples per patch (long block: crosses LFO/env e
 WARM=${JX_VERIFY_WARM:-6}
 PATCHES=${JX_VERIFY_PATCHES:-"$(seq 0 63)"}
 echo "[jx verify] work dir $WORK  rates=$RATES  n=$N warm=$WARM"
+
+echo "=== JX GATE S: THE SOURCES (ISO C99 in a generic and the native configuration; no approximation marker) ==="
+# the port must stand on ISO C99 alone: gcc -std=c99 -pedantic-errors and a scan of the live code (2026-10-11: the
+# lifted mul / div and the voice helpers used __int128, a builtin and x86 asm -- none of them C99)
+python3 "$REPO/tools/verify/c99_gate.py"
+python3 "$REPO/tools/verify/c99_gate.py" --self-test         # an __int128, a builtin, a POSIX header must be seen
+python3 "$REPO/tools/verify/approx_audit.py" --jx
 
 echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="
 # Every defect that cost this port days was a DRIVE defect, invisible to an

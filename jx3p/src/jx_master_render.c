@@ -18,11 +18,7 @@
 /* JX_G2H: a pointer the plugin stored in its own memory, as a host address. In the port's guest memory
  * (jx3p/gui/jx_bridge.c, JX-11) the cells hold the plugin's guest addresses and the bridge sets the delta;
  * every other build leaves it 0 (the cells hold host pointers). */
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((weak)) unsigned long long jx_g2h_delta;
-#else
-unsigned long long jx_g2h_delta;
-#endif
+extern unsigned long long jx_g2h_delta;   /* defined once, in jx_voice_helpers.c (every build of the renders has it) */
 #define JX_G2H(p) ((unsigned long long)(p) + jx_g2h_delta)
 
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
@@ -2812,7 +2808,7 @@ LABEL_216:
           *(float *)(st + 263968) = v827;
           /* the argument the decompile lost (2026-10-10, asm 0x3A0842..0x3A085A): the effect LFO's phase
            * ([+0x40AE0] + [+0x40790]) + [+0x407D0], the last two the previous phases moved just above.
-           * The placeholder 0 was right only while the LFO's rate was 0 (the pool-model recall). */
+           * The decompile's earlier argument 0 agreed only while the LFO's rate was 0 (the pool-model recall). */
           v828 = jx_h_3A2180((float)((float)(*(float *)(st + 264928) + *(float *)(st + 264080))
                                      + *(float *)(st + 264144)));
           v829 = v828;
@@ -3618,7 +3614,7 @@ LABEL_312:
                    * *(float *)(st + 267744))
            - v725;
       *(float *)(st + 267104) = (float)(v727 * *(float *)(st + 267504)) + v725;
-      v730 = jx_h_3A2180(v726);   /* asm 0x39FB4C: xmm0 = xmm6 = v726 (2026-10-10; was a placeholder 0) */
+      v730 = jx_h_3A2180(v726);   /* asm 0x39FB4C: xmm0 = xmm6 = v726 (2026-10-10; the decompile's earlier argument was 0) */
       *(_DWORD *)(st + 266880) = LODWORD(v730);
       if ( v726 < 1.0 )
         v727 = *(float *)(st + 267152);

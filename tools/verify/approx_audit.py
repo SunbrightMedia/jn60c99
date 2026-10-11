@@ -42,6 +42,9 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SRC = os.path.join(REPO, 'src')
+# --jx: the JX-3P port's sources -- its own, its bridge, and the JP8 runtime its bridge includes (the lifted code's
+# header and runtime) -- under the same rule (docs/GATE_PARITY.tsv approx_audit, 2026-10-11)
+JX_ROOTS = [os.path.join(REPO, 'jx3p', 'src'), os.path.join(REPO, 'jx3p', 'gui'), os.path.join(REPO, 'jp8', 'src')]
 
 # Words that describe falling short of the plugin. Case-insensitive.
 MARKERS = [
@@ -79,11 +82,12 @@ NEGATED = re.compile(
 def main():
     bad = []
     n_files = n_marks = n_ok = 0
-    for fn in sorted(os.listdir(SRC)):
+    roots = JX_ROOTS if '--jx' in sys.argv else [SRC]
+    for path in [os.path.join(r, f) for r in roots for f in sorted(os.listdir(r))]:
+        fn = os.path.relpath(path, REPO) if '--jx' in sys.argv else os.path.basename(path)
         if not fn.endswith(('.c', '.h')):
             continue
         n_files += 1
-        path = os.path.join(SRC, fn)
         lines = open(path, encoding='utf-8', errors='replace').read().split('\n')
         for i, line in enumerate(lines):
             low = line.lower()
@@ -107,7 +111,7 @@ def main():
                 continue
             bad.append((fn, i + 1, hit, line.strip()[:100]))
 
-    print('=== APPROXIMATION AUDIT (src/) ===')
+    print('=== APPROXIMATION AUDIT (%s) ===' % ('jx3p/src, jx3p/gui, jp8/src' if '--jx' in sys.argv else 'src/'))
     print('files %d   markers %d   justified %d   UNJUSTIFIED %d'
           % (n_files, n_marks, n_ok, len(bad)))
     if bad:

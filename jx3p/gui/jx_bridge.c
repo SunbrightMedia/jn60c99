@@ -32,8 +32,9 @@
 #include <stddef.h>
 #include <math.h>
 
-/* ---- the guest heap's translation for transcribed code: host = guest + delta (set at init) ---- */
-unsigned long long jx_g2h_delta;
+/* ---- the guest heap's translation for transcribed code: host = guest + delta (set at init; the variable is
+ * defined once, in jx3p/src/jx_voice_helpers.c, linked into every build) ---- */
+extern unsigned long long jx_g2h_delta;
 #define JXG_H(g)       ((uint8_t *)(uintptr_t)((unsigned long long)(g) + jx_g2h_delta))
 #define JX_NS_SZ  0xFF0            /* the note store's allocation (4080 bytes, EXECUTED 2026-10-10) */
 #define JX_MGR_SZ 0x7A8            /* the note manager, through its history list at +0x5A8 (jx_alloc.c) */

@@ -13,11 +13,7 @@
 /* JX_G2H: a pointer the plugin stored in its own memory, as a host address. In the port's guest memory
  * (jx3p/gui/jx_bridge.c, JX-11) the cells hold the plugin's guest addresses and the bridge sets the delta;
  * every other build leaves it 0 (the cells hold host pointers). */
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((weak)) unsigned long long jx_g2h_delta;
-#else
-unsigned long long jx_g2h_delta;
-#endif
+extern unsigned long long jx_g2h_delta;   /* defined once, in jx_voice_helpers.c (every build of the renders has it) */
 #define JX_G2H(p) ((unsigned long long)(p) + jx_g2h_delta)
 
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
