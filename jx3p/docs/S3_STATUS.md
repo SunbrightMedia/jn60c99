@@ -3,6 +3,32 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-11 (17) — THE ORACLE GRADED BY THE REAL CPU; THE CRT'S FMA3 CODE; ROW 24 FOR THE USER
+
+Unicorn is a model of a CPU (playbooks 226, 227). Two places where it is not the user's:
+- NaN MEETS NaN. Where both operands of an add / multiply are NaN, x86 returns the FIRST operand's (SDM Table 4-7);
+  Unicorn returns the larger significand (QEMU's x87 rule) -- executed: mulss / addss on both.
+- THE CRT's FMA3 CODE. The plugin's statically linked CRT sets a flag at load (init rva 0x74A920: cpuid FMA + AVX,
+  xgetbv) on every recent PC; 12 math functions then take FMA3 code. Unicorn reports neither, so every oracle ran
+  the SSE2 code. tools/verify/crt_fma_gate.py runs both natively over all 2^32 inputs for the four functions the
+  port reaches: tanf never differs, expf at one input no call site passes, sin / cos (0x7247F0) only past 2^23 (its
+  caller passes 3522 / n), log10 by 2.2e-16 under the meter's margin. No number the port computes changes.
+jx3p/tools/jx_native_replay.py runs the plugin's own render NATIVELY from the oracle's state (tools/verify/
+native_replay.c: the oracle's memory mapped at its own addresses, JX.render()'s loop). With no NaN, Unicorn == the
+CPU (every output sample, every unit window); the port == the CPU in the gates' mode (DAZ) and in the product's
+(FTZ + DAZ, the plugin in a host) -- the product's FP mode, inferred until now, executed. Every live cell's NaN
+alone (1416 scenes, three NaNs each; 6 reach: the JX's live cells are rewritten before they are read): equal, both
+modes. The JUNO's two single-source meeting sites (the phase adds of two LFOs: a NaN met the copy `-v` negated, GCC
+put the other operand first) were checked here: the JX's same LFO keeps the plugin's order in the add where the
+negated copy meets (GCC's output read; that LFO does not run in any factory patch).
+ROW 24 (OPEN, the user decides): two DIFFERENT NaNs meeting in one operation keep the compiler's operand order --
+the ISO C99 limit, exact only if every such operation tests its operands.
+RESULT (2026-10-11, before the full verify): the JUNO sweep on its real CPU -- every single-source NaN scene of
+patches 0, 5, 10, 20, 30, 40, 50, 60, 63 (682-829 targets each, three NaNs, both FP modes) EQUAL after the two
+juno_add_first sites; arp patches refused (no clock in a raw note-on harness). JX: patches 5, 33, 34, 40 EQUAL.
+crt_fma_gate: no reachable number changes (both ports; tooth bites). OPEN in row 23 until the full verify of the
+final commit is GREEN.
+
 ## 2026-10-11 (16) — NaN PARITY, SECOND PASS: EQUALITIES, HELPERS, THE COMPILER, THE WEB ENGINE
 
 The first pass (15) graded `<` `<=` `>` `>=` and min / max. Four more classes, found on the JUNO-60 and present here

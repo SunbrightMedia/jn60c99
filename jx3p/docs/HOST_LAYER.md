@@ -642,6 +642,29 @@ ARPEGGIO / TYPE / STEP changed (product states, modes 0, 3, 6), SCATTER appended
 modes 2, 5, 8, 10); and every one of the 19 modes put into every store by the plugin's own setter after
 patch 34's load (the port: its transcription), the 12 no input reaches included.
 
+## 3v. The oracle graded by the real CPU (EXECUTED, 2026-10-11; rows 23, 24; playbooks 226, 227)
+
+- THE NATIVE REPLAY (jx3p/tools/jx_native_replay.py, tools/verify/native_replay.c). The oracle builds the scene --
+  the plugin's product boot at 44.1 kHz, its own patch load, a note-on 60 / 105, NaNs if asked -- and its memory
+  goes out region by region (the image as it stands, the used heap, the stubs and their parameter blocks, the
+  buffers, the low page from 0x10000); a native process maps each region at its own address (every pointer inside
+  stays valid) and runs JX.render()'s loop: the plugin's own voice and master render through the stubs, on this
+  CPU. Batch mode restores the snapshot before each scene. No NaN: Unicorn == the CPU, every output sample and every
+  unit's window (jx_master_bisect.clean); the port == the CPU at MXCSR 0x1FC0 (the gates' mode, jx_set_fp_oracle_mode)
+  and at 0x9FC0 (FTZ + DAZ: the plugin in a host; the port's jx_enable_hw_ftz). The sweep: every live cell's NaN
+  alone (--all: 1416 scenes), three NaNs each -- equal, both modes; 6 reach (the JX's cells are rewritten before they
+  are read, so the decisions stay graded site by site by nan_sites.py). Tooth: the port with JX_NAN_TOOTH must
+  differ from the CPU (the chorus clamp's inputs).
+- THE CRT's FMA3 CODE (tools/verify/crt_fma_gate.py). The CRT init (rva 0x74A920, an _initterm entry) sets
+  0xCEFC0C on FMA + AVX + OSXSAVE with the YMM state saved; 12 math functions test it. The port reaches four: expf
+  (0x722EA0: differs at ONE input of 2^32, -68.5303421; the voice passes v * 5.2834215 with v in [0, 1]), tanf
+  (0x725150: never), sin / cos (0x7247F0: only |x| >= 2^23; the parameter system passes 3522 / n), log10 (0x708A70:
+  7 meter inputs by 2.2e-16, under the meter's 1e-12 margin). Unicorn reports no FMA and cannot decode VEX: these
+  runs are native, the image mapped at its base, the functions called through ms_abi. Tooth: the flag address moved
+  4 bytes loses expf's difference.
+- ROW 24. Two DIFFERENT NaNs meeting in one add / multiply keep the compiler's operand order: the ISO C99 limit
+  (exact only if every such operation tests its operands), the user's decision.
+
 ## 4. Next
 
 1. DONE (JX-8, 3i). The host tempo (READ, 2026-10-10; AUDIBLE: patches 33, 40, 43, 44, 48 and 54 of the factory bank (6 of

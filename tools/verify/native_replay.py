@@ -15,6 +15,11 @@ product's (FTZ + DAZ). Compared: every output sample, and every byte of the nine
 the outputs and the live cells nan_ab.py samples (port vs CPU).
 
     python3 tools/verify/native_replay.py [--patch 5] [--frames 4800] [--nan none|single|multi] [--keep DIR]
+    python3 tools/verify/native_replay.py --sweep [--all | --targets U:OFF,..] [--patch 5] [--tooth | --tooth-order
+            [--order-site 1|2]]
+        every nan_ab.py target alone (--all: every live cell), three NaNs each, the port vs the CPU in both modes;
+        --tooth: nan_ab.py's tooth library; --tooth-order: an LFO's phase add as a plain `+` again (site 1: rva
+        0x367A84, master line 2799; site 2: rva 0x3674AB, line 2668)
 exit 0 = the comparisons the scene promises hold (printed); 1 = one does not; 2 = the harness failed.
 """
 import ctypes
@@ -129,6 +134,31 @@ def port_run(d, patch, frames, inject, mode, cells):
     json.dump({'words': w, 'cells': cv}, open(os.path.join(d, 'port_%s.json' % mode), 'w'))
 
 
+ORDER_TEETH = {   # the two phase adds where a NaN meets its own negated copy (playbook 227)
+    1: ('juno_add_first(*(float *)(a1 + 90672), *(float *)(a1 + 90640))',      # rva 0x367A84, master +91456 found it
+        '( *(float *)(a1 + 90672) + *(float *)(a1 + 90640) )'),
+    2: ('juno_add_first(*(float *)(a1 + 96176), *(float *)(a1 + 96144))',      # rva 0x3674AB, master +96784 (patch 40)
+        '( *(float *)(a1 + 96176) + *(float *)(a1 + 96144) )')}
+
+
+def order_tooth_lib(d, site=1):
+    """the port with one LFO's phase add written `a + b` again (GCC then puts the increment first: the defect the
+    all-cells sweeps found, playbook 227)"""
+    import glob
+    src = open(os.path.join(REPO, 'src', 'master_render.c')).read()
+    if src.count(ORDER_TEETH[site][0]) != 1:
+        raise SystemExit('REFUSE: the order tooth\'s site %d is not in src/master_render.c once' % site)
+    mut = os.path.join(d, 'master_render.c')
+    open(mut, 'w').write(src.replace(ORDER_TEETH[site][0], ORDER_TEETH[site][1]))
+    units = [mut] + [f for f in sorted(glob.glob(os.path.join(REPO, 'src', '*.c'))) if not f.endswith('master_render.c')]
+    units += [os.path.join(REPO, 'gui', 'juno_bridge.c'), os.path.join(REPO, 'gui', 'juno_pm.c')]
+    so = os.path.join(d, 'libjuno_order_tooth.so')
+    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-frounding-math', '-fsignaling-nans',
+                    '-fno-strict-aliasing', '-shared', '-fPIC', '-I', os.path.join(REPO, 'src'), '-I',
+                    os.path.join(REPO, 'gui'), '-o', so] + units + ['-lm'], check=True)
+    return so
+
+
 def sweep(a):
     """every nan_ab.py target alone (--all: every live float cell the oracle finds), three NaNs each (the x86
     default 0xFFC00000, a marked quiet one, a marked signalling one): the port (oracle mode vs the CPU at DAZ,
@@ -136,12 +166,24 @@ def sweep(a):
     import nan_ab as NA
     opt = lambda k, dflt: a[a.index(k) + 1] if k in a else dflt
     patch, frames = int(opt('--patch', '5')), int(opt('--frames', '1024'))
-    seeds, ncell = (opt('--seeds', '1,2'), opt('--cells', '16')) if '--all' not in a else ('1', '1000000')
+    # an arpeggio patch is no scene here: the oracle's raw note-on has no clock, the port's note waits for one (the
+    # render gates leave these patches out for the same reason: recall_render_ab._arp_patches, asked of the bank)
+    arp = json.loads(subprocess.run([sys.executable, '-c', 'import sys, json; sys.path.insert(0, %r); import truth, '
+                                     'recall_render_ab as RA; print(json.dumps(sorted(RA._arp_patches(open(truth.BANK, '
+                                     '"rb").read()))))' % HERE], capture_output=True, text=True, check=True).stdout)
+    if patch in arp:
+        print('native_replay --sweep: patch %d has the arpeggiator on (%s) -- not a scene this harness can grade: '
+              'REFUSE' % (patch, arp))
+        return 2
+    seeds, ncell = (opt('--seeds', '1,2'), opt('--cells', '16')) if '--all' not in a and '--targets' not in a else (
+        '1', '1000000')
     d = opt('--keep', None) or tempfile.mkdtemp(prefix='natsw_')
     os.makedirs(d, exist_ok=True)
     r = json.loads(subprocess.run([sys.executable, os.path.join(HERE, 'nan_ab.py'), '--oracle', str(patch), seeds,
                                    ncell, '512'], capture_output=True, text=True, check=True).stdout)
     targets, cells = r['targets'], r['cells']
+    if '--targets' in a:            # chosen cells (unit:offset,..), every live cell read back
+        targets = [[int(x, 0) for x in t.split(':')] for t in opt('--targets', '').split(',')]
     rr = subprocess.run([sys.executable, __file__, '--oracle-snap', d, str(patch), '64', '[]'], capture_output=True,
                         text=True)
     if rr.returncode:
@@ -159,9 +201,11 @@ def sweep(a):
     json.dump(scenes, open(sf, 'w'))
     bf = os.path.join(d, 'batch.txt')
     open(bf, 'w').write(''.join(' '.join('%d:%d' % (o, b) for _, o, b in sc) + '\n' for sc in scenes))
-    tooth = '--tooth' in a
+    tooth = '--tooth' in a or '--tooth-order' in a
     env = dict(os.environ)
-    if tooth:                       # nan_ab.py's tooth: the decompile's ordered form back at a reached clamp
+    if '--tooth-order' in a:        # the operand-order defect back: an LFO's phase add as a plain `+`
+        env['NATREP_LIB'] = order_tooth_lib(d, int(opt('--order-site', '1')))
+    elif tooth:                     # nan_ab.py's tooth: the decompile's ordered form back at a reached clamp
         env['NATREP_LIB'] = NA.tooth_lib(d)
     bad = 0
     reach = {}

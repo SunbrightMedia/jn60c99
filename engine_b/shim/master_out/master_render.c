@@ -2670,7 +2670,10 @@ LABEL_164:
         *(_DWORD *)(a1 + 96240) = *(_DWORD *)(a1 + 96224);
         *(_DWORD *)(a1 + 95888) = v552;
         *(_DWORD *)(a1 + 95904) = v552;
-        v553 = juno_wrap_unit((float)((float)( *(float *)(a1 + 96176) + *(float *)(a1 + 96144) ) + *(float *)(a1 + 96352)));
+        /* rva 0x3674AB: movss xmm0, [+96176]; addss xmm0, [+96144] -- the phase FIRST, as at rva 0x367A84 below: where
+         * both are NaN (one NaN and the copy `v556 = -v556` flipped) x86 keeps the phase's; GCC put +96144 first
+         * (native_replay.py --sweep --all --patch 40: master +96784; playbook 227) */
+        v553 = juno_wrap_unit((float)(juno_add_first(*(float *)(a1 + 96176), *(float *)(a1 + 96144)) + *(float *)(a1 + 96352)));
         v554 = *(float *)&v553;
         v555 = !(*(float *)&v553 >= 0.0);
         *(_DWORD *)(a1 + 96160) = LODWORD(v553);

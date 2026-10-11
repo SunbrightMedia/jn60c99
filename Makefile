@@ -129,7 +129,10 @@ verify-recipe:
 	echo "=== THE ORACLE ON THE REAL CPU (playbooks 226, 227): the plugin's own render run natively from the oracle's state -- Unicorn == the CPU, the port == the CPU in the gates' mode and the product's (FTZ + DAZ); every live cell's NaN alone; the CRT's FMA3 code the user's PC runs ==="; \
 	python3 tools/verify/native_replay.py --patch 5 --frames 4800 || FAIL=1; \
 	python3 tools/verify/native_replay.py --sweep --all --patch 5 --frames 1024 || FAIL=1; \
+	python3 tools/verify/native_replay.py --sweep --all --patch 40 --frames 1024 || FAIL=1; \
 	python3 tools/verify/native_replay.py --sweep --tooth --patch 5 --frames 1024 || FAIL=1; \
+	python3 tools/verify/native_replay.py --sweep --tooth-order --targets 8:91456 --patch 5 --frames 1024 || FAIL=1; \
+	python3 tools/verify/native_replay.py --sweep --tooth-order --order-site 2 --targets 8:96784 --patch 40 --frames 1024 || FAIL=1; \
 	python3 tools/verify/crt_fma_gate.py --port-of juno || FAIL=1; \
 	python3 tools/verify/crt_fma_gate.py --port-of juno --tooth || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \

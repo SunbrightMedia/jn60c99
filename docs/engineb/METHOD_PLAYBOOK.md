@@ -3914,11 +3914,17 @@ and runs E2E.render()'s loop natively (the JX's JX.render too: jx3p/tools/jx_nat
 plugins: with no NaN, Unicorn == the CPU, every output sample and every byte of all nine units; the port == the CPU
 in the gates' mode (DAZ) AND in the product's (FTZ + DAZ: the plugin in a host) -- the product's FP mode, inferred
 until now, is executed. One NaN source (every target alone; the x86 default NaN, a marked quiet one, a marked
-signalling one): the port == the CPU, both modes. Several NaN sources at once: Unicorn != the CPU (its rule), and
+signalling one): the port == the CPU, both modes -- after two sites written in the plugin's operand order, found by the same sweep over every live cell of
+patches 5 and 40: the phase adds of two LFOs (rva 0x367A84, 0x3674AB), where one NaN meets the copy `v = -v`
+negated; GCC kept the copies in registers and put the increment first (each site has its tooth, the plain `+` put
+back: native_replay.py --sweep --tooth-order [--order-site 2], both bite). Several NaN sources at once: Unicorn !=
+the CPU (its rule), and
 the port != the CPU in 21 of 68 live cells, outputs equal -- which payload survives is the compiler's operand order
-(GCC orders commutative operands by its own numbering; the decompile's order is not the machine's either: master
-line 2865 prints `v624 * v626`, the plugin computes `mulss xmm1(v624), xmm3`). C99 fixes it only by testing both
-operands at every operation: stated as the boundary (JX SCOPE_AUDIT row 24), not hidden.
+(GCC orders commutative operands by its own numbering and register allocation, whatever the source's order). C99
+fixes it only by testing both operands at every operation: stated as the boundary (JX SCOPE_AUDIT row 24), not
+hidden. (A first reading here blamed the decompile's operand order at master line 2865 -- wrong: the plugin computes
+`mulss xmm1(v624), xmm3`, the decompile's own order, and the CPU keeps v624's NaN; Unicorn's larger-significand rule
+was what differed there.)
 The same day the sweep's tooth -- nan_ab.py's, the delay clamp at rva 0x366417 -- did NOT bite, and nan_ab.py's
 own tooth did not either: its one recorded "bite" (job juno_nan_post) was the 4 cells the port then had wrong, the
 same 4 its non-tooth run reported. No NaN in the targets ever reached that clamp. An instrumented build counted
