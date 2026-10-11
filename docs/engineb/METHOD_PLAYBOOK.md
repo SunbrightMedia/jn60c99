@@ -3915,7 +3915,8 @@ plugins: with no NaN, Unicorn == the CPU, every output sample and every byte of 
 in the gates' mode (DAZ) AND in the product's (FTZ + DAZ: the plugin in a host) -- the product's FP mode, inferred
 until now, is executed. One NaN source (every target alone; the x86 default NaN, a marked quiet one, a marked
 signalling one): the port == the CPU, both modes -- after two sites written in the plugin's operand order, found by the same sweep over every live cell of
-patches 5 and 40: the phase adds of two LFOs (rva 0x367A84, 0x3674AB), where one NaN meets the copy `v = -v`
+patches 5 and 40 (every non-arp factory patch since: 57, 135,204 scenes per FP mode, equal -- job sweep_fin2): the
+phase adds of two LFOs (rva 0x367A84, 0x3674AB), where one NaN meets the copy `v = -v`
 negated; GCC kept the copies in registers and put the increment first (each site has its tooth, the plain `+` put
 back: native_replay.py --sweep --tooth-order [--order-site 2], both bite). Several NaN sources at once: Unicorn !=
 the CPU (its rule), and

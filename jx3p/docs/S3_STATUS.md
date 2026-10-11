@@ -30,9 +30,10 @@ comments). The process() oracle now enters process() at a Windows thread's MXCSR
 plugin's FTZ + DAZ switch loads 0x9FC0, the port's product mode.
 ROW 24 (OPEN, the user decides): two DIFFERENT NaNs meeting in one operation keep the compiler's operand order --
 the ISO C99 limit, exact only if every such operation tests its operands.
-RESULT (2026-10-11, before the full verify): the JUNO sweep on its real CPU -- every single-source NaN scene of
-patches 0, 5, 10, 20, 30, 40, 50, 60, 63 (682-829 targets each, three NaNs, both FP modes) EQUAL after the two
-juno_add_first sites; arp patches refused (no clock in a raw note-on harness). JX: patches 5, 33, 34, 40 EQUAL.
+RESULT (2026-10-11): the JUNO sweep on its real CPU -- every single-source NaN scene of every non-arp factory patch
+(57 patches, 45,068 live cells x three NaNs, both FP modes: 135,204 scenes each) EQUAL after the two juno_add_first
+sites (job sweep_fin2, EXIT 0); the 7 arp patches refused (no clock in a raw note-on harness). JX: patches 5, 33,
+34, 40 EQUAL; this section of jx_verify.sh GREEN (the same job).
 crt_fma_gate: no reachable number changes (both ports; tooth bites). OPEN in row 23 until the full verify of the
 final commit is GREEN.
 
