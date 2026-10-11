@@ -395,6 +395,44 @@ save, queued record and host edit equal to the plugin's -- the round trips throu
 ranges, a bipolar range, KEY HOLD at 0 with drained keys, the rate setting through the editor; mutant: the
 performEdit value as stored / max -- RED (the bipolar entry).
 
+## 3o. A window's zoom (READ + EXECUTED, 2026-10-11; PORTED, JX-25)
+
+The JUNO-60's rules (docs/WINDOW_ZOOM.md, CLAIMS A40) on the JX's own code: the getter 0x2AA470 and the fit
+0x312580 equal the JUNO's 0x2AA590 / 0x312750 (fw_map --pair; the fit's 35 instructions, its common return at
+0x3125F1). The JX's windows: main 1924 x 704, patch 1668 x 600 (jx3p/truth/Script.xml, zoomValueRef
+vm.vs.mainZoom / vm.vs.patchZoom); the JX editor attaches under the oracle (createView "editor", attached: its
+GUI built from the Script.xml, blank images of the real sizes -- no art needed). EXECUTED: the getter's set is
+the value object's own (no engine record, no host edit: the editor on an 800 x 600 screen sets mainZoom 62 ->
+39 and the engine's queue and the host's edits stay empty); the panel trio's set of a zoom queues one engine
+record, as jx3p_model_set does; panelPatch (not in the DAW state) queues nothing. PORTED: jx3p_zoom_fit,
+jx3p_zoom_get (one kept fit per window, the app's), jx3p_value_set (the value object's set), jx3p_model_get.
+MEASURED (jx_zoom_fit_gate.py, 16 screens from none to 3840 x 2160, portrait, two monitors, screens changing
+under a running editor): 278 steps, 3,392 fits, 192 engine records, both zooms after every step -- EQUAL;
+teeth (JX_ZF_TOOTH 1-4: the margins swapped, the larger fit, the fits rounded, no fit kept) all bite.
+
+## 3p. The level meters (READ + EXECUTED, 2026-10-11; PORTED, JX-22)
+
+The JX panel has two meters (Script.xml barGraphL / barGraphR: ch 0 / 1, decay 8, fade 10, horizontal) and no
+LFO LED (no control reads vm.vs.dm; the engine's vt+104 is 0x34AE20, `ret 0`). THE ENGINE SIDE IS THE JX'S OWN
+(READ, the render 0x3F9220): the output gain stage's loop takes, after each sample's gain, the larger magnitude
+per channel (andps 0x7FFFFFFF; `comiss peak, x; jae`: the peak becomes x unless peak >= x -- a NaN replaces it
+and the next sample replaces the NaN), both from 0; then under the lock at HOST+0x10 the held peaks at
+HOST+0x20 / +0x24 become maxss(held, peak) for BOTH channels (the JUNO-60 takes the left one the other way
+round: docs/LED_METER.md rule 5); a call of no samples merges peaks 0. The read (the engine's vt+72, 0x34AE30),
+the tick (0x31C330: the dB step through the CRT's log10 0x708A70, the decay, the fill 0x2C98F0) and the draw
+(0x31C0F0) are the JUNO's code (fw_map --pair: equal; LED_METER.md rules 6, 9-12). PORTED: the peaks in
+jx3p_render's gain stage (jx_gain_sample, jx_peak_end: on the HOST's own words, the port's memory being the
+plugin's heap), jx3p_peak, jx3p_meter_tick, jx3p_bar_draw; jx3p_gain_tail / jx3p_gain_cells for the gate. On
+the way: the fade-in length's float-to-int is now the plugin's cvttss2si (0x80000000 out of range; a C cast is
+undefined there). MEASURED (jx_meter_gate.py): part 1 in plain IEEE mode -- 1,200 tails of the render's loop as
+a segment of the real engine (NaN payloads, infinities, denormals, signed zeros; held peaks; 15 gain states:
+steady, muted, the delay ending inside the call, fading, clamping, an unordered step), 54 reads, 13,052 ticks
+(every float next to the 998 dB steps: the margin 6.47e-9, so the C log10 gives the CRT's step), 1,500 draws;
+part 2 in the running plugin -- 5 chains (44.1 / 48 / 96 kHz, chords, a clock patch, an effects patch, a warm
+patch change, silence), 560 meter reads (356 with a peak) and every sample -- EQUAL; teeth (JX_LM_TOOTH 1-5:
+the merge's operands swapped, the peak before the gain, an ordered peak test, the floor 0.0001, the fade one
+step early) all bite.
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md
@@ -483,4 +521,6 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
    (jx_lift_roots.py); the image pages it reads: a dynamic census and a static scan (jx_guest_export.py
    image_pages). Graded: GATE 3d --recall (warm changes, a key held, through the plugin's process()),
    GATE 3e --loads modes / settings.
-4. The rest of the JUNO's host layer on the JX engine: the state, the patch manager, other rates.
+4. The rest of the JUNO's host layer on the JX engine: the state, other rates (done: 3j-3n). The editor's
+   own logic: the window zoom (3o) and the meters (3p) done; the CC assign menu and the patch window (the
+   plugin's patch manager) open -- SCOPE_AUDIT rows 18, 19. The drawn panel waits for the JX art (row 20).

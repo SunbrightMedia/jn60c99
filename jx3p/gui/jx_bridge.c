@@ -470,6 +470,115 @@ static void jxg_ramp_sweep(uint8_t *st)
     }
 }
 
+/* ---- THE OUTPUT PEAKS (JX-22; the meters' engine side, READ from the JX's render 0x3F9220) ----
+ * The gain stage's loop takes, after each sample's gain, the larger magnitude per channel: x = |sample| (andps
+ * 0x7FFFFFFF), `comiss peak, x; jae` -- the peak becomes x unless peak >= x, so a NaN replaces it and is replaced
+ * by the next sample (0x3F984D..0x3F9874); both start at 0 (xorps), so a call of no samples has peaks 0. Then,
+ * under the lock at HOST+0x10, the held peaks at HOST+0x20 / +0x24 become maxss(held, peak) -- held if held >
+ * peak, else peak (peak when either is NaN) -- for BOTH channels (0x3F989B..0x3F98B7; the JUNO-60's left channel
+ * has the operands the other way round: docs/LED_METER.md rule 5). A meter's read (the engine's vt+72, rva
+ * 0x34AE30 = the JUNO's 0x34AF70) takes a held peak and zeroes it. Graded: jx3p/tools/jx_meter_gate.py. */
+#ifndef JX_LM_TOOTH      /* TEETH (jx_meter_gate.py --tooth): 1 the merge's operands swapped (the JUNO's left),
+                          * 2 the peak taken before the gain, 3 the peak test ordered (a NaN never replaces it),
+                          * 4 the meter's floor 0.0001, 5 the fade's alpha from k, not k + 1 */
+#define JX_LM_TOOTH 0
+#endif
+static float g_pk[2];
+static void jx_peak_begin(void) { g_pk[0] = g_pk[1] = 0.0f; }
+static void jx_peak_one(int ch, uint32_t bits)
+{
+    float x;
+    bits &= 0x7FFFFFFFu;
+    memcpy(&x, &bits, 4);
+#if JX_LM_TOOTH == 3
+    if (g_pk[ch] < x) g_pk[ch] = x;
+#else
+    if (!(g_pk[ch] >= x)) g_pk[ch] = x;
+#endif
+}
+static void jx_peak_end(void)
+{
+    for (int ch = 0; ch < 2; ++ch) {
+        float h = gf(G.host + 0x20 + 4 * ch), p = g_pk[ch];
+#if JX_LM_TOOTH == 1
+        h = p > h ? p : h;
+#else
+        h = h > p ? h : p;
+#endif
+        sf32(G.host + 0x20 + 4 * ch, h);
+    }
+}
+/* THE OUTPUT GAIN STAGE (rva 0x3F9731..0x3F9844, READ), on the HOST's own cells: while samples are left the gain
+ * moves by the step, held in [0, 1]; then a positive step holds 1.0, else the gain is 0 and the delay counts down;
+ * when it ends the fade-in starts: trunc(rate x time x 0.001) samples (at least 1), step 1 / that (in double).
+ * writePatch arms it (1 sample at -1, the delay 0.5 s, the time 10 ms). One sample, in place; then its peaks. */
+static void jx_gain_sample(uint32_t *outL, uint32_t *outR)
+{
+    uint8_t *h = G.host;
+    float g;
+    int32_t left = gi(h + H_GLEFT);
+    si32(h + H_GLEFT, (int32_t)((uint32_t)left - 1u));  /* it counts on below 0, as the asm's dec does */
+    if (left > 0) {
+        g = gf(h + H_GSTEP) + gf(h + H_GAIN);
+        sf32(h + H_GAIN, g);
+        if (g >= 1.0f) { sf32(h + H_GAIN, 1.0f); g = 1.0f; }
+        else if (!(g > 0.0f)) { sf32(h + H_GAIN, 0.0f); g = 0.0f; }
+    } else if (!(0.0f >= gf(h + H_GSTEP))) {    /* comiss 0, step; jae: an unordered step holds 1.0 */
+        sf32(h + H_GAIN, 1.0f); g = 1.0f;
+    } else {
+        int32_t d;
+        sf32(h + H_GAIN, 0.0f); g = 0.0f;
+        d = gi(h + H_GDELAY);
+        if (d > 0) {
+            si32(h + H_GDELAY, d - 1);
+            if (d - 1 <= 0) {
+                float t = jxg_rate() * gf(h + H_GTIME);
+                int32_t k;
+                t = t * 0.001f;
+                k = (t > -2147483649.0f && t < 2147483648.0f) ? (int32_t)t : INT32_MIN;   /* cvttss2si */
+                if (k < 1) k = 1;
+                si32(h + H_GLEFT, k);
+                sf32(h + H_GSTEP, (float)(1.0 / (double)k));
+                g = gf(h + H_GAIN);
+            }
+        }
+    }
+    {   float l, r;
+        uint32_t l0 = *outL, r0 = *outR;
+        memcpy(&l, outL, 4); memcpy(&r, outR, 4);
+        l = g * l; r = gf(h + H_GAIN) * r;
+        memcpy(outL, &l, 4); memcpy(outR, &r, 4);
+#if JX_LM_TOOTH == 2
+        jx_peak_one(0, l0); jx_peak_one(1, r0);
+#else
+        (void)l0; (void)r0;
+        jx_peak_one(0, *outL); jx_peak_one(1, *outR);
+#endif
+    }
+}
+/* the gate's entry (jx_meter_gate.py part 1): one engine call's gain stage, peaks and merge on these samples, in
+ * place, on the HOST's cells -- the plugin's loop 0x3F96DA..0x3F98B7 */
+void jx3p_gain_tail(float *L, float *R, int n)
+{
+    jx_peak_begin();
+    for (int s = 0; s < n; ++s) {
+        uint32_t l, r;
+        memcpy(&l, &L[s], 4); memcpy(&r, &R[s], 4);
+        jx_gain_sample(&l, &r);
+        memcpy(&L[s], &l, 4); memcpy(&R[s], &r, 4);
+    }
+    jx_peak_end();
+}
+/* the HOST's gain cells and held peaks (the gate's inspection and set): gain, step, left, delay, time, held L, R */
+void jx3p_gain_cells(uint32_t *io, int set)
+{
+    static const int off[7] = { H_GAIN, H_GSTEP, H_GLEFT, H_GDELAY, H_GTIME, 0x20, 0x24 };
+    for (int k = 0; k < 7; ++k) {
+        if (set) memcpy(G.host + off[k], &io[k], 4);
+        else memcpy(&io[k], G.host + off[k], 4);
+    }
+}
+
 void jx3p_render(float *L, float *R, int n)
 {
     /* THE MASTER'S INPUT ARRAY IN 8-BYTE SLOTS (2026-10-10, jx_wasm_check.py): the transcribed
@@ -502,6 +611,7 @@ void jx3p_render(float *L, float *R, int n)
             clk = kt_clock(u) + n;
             memcpy(G.kt[u] + 0xB0, &clk, 8);
         }
+    jx_peak_begin();
     for (int s = 0; s < n; ++s) {
         /* the per-unit WRAPPER (0x377080 voice / 0x377010 master):
          * flag==0 -> untouched; latch>0 -> outputs zeroed, GC only;
@@ -529,50 +639,13 @@ void jx3p_render(float *L, float *R, int n)
                 jxg_ramp_sweep(st);
             }
         }
-        if (!G.host_stage_off) {
-            /* THE OUTPUT GAIN STAGE (rva 0x3F9731..0x3F9844, READ), on the HOST's own cells: while samples
-             * are left the gain moves by the step, held in [0, 1]; then a positive step holds 1.0, else the
-             * gain is 0 and the delay counts down; when it ends the fade-in starts: trunc(rate x time x
-             * 0.001) samples (at least 1), step 1 / that (in double). writePatch arms it (1 sample at -1,
-             * the delay 0.5 s, the time 10 ms). */
-            uint8_t *h = G.host;
-            float g;
-            int32_t left = gi(h + H_GLEFT);
-            si32(h + H_GLEFT, (int32_t)((uint32_t)left - 1u));  /* it counts on below 0, as the asm's dec does */
-            if (left > 0) {
-                g = gf(h + H_GSTEP) + gf(h + H_GAIN);
-                sf32(h + H_GAIN, g);
-                if (g >= 1.0f) { sf32(h + H_GAIN, 1.0f); g = 1.0f; }
-                else if (!(g > 0.0f)) { sf32(h + H_GAIN, 0.0f); g = 0.0f; }
-            } else if (!(0.0f >= gf(h + H_GSTEP))) {    /* comiss 0, step; jae: an unordered step holds 1.0 */
-                sf32(h + H_GAIN, 1.0f); g = 1.0f;
-            } else {
-                int32_t d;
-                sf32(h + H_GAIN, 0.0f); g = 0.0f;
-                d = gi(h + H_GDELAY);
-                if (d > 0) {
-                    si32(h + H_GDELAY, d - 1);
-                    if (d - 1 <= 0) {
-                        float t = jxg_rate() * gf(h + H_GTIME);
-                        int32_t k;
-                        t = t * 0.001f;
-                        k = (int32_t)t;
-                        if (k < 1) k = 1;
-                        si32(h + H_GLEFT, k);
-                        sf32(h + H_GSTEP, (float)(1.0 / (double)k));
-                        g = gf(h + H_GAIN);
-                    }
-                }
-            }
-            {   float l, r;
-                memcpy(&l, &outL, 4); memcpy(&r, &outR, 4);
-                l = g * l; r = gf(h + H_GAIN) * r;
-                memcpy(&outL, &l, 4); memcpy(&outR, &r, 4);
-            }
-        }
+        if (!G.host_stage_off)
+            jx_gain_sample(&outL, &outR);    /* the output gain stage and its peaks (above) */
         memcpy(&L[s], &outL, 4);
         memcpy(&R[s], &outR, 4);
     }
+    if (!G.host_stage_off)
+        jx_peak_end();                       /* the merge, also after a call of no samples (peaks 0) */
     G.clock += n;
 }
 
@@ -1147,6 +1220,169 @@ int jx3p_host_edits(uint32_t *ids, double *vals, int cap)
 /* a panel control's commit after its set (the model's notifies and commit, rva 0x285200 / 0x2852A0 / 0x283000):
  * the keyboard's change list empties */
 void jx3p_model_commit(void) { jx_ks_commit(); }
+/* the model's value of a state parameter as the store holds it (getState writes it); 0 for an id outside the state */
+int32_t jx3p_model_get(uint32_t id)
+{
+    int k = jx_state_index(id);
+    return k < 0 ? 0 : g_store[k];
+}
+/* a value object's own set (its vt+0x70), the one a window's zoom getter makes: the store at its storage law, and
+ * nothing else -- no engine record, no host edit (EXECUTED: the JX editor attached on an 800 x 600 screen sets
+ * vm.vs.mainZoom 62 -> 39, the engine's queue and the host's edits unchanged; jx_zoom_fit_gate.py) */
+int jx3p_value_set(uint32_t id, int32_t v)
+{
+    int k = jx_state_index(id);
+    if (k < 0) return 0;
+    jx_store_put(k, JX_STATE_ENT[k].mask ? (int32_t)((uint32_t)v & JX_STATE_ENT[k].mask) : v);
+    return 1;
+}
+/* ---- THE LEVEL METERS' GUI SIDE (JX-22): the JUNO-60's code (docs/LED_METER.md rules 9-12; the JX's meter tick
+ * 0x31C330, bar fill 0x2C98F0, bar draw 0x31C0F0 and log10 0x708A70 == the JUNO's 0x31C450, 0x2C9A10, 0x31C210,
+ * 0x6D2660, fw_map --pair). The JX panel's meters: Script.xml barGraphL / barGraphR, ch 0 / 1, decay 8, fade 10,
+ * horizontal; no LFO LED (the JX's engine vt+104 is 0x34AE20, `ret 0`). ---- */
+/* a meter's read (the engine's vt+72, rva 0x34AE30): channel ch's held peak, then 0 */
+float jx3p_peak(int ch)
+{
+    float p;
+    if (!G.host || ch < 0 || ch > 1) return 0.0f;
+    p = gf(G.host + 0x20 + 4 * ch);
+    sf32(G.host + 0x20 + 4 * ch, 0.0f);
+    return p;
+}
+/* cvttss2si / cvttsd2si: NaN and out of range give 0x80000000 */
+static int32_t jx_cvtt(double x)
+{
+    if (!(x > -2147483649.0 && x < 2147483648.0)) return INT32_MIN;
+    return (int32_t)x;
+}
+/* a bar's fill (rva 0x2C98F0): rect and fill are x0 y0 x1 y1; horizontal fills from the left, vertical from the
+ * bottom; val of max */
+static void jx_bar_fill(const int *rect, int horiz, int max, int val, int *fill)
+{
+    int32_t v4 = val >= max ? max : val, span, prod;
+    fill[0] = rect[0];
+    fill[3] = rect[3];
+    if (horiz) {
+        fill[1] = rect[1];
+        fill[2] = rect[0];
+        if (max > 0) {
+            span = (int32_t)((uint32_t)rect[2] - (uint32_t)rect[0]);
+            prod = (int32_t)((uint32_t)span * (uint32_t)v4);
+            fill[2] = (int32_t)((uint32_t)(prod / max) + (uint32_t)rect[0]);
+        }
+    } else {
+        fill[2] = rect[2];
+        fill[1] = rect[3];
+        if (max > 0) {
+            span = (int32_t)((uint32_t)rect[3] - (uint32_t)rect[1]);
+            prod = (int32_t)((uint32_t)span * (uint32_t)v4);
+            fill[1] = (int32_t)((uint32_t)rect[3] - (uint32_t)(prod / max));
+        }
+    }
+}
+/* a meter's tick (rva 0x31C330): channel ch's read, the new state from the old one and the decay, the bar's fill
+ * of rect (state / 1000 of 999). The dB step: the C library's log10 here, the CRT's there -- every float peak
+ * gives the same step (no float lies within 1e-9 of one: docs/LED_METER.md rule 10, the same function) */
+int jx3p_meter_tick(int ch, int decay, int state, const int *rect, int horiz, int *fill)
+{
+    double d;
+    int32_t v7, v8;
+    float peak = jx3p_peak(ch);
+#if JX_LM_TOOTH == 4
+    if (!(peak >= 0.0001f)) d = 0.0001;
+#else
+    if (!(peak >= 0.001f)) d = 0.001;
+#endif
+    else if (peak > 1.0f) d = 1.0;
+    else d = (double)peak;
+    v7 = (int32_t)((uint32_t)jx_cvtt(log10(d) * 333.0 + 999.0) * 1000u);
+    if (decay <= 0) {
+        v8 = v7;
+    } else {
+        int32_t t = (int32_t)((uint32_t)state - (uint32_t)(500000 / decay));
+        if (t >= v7) v7 = t;
+        v8 = v7 >= 0 ? v7 : 0;
+    }
+    jx_bar_fill(rect, horiz, 999, v8 / 1000, fill);
+    return v8;
+}
+/* a horizontal bar's draw (rva 0x31C0F0): its blits in order, 7 ints each -- dst x, dst y, width, height, src x,
+ * src y, alpha (-1: the first, a plain blit; then one column at a time at 255 - 255 (k + 1) / fade); returns
+ * their count, out holds cap. A vertical bar (none in the JX's Script.xml): 0 */
+int jx3p_bar_draw(const int *rect, const int *fill, int horiz, int fade, int *out, int cap)
+{
+    int32_t w = (int32_t)((uint32_t)fill[2] - (uint32_t)fill[0]);
+    int32_t h = (int32_t)((uint32_t)fill[3] - (uint32_t)fill[1]);
+    int32_t n = (int32_t)((uint32_t)rect[2] - (uint32_t)w - (uint32_t)rect[0]);
+    int32_t m = fade >= w ? w : fade, solid, k, nb = 0;
+    if (!horiz) return 0;
+    if (n >= m) n = m;
+    solid = (int32_t)((uint32_t)w - (uint32_t)n);
+    if (nb < cap) {
+        int *o = out + 7 * nb;
+        o[0] = fill[0]; o[1] = fill[1]; o[2] = solid; o[3] = h; o[4] = 0; o[5] = 0; o[6] = -1;
+    }
+    ++nb;
+    for (k = 0; k < n; ++k, ++nb) {
+        if (nb < cap) {
+            int *o = out + 7 * nb;
+            o[0] = (int32_t)((uint32_t)fill[0] + (uint32_t)solid + (uint32_t)k);
+            o[1] = fill[1];
+            o[2] = 1;
+            o[3] = h;
+            o[4] = (int32_t)((uint32_t)solid + (uint32_t)k);
+            o[5] = 0;
+#if JX_LM_TOOTH == 5
+            o[6] = 255 - (int32_t)(255u * (uint32_t)k) / fade;
+#else
+            o[6] = 255 - (int32_t)(255u * ((uint32_t)k + 1u)) / fade;
+#endif
+        }
+    }
+    return nb;
+}
+/* ---- A WINDOW'S ZOOM (JX-25): the JUNO-60's rules (docs/WINDOW_ZOOM.md, CLAIMS A40); the JX's getter 0x2AA470
+ * and fit 0x312580 are the JUNO's 0x2AA590 / 0x312750 (fw_map --pair: equal). The fit: the largest zoom, in
+ * percent, at which the panel (w x h, its Script.xml size: main 1924 x 704, patch 1668 x 600) fits the virtual
+ * screen cx x cy (GetSystemMetrics 78 / 79) less 40 x 120 pixels -- the smaller of (cy - 120) * 100 / h and
+ * (cx - 40) * 100 / w, each an integer division; the window keeps the first positive one (+0x13C). The getter
+ * (called by every coordinate conversion of the window): its zoom value, at most the fit, and the value set to
+ * that (jx3p_value_set). Graded: jx3p/tools/jx_zoom_fit_gate.py. ---- */
+#ifndef JX_ZF_TOOTH      /* TEETH (jx_zoom_fit_gate.py --port-tooth): 1 the margins swapped, 2 the larger fit,
+                          * 3 the fits rounded, 4 no fit kept */
+#define JX_ZF_TOOTH 0
+#endif
+int jx3p_zoom_fit(int cx, int cy, int w, int h)
+{
+    int a, b;
+    if (w <= 0 || h <= 0) return 0;                              /* (a panel is never empty) */
+#if JX_ZF_TOOTH == 1
+    a = (cy - 40) * 100 / h; b = (cx - 120) * 100 / w;
+#else
+    a = (cy - 120) * 100 / h; b = (cx - 40) * 100 / w;
+#endif
+#if JX_ZF_TOOTH == 2
+    return a >= b ? a : b;
+#elif JX_ZF_TOOTH == 3
+    a = (int)((double)(cy - 120) * 100 / h + 0.5); b = (int)((double)(cx - 40) * 100 / w + 0.5);
+    return a < b ? a : b;
+#else
+    return a >= b ? b : a;
+#endif
+}
+/* `cache`: the window's kept fit (start at 0). Returns the zoom; the caller sets the value (jx3p_value_set) when it
+ * differs from `value` */
+int jx3p_zoom_get(int value, int cx, int cy, int w, int h, int *cache)
+{
+    int f;
+#if JX_ZF_TOOTH == 4
+    f = jx3p_zoom_fit(cx, cy, w, h);
+#else
+    if (*cache > 0) f = *cache;
+    else f = *cache = jx3p_zoom_fit(cx, cy, w, h);
+#endif
+    return f < value ? f : value;
+}
 /* rva 0x319B70, a CC message the drain reads: none waits or cc >= 120 -> 0; else the waiting record's old CC
  * leaves the map, the CC's old record loses its CC, CC `cc` drives the waiting record, none waits */
 static int jx_cc_learn_done(int cc)

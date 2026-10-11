@@ -37,9 +37,14 @@
 #                  host's round trip: each against the booted plugin's own calls
 #                  (GATES 3d, 3e, 3f).
 #
+#   E. THE EDITOR'S LOGIC (2026-10-11, JX-22, JX-25) -- the window zoom and the
+#                  level meters against the plugin's own code, its editor attached
+#                  (GATE 3h).
+#
 # What this does NOT cover, stated so "green" is not read wider than it is
-# (jx3p/docs/SCOPE_AUDIT.md is the full table): the editor's GRAPHICS -- the
-# panel is not drawn (no JX art in truth/); its parameter path is graded (3f).
+# (jx3p/docs/SCOPE_AUDIT.md is the full table, rows 18-20 open): the CC assign
+# menu, the patch window, and the editor's GRAPHICS -- the panel is not drawn
+# (no JX art in truth/); its parameter path is graded (3f).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -219,6 +224,16 @@ python3 "$HERE/jx_state_gate.py" --mutants
 # the patch browser's load of any record (the factory bank, random bytes, a bank file): records, saves, samples
 python3 "$HERE/jx_patch_gate.py"
 python3 "$HERE/jx_patch_gate.py" --tooth --chains 0,1
+echo "=== JX GATE 3h: THE EDITOR'S LOGIC (the window zoom, the level meters: JX-25, JX-22) ==="
+# the plugin's editor attached under the oracle (its GUI from jx3p/truth/Script.xml, blank images): every fit its
+# windows' getter computes on 16 screens, both zooms and the engine records after every step
+python3 "$HERE/jx_zoom_fit_gate.py" --ref
+python3 "$HERE/jx_zoom_fit_gate.py" --port
+python3 "$HERE/jx_zoom_fit_gate.py" --port-tooth
+# the meters: the engine's peaks (the JX's own loop), the read, the tick and the draw on edge inputs, and the
+# meters read in the running plugin through process()
+python3 "$HERE/jx_meter_gate.py"
+python3 "$HERE/jx_meter_gate.py" --tooth --reuse
 echo "=== JX GATE 3g: THE MUTATION REACH (docs/PORT_COMPLETENESS_CHARTER.md section 4) ==="
 # one plausible slip per part of the port, in lines that run (gcov), the library rebuilt, one fast gate on the
 # mutated tree: every mutation must be KILLED. It edits the tree it runs in (one file at a time, restored):
