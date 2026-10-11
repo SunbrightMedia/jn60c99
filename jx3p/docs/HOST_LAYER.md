@@ -674,7 +674,11 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
   Unicorn (JXHost runs DllMain: 2, 2, no limit), this CPU (5, 2, no limit). The census also found false roots: the
   lifted code's comments carry memory-operand displacements (`[rip + 0x79fb9d]` fell in JUCE's CPU-info getter);
   a bracketed operand names no function. Teeth: the answers written off their globals (no path moves: refused);
-  displacements taken as names (ungraded readers: the census fails).
+  displacements taken as names (ungraded readers: the census fails). And the FP mode: Unicorn starts at MXCSR 0
+  and JXHost never set it, so process() ran with every exception unmasked (the plugin's ScopedNoDenormals, rva
+  0x34AC18, made 0x8040, not a host's 0x9FC0); jx_emu now starts at 0x1F80 as a Windows thread does, and the census
+  checks the switch loads 0x9FC0 (its --tooth-mxcsr: entry 0 is seen). The JUNO's 21 process() chains gave the
+  same 594,372 samples either way.
 - ROW 24. Two DIFFERENT NaNs meeting in one add / multiply keep the compiler's operand order: the ISO C99 limit
   (exact only if every such operation tests its operands), the user's decision.
 

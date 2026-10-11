@@ -137,6 +137,7 @@ verify-recipe:
 	python3 tools/verify/crt_fma_gate.py --port-of juno --tooth || FAIL=1; \
 	python3 tools/verify/cpu_census.py --port-of juno || FAIL=1; \
 	python3 tools/verify/cpu_census.py --port-of juno --tooth || FAIL=1; \
+	python3 tools/verify/cpu_census.py --port-of juno --tooth-mxcsr || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
 	fresh $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \

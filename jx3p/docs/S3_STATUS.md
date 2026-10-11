@@ -26,7 +26,8 @@ sets, every reader the port reaches -- graded on the static answers (the engine 
 this CPU's: the render driver's ISA tests unreached with 2 channels, memmove / memset / strrchr equal on both paths
 in Unicorn, strnlen / wcslen / wcsnlen (an AVX2 path on the PC; leaf functions the reach had not seen) equal on both
 paths natively, the FMA3 math above. The reach lost false roots on the way (displacements in the lifted code's
-comments).
+comments). The process() oracle now enters process() at a Windows thread's MXCSR (0x1F80, not Unicorn's 0): the
+plugin's FTZ + DAZ switch loads 0x9FC0, the port's product mode.
 ROW 24 (OPEN, the user decides): two DIFFERENT NaNs meeting in one operation keep the compiler's operand order --
 the ISO C99 limit, exact only if every such operation tests its operands.
 RESULT (2026-10-11, before the full verify): the JUNO sweep on its real CPU -- every single-source NaN scene of

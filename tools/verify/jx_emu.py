@@ -129,6 +129,9 @@ class JX:
         uc.mem_map(BUF_BASE,BUF_SIZE,UC_PROT_ALL)
         cr0=uc.reg_read(UC_X86_REG_CR0); cr0&=~(1<<2); cr0|=(1<<1); uc.reg_write(UC_X86_REG_CR0,cr0)
         cr4=uc.reg_read(UC_X86_REG_CR4); cr4|=(1<<9)|(1<<10); uc.reg_write(UC_X86_REG_CR4,cr4)
+        # a Windows thread starts with MXCSR 0x1F80 (every exception masked, the x64 ABI's default); Unicorn starts
+        # at 0, so a host oracle entered process() with every exception unmasked (playbook 228)
+        uc.reg_write(UC_X86_REG_MXCSR, 0x1F80)
         self.stub2name={}
         for i,(rva,(dll,name)) in enumerate(sorted(IMPORTS.items())):
             stub=STUB_BASE+8*i

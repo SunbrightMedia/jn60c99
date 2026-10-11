@@ -3955,6 +3955,13 @@ runs the CRT's own inits three ways: natively here (__isa_available 5, __favor 2
   them back and must fail).
 - The render driver's four ISA tests sit behind `cmp r13d, 8` (8+ channel pointers); with the plugin's 2 channels
   the process() oracle reaches them 0 times while its loads of __isa_available run every block.
+- AN ORACLE THAT NEVER SET ITS FP MODE. Unicorn starts at MXCSR 0 and the process() oracles never set it: they
+  entered process() with every exception unmasked, and the plugin's own ScopedNoDenormals (JUNO rva 0x34AD58, JX
+  0x34AC18) made 0x8040 where a Windows host makes 0x9FC0 (its threads start at 0x1F80). Unicorn's arithmetic
+  ignores the masks, and over host_process_gate's 21 chains (594,372 samples) entry 0 and 0x1F80 gave the same
+  samples (job mxcsr_entry); only code that reads MXCSR could tell -- the CRT's math error paths. Both emulators now
+  start a thread at 0x1F80; cpu_census.py checks that the switch loads 0x9FC0 -- the product mode the port renders
+  in -- and its --tooth-mxcsr puts 0 back (0x8040 is seen).
 - LEAF FUNCTIONS. MSVC writes no .pdata entry for code that never touches the stack; a reach built on .pdata alone
   never saw them. Counting each call target outside .pdata as a function found three more readers in each plugin:
   the CRT's strnlen, wcslen and wcsnlen take an AVX2 path for __isa_available >= 5 -- code the PC runs and Unicorn

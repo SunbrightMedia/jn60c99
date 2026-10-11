@@ -362,9 +362,11 @@ python3 "$REPO/tools/verify/crt_fma_gate.py" --port-of jx --tooth
 # every question the plugin asks the CPU (cpuid, xgetbv) and every reader of an answer the port reaches, graded:
 # the same decision on Unicorn's answers and this CPU's, a CRT routine proven alike on both paths, the render driver's
 # ISA tests unreached (2 channels), the FMA3 math above (playbook 228); the teeth: the answers written off their
-# globals (no path moves: refused), memory-operand displacements in the lifted code's comments taken as names
+# globals (no path moves: refused), memory-operand displacements in the lifted code's comments taken as names; and
+# the plugin's FTZ + DAZ switch must load 0x9FC0 in the process() oracle (its tooth: the oracle entered with MXCSR 0)
 python3 "$REPO/tools/verify/cpu_census.py" --port-of jx
 python3 "$REPO/tools/verify/cpu_census.py" --port-of jx --tooth
+python3 "$REPO/tools/verify/cpu_census.py" --port-of jx --tooth-mxcsr
 python3 "$REPO/tools/verify/cpu_census.py" --tooth-roots
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"

@@ -29,6 +29,9 @@ run different code. crt_fma_gate.py grades one such answer (the CRT's FMA3 flag)
             3000 random strings each, equal results, and an int3 on the AVX2 path's first instruction must fire
             under this CPU's answer only
     The DRIVER count's control: the driver's loads of __isa_available (each block) must be seen by the same hooks.
+    MXCSR: the plugin's own FTZ + DAZ switch (ScopedNoDenormals in process()) must load 0x9FC0 in the process() oracle
+    -- a host's 0x1F80 with FTZ and DAZ, the mode the port's product build renders in (Unicorn starts at MXCSR 0; the
+    oracles start a thread as Windows does, 0x1F80).
     A leaf function (no .pdata entry: MSVC writes none for code that never touches the stack) starts at each direct
     call target outside .pdata: without them these string routines' reads were invisible (playbook 228).
     any other reached reader FAILS the census until it is graded here.
@@ -37,6 +40,8 @@ run different code. crt_fma_gate.py grades one such answer (the CRT's FMA3 flag)
     python3 tools/verify/cpu_census.py --tooth          the PATH and NATIVE proofs with the answers written 4 bytes
                                                         off their globals: no path may move, and the proofs must
                                                         refuse
+    python3 tools/verify/cpu_census.py --tooth-mxcsr    the process() oracle entered with Unicorn's reset MXCSR 0 (as
+                                                        before playbook 228): the FTZ + DAZ switch must not load 0x9FC0
     python3 tools/verify/cpu_census.py --tooth-roots    memory-operand displacements admitted as names again (the
                                                         lifted code's comments): the JX reaches JUCE's CPU-info
                                                         getter and OpenSSL, ungraded readers -- the census must fail
@@ -437,9 +442,25 @@ def native_proof(port, C, entries, ans, tooth=False):
     return bad, refused
 
 
-def driver_count(port, C):
-    """the render driver's ISA tests in the process() oracle over a chain: reached how often"""
+def daz_switch(C):
+    """the plugin's own FTZ + DAZ switch (JUCE's ScopedNoDenormals in process()): the one `ldmxcsr` that follows
+    `or eax, 0x40` (DAZ) -- the MXCSR the plugin renders in"""
+    ins = C['ins']
+    hits = [ins[j] for k, x in enumerate(ins) if x.mnemonic == 'or' and x.op_str == 'eax, 0x40'
+            for j in range(k + 1, k + 4) if ins[j].mnemonic == 'ldmxcsr']
+    if len(hits) != 1:
+        raise SystemExit('REFUSE: %d FTZ + DAZ switches found (expected 1)' % len(hits))
+    m = re.fullmatch(r'dword ptr \[(\w+)(?: \+ (0x[0-9a-f]+|\d+))?\]', hits[0].op_str)
+    return hits[0].address, m.group(1), int(m.group(2) or '0', 0)
+
+
+def driver_count(port, C, tooth_mxcsr=False):
+    """in the process() oracle over a chain: the render driver's ISA tests (reached how often), and the MXCSR the
+    plugin's own FTZ + DAZ switch loads (it must be 0x9FC0: a host's 0x1F80 with FTZ and DAZ -- the product mode the
+    port renders in; the tooth enters process() with Unicorn's reset value 0, as the oracles did before playbook
+    228: 0x8040, every exception unmasked)"""
     from unicorn import UC_HOOK_CODE
+    from unicorn.x86_const import UC_X86_REG_MXCSR
     p = PORTS[port]
     f = C['fn_of'](p['driver'])
     tests = [k for k, g, kind, _ in decisions(C, f) if kind == 'cmp']
@@ -452,6 +473,13 @@ def driver_count(port, C):
         sys.path.insert(0, os.path.join(REPO, 'jx3p', 'tools'))
         import jx_host_emu as X
         h = X.JXHost()
+    if tooth_mxcsr:
+        h.uc.reg_write(UC_X86_REG_MXCSR, 0)
+    import unicorn.x86_const as K
+    sw, reg, disp = daz_switch(C)
+    loaded = collections.Counter()
+    h.uc.hook_add(UC_HOOK_CODE, lambda u, addr, s, d: loaded.update([struct.unpack('<I', bytes(u.mem_read(
+        u.reg_read(getattr(K, 'UC_X86_REG_' + reg.upper())) + disp, 4)))[0]]), begin=sw, end=sw)
     h.start(48000.0, 512)
     hits = collections.Counter()
     for a in addrs:
@@ -467,7 +495,7 @@ def driver_count(port, C):
         ev = [G.ev_on(0, 60, 0.8)]
     h.process(512, events=ev)
     h.process(512)
-    return len(addrs), sum(hits.values()), drv[1], sum(ld.values())
+    return len(addrs), sum(hits.values()), drv[1], sum(ld.values()), sw - C['base'], dict(loaded)
 
 
 def run(port, tooth=False, tooth_roots=False, no_driver=False):
@@ -527,10 +555,13 @@ def run(port, tooth=False, tooth_roots=False, no_driver=False):
         return pr and (nr or not native_needed)
     bad += pb + pr + nb + nr
     if drv and not no_driver:
-        nt, nh, nd, nl = driver_count(port, C)
+        nt, nh, nd, nl, sw, loaded = driver_count(port, C)
         print('  DRIVER in the process() oracle (2 channels): the driver ran %d times, its loads of __isa_available '
               '%d times, its %d ISA tests %d times' % (nd, nl, nt, nh))
-        bad += nh != 0 or nd == 0 or nl == 0
+        print('  MXCSR  the plugin\'s FTZ + DAZ switch (rva %x) loaded %s -- %s' % (sw, ', '.join(
+            '%#x x%d' % kv for kv in sorted(loaded.items())) or 'nothing', 'the product mode (0x9FC0)' if set(loaded) ==
+            {0x9FC0} else 'NOT the product mode 0x9FC0'))
+        bad += nh != 0 or nd == 0 or nl == 0 or set(loaded) != {0x9FC0}
     return bad
 
 
@@ -542,6 +573,16 @@ def main():
         bites = all(run(p, tooth=True) for p in ports)
         print('cpu_census --tooth: %s' % ('BITES (the answers written off their globals: no path moved, the proof '
                                            'refused)' if bites else 'DID NOT BITE'))
+        return 0 if bites else 1
+    if '--tooth-mxcsr' in a:     # the process() oracle entered with Unicorn's reset MXCSR 0 (before playbook 228)
+        bites = True
+        for p in ports:
+            C = census(p)
+            loaded = driver_count(p, C, tooth_mxcsr=True)[5]
+            print('  %s: the FTZ + DAZ switch loaded %s' % (p, ', '.join('%#x x%d' % kv for kv in sorted(loaded.items()))))
+            bites &= bool(loaded) and set(loaded) != {0x9FC0}
+        print('cpu_census --tooth-mxcsr: %s' % ('BITES (an oracle entering process() with MXCSR 0 is seen)' if bites
+                                                 else 'DID NOT BITE'))
         return 0 if bites else 1
     if '--tooth-roots' in a:
         bites = run('jx', tooth_roots=True) > 0
