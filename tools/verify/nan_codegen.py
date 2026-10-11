@@ -3,10 +3,16 @@
 
 A NaN keeps its sign through mulss / addss / subss / a conversion; a negation (xorps with the sign mask) flips it. GCC
 folds operations that are exact for every NUMBER and so flips a NaN where the plugin does not: x * 16384 computed as
--(x * -16384) (JUNO master, the delay read heads: 11 sites), x * -1.0 as -x (JUNO voice, the sign selector at
-line 1753), -(a * c) as a * -c. -frounding-math (no fold that holds only in round-to-nearest) and -fsignaling-nans
-(no fold that would skip an operation a signalling NaN goes through) keep every one; the port runs in round to
-nearest, so no number changes -- only a NaN's sign (playbook 225).
+-(x * -16384) (the delay read heads: 13 sites in the JUNO master, 12 in the JX master), v * x with v = -1.0 as -x
+(JUNO voice, the sign selectors at lines 1753, 1857, 1961, 2065) -- measured by the tooth, 2026-10-11.
+-frounding-math (no fold that holds only in round-to-nearest) and -fsignaling-nans (no fold that would skip an
+operation a signalling NaN goes through) keep every one; the port runs in round to nearest, so no number changes --
+only a NaN's sign (playbook 225).
+
+A flip is placed by its .loc line, and the scheduler and tail duplication move or copy instructions: without the
+flags the tooth lists JUNO master lines 1195 and 2749 for the folds of lines 1200 and 2721, and voice line 763's one
+negation is two flips on two paths. So this gate pins the compiler; it can not see a fold whose flip carries a line
+that also negates. The live A/B (nan_ab.py, jx_nan_ab.py) grades the result against the plugin.
 
 Two checks per render file, on GCC's own output for the port's flags (-g: each instruction's C line):
   A. every sign flip GCC emits (xorps / xorpd / pxor with a register or constant other than itself) lies on a C line

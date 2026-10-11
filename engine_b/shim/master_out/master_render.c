@@ -2801,7 +2801,10 @@ LABEL_164:
     *(_DWORD *)(a1 + 90976) = *(_DWORD *)(a1 + 90960);
     *(_DWORD *)(a1 + 90368) = v594;
     *(_DWORD *)(a1 + 90384) = v594;
-    v595 = juno_wrap_unit((float)((float)( *(float *)(a1 + 90672) + *(float *)(a1 + 90640) ) + *(float *)(a1 + 91152)));
+    /* rva 0x367A84: movss xmm0, [+90672]; addss xmm0, [+90640] -- the phase is the FIRST operand. Where both are NaN
+     * (one NaN and the copy `v596 = -v596` below flipped while the phase was NaN) x86 keeps the phase's; GCC put
+     * +90640 first (native_replay.py --sweep --all: master +91456, cells +90656 / +90672; playbook 227) */
+    v595 = juno_wrap_unit((float)(juno_add_first(*(float *)(a1 + 90672), *(float *)(a1 + 90640)) + *(float *)(a1 + 91152)));
     *(float *)(a1 + 90656) = v595;
     v596 = *(float *)(a1 + 91456);
     if ( !(v595 >= 0.0) )

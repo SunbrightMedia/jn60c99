@@ -707,9 +707,12 @@ float jx_h_3A21E0(float result)
 /* ---- statically linked CRT math, transcribed from the binary ----
  * The plugin does NOT import expf/tanf: both live in the image (expf @
  * 0x722EA0, tanf @ 0x725150) and both begin with a CPU-feature dispatch
- * (dword @ 0xCEFC0C). That flag is 0 in a fresh image, and the Unicorn
- * oracle executes a fresh image, so the ground truth is the NON-FMA path,
- * transcribed here instruction by instruction. System libm differs by 1 ulp
+ * (dword @ 0xCEFC0C). The CRT's init (rva 0x74A920) SETS that flag at load on
+ * a CPU with FMA3 + AVX -- the user's PC; Unicorn has no FMA, so every oracle
+ * runs the NON-FMA path, transcribed here instruction by instruction. Both
+ * paths, run natively over all 2^32 inputs: tanf never differs, expf at ONE
+ * input (-68.5303421) no call site can pass (tools/verify/crt_fma_gate.py,
+ * playbook 226) -- the port equals the plugin on both kinds of CPU. System libm differs by 1 ulp
  * on some inputs (seen to fail: patches 30/43/53/54/56/62 before this).
  * STATUS: PROVEN -- the render A/B (GATE 2: 64 patches x 3 rates EXACTLY 0) and every product gate run them.
  * ISO C99 (2026-10-11, docs/GATE_PARITY.tsv c99): the conversions are the portable twins of cvtsd2si /

@@ -3855,8 +3855,10 @@ delivered binary, not on the source.
 Paid 2026-10-11 (JUNO-60, nan_ab.py: a NaN in master +91168 / +91136 / +91488 left 0x7FC00000 where the plugin keeps
 0xFFC00000). The injected NaN is negative; the port's became positive at the delay read heads: GCC computed
 `(float)(v636 * 16384.0)` as the negation (xorps) of `v636 * -16384.0`, which it had for the read index -- exact for
-every number, a sign flip for a NaN. The plugin multiplies twice. 11 such sites in the JUNO master, 12 in the JX
-master; and `v413 * x` with v413 = -1.0 became `-x` in the JUNO voice (line 1753; the plugin's mulss keeps x's NaN).
+every number, a sign flip for a NaN. The plugin multiplies twice. 13 such sites in the JUNO master, 12 in the JX
+master; and `v413 * x` with v413 = -1.0 became `-x` in the JUNO voice (lines 1753, 1857, 1961, 2065; the plugin's
+mulss keeps x's NaN). (First written "11 sites" and "line 1753": the tooth's own list, counted, said 13 and four --
+two of its lines are the scheduler's: a flip carries the .loc of the line it was moved next to.)
 -frounding-math (no fold valid only in round-to-nearest) and -fsignaling-nans (no fold that skips an operation a
 signalling NaN goes through) keep every one; the port runs in round-to-nearest, so no number changes. nan_codegen.py
 proves it on GCC's output: every sign flip on a C line that writes a negation, every negation a flip; the tooth (no
@@ -3875,5 +3877,54 @@ dropped them and a parity test there would have gone unseen. The scan now follow
 instruction writes the flags.
 ### The rule
 A NaN's bits are the compiler's choice wherever C leaves them open; a port that promises bit-exact NaNs pins the
-compiler (flags) and proves the generated code, not the source. A map that grades sites must also account for every
+compiler (flags) and proves the generated code, not the source. A check that places an instruction by its .loc line
+is approximate (scheduling moves it, tail duplication copies it: voice line 763's one negation is two flips without
+the flags), so it pins the compiler; the live A/B against the plugin grades the result. A map that grades sites must also account for every
 instruction: a site may be right while an instruction is never looked at.
+
+## 226. THE ORACLE RUNS THE PLUGIN AS ON A CPU WITHOUT FMA3 -- ITS OWN C LIBRARY TAKES OTHER CODE ON THE USER'S PC
+Paid 2026-10-11 (an audit of the oracle as a CPU, not a defect seen in a render). Both plugins link the MSVC CRT
+statically. Its init -- an _initterm entry (JUNO rva 0x713C70, JX 0x74A920) -- runs cpuid (FMA, OSXSAVE, AVX:
+`and ecx, 0x18001000`) and xgetbv (XCR0 & 6) at load and SETS a flag (JUNO 0xCB79DC, JX 0xCEFC0C) on every x86-64 PC
+of the last decade; 13 (JX 12) math functions open with `cmp [flag], 0; jne <FMA3 code>`. Unicorn answers cpuid with
+FMA = 0, AVX = 0 and cannot decode VEX (vfmadd213sd: UC_ERR_INSN_INVALID): every oracle in this repository ran the
+SSE2 code, and the port was transcribed from it. The expf header even said "the flag is 0 in a fresh image, so the
+non-FMA path is the ground truth" -- true of the emulator, false of the plugin in a DAW. The CPU's own answer:
+tools/verify/crt_fma_native.c maps the image at its base and calls each function (ms_abi) natively, flag clear and
+flag set, on every input. expf: ONE input of 2^32 differs (-68.5303421, 0x0E0C39FC / 0x0E0C39FD); tanf: none; the
+JX's sin / cos (0x7247F0): only |x| >= 2^23 (the large-argument reduction), none below, none at infinities or NaNs;
+log10: 7 meter inputs, by 2.2e-16. The port reaches exactly those four (static closure over direct calls from every
+function its sources name), and its arguments miss every difference: expf gets v * 5.2834215 with v clamped to
+[0, 1] or an integer value, sin / cos gets 3522 / n, the meter's dB step holds for any log10 within 1e-12. So no
+number changes -- PROVEN by crt_fma_gate.py, which runs it all (both ports, about 5 minutes) and refuses on a CPU
+that cannot run FMA3 code; its tooth moves the flag address 4 bytes and must lose the expf difference.
+### The rule
+The oracle is a model of a CPU. List what the plugin asks the CPU (cpuid, xgetbv, MXCSR) and what it does with each
+answer; run every path the user's machine selects on a real CPU -- the plugin's own code, natively -- before a
+"bit-exact" claim covers that machine.
+
+## 227. THE ORACLE IS A MODEL OF A CPU -- RUN ITS MACHINE CODE ON THE REAL ONE, AND A TOOTH MUST FAIL ON ITS OWN
+Paid 2026-10-11 (the marked-NaN scenes: 68 NaNs at once, each its own payload, and the oracle and the port kept
+different survivors in 5 to 11 master cells). One instruction settled it: `mulss xmm1, xmm2` with two quiet NaNs
+returns xmm1's on this CPU -- the SDM's rule, the FIRST source operand (an SNaN first comes back quieted) -- and
+the LARGER significand under Unicorn (QEMU's softfloat applies x87's rule to SSE; FFC6CA52 * FFCB4510 = FFCB4510).
+The model cannot grade what survives where two NaNs meet. So the machine grades the model:
+tools/verify/native_replay.c maps the oracle's memory -- image, used heap, stubs, buffers -- at its own addresses
+and runs E2E.render()'s loop natively (the JX's JX.render too: jx3p/tools/jx_native_replay.py). Results, both
+plugins: with no NaN, Unicorn == the CPU, every output sample and every byte of all nine units; the port == the CPU
+in the gates' mode (DAZ) AND in the product's (FTZ + DAZ: the plugin in a host) -- the product's FP mode, inferred
+until now, is executed. One NaN source (every target alone; the x86 default NaN, a marked quiet one, a marked
+signalling one): the port == the CPU, both modes. Several NaN sources at once: Unicorn != the CPU (its rule), and
+the port != the CPU in 21 of 68 live cells, outputs equal -- which payload survives is the compiler's operand order
+(GCC orders commutative operands by its own numbering; the decompile's order is not the machine's either: master
+line 2865 prints `v624 * v626`, the plugin computes `mulss xmm1(v624), xmm3`). C99 fixes it only by testing both
+operands at every operation: stated as the boundary (JX SCOPE_AUDIT row 24), not hidden.
+The same day the sweep's tooth -- nan_ab.py's, the delay clamp at rva 0x366417 -- did NOT bite, and nan_ab.py's
+own tooth did not either: its one recorded "bite" (job juno_nan_post) was the 4 cells the port then had wrong, the
+same 4 its non-tooth run reported. No NaN in the targets ever reached that clamp. An instrumented build counted
+which rewritten sites a NaN does reach (master line 2375, rva 0x3672CD: 18 of 68 targets); the tooth moved there
+bites both gates (18 of 68 cells; the CPU sweep).
+### The rule
+Grade the oracle against the real CPU wherever the CPU, not the model, is what the user runs. A tooth counts only
+when it fails on its OWN mutation while the gate is otherwise green -- a tooth that "bites" next to a red gate has
+shown nothing.

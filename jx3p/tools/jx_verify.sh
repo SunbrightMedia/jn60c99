@@ -346,6 +346,19 @@ python3 "$REPO/tools/verify/nan_helpers.py" --port-of jx --tooth-mode
 # (-frounding-math -fsignaling-nans, playbook 225); the tooth builds without the two flags
 python3 "$REPO/tools/verify/nan_codegen.py" --port-of jx
 python3 "$REPO/tools/verify/nan_codegen.py" --port-of jx --tooth
+# THE ORACLE ON THE REAL CPU (playbooks 226, 227): the plugin's own render run natively from the oracle's state
+# (tools/verify/native_replay.c) -- Unicorn == the CPU, the port == the CPU in the gates' mode and the product's
+# (FTZ + DAZ); every live cell's NaN alone, three NaNs each; the tooth: JX_NAN_TOOTH must differ from the CPU
+python3 "$HERE/jx_native_replay.py" --patch 5 --frames 4096
+# (the JX's live cells are rewritten before they are read: 6 of 204 scenes reach, as many as --all's 1416 -- the
+# decisions are graded site by site by nan_sites.py above; the effect LFO's phase add, the JUNO's one meeting site,
+# keeps the plugin's operand order where a NaN can meet its own negated copy: GCC's output checked, playbook 227)
+python3 "$HERE/jx_native_replay.py" --sweep --patch 5
+python3 "$HERE/jx_native_replay.py" --sweep --tooth --patch 5 --seeds 1 --cells 4
+# the CRT's FMA3 code (the user's PC: the CRT init sets the flag on FMA3 + AVX), run natively against the SSE2 code
+# the oracle runs, for every function the port reaches; the tooth moves the flag address and must lose expf's one
+python3 "$REPO/tools/verify/crt_fma_gate.py" --port-of jx
+python3 "$REPO/tools/verify/crt_fma_gate.py" --port-of jx --tooth
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
 sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"

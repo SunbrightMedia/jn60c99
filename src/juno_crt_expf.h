@@ -1,8 +1,12 @@
 /* juno_crt_expf.h -- the JUNO binary's OWN expf, transcribed from its
  * machine code at rva 0x6EF740 (statically linked CRT; expf is NOT in the
  * import table). The routine opens with a CPU-feature dispatch on a .data
- * flag that is 0 in a fresh image; the Unicorn oracle executes a fresh
- * image, so the non-FMA path transcribed here is the ground truth. Host
+ * flag (0xCB79DC) that the CRT's init (rva 0x713C70, an _initterm entry) SETS
+ * at load on a CPU with FMA3 + AVX -- the user's PC; Unicorn has no FMA, so
+ * every oracle runs the SSE2 path transcribed here. The two paths, run
+ * natively over all 2^32 inputs, differ at ONE: -68.5303421 (0xC2890F89),
+ * which no call site can pass (tools/verify/crt_fma_gate.py, playbook 226):
+ * the port equals the plugin on both kinds of CPU. Host
  * libm may take an FMA path and differ by 1 ulp (playbook 79: exactly this
  * killed 6 of 64 JX-3P integration patches; the JX copy of this routine at
  * rva 0x722EA0 is instruction- and constant-identical, verified by canonical

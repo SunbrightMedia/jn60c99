@@ -72,6 +72,17 @@ static inline double juno_minsd(double a, double b)
  * for float ones. */
 static inline int juno_feq(double a, double b) { return !(a < b) && !(a > b); }
 static inline int juno_fne(double a, double b) { return a < b || a > b; }
+/* addss a, b where BOTH may be NaN (2026-10-11, playbook 227): x86 returns the FIRST source operand's NaN, quieted
+ * (SDM Table 4-7); C leaves the choice to the compiler, and GCC orders a commutative add by its own numbering. Where
+ * the plugin's order matters -- one NaN meeting a copy of itself another site negated -- it is written out: a NaN a
+ * comes back as addss returns it (a + 0.0 quiets a signalling one; -fsignaling-nans keeps the add). */
+static inline float juno_add_first(float a, float b)
+{
+    float s = a + b;
+    if (a != a)
+        s = a + 0.0f;
+    return s;
+}
 static inline double juno_maxsd(double a, double b)
 {
     uint64_t ua, ub, m;
