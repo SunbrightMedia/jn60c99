@@ -18,11 +18,11 @@ jp8/src/jp8_rt.c	RUNTIME	the lifted code's runtime (the JUPITER-8 track's)	jx3p/
 jp8/src/jp8_cpu.h	RUNTIME	the lifted code's CPU header (C99 helpers, playbook 213)	jx3p/tools/jx_lift_gate.py + tools/verify/c99_gate.py + tools/verify/c99_helpers_check.py
 jx3p/src/jp8_cpu.h	RUNTIME	forwards to jp8/src/jp8_cpu.h	jx3p/tools/jx_lift_gate.py
 jx3p/src/jx_lift.c	LIFTED	jx3p/tools/jx_lift.py on jx3p/gen/jx_lift_reach.json + jx_lift_roots.json (--relift --write)	jx3p/tools/jx_lift_gate.py
-jx3p/src/jx_voice_render.c	TRANSCRIBED	jx3p/tools/translate_jx_voice.py from the decompile, fixed by hand (S3_TRANSCRIPTION.md)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_full_gate.sh + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh
+jx3p/src/jx_voice_render.c	TRANSCRIBED	jx3p/tools/translate_jx_voice.py from the decompile, fixed by hand (S3_TRANSCRIPTION.md); every compare and min / max rewritten in its instruction's form by tools/verify/nan_sites.py (2026-10-11)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_full_gate.sh + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh + tools/verify/nan_sites.py
 jx3p/src/jx_voice_helpers.c	TRANSCRIBED	by hand from the binary (the CRT's expf / tanf, the tables)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh + tools/verify/c99_helpers_check.py
-jx3p/src/jx_voice_helpers.h	TRANSCRIBED	the helpers' declarations	jx3p/tools/ab_render_c.py
-jx3p/src/jx_master_render.c	TRANSCRIBED	jx3p/tools/translate_jx_master.py, the arguments from the asm (playbook 198)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/jx_nan_ab.py
-jx3p/src/jx_ftz.c	RUNTIME	the FTZ / DAZ mode glue	tools/verify/c99_gate.py + jx3p/tools/ab_render_c.py
+jx3p/src/jx_voice_helpers.h	TRANSCRIBED	the helpers' declarations; jx_minss / jx_maxss / jx_minsd / jx_maxsd, the instructions' selects (2026-10-11)	jx3p/tools/ab_render_c.py + tools/verify/nan_sites.py
+jx3p/src/jx_master_render.c	TRANSCRIBED	jx3p/tools/translate_jx_master.py, the arguments from the asm (playbook 198); compares and min / max in their instructions' form (nan_sites.py, 2026-10-11)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/jx_nan_ab.py + tools/verify/nan_sites.py
+jx3p/src/jx_ftz.c	RUNTIME	the FTZ / DAZ mode glue; the gates' oracle mode (DAZ on, FTZ off: playbook 220)	tools/verify/c99_gate.py + jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py
 jx3p/src/jx_midi_tables.h	GENERATED	jx3p/tools/jx_gen_midi_tables.py from the booted plugin	jx3p/tools/jx_gen_midi_tables.py
 jx3p/src/jx_state_tables.h	GENERATED	jx3p/tools/jx_gen_state_tables.py from the booted plugin	jx3p/tools/jx_gen_state_tables.py
 jx3p/src/jx_patch_tables.h	GENERATED	jx3p/tools/jx_gen_patch_tables.py from the plugin's own loads	jx3p/tools/jx_gen_patch_tables.py

@@ -520,6 +520,46 @@ in no row. Re-mapped: 55 classes; each owed one closed by an option of a gate th
   nothing: taken out of every build), tools/verify/c99_gate.py and approx_audit.py --jx (playbook 213).
 BLOCKED on inputs the project does not have: the panel art (row 20) and the user's own JX-3P banks.
 
+## 3t. NaN and denormal parity of the render code (EXECUTED, 2026-10-11; scope row 23)
+
+- THE FLAG RULE (playbook 219). After comiss / ucomiss a NaN sets CF = ZF = PF = 1: "A < B", "A <= B" (and
+  "A == B") read TRUE, "A > B", "A >= B" FALSE. Hex-Rays prints the predicate that selects a block as a relation in
+  the instruction's operand order; C reads every relation FALSE on NaN. So a decompiled `<` / `<=` in the
+  instruction's order, or `>` / `>=` with the operands swapped, takes the other branch on NaN. minss A, B returns
+  B when either is NaN (fminf returns the operand that is not NaN); the two agree on every other input, signed
+  zeros included (glibc's fminf is minss on ordered inputs: EXECUTED).
+- THE MAP. tools/verify/nan_sites.py: the plugin's function under Unicorn with a hook on every comiss / ucomiss /
+  minss / maxss / minsd / maxsd / cmp / `test r, r` (recursive descent from the entry; the voice's own copy, rva
+  0x3A22C0 -- the wrapper's jump table at 0x3771B4 picks one copy per voice); the C file rewritten into a copy
+  whose every relation and fminf / fmaxf / select call logs its operands (types and results kept); both run the same
+  scene (a patch or a variant's records, the oracle's FP mode, the warm-up from boot, a key down and up). A site
+  and an instruction are one when their operand values agree in order or swapped; ties are broken by the cell an
+  operand reads (the memory displacement), by a constant operand (rip-relative data, or a register whose every
+  reaching definition is a constant load), by program order, and an inner test that reuses the outer test's flags
+  (`if (v >= 0) { if (v > 0) ... }`) takes the outer's instruction. The fixes: `!(A >= B)` / `!(A > B)` for the
+  wrong relations, jx_minss / jx_maxss / jx_minsd / jx_maxsd (jx_voice_helpers.h: the compare, then the chosen
+  operand's bits) for every min / max -- also those with a constant operand, for the denormal operand the oracle's
+  minss hands back unflushed.
+- THE FP MODE (playbook 220). Unicorn honours DAZ and never flushes; its minss returns a denormal operand as it is.
+  Every JX gate that grades against the oracle runs the port in jx_set_fp_oracle_mode (DAZ on, FTZ off); the
+  product and the web page keep FTZ + DAZ (on hardware, under FTZ no operand is denormal, and the select equals
+  minss on every other input).
+- THE REACH (playbook 221). A site no scene runs is not graded. The master's scenes, besides the 64 patches and the
+  54 effect variants: `e:` events (records while a key sounds: a DELAY / REVERB TYPE change arms the delay's clear
+  fade, a DELAY TIME change glides its read head), a scene's own length (`@N`: EFFECT TYPE 2 for one second, its 2-
+  and 3-step reads), and a `w:` written state (the read head's speed cell +265360 lowered to 0.2 on both sides: its
+  measured top speed is 2.23 steps per sample at 44.1 and 96 kHz, so no parameter reaches the 4-step reads). A
+  compare of two integer C operands is graded by its types (a rotated loop's `i < 256` has no instruction of its
+  own); a site in a branch no build compiles (`#if JX_NAN_TOOTH`) is no site (the preprocessor's output decides).
+  The constant rule walks the whole function (xmm12 = 0 is set 2000-2900 instructions before its compares: capped
+  at 600, it left lines 2334 and 3634 "for review" -- both WRONG).
+- GATE 3i runs the map on both functions (64 patches, the mode / effect variants and the master's reach scenes,
+  from boot, key up) -- 0 sites may be wrong, unmatched, conflicting or left for review (a site nobody graded fails
+  like a wrong one); every site must run (--all-run, the reach guard) -- and its tooth (the decompiler's form
+  planted back at every site written in the machine's). Both new rules were seen to fail: one patch alone leaves 128
+  voice sites unrun (REACH, exit 1); without the cell rule lines 1422 / 1501 stay for review (exit 1). Result (job
+  nan_mapjx3, then the 12 master fixes re-graded): voice 275 / 275 run and right; master 144 / 144 run, 0 wrong.
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

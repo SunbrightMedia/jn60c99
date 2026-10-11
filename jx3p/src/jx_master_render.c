@@ -1181,7 +1181,7 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
                                              * *(float *)(st + 4466528))
                                      + (float)(*(float *)(st + 4466512) * *(float *)(st + 4466032)))
                              * *(float *)(st + 4466544);
-    v360 = fminf(*(float *)(st + 4466736), v359) * v11;
+    v360 = jx_minss(*(float *)(st + 4466736), v359) * v11;
     *(float *)(st + 4466208) = v360;
     if ( (float)(v360 - *(float *)(st + 4466192)) >= 0.0 )
       v361 = *(float *)(st + 4466752);
@@ -1199,24 +1199,24 @@ float *jx_master_render(unsigned char *st, unsigned char *a2, float **a3)
     *(float *)(st + 4466160) = v365;
     v368 = fabs(v365) * v367;
     v369 = v364 + v368;
-    v370 = fmaxf(v364 - v368, v362);
+    v370 = jx_maxss(v364 - v368, v362);
     if ( v366 > 0.0 )
-      v370 = fminf(v369, v362);
+      v370 = jx_minss(v369, v362);
     *(float *)(st + 4466176) = v370;
     v49 = 0.0;
-    if ( v363 <= 0.0 )
+    if ( !(v363 > 0.0) )
       v371 = 0.0;
     else
       v371 = v363;
     v51 = -1.0;
     v372 = v371;
     if ( v372 >= -1.0 )
-      v373 = fminf(v372, 1.0);
+      v373 = jx_minss(v372, 1.0);
     else
       v373 = -1.0;
     *(float *)(st + 4466224) = v373 * *(float *)(st + 4466544);
     v374 = v370 * *(float *)(st + 4466496);
-    if ( v374 <= 0x1p-13f )
+    if ( !(v374 > 0x1p-13f) )
       v375 = 0.0001220703125;
     else
       v375 = v374;
@@ -1397,19 +1397,19 @@ LABEL_61:
       *(float *)(st + 270928) = v308;
       v311 = fabs(v308) * v310;
       v312 = v307 + v311;
-      v313 = fmaxf(v307 - v311, v305);
+      v313 = jx_maxss(v307 - v311, v305);
       if ( v309 > 0.0 )
-        v313 = fminf(v312, v305);
+        v313 = jx_minss(v312, v305);
       *(float *)(st + 270944) = v313;
       v49 = 0.0;
-      if ( v306 <= 0.0 )
+      if ( !(v306 > 0.0) )
         v314 = 0.0;
       else
         v314 = v306;
       v51 = -1.0;
       v315 = v314;
       if ( v315 >= -1.0 )
-        v316 = fminf(v315, 1.0);
+        v316 = jx_minss(v315, 1.0);
       else
         v316 = -1.0;
       *(float *)(st + 270992) = v316 * *(float *)(st + 271296);
@@ -1509,7 +1509,7 @@ LABEL_61:
       *(_DWORD *)(st + 6564048) = *(_DWORD *)(st + 6564016);
       *(_DWORD *)(st + 6564064) = v231;
       v232 = jx_h_3A2010((double)(float)(*(float *)(st + 6564016) + *(float *)(st + 6564112)));  /* asm 0x39C188 */
-      *(float *)(st + 6564080) = fmaxf(fminf(v232, 512.0), -512.0);
+      *(float *)(st + 6564080) = jx_maxss(jx_minss(v232, 512.0), -512.0);
       v233 = *(float *)(st + 6564064);
       *(_DWORD *)(st + 6564320) = *(_DWORD *)(st + 6564304);
       v33 = 0;
@@ -1580,7 +1580,7 @@ LABEL_61:
       v255 = *(float *)(st + 6565280) + *(float *)(st + 6564704);
       *(float *)(st + 6598128) = v254
                                * (float)((float)(v248 * *(float *)(st + 6564544)) + (float)(*(float *)&v234 * v253));
-      v256 = fminf(*(float *)(st + 6565296), v255) * v254;
+      v256 = jx_minss(*(float *)(st + 6565296), v255) * v254;
       *(float *)(st + 6564688) = v256;
       if ( (float)(v256 - *(float *)(st + 6564672)) >= 0.0 )
         v257 = *(float *)(st + 6565312);
@@ -1590,7 +1590,7 @@ LABEL_61:
       v259 = *(float *)(st + 6564720) + v257;
       v260 = *(float *)(st + 6564672);
       v49 = 0.0;
-      if ( v259 <= 0.0 )
+      if ( !(v259 > 0.0) )
         v261 = 0.0;
       else
         v261 = v259;
@@ -1598,7 +1598,7 @@ LABEL_61:
       v262 = v261;
       v263 = (float)((float)(*(float *)(st + 6564832) - v260) * *(float *)(st + 6565104)) + v260;
       if ( v262 >= -1.0 )
-        v264 = fminf(v262, 1.0);
+        v264 = jx_minss(v262, 1.0);
       else
         v264 = -1.0;
       *(float *)(st + 6564704) = v264 * *(float *)(st + 6565152);
@@ -1780,19 +1780,19 @@ LABEL_61:
           *(float *)(st + 6665744) = v43;
           v46 = fabs(v43) * v45;
           v47 = v42 + v46;
-          v48 = fmaxf(v42 - v46, v40);
+          v48 = jx_maxss(v42 - v46, v40);
           if ( v44 > 0.0 )
-            v48 = fminf(v47, v40);
+            v48 = jx_minss(v47, v40);
           *(float *)(st + 6665760) = v48;
           v49 = 0.0;
-          if ( v41 <= 0.0 )
+          if ( !(v41 > 0.0) )
             v50 = 0.0;
           else
             v50 = v41;
           v51 = -1.0;
           v52 = v50;
           if ( v52 >= -1.0 )
-            v53 = fminf(v52, 1.0);
+            v53 = jx_minss(v52, 1.0);
           else
             v53 = -1.0;
           *(float *)(st + 6665808) = v53 * *(float *)(st + 6666112);
@@ -1881,7 +1881,7 @@ LABEL_61:
           *(_DWORD *)(st + 10860752) = *(_DWORD *)(st + 10860720);
           *(_DWORD *)(st + 10860768) = v91;
           v92 = jx_h_3A2010((double)(float)(*(float *)(st + 10860720) + *(float *)(st + 10860816)));  /* asm 0x39AEF6 */
-          *(float *)(st + 10860784) = fmaxf(fminf(v92, 512.0), -512.0);
+          *(float *)(st + 10860784) = jx_maxss(jx_minss(v92, 512.0), -512.0);
           v93 = *(float *)(st + 10860768);
           *(_DWORD *)(st + 10861024) = *(_DWORD *)(st + 10861008);
           v95 = jx_h_3A21E0(jx_lfo_step(*(float *)(st + 10860784) * *(float *)(st + 10861056),  /* asm 0x39AF3D..0x39AF7B */
@@ -1997,7 +1997,7 @@ LABEL_61:
           v126 = *(float *)(st + 10862128) + *(float *)(st + 10861584);
           *(float *)(st + 10927792) = v125
                                     * (float)((float)(v121 * *(float *)(st + 10861344)) + (float)(*(float *)&v94 * v124));
-          v127 = fminf(*(float *)(st + 10862144), v126) * v125;
+          v127 = jx_minss(*(float *)(st + 10862144), v126) * v125;
           *(float *)(st + 10861568) = v127;
           v128 = *(float *)(st + 10861600);
           if ( (float)(v127 - *(float *)(st + 10861552)) >= 0.0 )
@@ -2006,14 +2006,14 @@ LABEL_61:
             v129 = v128 + *(float *)(st + 10862176);
           v130 = *(float *)(st + 10861712);
           v131 = *(float *)(st + 10861552);
-          if ( v129 <= 0.0 )
+          if ( !(v129 > 0.0) )
             v132 = 0.0;
           else
             v132 = v129;
           v133 = v132;
           v134 = (float)((float)(*(float *)(st + 10861712) - v131) * *(float *)(st + 10861984)) + v131;
           if ( v133 >= -1.0 )
-            v135 = fminf(v133, 1.0);
+            v135 = jx_minss(v133, 1.0);
           else
             v135 = -1.0;
           *(float *)(st + 10861584) = v135 * *(float *)(st + 10862032);
@@ -2098,7 +2098,7 @@ LABEL_61:
       *(_DWORD *)(st + 6598208) = *(_DWORD *)(st + 6598176);
       *(_DWORD *)(st + 6598224) = v163;
       v164 = jx_h_3A2010((double)(float)(*(float *)(st + 6598176) + *(float *)(st + 6598272)));  /* asm 0x39B83A */
-      *(float *)(st + 6598240) = fmaxf(fminf(v164, 512.0), -512.0);
+      *(float *)(st + 6598240) = jx_maxss(jx_minss(v164, 512.0), -512.0);
       v165 = *(float *)(st + 6598224);
       *(_DWORD *)(st + 6598480) = *(_DWORD *)(st + 6598464);
       v33 = 0;
@@ -2210,7 +2210,7 @@ LABEL_61:
       v196 = *(float *)(st + 6599584) + *(float *)(st + 6599040);
       *(float *)(st + 6665248) = v195
                                * (float)((float)(v191 * *(float *)(st + 6598800)) + (float)(*(float *)&v166 * v194));
-      v197 = fminf(*(float *)(st + 6599600), v196) * v195;
+      v197 = jx_minss(*(float *)(st + 6599600), v196) * v195;
       *(float *)(st + 6599024) = v197;
       v198 = *(float *)(st + 6599056);
       if ( (float)(v197 - *(float *)(st + 6599008)) >= 0.0 )
@@ -2220,7 +2220,7 @@ LABEL_61:
       v200 = *(float *)(st + 6599168);
       v49 = 0.0;
       v201 = *(float *)(st + 6599008);
-      if ( v199 <= 0.0 )
+      if ( !(v199 > 0.0) )
         v202 = 0.0;
       else
         v202 = v199;
@@ -2228,7 +2228,7 @@ LABEL_61:
       v203 = v202;
       v204 = (float)((float)(*(float *)(st + 6599168) - v201) * *(float *)(st + 6599440)) + v201;
       if ( v203 >= -1.0 )
-        v205 = fminf(v203, 1.0);
+        v205 = jx_minss(v203, 1.0);
       else
         v205 = -1.0;
       *(float *)(st + 6599040) = v205 * *(float *)(st + 6599488);
@@ -2302,7 +2302,7 @@ LABEL_96:
   if ( *(int *)(st + 10928576) <= 0 )
   {
     v411 = *(float *)(st + 11190736);
-    if ( v410 < 1.0 && *(float *)(st + 10928080) > 0.0 )
+    if ( !(v410 >= 1.0) && !(*(float *)(st + 10928080) <= 0.0) )
     {
       v411 = v410 + 0x1.a36e2ep-12f;
       *(float *)(st + 11190736) = v410 + 0x1.a36e2ep-12f;
@@ -2319,7 +2319,7 @@ LABEL_96:
     {
       v410 = v410 - 0x1.a36e2ep-12f;
       *(float *)(st + 11190736) = v410;
-      if ( v410 < 0.0 )
+      if ( !(v410 >= 0.0) )
       {
         *(_DWORD *)(st + 11190736) = 0;
         v410 = 0.0;
@@ -2327,11 +2327,11 @@ LABEL_96:
     }
     v411 = v410;
   }
-  if ( v411 <= 0.0 || (v412 = *(float *)(st + 10928080), v412 <= 0.0) )
+  if ( !(v411 > 0.0) || (v412 = *(float *)(st + 10928080), !(v412 > 0.0)) )
   {
     v466 = v162;
     v467 = v161;
-    if ( *(int *)(st + 10928576) > 0 && v411 <= 0.0 )
+    if ( *(int *)(st + 10928576) > 0 && !(v411 > 0.0) )
     {
       for ( i = 0; i < 256; i += 8 )
       {
@@ -2428,7 +2428,7 @@ LABEL_96:
       *(float *)(st + 10928032) = v423;
     }
     v424 = v423 * *(float *)(st + 10928192);
-    if ( v423 < 0.0 )
+    if ( !(v423 >= 0.0) )
       v425 = 2048.0;
     else
       v425 = -2048.0;
@@ -2641,7 +2641,7 @@ LABEL_96:
     v969 = v965;
     v970 = *(float *)(st + 131328);
     v971 = v968 + v967;
-    v972 = fmax(v969, 0.19);
+    v972 = jx_maxsd(v969, 0.19);
     v973 = (float)(v972 * v972) * *(float *)(st + 131600);
     v974 = (float)(v972 * *(float *)(st + 131584)) + *(float *)(st + 131568);
     *(float *)(st + 131312) = v966;
@@ -2649,7 +2649,7 @@ LABEL_96:
     v976 = (float)((float)(v970 * *(float *)(st + 131536)) + (float)(v966 * *(float *)(st + 131520)))
          + (float)(*(float *)(st + 131552) * *(float *)(st + 131344));
     if ( v975 >= -1.0 )
-      v977 = fminf(v975, 1.0);
+      v977 = jx_minss(v975, 1.0);
     else
       v977 = -1.0;
     v978 = *(float *)(st + 131376);
@@ -2669,14 +2669,14 @@ LABEL_96:
     v987 = *(float *)(st + 132016);
     v988 = *(float *)(st + 131824);
     if ( (float)(v985 * v987) >= -1.0 )
-      v989 = fminf(v985 * v987, 1.0);
+      v989 = jx_minss(v985 * v987, 1.0);
     else
       v989 = -1.0;
     v990 = (float)((float)(v988 * *(float *)(st + 131984)) + (float)(v985 * *(float *)(st + 132000))) * v987;
     *(float *)(st + 131840) = (float)((float)((float)(v989 * v989) * v989) * *(float *)(st + 132048))
                             + (float)(v989 * *(float *)(st + 132032));
     if ( v990 >= -1.0 )
-      v991 = fminf(v990, 1.0);
+      v991 = jx_minss(v990, 1.0);
     else
       v991 = -1.0;
     v992 = *(float *)(st + 131824);
@@ -2684,7 +2684,7 @@ LABEL_96:
     *(float *)(st + 131872) = (float)((float)((float)(v991 * v991) * v991) * *(float *)(st + 132048))
                             + (float)(v991 * *(float *)(st + 132032));
     if ( v993 >= -1.0 )
-      v994 = fminf(v993, 1.0);
+      v994 = jx_minss(v993, 1.0);
     else
       v994 = -1.0;
     v995 = (float)(*(float *)(st + 131808) * *(float *)(st + 131984)) + (float)(v992 * *(float *)(st + 132000));
@@ -2693,7 +2693,7 @@ LABEL_96:
     *(float *)(st + 131904) = (float)((float)((float)(v994 * v994) * v994) * *(float *)(st + 132048))
                             + (float)(v994 * *(float *)(st + 132032));
     if ( v997 >= -1.0 )
-      v51 = fminf(v997, 1.0);
+      v51 = jx_minss(v997, 1.0);
     v998 = *(float *)(st + 131920);
     v999 = (float)((float)(v996 + *(float *)(st + 131952)) * *(float *)(st + 132064))
          + (float)(*(float *)(st + 132080) * *(float *)(st + 131872));
@@ -2719,7 +2719,7 @@ LABEL_96:
           + (float)(*(float *)(st + 132256) * *(float *)(st + 132160));
     v1006 = (float)((float)(*(float *)(st + 132144) * *(float *)(st + 132288)) + (float)(v1003 * *(float *)(st + 132272)))
           + (float)(*(float *)(st + 132304) * *(float *)(st + 132176));
-    if ( v1004 <= 0.0 )
+    if ( !(v1004 > 0.0) )
       v1007 = 0.0;
     else
       v1007 = v1004;
@@ -2727,7 +2727,7 @@ LABEL_96:
     *(float *)(st + 132144) = v1005;
     *(float *)(st + 132160) = v1006;
     v1009 = (float)((float)(v1008 * v1005) - (float)(v1008 * v1003)) + v1003;
-    if ( v1004 < -0.0 )
+    if ( !(v1004 >= -0.0) )
       v49 = (float)-v1004;
     v1010 = v49;
     v1011 = v1003 + (float)((float)(v1010 * v1006) - (float)(v1010 * v1003));
@@ -2777,7 +2777,7 @@ LABEL_96:
       *(_DWORD *)(st + 264736) = *(_DWORD *)(st + 264720);
       *(_DWORD *)(st + 264720) = *(_DWORD *)(st + 264704);
       v811 = *(float *)(st + 265408);
-      v812 = fminf(*(float *)(st + 264784) + 0x1p-14f, v811);
+      v812 = jx_minss(*(float *)(st + 264784) + 0x1p-14f, v811);
       *(float *)(st + 264768) = v812;
       if ( (float)(v812 - v811) >= 0.0 )
       {
@@ -2821,7 +2821,7 @@ LABEL_216:
           v829 = v828;
           v830 = *(float *)(st + 265376);
           *(float *)(st + 264064) = v829;
-          if ( v829 < 0.0 )
+          if ( !(v829 >= 0.0) )
             v830 = -v830;
           v831 = fabs(v829);
           *(float *)(st + 264128) = v830;
@@ -2947,7 +2947,7 @@ LABEL_264:
           v872 = *(float *)(st + 264464);
           *(float *)(st + 264320) = (float)((float)(1.0 - v871) * *(float *)(st + 264016))
                                   + (float)(v871 * *(float *)(st + 264000));
-          if ( v872 < 0.0 )
+          if ( !(v872 >= 0.0) )
             v872 = v872 + v870;
           *(float *)(st + 264464) = v872;
           v866 = *(float *)(st + 264400);
@@ -2962,15 +2962,15 @@ LABEL_264:
             v876 = *(float *)(st + 265328);
             *(float *)(st + 264384) = (float)(v874 * 0.75) + (float)(v873 * 0.25);
             v877 = v866 - *(float *)(st + 263456);
-            if ( v877 < 0.0 )
+            if ( !(v877 >= 0.0) )
               v877 = v877 + v876;
             v878 = v866 - v875;
             v879 = v866 - *(float *)(st + 263472);
-            if ( (float)(v866 - v1013) < 0.0 )
+            if ( !((float)(v866 - v1013) >= 0.0) )
               v879 = v879 + v876;
             *(float *)(st + 264416) = v877;
             v866 = v866 - *(float *)(st + 263488);
-            if ( v878 < 0.0 )
+            if ( !(v878 >= 0.0) )
               v866 = v866 + v876;
             *(float *)(st + 264432) = v879;
           }
@@ -2995,7 +2995,7 @@ LABEL_264:
               v888 = *(float *)(st + 265328);
               *(float *)(st + 264384) = v886;
               v866 = v866 - *(float *)(st + 263456);
-              if ( v887 < 0.0 )
+              if ( !(v887 >= 0.0) )
                 v866 = v866 + v888;
               goto LABEL_264;
             }
@@ -3008,10 +3008,10 @@ LABEL_264:
             *(float *)(st + 264384) = v881;
             v884 = v866 - *(float *)(st + 263472);
             v885 = v866 - *(float *)(st + 263456);
-            if ( v885 < 0.0 )
+            if ( !(v885 >= 0.0) )
               v885 = v885 + v883;
             v866 = v866 - *(float *)(st + 263472);
-            if ( v884 < 0.0 )
+            if ( !(v884 >= 0.0) )
               v866 = v866 + v883;
             *(float *)(st + 264416) = v885;
             *(float *)(st + 264432) = v866;
@@ -3103,7 +3103,7 @@ LABEL_266:
             v911 = *(float *)(st + 265328);
             *(float *)(st + 264480) = (float)((float)(1.0 - v910) * *(float *)(st + 264048))
                                     + (float)(v910 * *(float *)(st + 264032));
-            if ( v904 < 0.0 )
+            if ( !(v904 >= 0.0) )
               v904 = v904 + v911;
             *(float *)(st + 264624) = v904;
             v906 = *(float *)(st + 264560);
@@ -3118,15 +3118,15 @@ LABEL_266:
               v916 = *(float *)(st + 265328);
               *(float *)(st + 264544) = (float)(v913 * 0.75) + (float)(v912 * 0.25);
               v917 = v906 - *(float *)(st + 263456);
-              if ( v917 < 0.0 )
+              if ( !(v917 >= 0.0) )
                 v917 = v917 + v916;
               v918 = v906 - v915;
               v919 = v906 - *(float *)(st + 263472);
-              if ( (float)(v906 - v914) < 0.0 )
+              if ( !((float)(v906 - v914) >= 0.0) )
                 v919 = v919 + v916;
               *(float *)(st + 264576) = v917;
               v906 = v906 - *(float *)(st + 263488);
-              if ( v918 < 0.0 )
+              if ( !(v918 >= 0.0) )
                 v906 = v906 + v916;
               *(float *)(st + 264592) = v919;
               goto LABEL_312;
@@ -3142,10 +3142,10 @@ LABEL_266:
               *(float *)(st + 264544) = v921;
               v924 = v906 - *(float *)(st + 263472);
               v925 = v906 - *(float *)(st + 263456);
-              if ( v925 < 0.0 )
+              if ( !(v925 >= 0.0) )
                 v925 = v925 + v923;
               v906 = v906 - *(float *)(st + 263472);
-              if ( v924 < 0.0 )
+              if ( !(v924 >= 0.0) )
                 v906 = v906 + v923;
               *(float *)(st + 264576) = v925;
               *(float *)(st + 264592) = v906;
@@ -3302,7 +3302,7 @@ LABEL_312:
             v928 = *(float *)(st + 265328);
             *(float *)(st + 264544) = v926;
             v906 = v906 - *(float *)(st + 263456);
-            if ( v927 < 0.0 )
+            if ( !(v927 >= 0.0) )
               v906 = v906 + v928;
           }
           *(float *)(st + 264576) = v906;
@@ -3350,14 +3350,14 @@ LABEL_312:
       v757 = *(float *)(st + 266400);
       v758 = *(float *)(st + 266048);
       if ( (float)(v756 * v757) >= -1.0 )
-        v759 = fminf(v756 * v757, 1.0);
+        v759 = jx_minss(v756 * v757, 1.0);
       else
         v759 = -1.0;
       v760 = (float)((float)(v758 * *(float *)(st + 266368)) + (float)(v756 * *(float *)(st + 266384))) * v757;
       *(float *)(st + 266064) = (float)((float)((float)(v759 * v759) * v759) * *(float *)(st + 266448))
                               + (float)(v759 * *(float *)(st + 266432));
       if ( v760 >= -1.0 )
-        v761 = fminf(v760, 1.0);
+        v761 = jx_minss(v760, 1.0);
       else
         v761 = -1.0;
       v762 = *(float *)(st + 266048);
@@ -3365,7 +3365,7 @@ LABEL_312:
       *(float *)(st + 266096) = (float)((float)((float)(v761 * v761) * v761) * *(float *)(st + 266448))
                               + (float)(v761 * *(float *)(st + 266432));
       if ( v763 >= -1.0 )
-        v764 = fminf(v763, 1.0);
+        v764 = jx_minss(v763, 1.0);
       else
         v764 = -1.0;
       v765 = *(float *)(st + 266064);
@@ -3374,7 +3374,7 @@ LABEL_312:
       *(float *)(st + 266128) = (float)((float)((float)(v764 * v764) * v764) * *(float *)(st + 266448))
                               + (float)(v764 * *(float *)(st + 266432));
       if ( v766 >= -1.0 )
-        v767 = fminf(v766, 1.0);
+        v767 = jx_minss(v766, 1.0);
       else
         v767 = -1.0;
       v768 = *(float *)(st + 266144);
@@ -3415,14 +3415,14 @@ LABEL_312:
       v786 = *(float *)(st + 266416);
       v787 = *(float *)(st + 266208);
       if ( (float)(v784 * v786) >= -1.0 )
-        v788 = fminf(v784 * v786, 1.0);
+        v788 = jx_minss(v784 * v786, 1.0);
       else
         v788 = -1.0;
       v789 = (float)((float)(v784 * *(float *)(st + 266384)) + (float)(v787 * *(float *)(st + 266368))) * v786;
       *(float *)(st + 266224) = (float)((float)((float)(v788 * v788) * v788) * *(float *)(st + 266448))
                               + (float)(v788 * *(float *)(st + 266432));
       if ( v789 >= -1.0 )
-        v790 = fminf(v789, 1.0);
+        v790 = jx_minss(v789, 1.0);
       else
         v790 = -1.0;
       v791 = *(float *)(st + 266208);
@@ -3430,7 +3430,7 @@ LABEL_312:
       *(float *)(st + 266256) = (float)((float)((float)(v790 * v790) * v790) * *(float *)(st + 266448))
                               + (float)(v790 * *(float *)(st + 266432));
       if ( v792 >= -1.0 )
-        v793 = fminf(v792, 1.0);
+        v793 = jx_minss(v792, 1.0);
       else
         v793 = -1.0;
       v794 = *(float *)(st + 266224);
@@ -3439,7 +3439,7 @@ LABEL_312:
       *(float *)(st + 266288) = (float)((float)((float)(v793 * v793) * v793) * *(float *)(st + 266448))
                               + (float)(v793 * *(float *)(st + 266432));
       if ( v795 >= -1.0 )
-        v51 = fminf(v795, 1.0);
+        v51 = jx_minss(v795, 1.0);
       v796 = *(float *)(st + 266304);
       v797 = (float)((float)(v794 + *(float *)(st + 266336)) * *(float *)(st + 266464))
            + (float)(*(float *)(st + 266256) * *(float *)(st + 266480));
@@ -3465,7 +3465,7 @@ LABEL_312:
            + (float)(*(float *)(st + 266656) * *(float *)(st + 266560));
       v804 = (float)((float)(*(float *)(st + 266544) * *(float *)(st + 266688)) + (float)(v801 * *(float *)(st + 266672)))
            + (float)(*(float *)(st + 266704) * *(float *)(st + 266576));
-      if ( v802 <= 0.0 )
+      if ( !(v802 > 0.0) )
         v805 = 0.0;
       else
         v805 = v802;
@@ -3473,7 +3473,7 @@ LABEL_312:
       *(float *)(st + 266544) = v803;
       *(float *)(st + 266560) = v804;
       v807 = (float)((float)(v806 * v803) - (float)(v806 * v801)) + v801;
-      if ( v802 < -0.0 )
+      if ( !(v802 >= -0.0) )
         v49 = (float)-v802;
       v808 = v49;
       v809 = v801 + (float)((float)(v808 * v804) - (float)(v808 * v801));
@@ -3512,12 +3512,12 @@ LABEL_312:
       *(float *)(st + 266720) = v658;
       *(float *)(st + 266736) = v658;
       if ( v657 >= -1.0 )
-        v660 = fminf(v657, 1.0);
+        v660 = jx_minss(v657, 1.0);
       else
         v660 = -1.0;
       v661 = v660 * *(float *)(st + 267376);
       if ( v659 >= -1.0 )
-        v51 = fminf(v659, 1.0);
+        v51 = jx_minss(v659, 1.0);
       *(float *)(st + 267248) = 1.0
                               / (float)((float)((float)((float)(v51 * *(float *)(st + 267392)) + v661)
                                               + *(float *)(st + 267360))
@@ -3539,7 +3539,7 @@ LABEL_312:
       v672 = (float)(v670 * v671) + v667;
       *(float *)(st + 266848) = v672;
       v673 = fabs(v672) - *(float *)(st + 267536);
-      if ( v672 < 0.0 )
+      if ( !(v672 >= 0.0) )
         v674 = *(float *)(st + 267600);
       else
         v674 = *(float *)(st + 267584);
@@ -3623,7 +3623,7 @@ LABEL_312:
       *(float *)(st + 267104) = (float)(v727 * *(float *)(st + 267504)) + v725;
       v730 = jx_h_3A2180(v726);   /* asm 0x39FB4C: xmm0 = xmm6 = v726 (2026-10-10; the decompile's earlier argument was 0) */
       *(_DWORD *)(st + 266880) = LODWORD(v730);
-      if ( v726 < 1.0 )
+      if ( !(v726 >= 1.0) )
         v727 = *(float *)(st + 267152);
       v731 = *(float *)(st + 267168) * *(float *)(st + 267488);
       v732 = *(float *)(st + 267152) * *(float *)(st + 267472);
@@ -3631,7 +3631,7 @@ LABEL_312:
       v733 = (float)(v727 * *(float *)(st + 267456)) + (float)(v731 + v732);
       *(float *)(st + 267152) = v733;
       v734 = fabs(v733) - *(float *)(st + 267616);
-      if ( v733 < 0.0 )
+      if ( !(v733 >= 0.0) )
         v735 = *(float *)(st + 267680);
       else
         v735 = *(float *)(st + 267664);
@@ -3690,7 +3690,7 @@ LABEL_312:
     v495 = *(float *)(st + 130128);
     v496 = (float)(v492 + v492) * *(float *)(st + 130352);
     v497 = (float)(v493 * *(float *)(st + 130480)) + *(float *)(st + 130464);
-    v498 = fminf(*(float *)(st + 130720) + *(float *)(st + 130272), *(float *)(st + 130336));
+    v498 = jx_minss(*(float *)(st + 130720) + *(float *)(st + 130272), *(float *)(st + 130336));
     v499 = (float)(v493 * v493) * v493;
     v500 = (float)(v493 * v493) * *(float *)(st + 130496);
     *(float *)(st + 130112) = v496;
@@ -3717,14 +3717,14 @@ LABEL_312:
     v513 = *(float *)(st + 130944);
     v514 = *(float *)(st + 130752);
     if ( (float)(v512 * v513) >= -1.0 )
-      v515 = fminf(v512 * v513, 1.0);
+      v515 = jx_minss(v512 * v513, 1.0);
     else
       v515 = -1.0;
     v516 = (float)((float)(v512 * *(float *)(st + 130928)) + (float)(v514 * *(float *)(st + 130912))) * v513;
     *(float *)(st + 130768) = (float)((float)((float)(v515 * v515) * v515) * *(float *)(st + 130976))
                             + (float)(v515 * *(float *)(st + 130960));
     if ( v516 >= -1.0 )
-      v517 = fminf(v516, 1.0);
+      v517 = jx_minss(v516, 1.0);
     else
       v517 = -1.0;
     v518 = *(float *)(st + 130752);
@@ -3732,7 +3732,7 @@ LABEL_312:
     *(float *)(st + 130800) = (float)((float)((float)(v517 * v517) * v517) * *(float *)(st + 130976))
                             + (float)(v517 * *(float *)(st + 130960));
     if ( v519 >= -1.0 )
-      v520 = fminf(v519, 1.0);
+      v520 = jx_minss(v519, 1.0);
     else
       v520 = -1.0;
     v521 = (float)(*(float *)(st + 130736) * *(float *)(st + 130912)) + (float)(v518 * *(float *)(st + 130928));
@@ -3741,7 +3741,7 @@ LABEL_312:
     *(float *)(st + 130832) = (float)((float)((float)(v520 * v520) * v520) * *(float *)(st + 130976))
                             + (float)(v520 * *(float *)(st + 130960));
     if ( v523 >= -1.0 )
-      v51 = fminf(v523, 1.0);
+      v51 = jx_minss(v523, 1.0);
     v524 = *(float *)(st + 130848);
     v525 = (float)((float)(v522 + *(float *)(st + 130880)) * *(float *)(st + 130992))
          + (float)(*(float *)(st + 131008) * *(float *)(st + 130800));
@@ -3775,7 +3775,7 @@ LABEL_312:
          + (float)(*(float *)(st + 131184) * *(float *)(st + 131088));
     v536 = (float)((float)(*(float *)(st + 0x20000) * *(float *)(st + 131216)) + (float)(v533 * *(float *)(st + 131200)))
          + (float)(*(float *)(st + 131232) * *(float *)(st + 131104));
-    if ( v534 <= 0.0 )
+    if ( !(v534 > 0.0) )
       v537 = 0.0;
     else
       v537 = v534;
@@ -3783,7 +3783,7 @@ LABEL_312:
     *(float *)(st + 0x20000) = v535;
     *(float *)(st + 131088) = v536;
     v539 = (float)((float)(v538 * v535) - (float)(v538 * v533)) + v533;
-    if ( v534 < -0.0 )
+    if ( !(v534 >= -0.0) )
       v49 = (float)-v534;
     v540 = v49;
     v541 = v533 + (float)((float)(v540 * v536) - (float)(v540 * v533));
@@ -3801,7 +3801,7 @@ LABEL_355:
   *(_DWORD *)(st + 268384) = *(_DWORD *)(st + 268352);
   *(_DWORD *)(st + 268400) = v543;
   v544 = jx_h_3A2010((double)(float)(*(float *)(st + 268352) + *(float *)(st + 268448)));  /* asm 0x39EA2E */
-  *(float *)(st + 268416) = fmaxf(fminf(v544, 512.0), -512.0);
+  *(float *)(st + 268416) = jx_maxss(jx_minss(v544, 512.0), -512.0);
   v545 = *(float *)(st + 268640);
   *(float *)(st + 268656) = v545;
   v546 = *(float *)(st + 268416);
@@ -3855,7 +3855,7 @@ LABEL_355:
   v553 = v552 * *(float *)(st + 269472);
   v554 = (float)((float)(v551 * *(float *)(st + 269440)) - *(float *)(st + 129648)) - 1.0;
   if ( v554 >= -1.0 )
-    v51 = fminf(v554, 1.0);
+    v51 = jx_minss(v554, 1.0);
   v555 = *(float *)(st + 269632);
   v556 = *(float *)(st + 269200) * v555;
   v557 = *(float *)(st + 268928) * v555;

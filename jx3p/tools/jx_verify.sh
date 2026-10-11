@@ -324,10 +324,14 @@ python3 "$HERE/jx_nan_ab.py" --seeds 1,2 --cells 16
 python3 "$HERE/jx_nan_ab.py" --tooth --seeds 1 --cells 4
 # EVERY compare and min / max of the two transcribed render functions mapped to the plugin's own instruction by
 # execution (64 patches and the variants no patch holds, key down and up): a NaN reads TRUE for < <= after comiss,
-# minss returns its second operand -- 0 sites may be graded wrong (playbook 219); the tooth plants the decompiler's
-# form back at every site written in the machine's
-python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 0-63 --frames 256 --release 512 --variants modes
-python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func master --patches 0-63 --frames 256 --release 512 --variants fx
+# minss returns its second operand -- 0 sites may be graded wrong or left unresolved (playbook 219); --all-run: every
+# site must run (the reach guard); the tooth plants the decompiler's form back at every site written in the machine's
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 0-63 --frames 256 --release 512 --variants modes --from-boot --all-run
+# the master's reach scenes: a DELAY / REVERB TYPE change while a key sounds (the delay's clear fade), a DELAY TIME
+# change on a delay patch (the read head's glide), EFFECT TYPE 2 for one second (its 2- and 3-step reads) and the
+# 4-step reads in a written state (the read head's speed cell lowered: no parameter reaches 4 steps, playbook 221)
+NANS='e:5:24:67=3;e:5:24:68=3;e:32:24:37=0;v:5:65=2@44100;w:5:65=2|265360=0.2@40960'
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func master --patches 0-63 --frames 256 --release 512 --variants fx --scenes "$NANS" --from-boot --all-run
 python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5,34 --frames 256 --release 512 --tooth
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"

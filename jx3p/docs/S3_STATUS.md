@@ -3,6 +3,30 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-11 (15) — NaN AND DENORMAL PARITY: EVERY COMPARE AND MIN / MAX GRADED BY ITS OWN INSTRUCTION; THE GATES' FP MODE
+
+Two defect classes no gate could see (scope row 23; playbooks 219, 220, 221; HOST_LAYER.md 3t):
+- NaN. After `comiss A, B` a NaN reads TRUE for "A < B" and "A <= B"; Hex-Rays prints the flag test in the
+  instruction's operand order, and C reads every relation FALSE on NaN. `minss A, B` returns B when either is NaN,
+  fminf the other one. tools/verify/nan_sites.py maps every C compare and min / max of the two render functions to
+  the plugin's own instruction BY EXECUTION (the operand values both sides see, the cell an operand reads, the
+  constant an operand holds, program order; integer cmp / test too; an integer compare by its C types) and grades
+  it. Rewritten in the machine's own form: `!(A >= B)` for a `<` read in the instruction's order, and jx_minss /
+  jx_maxss (the instruction's select written out) for every min / max. JX voice: 275 sites, all run (64 patches + 19
+  mode variants), 275 right after the rewrite. JX master: 144 compiled sites (one more sits in `#if JX_NAN_TOOTH`),
+  all run, 0 wrong after the rewrite -- its last 12 were found only when the map had to grade EVERY site (playbook
+  221): 2 hid behind "operands equal" (a reaching-definition walk capped at 600 instructions missed xmm12 = 0;
+  line 2334 is the delay clear's wipe, which the plugin runs on a NaN fade), 4 needed scenes that reach them (a DELAY
+  / REVERB TYPE change with a key down, EFFECT TYPE 2 for a second), and 6 sit in 4-step reads no parameter reaches
+  (the read head's measured top speed is 2.23 steps per sample) -- graded in a written state (the speed cell
+  lowered on both sides). The gate now fails on any site left for review and, with --all-run, on any site no scene
+  ran; both rules were seen to fail.
+- FP mode. Unicorn never flushes (FTZ ignored, even after an emulated ldmxcsr) and its minss returns a denormal
+  operand unflushed; every JX harness ran the port with FTZ on, so a stored denormal split them (the polyphony
+  scripts on patches 20 / 49, job jx26_probe). Every gate now runs the port in the oracle's mode
+  (jx_set_fp_oracle_mode: DAZ on, FTZ off) -- equal again; the product keeps FTZ + DAZ.
+OPEN in row 23 until the full verify of the commit is GREEN.
+
 ## 2026-10-11 (14) — THE JUNO-60's GATE CLASSES ON THE JX (JX-26): THE PARITY LEDGER RE-MAPPED; ISO C99
 
 A second census, by gate CLASS (docs/GATE_PARITY.tsv), disagreed with the scope table: 18 classes owed, 5 "OK" on

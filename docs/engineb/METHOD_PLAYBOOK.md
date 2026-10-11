@@ -3755,6 +3755,9 @@ compare / min / max instruction hooked under Unicorn, every C relation and fminf
 instrumented copy, the two matched by the operand values they see in the same scene (64 factory patches); the order
 (same or swapped) comes from the values, the verdict from the flag rule, the fix from both. First map (patch 5):
 JUNO voice 57 sites wrong on NaN of 135 run, JUNO master 10 of 36, JX voice 58 of 134, JX master 6 of 29.
+A tie (one value pair at two instructions of different kinds -- JX voice line 1422's `cell <= 0.0` matched a
+`comiss 0, [rdi + 0x660]` and a register minss) goes to the instruction that READS the C operand's cell (0x660 =
+1632); the tooth for it: `!(cell > 0.0)` planted at line 1422 is graded wrong (REFUSE: written !( ) and still wrong).
 ### The rule
 A relation or min / max the decompiler wrote is graded against its own instruction, in its own operand order, by
 execution -- never by reading the C. Integer compares (`cmp`, `test r, r`) are matched too, so "no NaN" is shown,
@@ -3773,3 +3776,27 @@ every mode and to the CPU wherever FTZ keeps operands normal (production).
 ### The rule
 Measure the emulator's floating point per instruction class (arithmetic, conversion, min / max) before trusting a
 gate on long tails; run every gate's port in the oracle's mode; product code keeps FTZ + DAZ.
+
+## 221. A SITE NO SCENE RAN IS NOT GRADED -- AND "OPERANDS EQUAL" HID TWO DEFECTS; REACH IS MEASURED, THEN BUILT
+Paid 2026-10-11 (JX-3P master, nan_sites.py). The first full JX master map (64 patches + 54 effect variants) said
+"0 wrong" -- and left 12 sites unrun, 4 "for review" (operands equal in every execution) and 1 unmatched, while the
+gate passed on them. Each class had a cause, and one hid real defects:
+- REVIEW, operands equal: the C side `v411 <= 0.0` and the machine's `comiss xmm1, xmm12` saw 0 vs 0 every time, so
+  the values could not give the operand order; the constant rule could, but the reaching-definition walk stopped at
+  600 instructions and xmm12 = 0 is set (xorps) 2000-2900 instructions earlier. Uncapped, xmm12 is a constant, the
+  order is the C's, and lines 2334 (`v411 <= 0.0`, the clear's wipe: `ja` skips it, so a NaN fade WIPES) and 3634
+  (`v733 < 0.0`) are WRONG on NaN -- the JUNO's playbook-81 site, unseen on the JX for this reason alone.
+- UNMATCHED: `i < 256` of a loop the compiler rotated -- graded by the C operands' types now (both integers: no NaN
+  reaches it; __builtin_classify_type in the instrumented copy).
+- NEVER RAN, by cause: one site sits in `#if JX_NAN_TOOTH` (no build compiles it: the preprocessor's output now
+  decides what is a site); one runs only while the delay's clear fade counts down (a DELAY / REVERB TYPE change with
+  a key down); one on a DELAY TIME glide; three on EFFECT TYPE 2's 2- and 3-step reads (one second of sound, not
+  768 samples); six in 4-step reads that NO parameter reaches -- the read head's measured top speed is 2.23 steps
+  per sample at 44.1 and 96 kHz -- run by writing the speed cell (+265360 = 0.2) on both sides alike (a `w:` scene).
+The re-map with those scenes (job nan_mapjx3): 144 compiled sites, all run, 12 WRONG on NaN -- the 2 hidden behind
+"operands equal", 4 of the unrun (the fade's clamp, the three 2- / 3-step wraps) and the 6 four-step wraps; after the
+rewrite 0 wrong. Every one of them was a `<` / `<=` in the instruction's order.
+### The rule
+A gate that lists sites must fail on any site it did not grade: unresolved is not right, and unrun is not right
+(--all-run). Build the scene that reaches a site -- an event, a longer render, a written state the same on both
+sides -- before reading a single instruction by eye; reading is the last resort, labelled READ.
