@@ -39,4 +39,49 @@ float  jx_h_3A21E0(float result);  /* sub_1803A21E0: positive-side fmodf wrap */
 float  jx_h_expf_722EA0(float a1);  /* expf  @ rva 0x722EA0 */
 float  jx_h_tanf_725150(float a1);  /* tanf  @ rva 0x725150 */
 
+/* minss / maxss / minsd / maxsd as the plugin's instructions compute them (2026-10-11, tools/verify/nan_sites.py,
+ * playbook 219): the first operand when the compare holds, else the SECOND -- so the second when either is NaN,
+ * where C's fminf / fmaxf return the one that is not NaN. The compare runs in the CPU's mode (DAZ reads a denormal
+ * as 0) and the chosen operand's bits are returned as they are: the emulated plugin's select (Unicorn's minss hands
+ * a denormal operand back unflushed, EXECUTED), and on hardware under FTZ no operand is denormal. memcpy, no type
+ * pun: ISO C99. */
+#include <stdint.h>
+#include <string.h>
+static inline float jx_minss(float a, float b)
+{
+    uint32_t ua, ub, m;
+    memcpy(&ua, &a, 4); memcpy(&ub, &b, 4);
+    m = 0u - (uint32_t)(a < b);
+    ua = (ua & m) | (ub & ~m);
+    memcpy(&a, &ua, 4);
+    return a;
+}
+static inline float jx_maxss(float a, float b)
+{
+    uint32_t ua, ub, m;
+    memcpy(&ua, &a, 4); memcpy(&ub, &b, 4);
+    m = 0u - (uint32_t)(a > b);
+    ua = (ua & m) | (ub & ~m);
+    memcpy(&a, &ua, 4);
+    return a;
+}
+static inline double jx_minsd(double a, double b)
+{
+    uint64_t ua, ub, m;
+    memcpy(&ua, &a, 8); memcpy(&ub, &b, 8);
+    m = (uint64_t)0 - (uint64_t)(a < b);
+    ua = (ua & m) | (ub & ~m);
+    memcpy(&a, &ua, 8);
+    return a;
+}
+static inline double jx_maxsd(double a, double b)
+{
+    uint64_t ua, ub, m;
+    memcpy(&ua, &a, 8); memcpy(&ub, &b, 8);
+    m = (uint64_t)0 - (uint64_t)(a > b);
+    ua = (ua & m) | (ub & ~m);
+    memcpy(&a, &ua, 8);
+    return a;
+}
+
 #endif /* JX_VOICE_HELPERS_H */

@@ -42,6 +42,7 @@ sys.path.insert(0, HERE)
 import jx_master_bisect as B  # noqa: E402  (SNAP_V, SNAP_M, CH, clean: the bisect's windows)
 
 NAN = 0x7FC00000
+CHUNK = 24                     # NaN runs per oracle process
 SRCS = B.SRCS
 
 
@@ -111,17 +112,32 @@ def oracle(patch, seeds, ncell):
         for u in (8, 0):
             pool = [o for o in moved[u] if (u, o) not in FIXED]
             targets += [(u, o) for o in sorted(r.sample(pool, min(ncell, len(pool))))]
-    out = {'moved': {str(u): len(moved[u]) for u in moved}, 'control': run(boot()), 'targets': []}
+    return {'moved': {str(u): len(moved[u]) for u in moved}, 'control': run(boot()), 'targets': targets}
+
+
+def oracle_run(patch, targets):
+    """the NaN runs of one chunk of targets (its own process: hundreds of boots in one process exhaust memory)"""
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
+    import jx_emu as J
+    out = []
     for u, o in targets:
-        jx = boot()
+        jx = J.JX().boot(44100.0, snap=False, product=True, patch=patch)
+        jx.note_on(60, 105)
         jx.uc.mem_write(jx.state[u] + o, struct.pack('<I', NAN))
-        out['targets'].append([u, o, run(jx)])
+        res = []
+        for _ in range(1024 // B.CH):
+            L, R = jx.render(B.CH, B.CH)
+            res.append(hashlib.sha256(struct.pack('<%dI' % (2 * B.CH), *(L + R))).hexdigest()[:16])
+        res.append([hashlib.sha256(B.clean(bytes(jx.uc.mem_read(jx.state[w], B.SNAP_V if w < 8 else B.SNAP_M))))
+                    .hexdigest()[:16] for w in range(9)])
+        out.append([u, o, res])
+        del jx
     return out
 
 
 def port(so, patch, ref):
     lib = ctypes.CDLL(so)
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     for f in ('jx3p_vstate', 'jx3p_mstate'):
         getattr(lib, f).restype = ctypes.c_void_p
     sys.path.insert(0, HERE)
@@ -161,6 +177,9 @@ def main():
     if a[:1] == ['--oracle']:
         json.dump(oracle(int(a[1]), [int(x) for x in a[2].split(',')], int(a[3])), sys.stdout)
         return 0
+    if a[:1] == ['--oracle-run']:
+        json.dump(oracle_run(int(a[1]), json.load(open(a[2]))), sys.stdout)
+        return 0
     if a[:1] == ['--port']:
         json.dump(port(a[1], int(a[2]), json.load(open(a[3]))), sys.stdout)
         return 0
@@ -175,10 +194,18 @@ def main():
     o = subprocess.run([sys.executable, __file__, '--oracle', str(patch), seeds, str(ncell)], capture_output=True,
                        text=True)
     if o.returncode:
-        raise SystemExit('oracle failed: ' + o.stderr[-1500:])
-    ref = os.path.join(tmp, 'ref.json')
-    open(ref, 'w').write(o.stdout)
+        raise SystemExit('oracle failed: rc %d %s' % (o.returncode, o.stderr[-1500:]))
     r = json.loads(o.stdout)
+    targets, r['targets'] = r['targets'], []
+    for c in range(0, len(targets), CHUNK):
+        tf = os.path.join(tmp, 'targets.json')
+        json.dump(targets[c:c + CHUNK], open(tf, 'w'))
+        oc = subprocess.run([sys.executable, __file__, '--oracle-run', str(patch), tf], capture_output=True, text=True)
+        if oc.returncode:
+            raise SystemExit('oracle failed (targets %d..): rc %d %s' % (c, oc.returncode, oc.stderr[-1500:]))
+        r['targets'] += json.loads(oc.stdout)
+    ref = os.path.join(tmp, 'ref.json')
+    json.dump(r, open(ref, 'w'))
     p = subprocess.run([sys.executable, __file__, '--port', so, str(patch), ref], capture_output=True, text=True)
     if p.returncode:
         raise SystemExit('port failed: ' + p.stderr[-1500:])

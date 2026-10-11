@@ -112,7 +112,7 @@ def oracle(ci):
 
 def port(so, ci, tmp):
     lib = ctypes.CDLL(so)
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     lib.jx3p_product_init.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
     lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]

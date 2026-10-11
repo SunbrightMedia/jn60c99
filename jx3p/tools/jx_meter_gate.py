@@ -339,7 +339,7 @@ def port_worker(so, out):
         n = lib.jx3p_bar_draw((I * 4)(*rect), (I * 4)(*fl), 1, fade, ob, 400)
         res['draws'].append([tuple(ob[7 * k:7 * k + 7]) for k in range(min(n, 400))])
     # PART 2, in the oracle's FP mode (the product path's own)
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     res['chains'] = []
     for c in chains():
         name, rate, patch, blk, nblk, every, kind, rc = c

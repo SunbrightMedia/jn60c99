@@ -21,9 +21,9 @@ def main():
     n = int(sys.argv[4]) if len(sys.argv) > 4 else 1200
     fails = 0
     lib = ctypes.CDLL(so)
-    if not hasattr(lib, "jx_enable_hw_ftz"):
-        raise SystemExit("REFUSE: no jx_enable_hw_ftz -- link jx_ftz.c")
-    lib.jx_enable_hw_ftz()
+    if not hasattr(lib, "jx_set_fp_oracle_mode"):
+        raise SystemExit("REFUSE: no jx_set_fp_oracle_mode -- link jx_ftz.c")
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     for patch in patches:
         # jx3p_init is a fresh engine: the plugin's heap after its boot (the guest image), then the patch's
         # records through the plugin's own parameter system, lifted (JX-11)

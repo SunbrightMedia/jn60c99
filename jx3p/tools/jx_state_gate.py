@@ -214,7 +214,7 @@ def port(so, ci, tooth, idfile):
     lib.jx3p_cc_of.argtypes = [ctypes.c_uint32]
     lib.jx3p_cc_entry.argtypes = [ctypes.c_uint32]
     ccof = lambda: [lib.jx3p_cc_of(i) for i in ids]
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
     lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
     lib.jx3p_lift_error.restype = ctypes.c_char_p

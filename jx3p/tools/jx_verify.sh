@@ -322,6 +322,13 @@ sh "$HERE/fuzz_gate.sh" --tooth 0 4
 # unit state; the tooth puts the decompile's ordered compare back at the clamp
 python3 "$HERE/jx_nan_ab.py" --seeds 1,2 --cells 16
 python3 "$HERE/jx_nan_ab.py" --tooth --seeds 1 --cells 4
+# EVERY compare and min / max of the two transcribed render functions mapped to the plugin's own instruction by
+# execution (64 patches and the variants no patch holds, key down and up): a NaN reads TRUE for < <= after comiss,
+# minss returns its second operand -- 0 sites may be graded wrong (playbook 219); the tooth plants the decompiler's
+# form back at every site written in the machine's
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 0-63 --frames 256 --release 512 --variants modes
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func master --patches 0-63 --frames 256 --release 512 --variants fx
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5,34 --frames 256 --release 512 --tooth
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
 sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"

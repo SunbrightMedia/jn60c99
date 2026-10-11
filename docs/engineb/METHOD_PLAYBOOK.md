@@ -3741,3 +3741,35 @@ INT_MIN, the integer indefinite's own value. Replaced by a real defect (the uppe
 ### The rule
 A replacement for a machine operation gets a differential test against the machine on its whole domain (edges
 first). When a tooth does not bite, first ask whether the mutant is equivalent -- then pick one that is not.
+
+## 219. A DECOMPILED `<` IS THE MACHINE'S FLAG TEST -- ON NaN IT IS TRUE; MEASURE EVERY SITE
+Paid 2026-10-11 (JUNO and JX-3P). After `comiss A, B` a NaN sets CF = ZF = PF = 1: the machine reads "A < B",
+"A <= B" (and "A == B") as TRUE, "A > B", "A >= B" as FALSE. Hex-Rays prints the flag predicate that selects a block
+as a relation in the instruction's operand order -- so a transcribed `if ( v333 <= 0.0 ) v334 = 0.0` (`comiss; jbe`)
+clamps a NaN to 0 in the plugin and keeps it in C. And `minss A, B` returns B when either is NaN, where fminf returns
+the operand that is not NaN. A NaN injected into the JUNO voice (+9680) proved it in one frame: plugin 0.0, port NaN
+at +9776. playbook 81's rule ("rewriting them trades one defect for unknown new ones") held for the unmeasured
+rewrite: the decompiler DOES swap operands (JUNO voice line 1023 `JF(1824) <= 0.0` is `comiss 0, x` -- right as
+written), so a blind text rule breaks such sites. tools/verify/nan_sites.py measures instead: the plugin's every
+compare / min / max instruction hooked under Unicorn, every C relation and fminf / fmaxf wrapped in a logger on an
+instrumented copy, the two matched by the operand values they see in the same scene (64 factory patches); the order
+(same or swapped) comes from the values, the verdict from the flag rule, the fix from both. First map (patch 5):
+JUNO voice 57 sites wrong on NaN of 135 run, JUNO master 10 of 36, JX voice 58 of 134, JX master 6 of 29.
+### The rule
+A relation or min / max the decompiler wrote is graded against its own instruction, in its own operand order, by
+execution -- never by reading the C. Integer compares (`cmp`, `test r, r`) are matched too, so "no NaN" is shown,
+not assumed.
+
+## 220. THE EMULATOR NEVER FLUSHES -- A GATE RUNS THE PORT IN THE ORACLE'S MODE, AND MIN / MAX RETURN RAW BITS
+Paid 2026-10-11 (JX-3P, job jx26_probe: polyphony scripts on patches 20 and 49 RED at voice 3 / 5). Playbook 120
+measured it on the JUNO; the JX never took it: every JX harness ran the port with FTZ on (jx_enable_hw_ftz) while
+Unicorn -- with MXCSR 0x9FC0, and even after an emulated ldmxcsr -- stores 1e-20f * 1e-20f as the denormal
+0x000116c2. A decaying voice stored 0x806B8F58 in the plugin and -0 in the port; nothing else differed (v3diag: 2
+words). In the oracle's mode (jx_set_fp_oracle_mode: DAZ on, FTZ off) both runs are equal over 110 chunks and 47
+event checkpoints. One more gap, EXECUTED: Unicorn's minss compares under DAZ but returns a denormal operand
+UNFLUSHED (minss(1.0, den) = den), where the CPU returns -0. So the port's min / max are the instruction's select
+written out -- compare, then the chosen operand's bits (jx_minss in jx_voice_helpers.h) -- equal to the oracle in
+every mode and to the CPU wherever FTZ keeps operands normal (production).
+### The rule
+Measure the emulator's floating point per instruction class (arithmetic, conversion, min / max) before trusting a
+gate on long tails; run every gate's port in the oracle's mode; product code keeps FTZ + DAZ.

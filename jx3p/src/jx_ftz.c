@@ -26,6 +26,15 @@ void jx_enable_hw_ftz(void)
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 }
+/* THE ORACLE'S MODE, for the gates only (playbook 120, the JUNO-60's juno_set_fp_oracle_mode): Unicorn honours DAZ
+ * but NOT FTZ -- with MXCSR 0x9FC0, even after an emulated ldmxcsr, 1e-20f * 1e-20f stores the denormal 0x000116c2
+ * (EXECUTED 2026-10-11) -- so a gate that grades the port against the emulated plugin runs the port with DAZ on and
+ * FTZ off. Production code never calls it. */
+void jx_set_fp_oracle_mode(int on)
+{
+    _MM_SET_FLUSH_ZERO_MODE(on ? _MM_FLUSH_ZERO_OFF : _MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+}
 int jx_hw_ftz_available(void) { return 1; }
 
 #elif defined(__ARM_FP) && !defined(__EMSCRIPTEN__)
@@ -37,6 +46,7 @@ void jx_enable_hw_ftz(void)
     fpscr |= (1u << 24);
     __asm__ __volatile__("vmsr fpscr, %0" : : "r"(fpscr));
 }
+void jx_set_fp_oracle_mode(int on) { (void)on; }   /* ARM's FZ is one bit for both: no oracle mode to model */
 int jx_hw_ftz_available(void) { return 1; }
 
 #else
@@ -44,5 +54,6 @@ int jx_hw_ftz_available(void) { return 1; }
  * REFUSAL to claim bit-exactness, not a silent fallback: the caller must
  * flush explicitly, exactly as the JUNO's WASM build does. */
 void jx_enable_hw_ftz(void) { }
+void jx_set_fp_oracle_mode(int on) { (void)on; }
 int jx_hw_ftz_available(void) { return 0; }
 #endif

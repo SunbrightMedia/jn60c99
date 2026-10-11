@@ -55,6 +55,7 @@ def port_worker(so, out):
     import jx_guest
     r = pickle.load(open(PKL, 'rb'))
     lib = ctypes.CDLL(so)
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     lib.jx3p_product_init.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
     lib.jx3p_model_set.argtypes = [ctypes.c_uint32, ctypes.c_int32]
     if lib.jx3p_product_init(jx_guest.path(96).encode(),

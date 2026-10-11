@@ -121,13 +121,13 @@ def main():
     # not. It stayed green because no factory patch drives a denormal into a
     # compared cell -- the seeded ramp-walker A/B found it at 90/200 cases.
     # An optional correctness switch is not a switch; it is a comment. Refuse.
-    if not hasattr(lib, "jx_enable_hw_ftz"):
-        raise SystemExit("REFUSE: %s does not export jx_enable_hw_ftz -- link "
+    if not hasattr(lib, "jx_set_fp_oracle_mode"):
+        raise SystemExit("REFUSE: %s does not export jx_set_fp_oracle_mode -- link "
                          "jx3p/src/jx_ftz.c. The port must compute in the "
                          "plugin's FTZ/DAZ mode or the A/B compares two "
                          "different functions." % so)
     lib.jx_hw_ftz_available.restype = ctypes.c_int
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     if not lib.jx_hw_ftz_available():
         raise SystemExit("REFUSE: no hardware FTZ/DAZ on this target; a "
                          "bit-exact claim cannot be made without it.")

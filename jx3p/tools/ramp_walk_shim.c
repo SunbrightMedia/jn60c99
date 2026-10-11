@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 
-void jx_enable_hw_ftz(void);
+void jx_set_fp_oracle_mode(int on);
 int jx3p_ramp_sweep_obj(uint8_t *obj);
 
 int jx_walk_case(int n, void *pool_bytes, void *idx_bytes, void *tgt_bytes)
@@ -20,7 +20,7 @@ int jx_walk_case(int n, void *pool_bytes, void *idx_bytes, void *tgt_bytes)
 
     /* The oracle runs FTZ+DAZ. Match the plugin's FP MODE, or the two sides
      * are not computing the same function on denormal inputs. */
-    jx_enable_hw_ftz();
+    jx_set_fp_oracle_mode(1);   /* the oracle's mode: DAZ on, FTZ off (playbook 120) */
 
     for (i = 0; i < n; i++) {
         p = (uint64_t)(uintptr_t)&tgt[i];

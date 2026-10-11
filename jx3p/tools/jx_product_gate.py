@@ -419,7 +419,7 @@ def guest96(tmp):
 
 def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-1'):
     lib = ctypes.CDLL(so)
-    lib.jx_enable_hw_ftz()
+    lib.jx_set_fp_oracle_mode(1)    # the oracle's mode: DAZ on, FTZ off -- Unicorn never flushes a result (playbook 120)
     lib.jx3p_lift_error.restype = ctypes.c_char_p
     g = lambda p: os.path.join(REPO, 'jx3p', p).encode()
     sys.path.insert(0, HERE)
