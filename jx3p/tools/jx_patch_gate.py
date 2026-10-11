@@ -85,6 +85,7 @@ def oracle(ci):
     h.start(RATE, 512)
     h.process(BLK)                             # the first block: initialize's queue applied
     bankrecs, res = [], []
+    e0 = len(h.edits)
     for stp in steps:
         k = stp[0]
         n0 = len(h.queue())
@@ -102,8 +103,10 @@ def oracle(ci):
         new = [] if k == 'proc' else [(0, o, r[8], r[9], r[10]) if kind == 0 else
                                       (kind, o, struct.unpack_from('<I', r, 12)[0], struct.unpack_from('<i', r, 20)[0])
                                       for kind, o, r in h.queue()[n0:]]
+        edits = [[e[0], e[1], e[2]] for e in h.edits[e0:]]       # before the block: the load's calls
         L, R = h.process(BLK, events=ev)
-        res.append(dict(queue=new, save=h.get_state().hex(), audio=bits(L) + bits(R)))
+        e0 = len(h.edits)
+        res.append(dict(queue=new, save=h.get_state().hex(), audio=bits(L) + bits(R), edits=edits))
     return res
 
 
@@ -124,6 +127,8 @@ def port(so, ci, tmp):
     lib.jx3p_product_block(L, R, BLK, (ctypes.c_int * 1)(), 0)
     buf = (ctypes.c_ubyte * 4096)()
     pend = (ctypes.c_int * (5 * 512))()
+    eid, ev_, ekind = (ctypes.c_uint32 * 512)(), (ctypes.c_double * 512)(), (ctypes.c_int * 512)()
+    lib.jx3p_host_edits(eid, ev_, ekind, 512)       # (the boot's: none)
     res = []
     for stp in steps:
         k = stp[0]
@@ -150,9 +155,14 @@ def port(so, ci, tmp):
         new = [] if k == 'proc' else [(0, q[1], q[2] & 0xFF, q[3] & 0xFF, q[4] & 0xFF) if q[0] == 0 else
                                       (q[0], q[1], q[3] & 0xFFFFFFFF, q[4]) for q in
                                       (flat[5 * i:5 * i + 5] for i in range(n0, n1))]
+        ne = lib.jx3p_host_edits(eid, ev_, ekind, 512)
+        edits = []
+        for i in range(ne):
+            edits += ([['performEdit', eid[i], ev_[i]]] if ekind[i] == 1 else
+                      [['beginEdit', eid[i], None], ['performEdit', eid[i], ev_[i]], ['endEdit', eid[i], None]])
         lib.jx3p_product_block(L, R, BLK, (ctypes.c_int * 1)(), 0)
         n = lib.jx3p_state_save(buf, 4096)
-        res.append(dict(queue=new, save=bytes(buf)[:n].hex(), audio=bits(list(L)) + bits(list(R))))
+        res.append(dict(queue=new, save=bytes(buf)[:n].hex(), audio=bits(list(L)) + bits(list(R)), edits=edits))
     if lib.jx3p_lift_error():
         raise SystemExit('the lifted code trapped: %s' % lib.jx3p_lift_error().decode())
     return res
@@ -187,13 +197,14 @@ def main():
         nsteps += len(ro)
         nrec += sum(len(x['queue']) for x in ro)
         first = next((i for i, (x, y) in enumerate(zip(ro, rp))
-                      if x['save'] != y['save'] or x['audio'] != y['audio'] or
+                      if x['save'] != y['save'] or x['audio'] != y['audio'] or x['edits'] != y['edits'] or
                       [list(q) for q in x['queue']] != [list(q) for q in y['queue']]), None)
         loud = sum(1 for x in ro for s in x['audio'] if s & 0x7FFFFFFF)
         if first is None and len(ro) == len(rp):
-            print('  chain %d %s: %d steps -- every queued record, save and sample equal (%d records, %d MIDI; %d '
-                  'nonzero samples)' % (ci, name, len(steps), sum(len(x['queue']) for x in ro),
-                                        sum(1 for x in ro for q in x['queue'] if q[0] == 0), loud), flush=True)
+            print('  chain %d %s: %d steps -- every queued record, host edit, save and sample equal (%d records, %d MIDI, '
+                  '%d host edits; %d nonzero samples)' % (ci, name, len(steps), sum(len(x['queue']) for x in ro),
+                                        sum(1 for x in ro for q in x['queue'] if q[0] == 0),
+                                        sum(len(x['edits']) for x in ro), loud), flush=True)
             continue
         bad += 1
         x, y = ro[first], rp[first]
@@ -204,6 +215,10 @@ def main():
                 ci, name, first, what, d, x['queue'][d:d + 2], y['queue'][d:d + 2]), flush=True)
         elif x['save'] != y['save']:
             print('  chain %d %s: step %d (%s): the save differs' % (ci, name, first, what), flush=True)
+        elif x['edits'] != y['edits']:
+            d = next(i for i, (u, v) in enumerate(zip(x['edits'] + [None], y['edits'] + [None])) if u != v)
+            print('  chain %d %s: step %d (%s): host edit %d differs: plugin %s port %s' % (
+                ci, name, first, what, d, x['edits'][d:d + 2], y['edits'][d:d + 2]), flush=True)
         else:
             s = next(i for i, (u, v) in enumerate(zip(x['audio'], y['audio'])) if u != v)
             print('  chain %d %s: step %d (%s): sample %d differs' % (ci, name, first, what, s), flush=True)

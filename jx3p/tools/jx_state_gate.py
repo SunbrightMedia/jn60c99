@@ -51,6 +51,7 @@ F1, F2, TUNE, VOICES, SRATE = 0x00A02802, 0x00A00000, 0x00000002, 0x0FFFC00E, 0x
 NAME0 = 0x00600080                   # the patch name's first word
 KH = 0x00600138                      # KEY HOLD
 UI_DRAIN, LEARN, FORGET, CC_INDEX = 0x320000, 0x31A920, 0x3191C0, 0x319B30      # == the JUNO's (fw_map --pair)
+CC_OF = 0x319A50                     # the CC a control's menu shows (= the JUNO's 0x319B70; JX-23)
 MODEL_SET, MODEL_COMMIT = 0x283C90, (0x285200, 0x2852A0, 0x283000)          # == the JUNO's 0x283DB0, ... (--pair)
 fb = lambda f: struct.unpack('<i', struct.pack('<f', f))[0]
 # the deserializer's field width (the JUNO's code): 8 bytes when the stream / the count is longer than (83 + 128) *
@@ -165,7 +166,10 @@ def oracle(ci):
     obj = {pid: q(vb + 24 * i) for pid, i in index.items()}     # each record's model object (its first word)
     model = q(q(h.core + 8))
     q0, e_step, e_rt = len(h.queue()), len(h.edits), len(h.edits)
-    res = [dict(save=h.get_state().hex(), queue=[], edits=[])]
+    ids = sorted(index, key=index.get)          # the records' ids in the CC map's order
+    sg = lambda v: v - (1 << 32) if v >= 1 << 31 else v
+    ccof = lambda: [sg(h.call(X.IB + CC_OF, rcx=h.core + 24, rdx=i) & 0xFFFFFFFF) for i in range(len(ids))]
+    res = [dict(save=h.get_state().hex(), queue=[], edits=[], ccof=ccof(), ids=ids)]
     for stp in steps:
         k = stp[0]
         if k in ('state', 'state8', 'stream'):
@@ -199,13 +203,17 @@ def oracle(ci):
                                       for kind, off, rec in qq[q0:]]
         q0 = len(qq)
         res.append(dict(save=h.get_state().hex(), queue=new,
-                        edits=[list(e) for e in h.edits[e_step:]] if k != 'roundtrip' else []))
+                        edits=[list(e) for e in h.edits[e_step:]] if k != 'roundtrip' else [], ccof=ccof()))
         e_step = len(h.edits)
     return res
 
 
-def port(so, ci, tooth):
+def port(so, ci, tooth, idfile):
     lib = ctypes.CDLL(so)
+    ids = json.load(open(idfile))
+    lib.jx3p_cc_of.argtypes = [ctypes.c_uint32]
+    lib.jx3p_cc_entry.argtypes = [ctypes.c_uint32]
+    ccof = lambda: [lib.jx3p_cc_of(i) for i in ids]
     lib.jx_enable_hw_ftz()
     lib.jx3p_product_param.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_double]
     lib.jx3p_product_note.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
@@ -228,8 +236,9 @@ def port(so, ci, tooth):
         if tooth:
             b[-1] ^= 1
         return bytes(b).hex()
-    res = [dict(save=save(), queue=[], edits=[])]
-    eid, ev_ = (ctypes.c_uint32 * 64)(), (ctypes.c_double * 64)()
+    res = [dict(save=save(), queue=[], edits=[], ccof=ccof(),
+                entry=[lib.jx3p_cc_entry(i) for i in ids] + [lib.jx3p_cc_entry(i) for i in (0, 0x7777, 0x0FFFC002)])]
+    eid, ev_, ekind = (ctypes.c_uint32 * 512)(), (ctypes.c_double * 512)(), (ctypes.c_int * 512)()
     rt = []                                    # the host edits not yet sent back
     for stp in steps:
         k = stp[0]
@@ -263,17 +272,20 @@ def port(so, ci, tooth):
                 lib.jx3p_product_param(pid, 0, v)
             rt = []
             lib.jx3p_product_block(L, R, 256, (ctypes.c_int * 1)(), 0)
-        ne = lib.jx3p_host_edits(eid, ev_, 64)
+        ne = lib.jx3p_host_edits(eid, ev_, ekind, 512)
         edits = []
         for i in range(ne):
-            edits += [['beginEdit', eid[i], None], ['performEdit', eid[i], ev_[i]], ['endEdit', eid[i], None]]
-            rt.append((eid[i], ev_[i]))
+            if ekind[i] == 1:                        # a load's: performEdit alone
+                edits.append(['performEdit', eid[i], ev_[i]])
+            else:
+                edits += [['beginEdit', eid[i], None], ['performEdit', eid[i], ev_[i]], ['endEdit', eid[i], None]]
+            rt.append((eid[i], ev_[i]))              # the round trip sends every performEdit back, as the oracle's
         n1 = lib.jx3p_product_pending(pend, 5 * 512)
         flat = list(pend)
         new = [] if k in ('proc', 'roundtrip') else [(0, r[1], r[2] & 0xFF, r[3] & 0xFF, r[4] & 0xFF) if r[0] == 0 else
                                                      (r[0], r[1], r[3] & 0xFFFFFFFF, r[4]) for r in
                                                      (flat[5 * i:5 * i + 5] for i in range(n0, n1))]
-        res.append(dict(save=save(), queue=new, edits=edits))
+        res.append(dict(save=save(), queue=new, edits=edits, ccof=ccof()))
     if lib.jx3p_lift_error():
         raise SystemExit('the lifted code trapped: %s' % lib.jx3p_lift_error().decode())
     return res
@@ -285,25 +297,31 @@ def main():
         json.dump(oracle(int(a[1])), sys.stdout)
         return 0
     if a[:1] == ['--port']:
-        json.dump(port(a[1], int(a[2]), a[3] == '1'), sys.stdout)
+        json.dump(port(a[1], int(a[2]), a[3] == '1', a[4]), sys.stdout)
         return 0
     tooth = '--tooth' in a
     sel = [int(x) for x in a[a.index('--chains') + 1].split(',')] if '--chains' in a else list(range(len(chains())))
     tmp = tempfile.mkdtemp()
     atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     if '--mutants' in a:                     # each mutant must make at least one chain RED
+        # ... on chains that are GREEN without it: a RED a mutant finds on a chain already RED proves nothing
+        # (playbook 210: at JX-18 the clean chains 0 and 1 were RED and 'BITES' hid the loads' host edits)
+        r = subprocess.run([sys.executable, __file__, '--chains', '0,1,4,5,6'], capture_output=True, text=True)
+        if r.returncode:
+            print('jx_state_gate --mutants: REFUSE -- the clean chains are RED:\n' + r.stdout[-1500:])
+            return 1
         bitten = 0
-        for m in (1, 2, 3, 'ks', 'edit'):
-            r = subprocess.run([sys.executable, __file__, '--chains', {'ks': '4', 'edit': '6'}.get(m, '0,1'),
+        for m in (1, 2, 3, 'ks', 'edit', 'ccof'):
+            r = subprocess.run([sys.executable, __file__, '--chains', {'ks': '4', 'edit': '6', 'ccof': '5'}.get(m, '0,1'),
                                 '--mutant', str(m)], capture_output=True, text=True)
             print('  mutant %s: %s' % (m, 'RED (bites)' if r.returncode else 'GREEN -- DID NOT BITE'), flush=True)
             bitten += r.returncode != 0
-        print('jx_state_gate --mutants: %s' % ('BITES (5 of 5)' if bitten == 5 else 'DID NOT BITE on %d of 5' % (5 - bitten)))
-        return 0 if bitten == 5 else 1
+        print('jx_state_gate --mutants: %s' % ('BITES (6 of 6)' if bitten == 6 else 'DID NOT BITE on %d of 6' % (6 - bitten)))
+        return 0 if bitten == 6 else 1
     so = os.path.join(tmp, 'libjx3p.so')
     mv = a[a.index('--mutant') + 1] if '--mutant' in a else None
     mut = [] if mv is None else ['-DJX_KS_TOOTH=1'] if mv == 'ks' else ['-DJX_EDIT_TOOTH=1'] if mv == 'edit' else \
-        ['-DJX_STATE_TOOTH=%s' % mv]
+        ['-DJX_CCOF_TOOTH=1'] if mv == 'ccof' else ['-DJX_STATE_TOOTH=%s' % mv]
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    mut + [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
     bad, nsteps = 0, 0
@@ -312,21 +330,25 @@ def main():
         o = subprocess.run([sys.executable, __file__, '--oracle', str(ci)], capture_output=True, text=True)
         if o.returncode:
             raise SystemExit('oracle failed (%s): %s' % (name, o.stderr[-1500:]))
-        p = subprocess.run([sys.executable, __file__, '--port', so, str(ci), '1' if tooth else '0'],
+        idfile = os.path.join(tmp, 'ids_%d.json' % ci)
+        json.dump(json.loads(o.stdout)[0]['ids'], open(idfile, 'w'))
+        p = subprocess.run([sys.executable, __file__, '--port', so, str(ci), '1' if tooth else '0', idfile],
                            capture_output=True, text=True)
         if p.returncode:
             raise SystemExit('port failed (%s): %s' % (name, p.stderr[-1500:]))
         ro, rp = json.loads(o.stdout), json.loads(p.stdout)
         steps = chains()[ci][2]
+        if rp[0]['entry'] != list(range(len(ro[0]['ids']))) + [-1, -1, -1]:
+            raise SystemExit('chain %s: the port\'s CC map records are not the plugin\'s order: %s' % (name, rp[0]['entry']))
         first = None
         for i, (x, y) in enumerate(zip(ro, rp)):
             if x['save'] != y['save'] or [list(q) for q in x['queue']] != [list(q) for q in y['queue']] or \
-                    x.get('edits') != y.get('edits'):
+                    x.get('edits') != y.get('edits') or x['ccof'] != y['ccof']:
                 first = i
                 break
         nsteps += len(ro)
         if first is None and len(ro) == len(rp):
-            print('  chain %d %s: %d steps -- every save, queued record and host edit equal (%d records, %d host '
+            print('  chain %d %s: %d steps -- every save, queued record, host edit and menu CC equal (%d records, %d host '
                   'edits)' % (ci, name, len(steps), sum(len(x['queue']) for x in ro),
                               sum(1 for x in ro for e in x.get('edits', []) if e[0] == 'performEdit')), flush=True)
             continue
@@ -342,9 +364,13 @@ def main():
         elif [list(q) for q in x['queue']] != [list(q) for q in y['queue']]:
             print('  chain %d %s: the queued records differ after step %d (%s): plugin %s port %s' % (
                 ci, name, first, what, x['queue'][:6], y['queue'][:6]), flush=True)
-        else:
+        elif x.get('edits') != y.get('edits'):
             print('  chain %d %s: the host edits differ after step %d (%s): plugin %s port %s' % (
                 ci, name, first, what, x.get('edits'), y.get('edits')), flush=True)
+        else:
+            d = [(i, a, b) for i, (a, b) in enumerate(zip(x['ccof'], y['ccof'])) if a != b]
+            print('  chain %d %s: the CC a record\'s menu shows differs after step %d (%s): (record, plugin, port) %s' % (
+                ci, name, first, what, d[:6]), flush=True)
     if tooth:
         print('jx_state_gate --tooth: %s' % ('BITES (%d of %d chains)' % (bad, len(sel)) if bad == len(sel) else
                                              'DID NOT BITE on %d of %d' % (len(sel) - bad, len(sel))))

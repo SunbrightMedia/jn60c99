@@ -1167,6 +1167,28 @@ int jx3p_cc_forget(uint32_t id)
     g_cc.rec[e] = -1;
     return 1;
 }
+/* ---- THE CC ASSIGN MENU'S MODEL (JX-23): the JUNO-60's code (docs/CC_MENU.md rules 3-6; the JX's handler
+ * 0x31D300, search 0x31D150, entry 0x3199F0, CC-of 0x319A50, learn 0x31A920, forget 0x3191C0 == the JUNO's,
+ * fw_map --pair). A right press on a control whose value has a CC map record opens "Learn MIDI CC" and "Forget
+ * MIDI CC" -- with " #n" when the record's CC is n >= 0, greyed without it. The press's search on the panel tree
+ * hit-tests rectangles that come from the art's frame sizes: it belongs to the drawn panel (SCOPE_AUDIT row 20).
+ * Graded: jx_state_gate.py (every record's CC after every step, its record index). ---- */
+#ifndef JX_CCOF_TOOTH    /* MUTANT (jx_state_gate.py --mutants): 1 the CC shown while a learn waits */
+#define JX_CCOF_TOOTH 0
+#endif
+/* the CC map record of a parameter (rva 0x3199F0): -1 when it has none (no menu) */
+int jx3p_cc_entry(uint32_t id) { return jx_midi_entry(id); }
+/* the CC its menu shows (rva 0x319A50): -1 when none, or while a learn waits */
+int jx3p_cc_of(uint32_t id)
+{
+    int e = jx_midi_entry(id);
+#if JX_CCOF_TOOTH == 1
+    if (e < 0) return -1;
+#else
+    if (g_cc.learn >= 0 || e < 0) return -1;
+#endif
+    return g_cc.rec[e];
+}
 /* ---- THE EDITOR'S SET (JX-18): a panel control's value through the model (rva 0x283C90 = the JUNO-60's
  * 0x283DB0, fw_map --pair), EXECUTED on every record at 14 values (jx_model_census.py; jx_state_tables.h
  * JX_STATE_EDIT_HOST): the model keeps the value at its storage law (getState), LFO RATE and VCF CUTOFF set their
@@ -1178,13 +1200,29 @@ int jx3p_cc_forget(uint32_t id)
 #ifndef JX_EDIT_TOOTH    /* MUTANT (jx_state_gate.py --mutants): 1 performEdit's value is the stored value / max */
 #define JX_EDIT_TOOTH 0
 #endif
-#define JX_EDIT_MAX 64
-static struct { uint32_t id; double v; } g_edit[JX_EDIT_MAX];     /* g_nedit: with the state's boot */
+#define JX_EDIT_MAX 512
+static struct { uint32_t id; double v; int kind; } g_edit[JX_EDIT_MAX];   /* g_nedit: with the state's boot */
+/* one host edit of a stored value: performEdit's value (float)(stored - min) / (float)(max - min), both unsigned
+ * 32-bit; kind 0 the editor's (beginEdit / performEdit / endEdit), 1 a load's (performEdit alone: no beginEdit while
+ * loading -- the JUNO-60's census, docs/B6_WRAPPER_BOOT.md) */
+static int jx_edit_push(uint32_t id, int32_t st, int kind)
+{
+    int e = jx_midi_entry(id);
+    float f;
+    if (e < 0 || g_nedit >= JX_EDIT_MAX) return 0;
+#if JX_EDIT_TOOTH == 1
+    f = (float)st / (float)JX_MIDI_PARAM[e].max;
+#else
+    f = (float)(int64_t)(uint32_t)(st - JX_MIDI_PARAM[e].min) /
+        (float)(int64_t)(uint32_t)(JX_MIDI_PARAM[e].max - JX_MIDI_PARAM[e].min);
+#endif
+    g_edit[g_nedit].id = id; g_edit[g_nedit].v = (double)f; g_edit[g_nedit].kind = kind; ++g_nedit;
+    return 1;
+}
 int jx3p_model_set(uint32_t id, int32_t v)
 {
-    int k = jx_state_index(id), e;
+    int k = jx_state_index(id);
     int32_t st;
-    float f;
     if (id == JX_STATE_WRITEPATCH) {
         drv_pend(2, 0, 0, (int)id, (int32_t)((uint32_t)v & JX_STATE_WRITEPATCH_MASK));
         return 1;
@@ -1197,23 +1235,19 @@ int jx3p_model_set(uint32_t id, int32_t v)
         drv_pend(2, 0, 0, (int)id, st);
         return 1;
     }
-    e = jx_midi_entry(id);
-    if (e < 0 || g_nedit >= JX_EDIT_MAX) return 0;
-#if JX_EDIT_TOOTH == 1
-    f = (float)st / (float)JX_MIDI_PARAM[e].max;
-#else
-    f = (float)(int64_t)(uint32_t)(st - JX_MIDI_PARAM[e].min) /
-        (float)(int64_t)(uint32_t)(JX_MIDI_PARAM[e].max - JX_MIDI_PARAM[e].min);
-#endif
-    g_edit[g_nedit].id = id; g_edit[g_nedit].v = (double)f; ++g_nedit;
-    return 1;
+    return jx_edit_push(id, st, 0);
 }
-/* the host edits (performEdit's id and value) the editor's sets made since the last call, in order; returns the
- * count -- what a host receives, and sends back through process() (jx3p_product_param) */
-int jx3p_host_edits(uint32_t *ids, double *vals, int cap)
+/* the host edits the plugin made since the last call, in order -- performEdit's id and value, and (kinds, may be
+ * NULL) 0 for the editor's set (beginEdit / performEdit / endEdit: the host sends the value back through process(),
+ * jx3p_product_param) or 1 for a load's (setState, the patch browser: performEdit alone, for each host parameter
+ * the load sets, in its order -- EXECUTED, jx_state_gate.py). Returns the count; the rest past cap is dropped. */
+int jx3p_host_edits(uint32_t *ids, double *vals, int *kinds, int cap)
 {
     int n = g_nedit < cap ? g_nedit : cap;
-    for (int i = 0; i < n; ++i) { ids[i] = g_edit[i].id; vals[i] = g_edit[i].v; }
+    for (int i = 0; i < n; ++i) {
+        ids[i] = g_edit[i].id; vals[i] = g_edit[i].v;
+        if (kinds) kinds[i] = g_edit[i].kind;
+    }
     g_nedit = 0;
     return n;
 }
@@ -1454,6 +1488,7 @@ int jx3p_state_load(const unsigned char *data, int len)
         jx_store_put(k, v);
         if (id == JX_KEY_HOLD && v == 0) jx_ks_release();     /* each entry its own set: before its record */
         drv_pend(2, 0, 0, (int)id, v);
+        if (JX_STATE_EDIT_HOST[k]) jx_edit_push(id, v, 1);  /* and the host told (performEdit alone) */
         ++applied;
     }
     drv_pend(2, 0, 0, (int)JX_STATE_WRITEPATCH, 127);
@@ -1517,6 +1552,7 @@ int jx3p_product_load_record(const unsigned char *rec, int len)
         if (id == 0x00600108u && hold == 0) jx_ks_release();
         if ((sk = jx_state_index(id)) >= 0) jx_store_put(sk, v);
         drv_pend(2, 0, 0, (int)id, v);
+        if (sk >= 0 && JX_STATE_EDIT_HOST[sk]) jx_edit_push(id, v, 1);
     }
     return JX_PATCH_EV_N;
 }

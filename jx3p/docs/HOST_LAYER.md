@@ -395,6 +395,25 @@ save, queued record and host edit equal to the plugin's -- the round trips throu
 ranges, a bipolar range, KEY HOLD at 0 with drained keys, the rate setting through the editor; mutant: the
 performEdit value as stored / max -- RED (the bipolar entry).
 
+## 3n2. The loads' host edits and the CC menu's model (EXECUTED, 2026-10-11; PORTED)
+
+A LOAD TELLS THE HOST TOO. setState and the patch browser's load call performEdit -- alone, no beginEdit while
+loading -- once per host parameter they set (the 63 of JX_STATE_EDIT_HOST; a patch: all 63, in its records'
+order; a setState: the payload's, in payload order), the value by the editor's law on the stored value (past the
+ranges too: random-byte records). The JUNO-60's census had it (docs/B6_WRAPPER_BOOT.md: 79 per load); the JX port
+had none until 2026-10-11 (playbook 210: the JX-18 comparison was checked on the editor's chain only). PORTED:
+jx_edit_push(kind 1) in jx3p_state_load and jx3p_product_load_record; jx3p_host_edits(ids, vals, kinds, cap)
+gives the kind (0 the editor's begin / perform / end, 1 a load's perform). MEASURED: jx_state_gate.py, 7 chains,
+692 host edits; jx_patch_gate.py, 4 chains, 6,081 host edits (1,512 on random-byte records) -- EQUAL.
+
+THE CC ASSIGN MENU'S MODEL (JX-23): the handler 0x31D300, search 0x31D150, entry 0x3199F0, CC-of 0x319A50,
+learn 0x31A920 and forget 0x3191C0 are the JUNO's code (fw_map --pair; docs/CC_MENU.md). PORTED: jx3p_cc_entry
+(the record of an id: no record, no menu), jx3p_cc_of (the "#n" of "Forget MIDI CC": -1 when none or while a
+learn waits); learn and forget were (JX-17b). MEASURED (jx_state_gate.py): every record's CC-of after every step
+of the 7 chains (learns armed, completed by a drain, refused, forgotten; CC maps from setState) EQUAL; the
+record index of every id equal to the plugin's CC map order; mutant (the CC shown while a learn waits) RED. The
+press's search hit-tests control rectangles whose sizes come from the art's frames: with the drawn panel (row 20).
+
 ## 3o. A window's zoom (READ + EXECUTED, 2026-10-11; PORTED, JX-25)
 
 The JUNO-60's rules (docs/WINDOW_ZOOM.md, CLAIMS A40) on the JX's own code: the getter 0x2AA470 and the fit

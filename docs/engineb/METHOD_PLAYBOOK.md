@@ -3636,3 +3636,18 @@ boot) must be RED (jx_drive_gate.py --tooth, in GATE 0).
 An artifact has READERS and RE-MAKERS. When its definition changes, find both: grep the file's name, and also
 every gate that rebuilds it from the binary to compare. Then run the finish line from the top, not only the
 gates the change touched -- a full run is the only list of re-makers that cannot be incomplete.
+
+## 210. A TOOTH THAT BITES ON A RED CHAIN PROVES NOTHING
+Paid 2026-10-11 (JX-3P, found adding the CC menu's model to jx_state_gate.py).
+JX-18 added the host's edits (beginEdit / performEdit / endEdit) to what the state gate compares, and was
+checked on its own chain (the editor's) and by the mutants -- which run on chains 0 and 1. Those chains were
+RED WITHOUT ANY MUTANT: a patch load and a setState also call performEdit, once per host parameter they set
+(63 per patch; the payload's, in order; no beginEdit while loading -- the JUNO-60's census had recorded it,
+docs/B6_WRAPPER_BOOT.md), and the port made none. The mutants were reported "BITES (5 of 5)" and the gap stood
+for a day. Fixed: the loads push their host edits (kind 1: performEdit alone), the patch gate compares them too
+(1,512 on random-byte records: the value law past the ranges); the state gate's mutant mode now runs its clean
+chains first and refuses when they are RED.
+### The rule
+A tooth's RED counts only against a GREEN run of the same chains, in the same run. Before reporting "bites",
+run the clean gate on exactly the tooth's chains; a new comparison is checked on every chain, never on the one
+it was written for.

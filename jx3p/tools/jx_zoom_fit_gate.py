@@ -199,13 +199,13 @@ def port_worker(so, out):
     bank = os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin').encode()
     ref = pickle.load(open(REF_PKL, 'rb'))
     pend = (ctypes.c_int * (5 * 1024))()
-    eid, ev = (ctypes.c_uint32 * 64)(), (ctypes.c_double * 64)()
+    eid, ev = (ctypes.c_uint32 * 512)(), (ctypes.c_double * 512)()
     runs = []
     for scn, steps in ref['runs']:
         if lib.jx3p_product_init(img, bank, 48000) < 0:
             raise SystemExit('jx3p_product_init failed')
         n0 = lib.jx3p_product_pending(pend, 5 * 1024)     # initialize's records, queued for the first block
-        lib.jx3p_host_edits(eid, ev, 64)
+        lib.jx3p_host_edits(eid, ev, None, 512)
         screen = list(scn[0])
         cache = {'main': I(0), 'patch': I(0)}
         get = lambda i: lib.jx3p_model_get(i)
@@ -235,7 +235,7 @@ def port_worker(so, out):
             recs = [(pend[5 * i], pend[5 * i + 3] & 0xFFFFFFFF, pend[5 * i + 4]) if pend[5 * i] == 2 else
                     (pend[5 * i], pend[5 * i + 2], pend[5 * i + 3], pend[5 * i + 4]) for i in range(n0, n)]
             n0 = n
-            ne = lib.jx3p_host_edits(eid, ev, 64)
+            ne = lib.jx3p_host_edits(eid, ev, None, 512)
             port.append((label, (get(MAINZOOM), get(PATCHZOOM)), got, recs,
                          [(eid[i], ev[i]) for i in range(ne)]))
         runs.append(port)
