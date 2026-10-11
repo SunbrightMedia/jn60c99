@@ -83,7 +83,7 @@ python3 "$HERE/jx_recall_data_gate.py"                   # the port's recall == 
 python3 "$HERE/jx_recall_data_gate.py" --patches 0,20 --tooth
 
 echo "=== JX GATE 2/5: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
-cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC \
+cc -O2 -fno-strict-aliasing -ffp-contract=off -frounding-math -fsignaling-nans -shared -fPIC \
    -o "$WORK/libjxengine.so" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
    "$REPO/jx3p/src/jx_master_render.c" "$REPO/jx3p/src/jx_ftz.c" -lm
@@ -333,6 +333,19 @@ python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 0-
 NANS='e:5:24:67=3;e:5:24:68=3;e:32:24:37=0;v:5:65=2@44100;w:5:65=2|265360=0.2@40960'
 python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func master --patches 0-63 --frames 256 --release 512 --variants fx --scenes "$NANS" --from-boot --all-run
 python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5,34 --frames 256 --release 512 --tooth
+# the census's tooth: line 1162 (`jx_feq(cell +270208, 1.0)`) taken out of the map -- its instruction (ucomiss at rva
+# 0x3A22FD, the cell it reads) must be reported UNCLAIMED
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5 --frames 256 --release 512 --from-boot --tooth-census 1162:0x3a22fd
+# the helpers the render functions call (wraps, triangle, pitch spline, expf, tanf, the CRT's fmodf), each alone on NaNs,
+# infinities, denormals and random bits: every output bit the plugin's (playbook 222); the teeth: the wrap's `<` back,
+# and the oracle at the CPU's reset MXCSR (its FP mode must be live)
+python3 "$REPO/tools/verify/nan_helpers.py" --port-of jx
+python3 "$REPO/tools/verify/nan_helpers.py" --port-of jx --tooth
+python3 "$REPO/tools/verify/nan_helpers.py" --port-of jx --tooth-mode
+# the compiled render code negates exactly where the C does: GCC's folds that flip a NaN's sign stay off
+# (-frounding-math -fsignaling-nans, playbook 225); the tooth builds without the two flags
+python3 "$REPO/tools/verify/nan_codegen.py" --port-of jx
+python3 "$REPO/tools/verify/nan_codegen.py" --port-of jx --tooth
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
 sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"
@@ -354,6 +367,9 @@ echo "=== JX GATE 5/5: THE DELIVERED WEB ENGINE (WASM == native on the page's pr
 if command -v node >/dev/null 2>&1; then
   python3 "$HERE/jx_wasm_check.py" --patches "$(seq -s, 0 63)"   # 3 host rates, events inside blocks
   python3 "$HERE/jx_wasm_check.py" --tooth
+  # a NaN / out-of-range float -> int in the delivered WASM is x86's (-mno-nontrapping-fptoint, playbook 224)
+  python3 "$REPO/tools/verify/wasm_fptoint_check.py" --app jx
+  python3 "$REPO/tools/verify/wasm_fptoint_check.py" --app jx --tooth
   node "$HERE/jx_page_check.mjs"                                 # the page itself, headless Chromium
   node "$HERE/jx_page_check.mjs" --tooth keys
   node "$HERE/jx_page_check.mjs" --tooth data

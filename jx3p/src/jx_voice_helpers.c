@@ -530,9 +530,9 @@ float jx_h_39A250(float result, int a2)
  * qword_1809C2BC8 (8.9), addsd qword_180B1BE08 (+20.0) then cvttsd2si
  * (C (int) truncation), imul 0xD0 row stride, 12 mulsd/addsd terms in
  * exactly the order written below (addsd sequence t0, x^2, x^3, ..., x^12).
- * fmax/fmin match maxsd/minsd here: maxsd returns the second operand (-20.0)
- * on NaN input, and fmax(NaN, -20.0) = -20.0 likewise; after that no NaN can
- * reach minsd. Power products are staged left-to-right exactly as the asm
+ * maxsd / minsd in their own form (jx_maxsd / jx_minsd): maxsd returns the
+ * second operand (-20.0) on any NaN input; C's fmax gives NaN for a
+ * signalling one, then fmin gives 8.9 (nan_helpers.py). Power products are staged left-to-right exactly as the asm
  * stages registers (v2 = x^3, v4 = x^5, v5 = x^7, v6 = x^9; each *v1*v1 step
  * is one mulsd). */
 #ifndef JX_HELPER_TOOTH
@@ -547,7 +547,7 @@ double jx_h_3A2010(double a1)
   double v5; /* xmm6 */
   double v6; /* xmm8 */
 
-  v1 = fmin(fmax(a1, -20.0), 8.9);
+  v1 = jx_minsd(jx_maxsd(a1, -20.0), 8.9);
   v2 = v1 * v1 * v1;
   v3 = (const double *)((const char *)&jx_tab_9C1400[0][0] + 208 * (int)(v1 + 20.0));
 #if JX_HELPER_TOOTH   /* TOOTH (fuzz_gate.sh --tooth): one ulp-scale slip in a term every voice runs */
@@ -578,14 +578,14 @@ double jx_h_3A2010(double a1)
  * (-1.0f); fmodf second arg flt_180B1BD88 (2.0f). ALL single precision --
  * the decompile's unsuffixed 1.0/2.0 literals are IDA's rendering of f32
  * constants, so they carry the f suffix here.
- * NaN note (input NaN only): asm falls into the second fmodf path (comiss
- * unordered sets CF), C returns the NaN unchanged; both yield NaN, payload
- * may differ. Finite inputs are branch-identical. */
+ * NaN: `comiss x, -1; jae` falls into the second fmodf path (comiss
+ * unordered sets CF), so the second test is written !(x >= -1): a signalling
+ * NaN comes back quieted, as the plugin's (nan_helpers.py). */
 float jx_h_3A2180(float result)
 {
   if ( result > 1.0f )
     return fmodf(result + 1.0f, 2.0f) - 1.0f;
-  if ( result < -1.0f )
+  if ( !(result >= -1.0f) )
     return fmodf(result - 1.0f, 2.0f) + 1.0f;
   return result;
 }
@@ -604,15 +604,16 @@ float jx_h_3A2180(float result)
  * subss(dword_180B1C098 (-2.0f), xmm1); else comiss dword_180B1BBAC (0.5f):
  * above => return subss(flt_180B1BD88 (2.0f), xmm1); else return xmm1.
  * ALL single precision.
- * NaN note (input NaN only): asm takes the second fmodf and the -2.0f - v2
- * paths, C skips the fmodf; both yield NaN, payload may differ. */
+ * NaN: the asm takes the second fmodf and the -2.0f - v2 paths; the two
+ * wrap tests are written in that form, !(x > 1) and !(x >= -1)
+ * (nan_helpers.py). */
 float jx_h_3A2210(float a1)
 {
   float v2; /* xmm1 lane 0 */
 
-  if ( a1 <= 1.0f )
+  if ( !(a1 > 1.0f) )
   {
-    if ( a1 < -1.0f )
+    if ( !(a1 >= -1.0f) )
       a1 = fmodf(a1 - 1.0f, 2.0f) + 1.0f;
   }
   else

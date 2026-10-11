@@ -1093,7 +1093,7 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
 
   v2 = JF(a1, 320);
   v528 = 0;
-  if ( JF(base, auxoff) == 1.0 )
+  if ( juno_feq(JF(base, auxoff), 1.0) )
   {
     v528 = JI(a1, 320);
     v2 = 0.0;
@@ -2096,7 +2096,7 @@ uint32_t juno_voice_render(unsigned char *base, int voice, float *outL, float *o
   JF(a1, 4928) = v526;
   JF(a1, 3520) = v526;
   /* ==== END ENGINE B MODULE DECIM ======================================= */
-  if ( JF(base, auxoff) == 1.0 )
+  if ( juno_feq(JF(base, auxoff), 1.0) )
   {
     JI(a1, 320) = v528;
     JI(base, auxoff) = 0;

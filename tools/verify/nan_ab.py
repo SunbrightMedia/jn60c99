@@ -149,11 +149,13 @@ def port(so, patch, frames, ref):
     lib.juno_gui_peek.restype = ctypes.c_uint
     lib.juno_gui_render.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
     lib.juno_gui_destroy.argtypes = [ctypes.c_void_p]
+    lib.juno_set_fp_oracle_mode.argtypes = [ctypes.c_int]
     bank = bytes.fromhex(ref['bank'])
     cells = ref['cells']
 
     def run(inject):
         ctx = lib.juno_gui_create(ctypes.c_float(float(ref['rate'])), 0)
+        lib.juno_set_fp_oracle_mode(1)            # after create, which sets the production FTZ (playbook 120)
         lib.juno_gui_apply_bank(ctx, bank, len(bank), patch)
         lib.juno_gui_note_on(ctx, 60, 105)
         if inject is not None:
@@ -179,7 +181,7 @@ def tooth_lib(tmp):
     units = [mut] + [f for f in sorted(glob.glob(os.path.join(REPO, 'src', '*.c'))) if not f.endswith('master_render.c')]
     units += [os.path.join(REPO, 'gui', 'juno_bridge.c'), os.path.join(REPO, 'gui', 'juno_pm.c')]
     so = os.path.join(tmp, 'libjuno_tooth.so')
-    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC',
+    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-frounding-math', '-fsignaling-nans', '-fno-strict-aliasing', '-shared', '-fPIC',
                     '-I', os.path.join(REPO, 'src'), '-I', os.path.join(REPO, 'gui'), '-o', so] + units + ['-lm'],
                    check=True)
     return so

@@ -17,7 +17,8 @@ cd "$(dirname "$0")/../../.."   # repo root
 cp jx3p/gen/jx_guest_96k.bin.gz jx3p/gui/web/jx_guest_96k.bin.gz
 rm -f jx3p/gui/web/jx_template.bin.gz jx3p/gui/web/jx_master_recall.bin.gz \
       jx3p/gui/web/jx_template_96k.bin.gz jx3p/gui/web/jx_master_recall_96k.bin.gz
-emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
+# -mno-nontrapping-fptoint: a NaN / out-of-range float -> int is INT_MIN, as x86's cvttss2si (gui/web/build.sh)
+emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -mno-nontrapping-fptoint \
   -sGROWABLE_ARRAYBUFFERS=0 \
   jx3p/gui/jx_bridge.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
@@ -51,7 +52,7 @@ cp jx3p/gui/web/index.html jx3p/gui/web/jx3p.js jx3p/gui/web/jx3p.wasm \
    jx3p/gui/web/bank.bin.gz docs/jx3p/
 touch docs/.nojekyll
 # single-file build for the claude.ai Artifact (classic script, wasm inlined)
-emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
+emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -mno-nontrapping-fptoint \
   -sGROWABLE_ARRAYBUFFERS=0 \
   jx3p/gui/jx_bridge.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \

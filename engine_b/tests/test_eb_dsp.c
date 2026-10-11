@@ -74,6 +74,30 @@ int main(void)
         n += 3;
     }
 
+    /* NaNs (quiet, signalling, negative, payloads), infinities and denormals: the copies decide on NaN in the
+     * machine's form, as the port does (playbooks 219, 223) */
+    {
+        static const unsigned SPF[] = { 0x7FC00000u, 0xFFC00000u, 0x7F800001u, 0x7F9A7D10u, 0xFFC54321u,
+                                        0x7F800000u, 0xFF800000u, 0x00000001u, 0x807FFFFFu };
+        static const unsigned long long SPD[] = { 0x7FF8000000000000ull, 0xFFF8000000000000ull,
+                                                  0x7FF0000000000001ull, 0x7FF0000000000000ull,
+                                                  0xFFF0000000000000ull, 0x0000000000000001ull };
+        for (i = 0; i < (int)(sizeof SPF / sizeof SPF[0]); ++i) {
+            float x;
+            memcpy(&x, &SPF[i], 4);
+            cf(eb_triangle_wrap(x), juno_triangle(x), "triangle", x);
+            cf(eb_wrap_unit(x), juno_wrap_unit(x), "wrap_unit", x);
+            cf(eb_wrap_hi(x), juno_wrap_hi(x), "wrap_hi", x);
+            n += 3;
+        }
+        for (i = 0; i < (int)(sizeof SPD / sizeof SPD[0]); ++i) {
+            double x;
+            memcpy(&x, &SPD[i], 8);
+            cd(eb_pitch_poly(x), juno_pitch_poly(x), "pitch_poly", x);
+            ++n;
+        }
+    }
+
     /* The pitch polynomial across the clamped domain [-20, 8.9] and OUTSIDE it
      * on both sides -- the clamp is part of the function and a copy that
      * dropped it would agree everywhere in the middle. */

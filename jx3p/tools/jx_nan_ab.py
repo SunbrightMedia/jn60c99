@@ -189,7 +189,7 @@ def main():
     tmp = tempfile.mkdtemp(prefix='jxnan_')
     atexit.register(shutil.rmtree, tmp, True)
     so = os.path.join(tmp, 'libjx.so')
-    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
+    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-frounding-math', '-fsignaling-nans', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    (['-DJX_NAN_TOOTH=1'] if tooth else []) + [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
     o = subprocess.run([sys.executable, __file__, '--oracle', str(patch), seeds, str(ncell)], capture_output=True,
                        text=True)

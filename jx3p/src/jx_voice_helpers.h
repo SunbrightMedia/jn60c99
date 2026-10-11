@@ -74,6 +74,12 @@ static inline double jx_minsd(double a, double b)
     memcpy(&a, &ua, 8);
     return a;
 }
+/* ucomiss / ucomisd, then je / jne with NO parity test (2026-10-11, playbook 222): the machine's ZF is 1 for an
+ * unordered pair, so its "equal" is TRUE on NaN and its "not equal" FALSE -- where C's == / != read it the other
+ * way. nan_sites.py grades each equality by its instruction's flag consumers. The operands go in as double: exact
+ * for float ones. */
+static inline int jx_feq(double a, double b) { return !(a < b) && !(a > b); }
+static inline int jx_fne(double a, double b) { return a < b || a > b; }
 static inline double jx_maxsd(double a, double b)
 {
     uint64_t ua, ub, m;

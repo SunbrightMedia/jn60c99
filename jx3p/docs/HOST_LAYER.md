@@ -560,6 +560,42 @@ BLOCKED on inputs the project does not have: the panel art (row 20) and the user
   voice sites unrun (REACH, exit 1); without the cell rule lines 1422 / 1501 stay for review (exit 1). Result (job
   nan_mapjx3, then the 12 master fixes re-graded): voice 275 / 275 run and right; master 144 / 144 run, 0 wrong.
 
+## 3u. NaN parity, second pass: equalities, helpers, the compiler, the web engine (EXECUTED, 2026-10-11; row 23)
+
+- EQUALITIES (playbook 222). Every float equality of the plugin is `ucomiss` (four `comiss`) followed by a bare
+  je / jne -- no parity test: an unordered pair sets ZF, so the machine's "equal" is TRUE on NaN; C's `==` is FALSE.
+  The plugin's JX voice holds 53 such compares, the master 41 (12 of the master's float tests belong to the four
+  inline copies of jx_lfo_step, written in the machine's form since 2026-10-10: READ, listed in the census). The map
+  now grades `==` / `!=` by the instruction and its flag consumers (a jp / setp / lahf after it would make C right;
+  none in either function): voice 53, master 37 WRONG -- rewritten jx_feq / jx_fne (jx_voice_helpers.h,
+  `!(a < b) && !(a > b)` / `a < b || a > b`).
+- THE HELPERS (playbook 223, tools/verify/nan_helpers.py). Each helper alone at its rva in Unicorn (the oracle's MXCSR
+  written into the register: the JX emulator's call() reads it from a field, the JUNO's never) against the port's C
+  function, bits in and out (a float -> double conversion would quiet a signalling NaN): quiet / signalling /
+  negative NaNs and payloads, infinities, zeros, denormals, the boundaries the helpers test, random values and
+  random bit patterns. jx_h_3A2180 (the wrap to [-1, 1)) returned a signalling NaN unquieted -- `comiss x, -1; jae`
+  falls into the fmod on NaN; jx_h_3A2010 (the pitch spline) clamped a signalling NaN to 8.9 -- C's fmax gives NaN
+  for it, maxsd gives -20; jx_h_3A2210 (the triangle) -- its two wrap tests in the machine's form. tanf, expf, the
+  24-bit wrap and the CRT's own fmodf (rva 0x724EE8, statically linked) equal. Teeth: the wrap's `<` back; the
+  oracle at the reset MXCSR (no DAZ: the triangle on a denormal differs).
+- THE COMPILER (playbook 225, tools/verify/nan_codegen.py). GCC computed `x * 16384` as the negation (xorps) of the
+  `x * -16384` it had for the read index -- exact for numbers, a NaN's sign flipped where the plugin's two mulss keep
+  it: 12 sites in the master's read heads. -frounding-math -fsignaling-nans keep every operation the C writes; the
+  port runs in round to nearest, so no number changes. The gate reads GCC's output (-g: each instruction's C line):
+  every sign flip on a line that negates, every negation a flip; its tooth (no flags) finds 12.
+- THE WEB ENGINE (playbook 224, tools/verify/wasm_fptoint_check.py). emcc's default feature set converts float ->
+  int with trunc_sat: 0 for a NaN, INT_MAX above the range, where x86 (the plugin, the native port) gives INT_MIN.
+  The page builds with -mno-nontrapping-fptoint; the check rebuilds the page's engine with names kept and scans every
+  function (trunc_sat only in libc's printf), and a probe of NaN / infinity / past-range conversions prints what
+  x86 prints; its tooth (the default) shows both. A NaN result's sign and payload in WASM are the WebAssembly
+  spec's choice, not graded.
+- THE CENSUS. Every float compare / min-max instruction that ran must be graded through a C site: a tie had let
+  two sites share one instruction (all candidates of one kind and order: the verdict holds for each) and leave the
+  twin ungraded. An equality takes a candidate read by je / jne, a relation one read by jb / ja / jae / jbe; a
+  compare of two C integers is graded by its C types first (master line 2619, `*v490 == 1`). Tooth: line 1162 taken
+  out of the map, its instruction (ucomiss at rva 0x3A22FD, the cell +270208 it reads) must be reported UNCLAIMED.
+- RESULT: RESULT_3U
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

@@ -35,9 +35,13 @@ MATCH   a C site and an instruction whose first executions saw the same operand 
     python3 tools/verify/nan_sites.py --apply FILE   rewrite the C file in place from a fixes file (each site's text
                                       checked unchanged first)
     ... --tooth   every `!(A op B)` site planted back in the decompiler's `A cop B` form: WRONG must be seen
-    ... --all-run the REACH guard: every C site must run in some scene (a site no scene reaches is not graded)
+    ... --all-run the REACH guard: every C site must run in some scene (a site no scene reaches is not graded), and the
+                  CENSUS: every float compare / min-max instruction that ran is graded through a site (READ_INLINE
+                  lists the plugin's inlined helper tests the port keeps outside the function)
+    ... --tooth-census LINE:RVA   the C site(s) on LINE taken out of the map: the census must report the
+                                  instruction RVA (the one LINE grades) UNCLAIMED
 exit 0 = every executed site matched and right; 1 = a WRONG, unmatched, conflicting or unresolved (review) site, or
-with --all-run a site that never ran (listed).
+with --all-run a site that never ran or an instruction no site grades (listed).
 """
 import atexit
 import ctypes
@@ -68,6 +72,11 @@ TARGETS = {
                            vst3='jx3p/truth/JX3P.vst3'),
 }
 CMP = ('comiss', 'ucomiss', 'comisd', 'ucomisd', 'vcomiss', 'vucomiss', 'vcomisd', 'vucomisd')
+# float tests the plugin INLINED from a helper the port keeps outside the render function (no C site the tool can map
+# there): READ against the instruction, each named; the census accepts these and no others
+_LFO = 'jx_lfo_step (jx_master_render.c): comiss t, 4 / 2; jb skips the step on NaN; ucomiss t, 0; jne takes alt on NaN'
+READ_INLINE = {('jx', 'master'): {a: _LFO for a in (0x39AF45, 0x39AF58, 0x39AF69, 0x39B884, 0x39B894, 0x39B8A2,
+                                                    0x39C1D2, 0x39C1E2, 0x39C1F0, 0x39EA97, 0x39EAAA, 0x39EAB7)}}
 MINMAX = ('minss', 'maxss', 'minsd', 'maxsd', 'vminss', 'vmaxss', 'vminsd', 'vmaxsd')
 
 
@@ -79,9 +88,15 @@ TOKRE = re.compile(r'(?P<ws>\s+)|(?P<com>/\*.*?\*/|//[^\n]*)|(?P<pp>(?<![^\n])[ 
                    r'|(?P<str>"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\')'
                    r'|(?P<num>0[xX][0-9a-fA-F]+[uUlL]*|(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?[fFlL]?|\d+[eE][+-]?\d+[fFlL]?'
                    r'|\d+[uUlL]*)|(?P<id>[A-Za-z_]\w*)|(?P<op>' + '|'.join(re.escape(o) for o in OPS) + ')', re.S)
-REL = ('<', '<=', '>', '>=')
+REL = ('<', '<=', '>', '>=', '==', '!=')
 SELECTS = tuple('%s_%s%s' % (p, m, w) for p in ('jx', 'juno') for m in ('min', 'max') for w in ('ss', 'sd'))
-MMNAMES = ('fminf', 'fmaxf', 'fmin', 'fmax') + SELECTS        # the selects: the instruction's own, written out
+EQS = tuple('%s_f%s' % (p, e) for p in ('jx', 'juno') for e in ('eq', 'ne'))   # ucomiss + je / jne, no parity test
+MMNAMES = ('fminf', 'fmaxf', 'fmin', 'fmax') + SELECTS + EQS  # the selects: the instruction's own, written out
+ZF_USERS = ('je', 'jne', 'jz', 'jnz', 'sete', 'setne', 'setz', 'setnz', 'cmove', 'cmovne', 'cmovz', 'cmovnz')
+CF_USERS = ('jb', 'jbe', 'ja', 'jae', 'jnb', 'jnbe', 'jna', 'jnae', 'jc', 'jnc', 'setb', 'setbe', 'seta', 'setae',
+            'setnb', 'setnbe', 'setna', 'setnae', 'cmovb', 'cmovbe', 'cmova', 'cmovae', 'cmovnb', 'cmovnbe', 'cmovna',
+            'cmovnae')
+PARITY = ('jp', 'jnp', 'jpe', 'jpo', 'setp', 'setnp', 'setpe', 'setpo', 'cmovp', 'cmovnp', 'lahf')
 STOP = {'==', '!=', '&&', '||', '?', ':', '=', '+=', '-=', '*=', '/=', '%=', '&=', '^=', '|=', '<<=', '>>=', ',', ';',
         '{', '}', '<', '<=', '>', '>=', 'return', 'case'}
 LOWBIN = {'&', '|', '^'}
@@ -291,6 +306,10 @@ def instrument(src, sites, body0, voice_var):
             out.append('NANSITE_SEL_%s(%d, %s, ' % ('D' if st['kind'].endswith('sd') else 'F', i, st['kind']))
             cur = st['open']
             continue
+        elif st['kind'] in EQS:
+            out.append('NANSITE_SEL_D(%d, %s, ' % (i, st['kind']))
+            cur = st['open']
+            continue
         else:
             out.append('NANSITE_%s(%d, ' % (st['kind'].upper(), i))
             cur = st['open']
@@ -356,6 +375,48 @@ def event_of(arg):
     return out
 
 
+def juno_variant(bank, arg):
+    """JUNO-60 'P:BB=VAL,...' -> (bank, P): factory patch P with its recall bytes BB (blob offsets, the leaf table's)
+    set to VAL -- the record's nibble pair, as the plugin's bank parser reads it (real_bank_parse.py: header 23,
+    stride 20223, blob at +16); the plugin's and the port's recall then load the same record"""
+    p, _, edits = arg.partition(':')
+    b = bytearray(bank)
+    base = 23 + int(p) * 20223 + 16
+    for ed in filter(None, edits.split(',')):
+        bb, _, v = ed.partition('=')
+        bb, v = int(bb), int(v, 0)
+        assert 0 <= v <= 255, 'a recall byte is 0..255'
+        b[base + bb] = (v >> 4) & 0xF
+        b[base + bb + 1] = v & 0xF
+    return bytes(b), int(p)
+
+
+JUNO_VOICE_STRIDE = 10512                 # src/juno_engine.h JUNO_VOICE_MAIN_STRIDE: voice v's cells at v * stride
+
+
+def juno_scene_bank(bank, kind, arg):
+    """the bank and the patch a JUNO scene recalls first: 'p:P', 'v:P:BB=VAL', 'e:P:...', 'w:P[:BB=VAL]|...'"""
+    if kind == 'w':
+        arg = arg.split('|')[0]
+        kind = 'v' if ':' in arg else 'p'
+    if kind == 'v':
+        return juno_variant(bank, arg)
+    return bank, int(arg.split(':')[0])
+
+
+def juno_events(bank, arg):
+    """JUNO-60 'P:N:BB=VAL,.../N:...' -> [(N, bank, P)]: after N blocks of 256 with the key down, a settled warm
+    recall of patch P with its recall bytes BB set to VAL (the warm render gate's settled pair: the plugin's
+    recall_render_ab.apply_recall, the port's juno_gui_apply_bank on the running engine)"""
+    p, steps = arg.split(':', 1)
+    out = []
+    for step in steps.split('/'):
+        n, _, edits = step.partition(':')
+        wbank, wp = juno_variant(bank, '%s:%s' % (p, edits))
+        out.append((int(n), wbank, wp))
+    return out
+
+
 def pokes_of(text):
     """'OFF=VALUE,...' -> [(state offset, 32-bit value)]: OFF decimal, VALUE a float (its bits are written)"""
     out = []
@@ -390,7 +451,12 @@ def oracle(port, func, scn, frames, release):
     kind, _, arg = scn.partition(':')
     if port == 'juno':
         import e2e_emu as E, real_recall as R, recall_render_ab as RA
-        e = RA.prepare_recall(int(arg), E.bank_bytes(), R.leaf_table(), E, R, RA.SR)
+        bank, p = juno_scene_bank(E.bank_bytes(), kind, arg)
+        e = RA.prepare_recall(p, bank, R.leaf_table(), E, R, RA.SR)
+        if kind == 'w':                           # cells written after the recall: a voice cell (below the voice
+            for off, bits in pokes_of(arg.split('|')[1]):    # stride) in voice 0's unit, any other in all nine
+                for u in ([0] if off < JUNO_VOICE_STRIDE else range(9)):
+                    e.uc.mem_write(e.state[u] + off, struct.pack('<I', bits))
         e.note_on(60, 105)
         IB, uc = E.IB, e.uc
     else:
@@ -471,6 +537,10 @@ def oracle(port, func, scn, frames, release):
         for nblk, recs in event_of(arg):
             e.render(256 * nblk)
             e.host_records([(2, pid, val) for pid, val in recs])
+    if port == 'juno' and kind == 'e':            # N blocks with the key down, then a settled warm recall of the
+        for nblk, wbank, wp in juno_events(E.bank_bytes(), arg):     # patch (its bytes edited): the recall re-arms
+            e.render(256 * nblk)                  # the reverb tank's clear, so the fade counts down
+            RA.apply_recall(e, wp, wbank, R.leaf_table(), E, R)
     e.render(frames)
     if release:                                   # the key up: the release paths run too
         e.note_off(60)
@@ -482,7 +552,7 @@ def oracle(port, func, scn, frames, release):
             y = ins.get(b)
             if y is None:
                 break
-            if y.mnemonic.startswith(('j', 'set', 'cmov')) and y.mnemonic != 'jmp':
+            if (y.mnemonic.startswith(('j', 'set', 'cmov')) and y.mnemonic != 'jmp') or y.mnemonic == 'lahf':
                 seq.append(y.mnemonic)
             if y.mnemonic in CMP or y.mnemonic in ('cmp', 'test', 'sub', 'add', 'and', 'or', 'xor', 'dec', 'inc'):
                 break
@@ -597,7 +667,7 @@ def build_port(port, func, cfile_text, so_dir):
         units = [os.path.join(REPO, s) for s in B.SRCS if os.path.basename(s) != os.path.basename(t['c'])]
         inc += ['-I', os.path.join(REPO, 'jx3p', 'src'), '-I', os.path.join(REPO, 'jx3p', 'gui')]
     so = os.path.join(so_dir, 'libport.so')
-    r = subprocess.run(['cc', '-std=gnu99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC',
+    r = subprocess.run(['cc', '-std=gnu99', '-O2', '-ffp-contract=off', '-frounding-math', '-fsignaling-nans', '-fno-strict-aliasing', '-shared', '-fPIC',
                         '-w'] + inc + ['-o', so, path] + units + ['-lm'], capture_output=True, text=True)
     if r.returncode:
         raise SystemExit('REFUSE: the instrumented port did not build:\n' + r.stderr[-3000:])
@@ -625,10 +695,22 @@ def scene(lib, port, scn, frames, release, nsites):
         lib.juno_set_fp_oracle_mode(1)            # the oracle's mode: DAZ on, FTZ off (playbook 120)
         rate = float(os.environ.get('JUNO_RENDER_SR', '48000'))
         ctx = lib.juno_gui_create(ctypes.c_float(rate), 0)
-        lib.juno_gui_apply_bank(ctx, bank, len(bank), int(scn.partition(':')[2]))
+        kind, _, arg = scn.partition(':')
+        bank0 = bank
+        bank, p = juno_scene_bank(bank, kind, arg)
+        lib.juno_gui_apply_bank(ctx, bank, len(bank), p)
+        if kind == 'w':
+            lib.juno_gui_poke.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint]
+            for off, bits in pokes_of(arg.split('|')[1]):
+                lib.juno_gui_poke(ctx, off, bits)
         ctypes.memset(ctypes.addressof(ctypes.c_int.in_dll(lib, 'nansite_n')), 0, 4 * nsites)   # the recall's runs
         lib.juno_gui_note_on(ctx, 60, 105)
-        buf = (ctypes.c_float * (2 * max(frames, release)))()
+        buf = (ctypes.c_float * (2 * max(frames, release, 256)))()
+        if kind == 'e':
+            for nblk, wbank, wp in juno_events(bank0, arg):
+                for _ in range(nblk):
+                    lib.juno_gui_render(ctx, buf, 256)
+                lib.juno_gui_apply_bank(ctx, wbank, len(wbank), wp)
         lib.juno_gui_render(ctx, buf, frames)
         if release:
             lib.juno_gui_note_off(ctx, 60)
@@ -721,6 +803,8 @@ def grade(sites, vals, asm, port):
     def kind_ok(i, m):
         """a min / max site only as its own kind; a compare that saw a non-integer is no integer compare"""
         sk = sites[i]['kind']
+        if sk in EQS:
+            return kind_of(m) == 'fcmp'
         if sk != 'cmp':
             return kind_of(m) == 'mm' and (('min' in m) == ('min' in sk))
         if kind_of(m) == 'icmp':
@@ -743,6 +827,21 @@ def grade(sites, vals, asm, port):
                     out.append((ad, True))
         return out
     cand = [cands(i) if vals[i] else [] for i in range(len(sites))]
+    grade.raw = [list(c) for c in cand]           # the census's hint: the sites whose values an instruction matched
+    # an equality's flags are read by je / jne (ZF), a relation's by jb / ja / jae / jbe (CF): among several candidates
+    # an instruction whose flags only the other kind reads is not the site (JUNO voice line 723: an equality whose
+    # values three relational compares also saw)
+    for i, c in enumerate(cand):
+        if len(c) < 2:
+            continue
+        s = sites[i]
+        eq = (s['kind'] == 'cmp' and s.get('op') in ('==', '!=')) or s['kind'] in EQS
+        rel = s['kind'] == 'cmp' and s.get('op') in ('<', '<=', '>', '>=')
+        if eq or rel:
+            want = ZF_USERS if eq else CF_USERS
+            keep = [(ad, sw) for ad, sw in c if any(j in want for j in (asm[ad].get('jumps') or []))]
+            if keep:
+                cand[i] = keep
     # a tie (one value pair seen at several instructions) is broken by program order: the instruction must lie
     # between the instructions of the nearest uniquely matched sites before and after it
     uniq = [(sites[i]['lo'], c[0][0]) for i, c in enumerate(cand) if len({ad for ad, _ in c}) == 1]
@@ -761,11 +860,17 @@ def grade(sites, vals, asm, port):
             hit = [(ad, sw) for ad, sw in cand[i] if cell_hit(i, asm[ad], sw)]
             if hit:
                 cand[i] = hit
+    grade.cands = cand                            # the census: a definite verdict holds for every candidate
     out = []
     for i, s in enumerate(sites):
         c = cand[i]
         if not vals[i]:
             out.append(None)
+            continue
+        if s['kind'] == 'cmp' and s.get('real') == 1:
+            # both C operands are integers (or pointers): no NaN reaches the compare, whatever float instruction its
+            # values happen to match (JX master line 2619, `*v490 == 1`, matched a ucomiss on (1, 1)): its C types decide
+            out.append(('int-type', 0, False))
             continue
         if not c:
             if s['kind'] == 'cmp' and s.get('real') == 1:
@@ -836,6 +941,17 @@ def grade(sites, vals, asm, port):
             continue
         ad, sw = c[0]
         m = asm[ad]['m']
+        ieee = any(j in PARITY for a_, _ in c for j in (asm[a_].get('jumps') or []))
+        if s['kind'] == 'cmp' and kind_of(m) == 'fcmp' and s['op'] in ('==', '!='):
+            # ucomiss sets ZF = PF = CF = 1 on an unordered pair: a je / jne with no parity test reads a NaN as
+            # EQUAL (MSVC's fast float model); C's == reads it unequal. With a parity test (jp, or lahf; test ah,
+            # 44h) the machine's equality is IEEE's, as C's (playbook 222)
+            out.append(('wrong' if not ieee else 'right', ad, False))    # !( == ) / !( != ) alike
+            continue
+        if s['kind'] in EQS:
+            out.append(('right' if not ieee else 'wrong', ad, False) if kind_of(m) == 'fcmp' else
+                       ('review', 'an equality helper matched a %s instruction' % m, c))
+            continue
         if s['kind'] == 'cmp' and kind_of(m) == 'fcmp':
             if all(x == y for x, y in vals[i]):
                 # equal values cannot give the order; a cell read from memory can: the C operand that is cell X
@@ -887,6 +1003,14 @@ def fix_of(s, src, port, ad, sw, m):
             s['line'], s['kind'], m, ' (operands swapped)' if sw else ''))
     if s['kind'] == 'cmp' and s['neg']:
         raise SystemExit('REFUSE: line %d is written !( ) and still wrong -- fix it by hand' % s['line'])
+    if s['kind'] == 'cmp' and s['op'] in ('==', '!='):
+        new = '%s_f%s(%s, %s)' % (port, 'eq' if s['op'] == '==' else 'ne', s['A'], s['B'])
+        return dict(lo=s['lo'], hi=s['hi'], line=s['line'], old=src[s['lo']:s['hi']], new=new, rva='%x' % ad, insn=m,
+                    swapped=False)
+    if s['kind'] in EQS:
+        new = '%s %s %s' % (s['A'], '==' if s['kind'].endswith('eq') else '!=', s['B'])
+        return dict(lo=s['lo'], hi=s['hi'], line=s['line'], old=src[s['lo']:s['hi']], new=new, rva='%x' % ad, insn=m,
+                    swapped=False)
     if s['kind'] == 'cmp':
         neg = {'<': '>=', '<=': '>', '>': '<=', '>=': '<'}[s['op']]
         new = '!(%s %s %s)' % (s['A'], neg, s['B'])
@@ -947,12 +1071,15 @@ def main():
             continue
         lo, _, hi = part.partition('-')
         scenes += ['p:%d' % k for k in range(int(lo), int(hi or lo) + 1)]
-    if opt('--variants'):                         # JX: the bisect's variant records (modes | fx | SPEC;SPEC)
-        sys.path.insert(0, os.path.join(REPO, 'jx3p', 'tools'))
-        import jx_master_bisect as B
-        v = opt('--variants')
-        specs = B.mode_variants() if v == 'modes' else B.fx_variants() if v == 'fx' else v.split(';')
-        scenes += ['v:' + x for x in specs]
+    if opt('--variants'):                         # JX: the bisect's variant records (modes | fx | SPEC;SPEC);
+        v = opt('--variants')                     # JUNO: 'P:BB=VAL,...;...' (juno_variant)
+        if v in ('modes', 'fx'):
+            sys.path.insert(0, os.path.join(REPO, 'jx3p', 'tools'))
+            import jx_master_bisect as B
+            specs = B.mode_variants() if v == 'modes' else B.fx_variants()
+        else:
+            specs = v.split(';')
+        scenes += ['v:' + x for x in specs if x]
     if opt('--scenes'):                           # raw scenes (e: events, w: written cells; SCENE@N its length)
         scenes += [x for x in opt('--scenes').split(';') if x]
     t = TARGETS[(port, func)]
@@ -969,9 +1096,22 @@ def main():
         src = re.sub(r'!\(([^()]*?(?:\([^()]*\)[^()]*?)*?)\s(>=|<=|>|<)\s([^()]*?(?:\([^()]*\)[^()]*?)*?)\)',
                      plant, src)
         planted = n0 - len(re.findall(r'!\(', src))
+        # the machine's equality helpers planted back as C's == / != (the decompiler's form)
+        eqs = [st for st in sites_of(src, t['fn'])[0] if st['kind'] in EQS]
+        for st in sorted(eqs, key=lambda st: -st['lo']):
+            plines.add(st['line'])
+            src = src[:st['lo']] + '(%s %s %s)' % (st['A'], '==' if st['kind'].endswith('eq') else '!=', st['B']) + \
+                src[st['hi']:]
+        planted += len(eqs)
         if not planted:
             raise SystemExit('REFUSE --tooth: no site written !( ) in %s' % t['c'])
     sites, body0 = sites_of(src, t['fn'])
+    if opt('--tooth-census'):                     # the census's tooth: one C site taken out of the map -- the
+        drop = int(opt('--tooth-census').split(':')[0])   # instruction it grades must then be reported UNCLAIMED
+        n0 = len(sites)
+        sites = [s for s in sites if s['line'] != drop]
+        if len(sites) == n0:
+            raise SystemExit('REFUSE --tooth-census: no site on line %d of %s' % (drop, t['c']))
     tmp = tempfile.mkdtemp(prefix='nansites_')
     atexit.register(shutil.rmtree, tmp, True)
     # the port side in this process (no Unicorn here: the two-process rule); the oracle one process per scene
@@ -981,7 +1121,8 @@ def main():
             raise SystemExit('REFUSE: --rate is 44100 or 96000, for the JX-3P')
         os.environ['NANSITES_RATE'] = opt('--rate')
     per = [[] for _ in sites]
-    asm_m, ninsn, ran_asm = {}, 0, set()
+    asm_m, ninsn, ran_asm, claimed, seen_at = {}, 0, set(), set(), {}
+    DEF = ('right', 'wrong', 'int', 'exact', 'nested-right', 'nested-wrong', 'int-type')
     for pt in scenes:
         o = subprocess.run([sys.executable, __file__, '--oracle', port, func, pt, str(frames), str(release)],
                            capture_output=True, text=True)
@@ -998,6 +1139,12 @@ def main():
         for i, g in enumerate(grade(sites, vals, asm, port)):
             if g is not None:
                 per[i].append((pt, g))
+                for ad, _ in grade.raw[i]:
+                    seen_at.setdefault(ad, set()).add(sites[i]['line'])
+                if g[0] in DEF:                   # the instruction(s) this verdict graded
+                    claimed.add(g[1])
+                    if not g[0].startswith('nested'):
+                        claimed |= {ad for ad, _ in grade.cands[i]}
     # merge the scenes: a definite verdict wins over review / unmatched; two definite verdicts must agree
     right = ints = exact = 0
     wrong, review, unmatched, conflict, fixes = [], [], [], [], []
@@ -1005,7 +1152,6 @@ def main():
     for i, s in enumerate(sites):
         # one C site can be several instructions (a block the compiler duplicated): the verdict and the operand
         # order must agree, the address may differ
-        DEF = ('right', 'wrong', 'int', 'exact', 'nested-right', 'nested-wrong', 'int-type')
         defin = {(g[0].replace('nested-', '').replace('int-type', 'int'), g[2]) for _, g in per[i] if g[0] in DEF}
         addrs = sorted({g[1] for _, g in per[i] if g[0] in DEF})
         nested[i] = any(g[0].startswith('nested') for _, g in per[i])
@@ -1053,6 +1199,19 @@ def main():
     for s, d in conflict:
         print('  CONFLICT line %-5d %s: %s' % (s['line'], s.get('op') or s['kind'], d))
     never = [s for i, (s, p_) in enumerate(zip(sites, per)) if not p_ and i in compiled]
+    # THE CENSUS (playbook 224): every float compare / min-max instruction the plugin ran is graded through a C site.
+    # One no site claims is a test the tool cannot see in the C (an inline helper outside the function: READ, listed)
+    # or a tie that gave two sites one instruction (JUNO master lines 2017 / 2109 before this check)
+    fl = sorted(ad for ad in ran_asm if asm_m[ad] in CMP + MINMAX)
+    rd = READ_INLINE.get((port, func), {})
+    uncl = [ad for ad in fl if ad not in claimed and ad not in rd]
+    print('  census: %d float compare / min-max instructions ran: %d graded through a C site, %d READ (%s), '
+          '%d UNCLAIMED' % (len(fl), sum(1 for ad in fl if ad in claimed), sum(1 for ad in fl if ad in rd and
+                                                                                 ad not in claimed),
+                            ', '.join(sorted(set(rd.values()))) or 'none', len(uncl)))
+    for ad in uncl:
+        print('  UNCLAIMED rva 0x%x %s (values matched at C line(s): %s)' % (
+            ad, asm_m[ad], ', '.join(map(str, sorted(seen_at.get(ad, ())))) or 'none'))
     if '--list-never' in a or '--all-run' in a:
         for s in never:
             print('  NEVER RAN line %-5d %s' % (s['line'], s.get('op') or s['kind']))
@@ -1065,11 +1224,16 @@ def main():
             planted, sum(1 for s_, p_ in zip(sites, per) if p_ and s_['line'] in plines),
             'BITES (%d graded WRONG)' % len(hit) if hit else 'DID NOT BITE'))
         return 0 if hit else 1
+    if opt('--tooth-census'):                     # LINE:RVA -- the very instruction the dropped line grades
+        want = int(opt('--tooth-census').split(':')[1], 16)
+        print('nan_sites --tooth-census (line %s taken out): %s' % (
+            opt('--tooth-census'), 'BITES (rva 0x%x UNCLAIMED)' % want if want in uncl else 'DID NOT BITE'))
+        return 0 if want in uncl else 1
     # a site for review is a site nobody graded: it fails the gate like a wrong one (mantra 5); so does a site no
     # scene reached, under --all-run
     if '--all-run' in a and never:
         print('nan_sites: REACH -- %d C sites never ran in these scenes (--all-run)' % len(never))
-    return 1 if (wrong or unmatched or conflict or review or ('--all-run' in a and never)) else 0
+    return 1 if (wrong or unmatched or conflict or review or ('--all-run' in a and (never or uncl))) else 0
 
 
 if __name__ == '__main__':

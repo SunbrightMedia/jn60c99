@@ -33,8 +33,10 @@ BUILD = os.path.join(OUT, 'native')
 EXE = os.path.join(OUT, 'JUNO-60.exe')
 
 ID_XML, ID_BANKS, ID_PNG0 = 100, 101, 200
-# the port's own build flags (Makefile): -ffp-contract=off is load-bearing
-CFLAGS = ['-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-Wall', '-Wno-unused-function']
+# the port's own build flags (Makefile): -ffp-contract=off is load-bearing; -frounding-math -fsignaling-nans keep a
+# NaN's sign where the plugin keeps it (playbook 225)
+CFLAGS = ['-std=c99', '-O2', '-ffp-contract=off', '-frounding-math', '-fsignaling-nans', '-fno-strict-aliasing', '-Wall',
+          '-Wno-unused-function']
 LIBS = ['-lgdiplus', '-lshlwapi', '-lwinmm', '-lcomdlg32', '-lgdi32', '-lole32', '-lshell32', '-lavrt', '-luuid', '-lm',
         '-Wl,--no-insert-timestamp']          # no time stamp: the same sources give the same bytes (task #62)
 

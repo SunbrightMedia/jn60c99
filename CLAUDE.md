@@ -156,7 +156,11 @@ mine is a hypothesis (playbook 80).
   gui/skin/ draws the plugin's own GUI from truth/Script.xml + truth/Script/*.png,
   local only, never published; CLAIMS C5, gui/skin/README.md). The web app's WASM is rebuilt
   with all of it (make webapp green: WASM == native, headless check; emcc from
-  /home/user/emsdk/emsdk_env.sh). PROVENANCE 38/38 PROVEN (34 engine and host rows, 4 GUI rows: A37-A40);
+  /home/user/emsdk/emsdk_env.sh). PROVENANCE 39/39 PROVEN (35 engine and host rows, 4 GUI rows: A37-A40);
+  NaN parity of the render code (A41, 2026-10-11, playbooks 219-225): every relation, equality and min / max in
+  its instruction's form, every site run, every float compare instruction graded (nan_sites.py census), the
+  helpers alone (nan_helpers.py), GCC's NaN-sign folds off (-frounding-math -fsignaling-nans, nan_codegen.py),
+  the web's float -> int x86's (-mno-nontrapping-fptoint, wasm_fptoint_check.py) -- in make verify / webapp;
   full verify of d59277db GREEN (job verify_final, EXIT 0, every section ran,
   every reference rebuilt from the plugin; ARM golden OK in the same run), and
   of 84921859 -- the stack fix and the rebuilt web app -- GREEN (job
@@ -270,7 +274,9 @@ mine is a hypothesis (playbook 80).
   docs/GATE_PARITY.tsv has a JX gate jx_verify.sh runs (gate_parity.py rule 4),
   but 2 BLOCKED on inputs (the art; the user's JX banks); ISO C99 checked
   (tools/verify/c99_gate.py, both ports); every JX file's role and proof in
-  jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Full verify-jx3p owed on the
+  jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Row 23 (NaN parity, the JUNO's
+  A41 classes: 53 + 37 equalities, 3 helpers, 12 sign folds, the page's
+  conversions) fixed 2026-10-11, S3_STATUS (16); full verify-jx3p owed on the
   newest commit.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory

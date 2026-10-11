@@ -53,8 +53,10 @@ float juno_wrap24(float x)
  */
 float juno_triangle(float phase)
 {
-    if (phase <= 1.0f) {
-        if (phase < -1.0f)
+    /* the machine's two tests, NaN included: `comiss p, 1; jbe` takes the low path on NaN, and
+       `comiss p, -1; jae` falls into the fmod on NaN (playbooks 219, 222) */
+    if (!(phase > 1.0f)) {
+        if (!(phase >= -1.0f))
             phase = fmodf(phase - 1.0f, 2.0f) + 1.0f;
     } else {
         phase = fmodf(phase + 1.0f, 2.0f) - 1.0f;
@@ -76,7 +78,9 @@ float juno_triangle(float phase)
  */
 double juno_pitch_poly(double x)
 {
-    double v1 = fmin(fmax(x, -20.0), 8.9);
+    /* maxsd x, -20.0 then minsd x, 8.9: a NaN (signalling too) clamps to -20, where C's fmax gives NaN for a
+       signalling one (nan_helpers.py) */
+    double v1 = juno_minsd(juno_maxsd(x, -20.0), 8.9);
     double v2 = v1 * v1 * v1;
     const double *v3 = juno_pitch_table[(int)(v1 + 20.0)];
     double v4 = v2 * v1 * v1;
@@ -101,7 +105,7 @@ double juno_pitch_poly(double x)
 float juno_wrap_unit(float x)
 {
     if (x > 1.0f)  return fmodf(x + 1.0f, 2.0f) - 1.0f;
-    if (x < -1.0f) return fmodf(x - 1.0f, 2.0f) + 1.0f;
+    if (!(x >= -1.0f)) return fmodf(x - 1.0f, 2.0f) + 1.0f;     /* `comiss x, -1; jae`: NaN takes the fmod */
     return x;
 }
 

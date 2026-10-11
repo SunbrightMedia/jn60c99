@@ -29,7 +29,7 @@
 static inline float eb_wrap_unit(float x)
 {
     if (x > 1.0f)  return fmodf(x + 1.0f, 2.0f) - 1.0f;
-    if (x < -1.0f) return fmodf(x - 1.0f, 2.0f) + 1.0f;
+    if (!(x >= -1.0f)) return fmodf(x - 1.0f, 2.0f) + 1.0f;     /* `comiss x, -1; jae`: NaN takes the fmod */
     return x;
 }
 

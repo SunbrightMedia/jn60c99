@@ -3800,3 +3800,75 @@ rewrite 0 wrong. Every one of them was a `<` / `<=` in the instruction's order.
 A gate that lists sites must fail on any site it did not grade: unresolved is not right, and unrun is not right
 (--all-run). Build the scene that reaches a site -- an event, a longer render, a written state the same on both
 sides -- before reading a single instruction by eye; reading is the last resort, labelled READ.
+
+## 222. AN EQUALITY IS A FLAG TEST TOO -- `ucomiss; jne` WITH NO PARITY TEST READS A NaN AS EQUAL
+Paid 2026-10-11 (JUNO-60, tools/verify/nan_ab.py after the playbook-219 rewrite: a NaN in voice 0's +592 still
+changed the output). nan_sites.py had graded `<` `<=` `>` `>=` only: its site list never held `==` / `!=`. The plugin's
+float equalities are `ucomiss` then a bare `je` / `jne` (MSVC's fast float model): an unordered pair sets ZF = 1, so
+the machine's "equal" is TRUE on NaN and its "not equal" FALSE; C's `==` / `!=` read it the other way. Voice line 723
+`if ( v45 == 0.0 ) v56 = v28;` -- with v45 = NaN the plugin takes `v56 = v28`, the port kept the NaN. Where a parity
+test follows (a `jp`, or `lahf; test ah, 44h`), the machine's equality is IEEE's and C's is right.
+### The rule
+Every float relation the decompiler prints -- equalities included -- is graded by its instruction AND its flag
+consumers: the jump that reads ZF alone reads unordered as equal. The machine's equality written out:
+juno_feq / juno_fne (src/juno_dsp.h), jx_feq / jx_fne (jx_voice_helpers.h): `!(a < b) && !(a > b)` / `a < b || a > b`.
+
+## 223. A HELPER DECIDES ON NaN WITH ITS OWN FLAGS -- AND THE ORACLE'S MODE WAS A FIELD ONE EMULATOR NEVER READ
+Paid 2026-10-11 (both ports, tools/verify/nan_helpers.py). nan_sites.py grades the two render functions; the leaf
+helpers they call were outside it. Each helper is now called ALONE -- the plugin's machine code at its rva in Unicorn,
+the port's C function -- on quiet / signalling / negative NaNs, infinities, zeros, denormals, its own boundaries and
+random bits. Three helpers differed in BOTH ports, all on NaN:
+- the wrap to [-1, 1) (JUNO 0x368F30, JX 0x3A2180): `comiss x, -1; jae` falls INTO the fmod on NaN, so a signalling
+  NaN comes back quieted; C's `x < -1` returned it unchanged. Now `!(x >= -1)`.
+- the pitch spline's clamp (JUNO 0x368DC0, JX 0x3A2010): `maxsd x, -20; minsd x, 8.9` gives -20 for ANY NaN; C's
+  fmax gives NaN for a signalling one, then fmin gives 8.9 -- a different table row and a finite, wrong output. Now
+  juno_maxsd / juno_minsd (jx_maxsd / jx_minsd), the instruction's select.
+- the triangle's wrap tests (0x368FC0, 0x3A2210): `jbe` takes the low path on NaN; equal outputs, rewritten in the
+  machine's form so a later change cannot split them.
+The CRT the render code calls is the plugin's own static code (fmodf at 0x6EF4D8 / 0x724EE8, expf, tanf): graded the
+same way, equal. And the harness defect: the first oracle set `e._mxcsr`, a field the JX emulator's call() writes
+into MXCSR -- and the JUNO emulator never reads. The JUNO oracle ran at the reset MXCSR (no DAZ), and "the triangle
+differs on denormals" was the harness, not the port (seen when the JX, built the same way, disagreed). The oracle
+now writes the register itself and the field; the tooth --tooth-mode runs it at the reset MXCSR and must differ.
+### The rule
+Grade every helper a gated function calls, alone, on the values a NaN gate needs; the inline ones it cannot call
+(jx_lfo_step) are READ and say so. Set the oracle's FP mode by the register, never by a convention one class honours,
+and give the mode its own tooth.
+
+## 224. A FLOAT -> INT OF A NaN IS INT_MIN ON x86 AND 0 IN WASM -- THE DEFAULT WASM FEATURE SET SATURATES
+Paid 2026-10-11 (both web apps, tools/verify/wasm_fptoint_check.py). The plugin and the native port convert with
+cvttss2si / cvttsd2si: a NaN, an infinity or a value past the range gives the integer indefinite, INT_MIN (INT64_MIN).
+emcc 6.x enables nontrapping-fptoint by default: its trunc_sat gives 0 for a NaN and INT_MAX above the range. The
+shipped juno.wasm held 69 saturating conversions (27 in juno_master_render, 5 in juno_voice_render: the delay read
+heads' `(int)(float)(x * -16384.0)`), jx3p.wasm 100. Without the feature (-mno-nontrapping-fptoint) LLVM emits a guarded
+conversion whose result is x86's on every input. Two left in emscripten's prebuilt libc: fmt_fp (printf, text) and
+lrint (the JUNO's expf, its argument held in [-9600, 8192) by the tests above it) -- listed, each with its reason.
+The check rebuilds the app by its own build script's command with names kept and scans every function; a probe of
+NaN / infinity / past-range / in-range conversions must print what x86 prints; the tooth (the default features)
+must show both.
+### The rule
+A port that runs on two instruction sets is graded on both where their rules differ: float -> int of a value C
+leaves undefined (NaN, out of range) is one such place. Pin the target's semantics by a flag, prove it on the
+delivered binary, not on the source.
+
+## 225. GCC FLIPS A NaN'S SIGN WHERE THE ALGEBRA HOLDS FOR NUMBERS -- AND TWO SITES CAN TIE ON ONE INSTRUCTION
+Paid 2026-10-11 (JUNO-60, nan_ab.py: a NaN in master +91168 / +91136 / +91488 left 0x7FC00000 where the plugin keeps
+0xFFC00000). The injected NaN is negative; the port's became positive at the delay read heads: GCC computed
+`(float)(v636 * 16384.0)` as the negation (xorps) of `v636 * -16384.0`, which it had for the read index -- exact for
+every number, a sign flip for a NaN. The plugin multiplies twice. 11 such sites in the JUNO master, 12 in the JX
+master; and `v413 * x` with v413 = -1.0 became `-x` in the JUNO voice (line 1753; the plugin's mulss keeps x's NaN).
+-frounding-math (no fold valid only in round-to-nearest) and -fsignaling-nans (no fold that skips an operation a
+signalling NaN goes through) keep every one; the port runs in round-to-nearest, so no number changes. nan_codegen.py
+proves it on GCC's output: every sign flip on a C line that writes a negation, every negation a flip; the tooth (no
+flags) finds the 17 / 12 the C does not write. The same day's re-map showed a second blind spot: two equality sites
+whose values were (0, 0) in every scene (JUNO master lines 2017 / 2109, voice 669 / 723 and 972 / 1027) TIED on one
+instruction -- the verdict was right (every candidate the same kind), but the other instruction was graded by no
+site. The census now fails any float compare / min-max instruction that ran and no site claims (its tooth: one C line
+taken out, its very instruction must be reported UNCLAIMED). Two matcher rules came with it: an equality takes a
+candidate whose flags a je / jne reads, a relation one read by jb / ja / jae / jbe (JUNO voice line 723, an equality
+whose values three relational compares also saw); and a compare of two C integers is graded by its C types before
+any value match (JX master line 2619, `*v490 == 1`, had matched a ucomiss on (1, 1) and graded "wrong").
+### The rule
+A NaN's bits are the compiler's choice wherever C leaves them open; a port that promises bit-exact NaNs pins the
+compiler (flags) and proves the generated code, not the source. A map that grades sites must also account for every
+instruction: a site may be right while an instruction is never looked at.

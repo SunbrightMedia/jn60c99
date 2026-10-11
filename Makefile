@@ -8,7 +8,10 @@ CC      ?= cc
 # single-rounding instruction and silently diverge. This flag keeps every multiply
 # and add separately rounded, matching the reference on every target. The FMA
 # canary (tests/test_fma_canary.c) fails loudly if contraction ever slips through.
-CFLAGS  ?= -std=c99 -O2 -ffp-contract=off -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fno-strict-aliasing
+# -frounding-math -fsignaling-nans: GCC compiles the transcription literally -- no fold that is exact only for
+# numbers (x * 16384 as -(x * -16384), x * -1.0 as -x) and so flips a NaN's sign where the plugin's mulss keeps it
+# (playbook 225, nan_codegen.py). The port runs in round-to-nearest: no number changes, only a NaN's bits.
+CFLAGS  ?= -std=c99 -O2 -ffp-contract=off -frounding-math -fsignaling-nans -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fno-strict-aliasing
 LDLIBS  ?= -lm
 
 SRC     := $(wildcard src/*.c)
@@ -111,6 +114,18 @@ verify-recipe:
 	python3 tools/verify/rate_sweep_gate.py --port || FAIL=1; \
 	echo "=== LIVE GATE 3/7: render A/B (port render vs plugin's own render, 57 non-arp) ==="; \
 	python3 tools/verify/recall_render_ab.py --port || FAIL=1; \
+	echo "=== NaN PARITY (playbooks 219-222): every compare and min / max of the two render functions graded by its own instruction, every site run; a NaN in live cells; the helpers they call, alone ==="; \
+	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 0-63 --frames 256 --release 512 --scenes 'p:0@48000;w:0|1168=5.0' --all-run || FAIL=1; \
+	python3 tools/verify/nan_sites.py --port-of juno --func master --patches 0-63 --frames 256 --release 512 --scenes 'v:0:634=4;v:0:618=0;e:0:24:' --all-run || FAIL=1; \
+	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 5 --frames 256 --release 512 --tooth || FAIL=1; \
+	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 5 --frames 256 --release 512 --tooth-census 590:0x3690bd || FAIL=1; \
+	python3 tools/verify/nan_ab.py --seeds 1,2 --cells 16 || FAIL=1; \
+	python3 tools/verify/nan_ab.py --tooth || FAIL=1; \
+	python3 tools/verify/nan_helpers.py --port-of juno || FAIL=1; \
+	python3 tools/verify/nan_helpers.py --port-of juno --tooth || FAIL=1; \
+	python3 tools/verify/nan_helpers.py --port-of juno --tooth-mode || FAIL=1; \
+	python3 tools/verify/nan_codegen.py --port-of juno || FAIL=1; \
+	python3 tools/verify/nan_codegen.py --port-of juno --tooth || FAIL=1; \
 	echo "=== LIVE GATE 4/7: arp SCHEDULE (plugin's own arp vs carp.c, 7 arp patches) ==="; \
 	fresh $(SCRATCH)/arp_sched_ref.pkl || python3 tools/verify/arp_sched_ab.py --ref || FAIL=1; \
 	python3 tools/verify/arp_sched_ab.py --port || FAIL=1; \
@@ -342,6 +357,8 @@ native: libjuno.so
 
 webapp: libjuno.so
 	bash gui/web/build.sh
+	python3 tools/verify/wasm_fptoint_check.py --app juno
+	python3 tools/verify/wasm_fptoint_check.py --app juno --tooth
 	env node tools/verify/wasm_golden.mjs
 	python3 tools/verify/wasm_product_gate.py
 	python3 tools/verify/wasm_product_gate.py --tooth
