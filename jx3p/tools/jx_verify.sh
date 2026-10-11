@@ -62,6 +62,10 @@ echo "=== JX GATE S: THE SOURCES (ISO C99 in a generic and the native configurat
 # lifted mul / div and the voice helpers used __int128, a builtin and x86 asm -- none of them C99)
 python3 "$REPO/tools/verify/c99_gate.py"
 python3 "$REPO/tools/verify/c99_gate.py" --self-test         # an __int128, a builtin, a POSIX header must be seen
+# ... and the C99 that replaced them computes what they did: the 128-bit products and quotients, the bit scans and the
+# two float-to-int conversions against GCC's __int128 / builtins and the SSE2 instructions, ~20 M cases (playbook 218)
+python3 "$REPO/tools/verify/c99_helpers_check.py"
+python3 "$REPO/tools/verify/c99_helpers_check.py" --self-test   # five planted mutations, each must be seen
 python3 "$REPO/tools/verify/approx_audit.py" --jx
 
 echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="

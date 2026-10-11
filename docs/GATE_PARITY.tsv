@@ -73,7 +73,7 @@ voice_count	tools/verify/voice_count_gate.py	jx3p/tools/jx_product_gate.py	OK	--
 wasm_product	tools/verify/wasm_product_gate.py	jx3p/tools/jx_wasm_check.py	OK	WASM == native on the page's product-path calls, 64 patches, 3 rates (GATE 5)
 wrapper_velocity	tools/verify/wrapper_velocity_gate.py	jx3p/tools/jx_product_gate.py	OK	--vel: velocity 0 (a note-off at 64), 1, 37, 64, 99, 100, 101, 126, 127 and floats, MIDI channels 1 and 10, note-off velocities; and after a setState of velSense 0 (not in the state list: nothing changes, as the JUNO-60's)
 zoom_fit	tools/verify/zoom_fit_gate.py	jx3p/tools/jx_zoom_fit_gate.py	OK	16 screens, both windows (JX-25)
-c99	tools/verify/c99_gate.py	tools/verify/c99_gate.py	OK	both ports ISO C99: gcc -std=c99 -pedantic-errors + the live code scanned in a generic and the native configuration; its first run found __int128, builtins, x86 asm and a weak symbol in the JX (fixed 2026-10-11); make static and GATE S run it, with its tooth
+c99	tools/verify/c99_gate.py + tools/verify/c99_helpers_check.py	tools/verify/c99_gate.py + tools/verify/c99_helpers_check.py	OK	both ports ISO C99, and the C99 twins of the 128-bit mul / div, the bit scans and the cvt(t)sd2si conversions equal to GCC's __int128 / builtins and the SSE2 instructions on ~20 M edge and random cases (5 planted mutations seen): gcc -std=c99 -pedantic-errors + the live code scanned in a generic and the native configuration; its first run found __int128, builtins, x86 asm and a weak symbol in the JX (fixed 2026-10-11); make static and GATE S run it, with its tooth
 #
 # PARITY RUNS BOTH WAYS. ramp_smoothing was built for the JX first, so the
 # JUNO now owes an equivalent: does the JUNO port step ITS parameter ramps, or

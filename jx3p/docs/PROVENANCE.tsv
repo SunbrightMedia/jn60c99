@@ -15,11 +15,11 @@ src/juno_conv.c	SHARED	the JUNO-60's render object (CLAIMS A25); the JX's table 
 src/juno_conv.h	SHARED	its header	jx3p/tools/jx_product_gate.py
 src/conv_tables.h	SHARED	the JUNO-60's render-object table and vectors (tools/verify/gen_conv_tables.py); the JX's equal	jx3p/tools/jx_conv_tables.py
 jp8/src/jp8_rt.c	RUNTIME	the lifted code's runtime (the JUPITER-8 track's)	jx3p/tools/jx_lift_gate.py
-jp8/src/jp8_cpu.h	RUNTIME	the lifted code's CPU header (C99 helpers, playbook 213)	jx3p/tools/jx_lift_gate.py + tools/verify/c99_gate.py
+jp8/src/jp8_cpu.h	RUNTIME	the lifted code's CPU header (C99 helpers, playbook 213)	jx3p/tools/jx_lift_gate.py + tools/verify/c99_gate.py + tools/verify/c99_helpers_check.py
 jx3p/src/jp8_cpu.h	RUNTIME	forwards to jp8/src/jp8_cpu.h	jx3p/tools/jx_lift_gate.py
 jx3p/src/jx_lift.c	LIFTED	jx3p/tools/jx_lift.py on jx3p/gen/jx_lift_reach.json + jx_lift_roots.json (--relift --write)	jx3p/tools/jx_lift_gate.py
 jx3p/src/jx_voice_render.c	TRANSCRIBED	jx3p/tools/translate_jx_voice.py from the decompile, fixed by hand (S3_TRANSCRIPTION.md)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_full_gate.sh + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh
-jx3p/src/jx_voice_helpers.c	TRANSCRIBED	by hand from the binary (the CRT's expf / tanf, the tables)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh
+jx3p/src/jx_voice_helpers.c	TRANSCRIBED	by hand from the binary (the CRT's expf / tanf, the tables)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh + tools/verify/c99_helpers_check.py
 jx3p/src/jx_voice_helpers.h	TRANSCRIBED	the helpers' declarations	jx3p/tools/ab_render_c.py
 jx3p/src/jx_master_render.c	TRANSCRIBED	jx3p/tools/translate_jx_master.py, the arguments from the asm (playbook 198)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/jx_nan_ab.py
 jx3p/src/jx_ftz.c	RUNTIME	the FTZ / DAZ mode glue	tools/verify/c99_gate.py + jx3p/tools/ab_render_c.py

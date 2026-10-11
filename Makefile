@@ -57,7 +57,7 @@ ORACLE_DEPS := $(wildcard tools/verify/*.py)
 # `make test static` before EVERY commit (playbook 119): on 2026-10-05 four of
 # them went red across three commits, unseen, because only the gate being worked
 # on was run.
-STATIC_GATES := pathcheck shadow_bounds_gate shadow_sync_gate completeness_gate deferred_noop_gate approx_audit provenance_check completeness_scan reinit_check c99_gate
+STATIC_GATES := pathcheck shadow_bounds_gate shadow_sync_gate completeness_gate deferred_noop_gate approx_audit provenance_check completeness_scan reinit_check c99_gate c99_helpers_check
 static: libjuno.so
 	@mkdir -p $(SCRATCH); FAIL=0; for g in $(STATIC_GATES); do \
 	  if python3 tools/verify/$$g.py > $(SCRATCH)/static_$$g.log 2>&1; then echo "  ok   $$g"; \
@@ -76,6 +76,7 @@ static: libjuno.so
 	then echo "  ok   pi_log10_check"; else echo "  RED  pi_log10_check (log: $(SCRATCH)/static_pi_log10.log)"; FAIL=1; fi; \
 	{ cc -O2 -std=c99 -ffp-contract=off -DTOOTH -o $(SCRATCH)/pi_log10_tooth tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_tooth > /dev/null 2>&1; } || { echo "  RED  pi_log10_check tooth DID NOT BITE"; FAIL=1; }; \
 	python3 tools/verify/c99_gate.py --self-test > /dev/null 2>&1 || { echo "  RED  c99_gate tooth DID NOT BITE"; FAIL=1; }; \
+	python3 tools/verify/c99_helpers_check.py --self-test > /dev/null 2>&1 || { echo "  RED  c99_helpers_check teeth DID NOT BITE"; FAIL=1; }; \
 	exit $$FAIL
 
 # make verify: the gate list below (verify-recipe) four sections at a time, its prelude (the shared

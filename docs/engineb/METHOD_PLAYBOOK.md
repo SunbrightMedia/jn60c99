@@ -3728,3 +3728,16 @@ the index from HEAD (read-tree) before `add -A`; a snapshot with one working fil
 commit has (5708c4b7 both). The jobs before it graded their commits' files -- only the id was wrong.
 ### The rule
 A provenance step is a gate: run it once and see it equal, and once with a planted change and see it differ.
+
+## 218. "ISO C99" PROVES THE LANGUAGE, NOT THE ARITHMETIC -- GRADE THE TWIN AGAINST THE MACHINE
+Paid 2026-10-11 (JX-26a follow-up). c99_gate.py proves the ports use no __int128, builtin or asm; the C99 code that
+replaced them (32-bit-half products, a shift-and-subtract 128 / 64 divide, binary-search scans, rint() for
+cvtsd2si, a bounds twin for cvttsd2si) was graded only where the lift gate's and the renders' inputs happened to
+reach -- a carry or a bound wrong on an unreached input would pass every gate. tools/verify/c99_helpers_check.py
+now compiles each twin from its own source text beside GCC's __int128 / builtins and the SSE2 instructions:
+~20 M edge and random cases, 0 mismatches; five planted mutations each seen. One planted mutation did NOT bite --
+the truncation's lower bound (`t > -2^31-1` -> `t >= -2^31`) is an EQUIVALENT mutant: truncation there yields
+INT_MIN, the integer indefinite's own value. Replaced by a real defect (the upper bound one lower), which bites.
+### The rule
+A replacement for a machine operation gets a differential test against the machine on its whole domain (edges
+first). When a tooth does not bite, first ask whether the mutant is equivalent -- then pick one that is not.
