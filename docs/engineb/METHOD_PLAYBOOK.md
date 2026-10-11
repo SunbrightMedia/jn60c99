@@ -3708,3 +3708,13 @@ Paid 2026-10-11 (JX-3P, JX-26e). jx3p/src/jx_recall.c -- the pool-model recall t
 library and the web page's WASM, called by nothing; eight more retired transcriptions sat beside the product's
 files. jx3p/tools/jx_provenance.py now names each file's role and running proof and refuses a RETIRED file in the
 product's units (SRCS and everything they include).
+
+## 216. A REACH GUARD'S EXPECTATION IS A CLAIM ABOUT THE PLUGIN -- READ IT FROM THE TABLE, NOT FROM MEMORY
+Paid 2026-10-11 (JX-3P, JX-26c). The JX suite's line "the JUNO-60's other host rates: silent" listed 13 rates as
+"rate_sweep's 18 less the table's five" -- five from memory. The render object's table (src/conv_tables.h) holds
+NINE host rates; the plugin sounds at 176400 and 384000. The port was equal at all 13; the --expect-silent guard
+REFUSED twice and turned the run RED -- the guard did its job. Two of the nine (11025, 22050: kind-2 entries) are
+silent in the plugin 3 s after a key (EXECUTED), so the table alone does not say which rates sound either.
+### The rule
+A silent / sounding expectation names the plugin's behavior: derive the list from the generated table, then run
+each rate once without the expectation and keep what the plugin's own output says.

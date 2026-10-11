@@ -200,9 +200,13 @@ python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 1,2 --on 
 # setState of velSense 0 (not in the state list: nothing changes)
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,5 --vel --on 0.55 --secs 1.8
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --vel --on 0.55 --secs 1.8 --state 's0FFFC00D=0@0.2'
-# THE JUNO-60's OTHER HOST RATES (rate_sweep_gate.py's 18 less the table's five): no render object -- silent, both
-python3 "$HERE/jx_product_gate.py" --rates 8000,11025,16000,22050,32000,37800,47999,50000,64000,96001,176400,352800,384000 \
+# THE JUNO-60's OTHER HOST RATES (rate_sweep_gate.py's 18). The render object's table (src/conv_tables.h) holds nine
+# host rates: 11025 22050 44100 48000 88200 96000 176400 192000 384000. Outside it, and at 11025 / 22050 (kind-2
+# entries; EXECUTED 2026-10-11: the plugin's process() is silent 3 s after a key), silent -- both:
+python3 "$HERE/jx_product_gate.py" --rates 8000,11025,16000,22050,32000,37800,47999,50000,64000,96001,352800 \
         --patches 0 --on 0.55 --secs 1.0 --expect-silent
+# ... and at 176400 / 384000 the plugin sounds (EXECUTED): every sample equal
+python3 "$HERE/jx_product_gate.py" --rates 176400,384000 --patches 0 --on 0.55 --secs 1.0
 # EVERY FACTORY PATCH through process() (the JUNO-60's bank_product_gate), each with TEMPO SYNC engaged and
 # released under the held note at a host tempo (script_ab's A5)
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0-63 --on 0.55 --off 1.4 --secs 1.6 \

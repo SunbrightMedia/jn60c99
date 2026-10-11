@@ -505,7 +505,8 @@ in no row. Re-mapped: 55 classes; each owed one closed by an option of a gate th
   juno_gui_set_active: the automatic setting re-reads the engine's rate, the render object is looked up again,
   found: its buffers, the tick phase and the note count start again, then the all-sound-off record), --state
   sID=V (the voice count 4, 8, 3, 2 while notes sound), --vel (the wrapper's velocity rules: 0 a note-off at 64,
-  the edges, channels 1 and 10), the JUNO-60's 18 host rates (the render object's five play, 13 are silent), and
+  the edges, channels 1 and 10), the JUNO-60's 18 host rates (seven play: the table's 44100 48000 88200 96000 176400 192000
+  384000; 11 are silent on both sides: outside the table, and its kind-2 11025 / 22050 -- EXECUTED), and
   every factory patch with TEMPO SYNC (0x60006A) engaged and released under a held note at a host tempo.
 - jx_master_bisect.py (every unit and control object per chunk): --script (seeded polyphony, up to 10 keys over six
   voices, the state right after each chunk's events too), --modes (the 19 voice-mode values no factory patch holds,
