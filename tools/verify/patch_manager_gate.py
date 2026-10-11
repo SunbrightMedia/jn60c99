@@ -51,6 +51,16 @@ BANKBTN = (64, 60, 78, 94)                     # its button: buttonPosition 3,3,
 FULL_EVERY = 10                                # every history state's records: every 10th command and the last
 REF_FORMAT = 2                                 # the reference pickle's form (2: model calls and window values)
 WIN_IDS = (0x0FFFC002, 0x0FFFC004, 0x0FFFC005, 0x0FFFC006)   # panelPatch, patchManager, patchListMain, -Sub
+# ANOTHER PLUGIN (jx3p/tools/jx_patch_manager_gate.py: the JX-3P, the same manager code) sets these after importing
+# this module; the defaults are the JUNO-60's
+PM_EMU = None                                  # the plugin side's emulator module (None: patch_manager_emu)
+BAD_HDR = b'KoaBankFile00003PG-JU60'           # a bank file's header (the product tag)
+FACTORY_PATH = None                            # the factory bank (None: truth.BANK)
+REF_TAG = ''                                   # the reference pickles' name prefix
+GATE_SCRIPT = None                             # the script the workers run (None: this one)
+PORT_LIB = None                                # (tooth) -> the port's library path (None: libjuno.so, or the tooth's)
+PORT_INIT = None                               # (L) -> the context, the port booted as the plugin boots
+TOOTH_BUILD = None                             # (tooth) -> builds the tooth's library (None: libjuno's sources)
 
 
 def norm(p):
@@ -58,7 +68,7 @@ def norm(p):
 
 
 def factory():
-    return open(truth.BANK, 'rb').read()
+    return open(FACTORY_PATH or truth.BANK, 'rb').read()
 
 
 def variant(bank, rnd, name=None):
@@ -82,7 +92,7 @@ def setup(seed):
     if seed % 3 == 0:
         files.append((PATCH + '\\Preset A.bin', variant(bank, rnd)))
         files.append((OLD + '\\Old B.bin', variant(bank, rnd)))
-    files.append((DATA + '\\Bad.bin', b'KoaBankFile00003PG-JU60' + b'\0' * 100))
+    files.append((DATA + '\\Bad.bin', BAD_HDR + b'\0' * 100))
     files.append((DESK + '\\Imp One.bin', variant(bank, rnd)))
     files.append((DESK + '\\Imp Two.bin', variant(bank, rnd, b'NamedInFile')))
     files.append((DESK + '\\Broken.bin', b'not a bank'))
@@ -115,7 +125,8 @@ def script(seed, steps):
         elif r < 0.68:
             fn, a = rnd.choice(FUNCS)
             ops.append(('func', fn, a, ans))
-        elif r < 0.71:                                # the bank name control: a click or a double click
+        elif r < 0.71 and BANKBTN is not None:        # the bank name control: a click or a double click (its
+                                                      # button's frame comes from the art: None, no art)
             x0, y0, x1, y1 = BANKNAME
             a = (rnd.randrange(x0 - 10, x1 + 10), rnd.randrange(y0 - 5, y1 + 5))
             kind = rnd.choice(['click', 'click', 'dbl'])
@@ -143,7 +154,10 @@ def script(seed, steps):
 
 # ------------------------------------------------------------------ the plugin (worker)
 def run_plugin(seed, steps, out):
-    import patch_manager_emu as M
+    if PM_EMU is not None:                    # another plugin's (its loader set it)
+        M = PM_EMU
+    else:
+        import patch_manager_emu as M
     P = M.PlugPM(files=setup(seed))
     h = P.h
     pids = sorted(P.recobj)
@@ -191,10 +205,8 @@ def run_port(pkl, tooth=None):
     if ref.get('fmt') != REF_FORMAT:
         raise SystemExit('%s: an old reference form; delete it to rebuild' % pkl)
     seed, steps, pids = ref['seed'], ref['steps'], ref['pids']
-    L = C.CDLL(os.path.join(REPO, 'scratchpad', 'libjuno_pmtooth_%s.so' % tooth) if tooth else os.path.join(REPO, 'libjuno.so'))
-    L.juno_gui_create.restype = C.c_void_p
-    L.juno_gui_create.argtypes = [C.c_float, C.c_int]
-    L.juno_gui_plugin_init.argtypes = [C.c_void_p]
+    L = C.CDLL(PORT_LIB(tooth) if PORT_LIB else
+               os.path.join(REPO, 'scratchpad', 'libjuno_pmtooth_%s.so' % tooth) if tooth else os.path.join(REPO, 'libjuno.so'))
     L.juno_gui_record.argtypes = [C.c_void_p, C.c_void_p, C.c_int]
     L.juno_gui_model_set.argtypes = [C.c_void_p, C.c_uint32, C.c_int32]
     L.juno_gui_model_get.argtypes = [C.c_void_p, C.c_uint32]
@@ -340,8 +352,14 @@ def run_port(pkl, tooth=None):
                     ('open_files', OPENF), ('save_file', SAVEF), ('record', RECF), ('load', RECF),
                     ('model', MODELF)]
     io = IO(None, *cbs)
-    ctx = L.juno_gui_create(48000.0, 1)
-    L.juno_gui_plugin_init(ctx)
+    if PORT_INIT:
+        ctx = PORT_INIT(L)
+    else:
+        L.juno_gui_create.restype = C.c_void_p
+        L.juno_gui_create.argtypes = [C.c_float, C.c_int]
+        L.juno_gui_plugin_init.argtypes = [C.c_void_p]
+        ctx = L.juno_gui_create(48000.0, 1)
+        L.juno_gui_plugin_init(ctx)
     g = lambda s: s.replace('\\', '/').encode('latin1')
     pm = L.juno_pm_create(ctx, C.byref(io), g(DATA), g(PATCH), g(OLD), g(SCRIPT))
     L.juno_pm_attach(pm)
@@ -376,7 +394,8 @@ def run_port(pkl, tooth=None):
                 out_[k] = hashlib.sha1(v).hexdigest()[:16]
         return out_
     RECT = (C.c_int * 4)(*LIST)
-    BRECT, BBTN = (C.c_int * 4)(*BANKNAME), (C.c_int * 4)(*BANKBTN)
+    BRECT = (C.c_int * 4)(*BANKNAME)
+    BBTN = (C.c_int * 4)(*BANKBTN) if BANKBTN else None     # (no bank name presses without it: script())
     rows = ref['res']
     close = C.c_int()
 
@@ -518,15 +537,19 @@ def main():
             print('  FAIL ' + s)
         print('PORT %d %d' % (nfail, n))
         return 0
-    pkl = a.ref or os.path.join(REPO, 'scratchpad', 'patch_manager_ref%d_%d_%d.pkl' % (REF_FORMAT, a.seed, a.steps))
+    me = GATE_SCRIPT or __file__
+    pkl = a.ref or os.path.join(REPO, 'scratchpad', '%spatch_manager_ref%d_%d_%d.pkl' % (REF_TAG, REF_FORMAT, a.seed, a.steps))
     if not a.ref and not os.path.exists(pkl):
         os.makedirs(os.path.dirname(pkl), exist_ok=True)
-        r = subprocess.run([sys.executable, __file__, '--plugin', pkl + '.partial', '--seed', str(a.seed), '--steps', str(a.steps)])
+        r = subprocess.run([sys.executable, me, '--plugin', pkl + '.partial', '--seed', str(a.seed), '--steps', str(a.steps)])
         if r.returncode:
             raise SystemExit('the plugin side failed')
         os.replace(pkl + '.partial', pkl)
-    cmd = [sys.executable, __file__, '--port', pkl]
-    if a.tooth:
+    cmd = [sys.executable, me, '--port', pkl]
+    if a.tooth and TOOTH_BUILD:
+        TOOTH_BUILD(a.tooth)
+        cmd += ['--tooth', a.tooth]
+    elif a.tooth:
         lib = os.path.join(REPO, 'scratchpad', 'libjuno_pmtooth_%s.so' % a.tooth)
         srcs = subprocess.run(['make', '-s', '-C', REPO, '--no-print-directory', 'print-libjuno-srcs'],
                               capture_output=True, text=True).stdout.split()

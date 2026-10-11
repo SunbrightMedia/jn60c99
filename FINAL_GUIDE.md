@@ -16,7 +16,7 @@ Tracks B and D below were written for two chips. Read them this way from now on:
 - D: RETIRED by the one-board rule (2026-09-23).
 - B: REOPENED for ONE board — no one-board JUNO engine chosen yet (budget facts in docs/ONE_BOARD_BUDGET.md).
 - C: esp32s3/ playable (console, patch step, MIDI UART); the Pi PLAY image is built, not yet on silicon.
-- E: JX-3P every scope row closed and the mutation reach 11/11 killed (jx3p/docs/SCOPE_AUDIT.md, S3_STATUS (12)); its full verify on the newest commit owed; no JX panel (no JX art); JUPITER-8 at step 5-6 (lift gates on drive2, template exported); TB-303 intake only.
+- E: JX-3P every scope row closed but the drawn panel (no JX art): engine, host layer, the editor's logic (zoom, meters, CC menu model, patch window), mutation reach 11/11 (jx3p/docs/SCOPE_AUDIT.md, S3_STATUS (13)); its full verify on the newest commit owed; JUPITER-8 at step 5-6 (lift gates on drive2, template exported); TB-303 intake only.
 
 ## How to report status (rules for every future session)
 

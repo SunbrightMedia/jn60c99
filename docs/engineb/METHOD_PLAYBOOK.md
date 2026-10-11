@@ -3651,3 +3651,15 @@ chains first and refuses when they are RED.
 A tooth's RED counts only against a GREEN run of the same chains, in the same run. Before reporting "bites",
 run the clean gate on exactly the tooth's chains; a new comparison is checked on every chain, never on the one
 it was written for.
+
+## 211. A SHARED ORACLE TAKES A PROFILE ONLY WHEN NO LITERAL ADDRESS IS LEFT IN IT
+Paid 2026-10-11 (JX-3P, JX-24: the JUNO-60's patch-manager oracle given a JX profile).
+The module's named constants were moved to the profile; one literal stayed inside a method (the model's set,
+`IB + 0x283DB0`). In the JX image that address is the middle of another function: the emulator ran it for 25
+minutes, then stopped on an unmapped access. Had the garbage returned, a gate could have graded a wrong call.
+The second profile edit (a sprite-size table set to {} in place of "none") failed the plugin's initialize.
+### The rule
+Before a module runs another plugin, grep it for EVERY `IB + 0x...` and every literal rva, docstrings aside, and
+route each through the profile; a profile's "none" is None, never an empty table. Then run the FIRST plugin's
+gate again with a fresh reference: its plugin side must run through the changed module (the JUNO's patch
+manager gate, a new 60-command reference: GREEN).

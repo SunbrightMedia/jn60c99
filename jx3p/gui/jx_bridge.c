@@ -934,6 +934,8 @@ static void drv_pend(int kind, int off, int st, int a, int b)
  * src/juno_midi.c, CLAIMS A31 / A32) on the JX's tables: jx3p/src/jx_state_tables.h (EXECUTED through the
  * plugin's own getState / setState, jx_state_census.py) and jx_midi_tables.h ---- */
 #include "../src/jx_state_tables.h"
+#include "../src/jx_patch_tables.h"   /* the patch tree's leaves (JX-16; the record image, JX-24) */
+#include "../src/jx_record_tables.h"
 #ifndef JX_KS_TOOTH      /* MUTANT (jx_state_gate.py --mutants): 1 KEY HOLD at 0 releases nothing */
 #define JX_KS_TOOTH 0
 #endif
@@ -941,6 +943,45 @@ static void drv_pend(int kind, int off, int st, int a, int b)
 #define JX_STATE_TOOTH 0 /* 3 the store unmasked -- each must make the gate RED */
 #endif
 static int32_t g_store[JX_STATE_N];                 /* the model's value of each state parameter */
+/* ---- THE MODEL'S RECORD IMAGE (JX-24): what the plugin's serializer (rva 0x335870 = the JUNO-60's 0x335990, fw_map
+ * --pair) writes -- the bytes the patch window stores when it writes a patch. At boot the plugin's own image
+ * (jx_record_tables.h, generated from the booted plugin); a patch load keeps the record's bytes as given (any
+ * bytes, EXECUTED); the set of a state entry that is a leaf of the patch tree writes the leaf in the load's
+ * encoding inverted -- INT1X7 the low byte, INT2X4 two nibbles, INT4X4 four, INT8X4 eight, the high one first; the
+ * host settings write no byte (jx_record_census.py: 738 sets, 1,258 bytes). Graded: jx_record_gate.py. ---- */
+#ifndef JX_PREC_TOOTH    /* TEETH (jx_record_gate.py --tooth): 1 a two-nibble leaf's nibbles swapped, 2 a load keeps
+                          * the image (not the record's bytes) */
+#define JX_PREC_TOOTH 0
+#endif
+static uint8_t g_prec[JX_REC_BODY];
+static void jx_prec_put(int k)
+{
+    uint32_t id = JX_STATE_ENT[k].id, v = (uint32_t)g_store[k];
+    int e, i, n;
+    uint8_t *r;
+    for (e = 0; e < JX_PATCH_EV_N; ++e)
+        if (JX_PATCH_EV[e].id == id && JX_PATCH_EV[e].dec != JX_DEC_CONST) break;
+    if (e == JX_PATCH_EV_N) return;
+    r = g_prec + (JX_PATCH_EV[e].roff - 16);
+    switch (JX_PATCH_EV[e].dec) {
+    case JX_DEC_INT1X7: r[0] = (uint8_t)v; return;
+#if JX_PREC_TOOTH == 1
+    case JX_DEC_INT2X4: r[1] = (uint8_t)((v >> 4) & 15); r[0] = (uint8_t)(v & 15); return;
+#else
+    case JX_DEC_INT2X4: r[0] = (uint8_t)((v >> 4) & 15); r[1] = (uint8_t)(v & 15); return;
+#endif
+    case JX_DEC_INT8X4: n = 8; break;
+    default:            n = 4; break;
+    }
+    for (i = 0; i < n; ++i) r[i] = (uint8_t)((v >> (4 * (n - 1 - i))) & 15);
+}
+/* the model's record image (the serializer's bytes): `cap` >= JX_REC_BODY; returns its size */
+int jx3p_record(unsigned char *out, int cap)
+{
+    if (!out || cap < (int)JX_REC_BODY) return 0;
+    memcpy(out, g_prec, JX_REC_BODY);
+    return (int)JX_REC_BODY;
+}
 /* the CC map (core+24): the record CC n drives (an entry of JX_MIDI_PARAM, -1 none), each record's own CC, the
  * record a MIDI learn waits for (-1 none) */
 static struct { int8_t map[128]; int8_t rec[JX_MIDI_PARAM_N]; int learn; } g_cc;
@@ -955,6 +996,7 @@ static void jx_state_boot(void)
     jx_ks_boot();
     g_nedit = 0;
     for (int k = 0; k < JX_STATE_N; ++k) g_store[k] = JX_STATE_ENT[k].dflt;
+    memcpy(g_prec, JX_DEFAULT_REC, JX_REC_BODY);     /* the boot image: the defaults' leaves and the rest */
     jx_cc_clear();
     for (int cc = 0; cc < 128; ++cc)
         if (JX_CC_MAP[cc] >= 0) { g_cc.map[cc] = (int8_t)JX_CC_MAP[cc]; g_cc.rec[JX_CC_MAP[cc]] = (int8_t)cc; }
@@ -1023,11 +1065,12 @@ static void jx_store_put(int k, int32_t v)
 {
     uint32_t id = JX_STATE_ENT[k].id;
     g_store[k] = v;
+    jx_prec_put(k);
     if (id == 0x0FFFC015u) jx_setting_listener(v);       /* vm.vs.sampleRate: the core's listener, at once */
     if (JX_STATE_TOOTH != 1 && (id == 0x00600004u || id == 0x0060003Au)) {
         float h = (float)v * (1.0f / 255.0f);
         int kh = jx_state_index(id == 0x00600004u ? 0x00A00000u : 0x00A02802u);
-        if (kh >= 0) memcpy(&g_store[kh], &h, 4);
+        if (kh >= 0) { memcpy(&g_store[kh], &h, 4); jx_prec_put(kh); }
     }
 }
 /* ---- THE UI TIMER'S QUEUE AND THE KEYBOARD'S NOTE VALUE (JX-17b): the JUNO-60's code (CLAIMS A32 / A36,
@@ -1510,7 +1553,6 @@ int jx3p_product_pending(int *out, int cap)
  * load (rva 0x335730 = the JUNO-60's 0x335850, fw_map) as jx3p/src/jx_patch_tables.h states it (EXECUTED through
  * the plugin's load: jx_patch_census.py, the factory records and crafted ones; jx_patch_gate.py grades seeded
  * records of random bytes and the factory bank, record for record, the store and the audio after each) ---- */
-#include "../src/jx_patch_tables.h"
 #ifndef JX_PATCH_TOOTH   /* MUTANT (jx_patch_gate.py --tooth): 1 a two-nibble field's high nibble masked to 3 bits */
 #define JX_PATCH_TOOTH 0
 #endif
@@ -1554,6 +1596,9 @@ int jx3p_product_load_record(const unsigned char *rec, int len)
         drv_pend(2, 0, 0, (int)id, v);
         if (sk >= 0 && JX_STATE_EDIT_HOST[sk]) jx_edit_push(id, v, 1);
     }
+#if JX_PREC_TOOTH != 2
+    memcpy(g_prec, rec + 16, JX_REC_BODY);       /* the model keeps the record's bytes as given */
+#endif
     return JX_PATCH_EV_N;
 }
 /* the number of records in the bank file jx3p_init / jx3p_product_init read (the factory bank, or a user's bank of

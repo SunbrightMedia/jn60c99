@@ -3,6 +3,25 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-11 (13) — THE EDITOR'S OWN LOGIC (JX-22 .. JX-25), THE LOADS' HOST EDITS; ONE ROW OPEN: THE DRAWN PANEL
+
+The scope table had no rows for the editor's own logic -- the JUNO-60 port has it (CLAIMS A37-A40) and the JX's is
+the same machine code (fw_map --pair), its Script.xml in truth/. Rows 16-20 were added (HOST_LAYER.md 3n2-3r):
+- WINDOW ZOOM (row 16): the getter and fit with the JX editor attached under the oracle; 16 screens, 3,392 fits.
+- LEVEL METERS (row 17): the engine's peaks are the JX's own loop (both channels maxss(held, peak), not the
+  JUNO's order), ported in the gain stage; 13,052 ticks, 1,200 render tails, 560 reads in the running plugin.
+- CC MENU (row 18): its model -- the record of a control, the "#n" (-1 while a learn waits) -- every step of 7
+  chains; the press's search needs the art's rectangles (row 20).
+- PATCH WINDOW (row 19): the record image (the serializer: 751 steps, every byte) and the patch manager itself --
+  gui/juno_pm.c on the JX bridge, the JUNO's gate on the JX plugin's own manager: 8 seeds (up to 281 commands,
+  the 64-state history) EQUAL, 17 of 19 teeth bite (18, 19: the bank name control's presses, the art's).
+Found on the way (playbook 210): a patch load and a setState also call performEdit for each host parameter they
+set; the port made none; the JX-18 comparison had been checked on one chain and its mutants ran on chains already
+RED. Ported and graded (692 + 6,081 host edits); the mutant mode now refuses RED clean chains. Playbook 209 (the
+image's moment changed, the drive gate's re-make did not) and 211 (a shared oracle's last literal address).
+OPEN: row 20, the drawn panel -- the JX art (Script/*.png) is not in truth/. The full verify of the final commit
+is the next step (the run on 0dc75b56 was stopped: GATES 0-3 GREEN, NOTE in its job folder).
+
 ## 2026-10-10 (12) — ANY BANK, THE EDITOR'S PATH, THE MUTATION REACH (JX-16, JX-18, JX-19): EVERY SCOPE ROW CLOSED
 
 The PATCH BROWSER decodes any record of the plugin's bank format as the plugin does (HOST_LAYER.md 3m:

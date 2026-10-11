@@ -262,8 +262,11 @@ mine is a hypothesis (playbook 80).
   state, UI timer, KEY HOLD and MIDI learn (jx_state_tables.h), the patch
   browser on ANY bank (jx_patch_tables.h, random records graded; the web page
   loads bank files), the editor's set and the host's round trip
-  (performEdit) -- every SCOPE_AUDIT row closed but the visible panel (no JX
-  art in truth/). Full verify-jx3p owed on the newest commit.
+  (performEdit; a load's performEdits too, playbook 210), and the editor's own
+  logic (2026-10-11, S3_STATUS (13)): zoom, meters, the CC menu's model, the
+  record image, the patch window (gui/juno_pm.c on the JX bridge) -- every
+  SCOPE_AUDIT row closed but row 20, the drawn panel (no JX art in truth/).
+  Full verify-jx3p owed on the newest commit.
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code

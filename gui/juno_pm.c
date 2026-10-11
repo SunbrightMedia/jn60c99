@@ -562,6 +562,11 @@ int juno_pm_select(juno_pm *pm, int idx)                  /* rva 0x334E90: no cl
 /* ------------------------------------------------------------------ bank files */
 static const char KOA[16] = { 'K','o','a','B','a','n','k','F','i','l','e','0','0','0','0','3' };
 #define FILE_BYTES (16 + 7 + JPM_NPATCH * (16 + JPM_BODY))
+/* the product tag after it: the JUNO-60's; the JX-3P's build (jx3p/gui/jx_pm_glue.c, the same machine code:
+ * jx3p/docs/HOST_LAYER.md 3r) gives "PG-JX3P" */
+#ifndef JPM_PRODUCT
+#define JPM_PRODUCT "PG-JU60"
+#endif
 
 static unsigned char *bank_image(const pm_state *s)        /* rva 0x336A80 / 0x336830 */
 {
@@ -569,7 +574,7 @@ static unsigned char *bank_image(const pm_state *s)        /* rva 0x336A80 / 0x3
     int k;
     if (!f) return NULL;
     memcpy(f, KOA, 16);
-    memcpy(f + 16, "PG-JU60", 7);
+    memcpy(f + 16, JPM_PRODUCT, 7);
     for (k = 0, p = f + 23; k < JPM_NPATCH; ++k, p += 16 + JPM_BODY) {
         char nm[17];
         rec_name(s->rec[k]->b, nm);
@@ -598,11 +603,11 @@ static int write_bank_file(juno_pm *pm, const pm_state *s, const char *path)
     free(img);
     return ok;
 }
-/* a bank file's records (rva 0x331530): KoaBankFile00003, the product PG-JU60, 64 records */
+/* a bank file's records (rva 0x331530): KoaBankFile00003, the product (PG-JU60), 64 records */
 static int read_bank_file(const unsigned char *f, long len, pm_state *s)
 {
     int k;
-    if (len < FILE_BYTES || memcmp(f, KOA, 16) || memcmp(f + 16, "PG-JU60", 7)) return 0;
+    if (len < FILE_BYTES || memcmp(f, KOA, 16) || memcmp(f + 16, JPM_PRODUCT, 7)) return 0;
     for (k = 0; k < JPM_NPATCH; ++k) {
         const unsigned char *e = f + 23 + (long)k * (16 + JPM_BODY);
         pm_rec *r = rec_new(e + 16);

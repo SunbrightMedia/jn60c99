@@ -224,7 +224,7 @@ python3 "$HERE/jx_state_gate.py" --mutants
 # the patch browser's load of any record (the factory bank, random bytes, a bank file): records, saves, samples
 python3 "$HERE/jx_patch_gate.py"
 python3 "$HERE/jx_patch_gate.py" --tooth --chains 0,1
-echo "=== JX GATE 3h: THE EDITOR'S LOGIC (the window zoom, the level meters: JX-25, JX-22) ==="
+echo "=== JX GATE 3h: THE EDITOR'S LOGIC (zoom, meters, the record image, the patch window: JX-22, JX-24, JX-25) ==="
 # the plugin's editor attached under the oracle (its GUI from jx3p/truth/Script.xml, blank images): every fit its
 # windows' getter computes on 16 screens, both zooms and the engine records after every step
 python3 "$HERE/jx_zoom_fit_gate.py" --ref
@@ -234,6 +234,25 @@ python3 "$HERE/jx_zoom_fit_gate.py" --port-tooth
 # meters read in the running plugin through process()
 python3 "$HERE/jx_meter_gate.py"
 python3 "$HERE/jx_meter_gate.py" --tooth --reuse
+# the model's record image (JX-24): the plugin's serializer after the boot, 738 sets, loads and setStates; the
+# committed boot image equal to the one the plugin makes now; the port's image after every step
+python3 "$HERE/jx_record_census.py" >/dev/null
+python3 "$HERE/jx_gen_record_tables.py" --check
+python3 "$HERE/jx_record_gate.py"
+python3 "$HERE/jx_record_gate.py" --tooth
+# the patch window (JX-24): the JUNO-60's patch manager gate on the JX plugin's own manager (jx_pm_emu.py) and the
+# port (gui/juno_pm.c on the JX bridge); its teeth are the JUNO's PM_TOOTH set
+rm -f "$REPO"/scratchpad/jx_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
+for sp in 9:40 1:200 5:200 100:150; do
+  python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:} | grep -v '^REACH'
+done
+# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
+# presses (its button is the art's: SCOPE_AUDIT row 20) and cannot bite here
+for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
+          14:9:40 15:9:40 16:1:200 17:9:40; do
+  t=${ts%%:*}; r=${ts#*:}
+  python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t | tail -1
+done
 echo "=== JX GATE 3g: THE MUTATION REACH (docs/PORT_COMPLETENESS_CHARTER.md section 4) ==="
 # one plausible slip per part of the port, in lines that run (gcov), the library rebuilt, one fast gate on the
 # mutated tree: every mutation must be KILLED. It edits the tree it runs in (one file at a time, restored):

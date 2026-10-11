@@ -23,9 +23,12 @@ sets are its own: the bridge's load, graded by the bank gates).
 """
 import os, sys, struct, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import host_process_emu as H                                  # noqa: E402
-import wrapper_emu as W                                       # noqa: E402
-import truth                                                  # noqa: E402
+PP = globals().get('PM_PROFILE')     # another plugin's (jx3p/tools/jx_pm_emu.py: the JX-3P, the same machine code
+if PP:                               # at its own addresses); None: the JUNO-60
+    H, W = PP['H'], PP['W']
+else:
+    import host_process_emu as H                              # noqa: E402
+    import wrapper_emu as W                                   # noqa: E402
 from pm_common import pick, ntfs_key                          # noqa: E402
 from unicorn import UC_HOOK_CODE                              # noqa: E402
 from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8,  # noqa: E402
@@ -33,26 +36,33 @@ from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, U
 import numpy as np                                            # noqa: E402
 
 IB = H.IB
-HEAP = (0x310000000, 0x312000000)
-LIST_VT, BANKNAME_VT, MENU_OVERRIDE = 0x968D00, 0x968FE8, 0xCB21F8
-KEY_ACTION, MOUSE, MP_FN, MPB_FN = 0x3278C0, 0x327D70, 0x322E60, 0x323FD0
-TEXTEDIT, MESSAGE, PM_GET, SAVE_ALL, TICK = 0x2AD500, 0x292810, 0x330D10, 0x336FD0, 0x32F280
-FORMAT_G, BANK_MOUSE = 0xC43B50, 0x33F0A0
-SET, NOTIFY, COMMIT, RLOAD = 0x283DB0, 0x2853C0, 0x283120, 0x335850
+_a = lambda k, d: PP[k] if PP and k in PP else d
+HEAP = _a('HEAP', (0x310000000, 0x312000000))
+LIST_VT, BANKNAME_VT, MENU_OVERRIDE = _a('LIST_VT', 0x968D00), _a('BANKNAME_VT', 0x968FE8), _a('MENU_OVERRIDE', 0xCB21F8)
+KEY_ACTION, MOUSE, MP_FN, MPB_FN = _a('KEY_ACTION', 0x3278C0), _a('MOUSE', 0x327D70), _a('MP_FN', 0x322E60), _a('MPB_FN', 0x323FD0)
+TEXTEDIT, MESSAGE, PM_GET = _a('TEXTEDIT', 0x2AD500), _a('MESSAGE', 0x292810), _a('PM_GET', 0x330D10)
+SAVE_ALL, TICK = _a('SAVE_ALL', 0x336FD0), _a('TICK', 0x32F280)
+FORMAT_G, BANK_MOUSE = _a('FORMAT_G', 0xC43B50), _a('BANK_MOUSE', 0x33F0A0)
+SET, NOTIFY, COMMIT, RLOAD = _a('SET', 0x283DB0), _a('NOTIFY', 0x2853C0), _a('COMMIT', 0x283120), _a('RLOAD', 0x335850)
+REG_LIST, REG_BANK, REC_ID, VALUES = _a('REG_LIST', 0x3308C0), _a('REG_BANK', 0x3308B0), _a('REC_ID', 0x319C50), _a('VALUES', 0x34E170)
+TRIO, BANK_REFRESH, SERIALIZE = _a('TRIO', (0x285320, 0x2853C0, 0x283120)), _a('BANK_REFRESH', 0x33F530), _a('SERIALIZE', 0x335990)
 # the window's code: the buttons' functions and tails, the list's close, key and mouse handlers, the
 # manager (push .. the bank name control's commit); the record load and the serializer excluded
-CODE = ((0x322E60, 0x324900), (0x3262C0, 0x326330), (0x3278C0, 0x328550), (0x32C000, 0x335850),
-        (0x335990, 0x33F600))
+CODE = _a('CODE', ((0x322E60, 0x324900), (0x3262C0, 0x326330), (0x3278C0, 0x328550), (0x32C000, 0x335850),
+                   (0x335990, 0x33F600)))
 VS_IDS = {0x0FFFC002: 'panel', 0x0FFFC004: 'manager', 0x0FFFC005: 'main', 0x0FFFC006: 'sub'}
 GENERIC_WRITE = 0x40000000
 PATCH_DIR = W.MODPATH.rsplit('\\', 1)[0] + '\\Patch'
 SCRIPT_DIR = W.SCRIPT_DIR
-DATA_DIR, OLD_DIR = W.DATA_DIR, 'C:\\ProgramData\\Roland\\JUNO-60'
+DATA_DIR, OLD_DIR = W.DATA_DIR, _a('OLD_DIR', 'C:\\ProgramData\\Roland\\JUNO-60')
 CLSID_OPEN = bytes.fromhex('9c5a1cdc8ae8de4da5a160f82a20aef7')   # {DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}
 CLSID_SAVE = bytes.fromhex('f3e2b4c021ba73478dba335ec946eb8b')   # {C0B4E2F3-BA21-4773-8DBA-335EC946EB8B}
 
 
 def png_sizes():
+    if PP:                                       # another plugin: its sprite sheets' sizes when its art is given;
+        return PP.get('PNG')                     # None: the wrapper's own blank geometry from its Script.xml
+    import truth
     d = os.path.join(truth.TRUTH_DIR, 'Script')
     out = {}
     for f in os.listdir(d):
@@ -66,7 +76,7 @@ def norm(path):
     return W._norm(path).lower()
 
 
-class PMHost(H.HostProcess):
+class PMHost(_a('HOST', H.HostProcess)):
     """the booted plugin with a writable file system and scripted dialogs"""
     def __init__(self):
         super().__init__()
@@ -220,18 +230,21 @@ class PlugPM:
     """the plugin's manager, its list control registered, the dialogs scripted"""
     def __init__(self, files=(), rate=48000.0):
         h = self.h = PMHost()
-        h.skin = png_sizes()
+        sz = png_sizes()
+        if sz is not None:
+            h.skin = sz
         for path, data in files:
             h.put(path, data)
         h.start(rate, 4096)
         uc = self.uc = h.uc
         self.pm = h.call(IB + PM_GET)
-        blob = np.frombuffer(bytes(uc.mem_read(HEAP[0], HEAP[1] - HEAP[0])), dtype=np.uint64)
+        top = min(HEAP[1], (getattr(h, 'heap', HEAP[1]) + 7) & ~7) if PP else HEAP[1]
+        blob = np.frombuffer(bytes(uc.mem_read(HEAP[0], top - HEAP[0])), dtype=np.uint64)
         self.lst = HEAP[0] + 8 * int(np.nonzero(blob == np.uint64(IB + LIST_VT))[0][0])
         self.bnc = HEAP[0] + 8 * int(np.nonzero(blob == np.uint64(IB + BANKNAME_VT))[0][0])
         self.view = self.q(self.lst + 0x10)
-        h.call(IB + 0x3308C0, rcx=self.pm, rdx=self.lst, r8=0, r9=0, count=500_000_000)
-        h.call(IB + 0x3308B0, rcx=self.pm, rdx=self.bnc, r8=0, count=500_000_000)
+        h.call(IB + REG_LIST, rcx=self.pm, rdx=self.lst, r8=0, r9=0, count=500_000_000)
+        h.call(IB + REG_BANK, rcx=self.pm, rdx=self.bnc, r8=0, count=500_000_000)
         svc, svt, stub = h.alloc_com(0x40), h.alloc_com(0x100), h.alloc_com(0x10)
         uc.mem_write(stub, b'\xC3'); uc.mem_write(svc, struct.pack('<Q', svt)); uc.mem_write(svt, struct.pack('<Q', stub) * 32)
         uc.mem_write(IB + MENU_OVERRIDE, struct.pack('<Q', svc))
@@ -245,10 +258,10 @@ class PlugPM:
         vb, ve = self.q(h.core + 24), self.q(h.core + 32)
         self.recobj = {}
         for k in range((ve - vb) // 24):
-            self.recobj[h.call(IB + 0x319C50, rcx=h.core + 24, rdx=k) & 0xFFFFFFFF] = self.q(vb + 24 * k)
+            self.recobj[h.call(IB + REC_ID, rcx=h.core + 24, rdx=k) & 0xFFFFFFFF] = self.q(vb + 24 * k)
         self.model = self.q(self.q(h.core + 8))
         # the view's value objects (model+0x80, rva 0x34E170) and the vs record they point into
-        vo = h.call(IB + 0x34E170, rcx=self.model)
+        vo = h.call(IB + VALUES, rcx=self.model)
         slot = lambda k: h.call(self.q(self.q(vo) + k), rcx=vo)
         self.vobj = {0x0FFFC010: slot(0x50), 0x0FFFC014: slot(0x58), 0x0FFFC004: slot(0x60),
                      0x0FFFC005: slot(0x68), 0x0FFFC006: slot(0x70)}
@@ -313,7 +326,7 @@ class PlugPM:
         if self.value(0x0FFFC002):
             return 0
         self.h.call(IB + SET, rcx=self.model, rdx=self.vobj[0x0FFFC002], r8=1, r9=1)
-        for rva in (0x285320, 0x2853C0, 0x283120):
+        for rva in TRIO:
             self.h.call(IB + rva, rcx=self.model, count=500_000_000)
         return 1
 
@@ -344,7 +357,7 @@ class PlugPM:
     def refresh(self):
         """the bank name control shows the current bank's name, as the live editor keeps it: the
         control's own update (vt+0xB0, rva 0x33F530); the template never draws"""
-        self.h.call(IB + 0x33F530, rcx=self.bnc, count=500_000_000)
+        self.h.call(IB + BANK_REFRESH, rcx=self.bnc, count=500_000_000)
 
     def key(self, code, flags):
         self.refresh()
@@ -368,7 +381,7 @@ class PlugPM:
         self.h.call(IB + fn, rcx=self.strs[3], rdx=out, r8=a, r9=self.view, count=8_000_000_000)
 
     def model_set(self, pid, v):
-        self.h.call(IB + 0x283DB0, rcx=self.model, rdx=self.recobj[pid], r8=v & 0xFFFFFFFF, r9=1)
+        self.h.call(IB + SET, rcx=self.model, rdx=self.recobj[pid], r8=v & 0xFFFFFFFF, r9=1)
 
     def save_all(self): return self.h.call(IB + SAVE_ALL, rcx=self.pm, count=8_000_000_000) & 0xFF
 
@@ -377,7 +390,7 @@ class PlugPM:
     # ---- the state
     def serialize(self):
         self.uc.mem_write(self.ser_vec, b'\0' * 24)
-        self.h.call(IB + 0x335990, rcx=self.view, rdx=self.ser_vec, r8=0, r9=0, count=4_000_000_000)
+        self.h.call(IB + SERIALIZE, rcx=self.view, rdx=self.ser_vec, r8=0, r9=0, count=4_000_000_000)
         b, e = self.q(self.ser_vec), self.q(self.ser_vec + 8)
         return bytes(self.uc.mem_read(b, e - b))
 
