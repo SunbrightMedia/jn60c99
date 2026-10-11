@@ -23,6 +23,13 @@ heap after the calls (byte for byte), the stack (reported).
   --tooth RVA: lift with that one addss turned into subss (jp8_lift.py --tooth) -- the gate must FAIL.
   --tooth-skip K: the C twin does not replay entry K of the call list (calls and checkpoints alternate under
   --loads ctl: --tooth-skip 86 drops ctl call 43, the sustain's release with keys held) -- the gate must FAIL.
+  --tooth-skip w (the digest loads): the call that wrote the most pages is not replayed.
+  --loads exhaustive | fxmodes | notevel | random[K] (JX-26b, docs/GATE_PARITY.tsv): every id of the map x every
+  value 0..255 and the edges past it (float ids also 0.0 .. 1.0 by 1/256 and the IEEE edges); every effect parameter
+  and type so under each value of each effect type; every note x velocity through the note entries; 48 record sets
+  of random values in each id's declared range, wild ones among them -- a DIGEST after every call (the sha256 of
+  every heap page the call wrote, named by a write hook in the oracle) and the whole heap after each id / set.
+  The warm loads (5,34,40,62 ...) checkpoint the whole heap after every patch.
   --loads all: the 75 records of every factory patch in turn.
   --loads settings: the host settings 0x0FFFC000..0x0FFFC01F (not in the id map) at 7 values each.
   --loads modes: every factory patch with the master's effect-type cells (records 65, 67) forced to each of
@@ -81,6 +88,19 @@ REACH = (('dynreach_loads.json', ['--no-sweep']), ('dynreach_sweep.json', []),
          ('dynreach_boot44.json', ['--boot', 'boot44']), ('dynreach_boot88.json', ['--boot', 'boot88']),
          ('dynreach_boot32_b34.json', ['--base', '34', '--boot', 'boot32']), ('dynreach_boot31.json', ['--boot', 'boot31']),
          ('dynreach_bootat44.json', ['--boot', 'bootat44']))
+# JX-26b: the exhaustive loads -- every value 0..255 and the edges past it (the host entry takes 32 bits); the float
+# ids (their factory values are float bits) also every 1/256 step of 0.0 .. 1.0 and the IEEE edges
+EXH_VALUES = tuple(range(256)) + (256, 257, 1000, 4095, 65535, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF)
+EXH_FLOATS = tuple(struct.unpack('<I', struct.pack('<f', k / 256.0))[0] for k in range(1, 257)) + \
+    (0x80000000, 0x3F800001, 0x40000000, 0xBF800000, 0x7F7FFFFF, 0x7F800000, 0xFF800000, 0x7FC00000, 0x00000001,
+     0x007FFFFF, 0x00800000)
+# the effect types and parameters (jx3p/truth/Script.xml's patch tree, READ: EFX at 00 58, PAT_NAME3 at 04 00 --
+# jx_master_bisect.schema): EFFECT / DELAY / REVERB TYPE (0..5), and EFFECT LEVEL, REVERB LEVEL, DELAY LEVEL, DELAY
+# TIME, EFFECT TONE, REVERB TIME (0..255)
+FX_MODE_CELLS = (0x00600258, 0x00600268, 0x00600270)
+FX_PARAM_IDS = (0x00600058, 0x0060005A, 0x0060005C, 0x0060005E, 0x00600260, 0x00600278)
+RANDOM_SETS = 48
+DIGEST_LOADS = ('exhaustive', 'fxmodes', 'notevel')
 SCRIPTS = {'ctl': 'ctl_script', 'notes': 'notes_script', 'tick': 'tick_script',      # jx_dynreach.py's scripts
            'tempo': 'tempo_script', 'rate': 'rate_script'}
 BOOTS = ('boot', 'boot48', 'boot44', 'boot88', 'boot32', 'boot31', 'bootat44')      # jx_dynreach.py BOOT_RUNS
@@ -120,6 +140,7 @@ def oracle(ref, base, loads):
     mx = getattr(jx, '_mxcsr', 0x1F80)
     rsp = (J.STACK_BASE + J.STACK_SIZE - 0x10000) & ~0xF
     calls = []
+    psets, pset_ix = [], {}               # the digests' page sets (DIGEST_LOADS), each stored once
     recs = J.JX.records()['patches']
 
     def host(pid, val):
@@ -183,11 +204,124 @@ def oracle(ref, base, loads):
             for kind, rid, val in recs[base]:
                 if kind == 2:
                     host(rid, val)
+    elif isinstance(loads[0], str) and (loads[0] in DIGEST_LOADS or loads[0].startswith('random')):
+        # (JX-26b, docs/GATE_PARITY.tsv) the SPACE of the JUNO's exhaustive, random-state and note x velocity gates
+        # through the lifted entries: a DIGEST after every call -- the sha256 of every heap page the call wrote
+        # (a Unicorn write hook names them; the C twin hashes the same pages) -- and the whole heap's sha256 after
+        # each id / record set
+        import hashlib
+        import random
+        from unicorn import UC_HOOK_MEM_WRITE
+        sys.path.insert(0, HERE)
+        import jx_dynreach as D
+        wr = set()
+
+        def hk(uc_, access, addr, size, value, user):
+            wr.add(addr >> 12)
+            wr.add((addr + size - 1) >> 12)
+        hook = uc.hook_add(UC_HOOK_MEM_WRITE, hk, begin=J.HEAP_BASE, end=heap_end - 1)
+
+        def dcheck(tag):
+            ps = tuple(sorted(wr))
+            wr.clear()
+            if ps not in pset_ix:
+                pset_ix[ps] = len(psets)
+                psets.append(list(ps))
+            h = hashlib.sha256()
+            for pg in ps:
+                h.update(bytes(uc.mem_read(pg << 12, 4096)))
+            calls.append(dict(dcheck=h.hexdigest(), s=pset_ix[ps], id=tag))
+
+        def fullcheck(tag):
+            wr.clear()
+            calls.append(dict(check=hashlib.sha256(bytes(uc.mem_read(J.HEAP_BASE, heap_end - J.HEAP_BASE))).hexdigest(),
+                              id=tag))
+
+        def restore():
+            for kind, rid, val in recs[base]:
+                if kind == 2:
+                    host(rid, val)
+            wr.clear()
+        floats = {pid for pat in recs for kind, pid, val in pat if kind == 2 and (val & 0xFFFFFFFF) > 0xFFFF}
+        if loads[0] in ('exhaustive', 'fxmodes'):
+            if loads[0] == 'exhaustive':      # every id of the host entry's map
+                plan = [(None, pid) for pid in sorted(jx.id_map())]
+            else:                             # every effect parameter and type under each value of each effect type
+                rids = [pid for kind, pid, val in recs[base] if kind == 2]
+                if any(x not in rids for x in FX_MODE_CELLS + FX_PARAM_IDS):
+                    raise SystemExit('an effect id is not among the patch load\'s records')
+                plan = [((cell, mv), pid) for cell in FX_MODE_CELLS for mv in range(6) for pid in FX_MODE_CELLS + FX_PARAM_IDS]
+            mode_now = None
+            for mode, pid in plan:
+                if mode != mode_now:
+                    if mode is not None:
+                        host(mode[0], mode[1])
+                        fullcheck('mode 0x%x=%d' % mode)
+                    mode_now = mode
+                for v in EXH_VALUES + (EXH_FLOATS if pid in floats else ()):
+                    host(pid, v)
+                    dcheck('0x%x=%d' % (pid, v))
+                fullcheck('after id 0x%x%s' % (pid, '' if mode is None else ' (mode 0x%x=%d)' % mode))
+                restore()
+                if mode is not None:
+                    host(mode[0], mode[1])
+                    wr.clear()
+        elif loads[0] == 'notevel':
+            # every note x every velocity (0 too: the entry's own rule) through the note-on entry, its note-off after
+            for n in range(128):
+                for v in range(128):
+                    for c in (('on', n, v), ('off', n, 0)):
+                        for fn, rcx, rdx, r8, rax, x1 in D.ctl_call(jx, c):
+                            calls.append(dict(fn=fn, rcx=rcx, rdx=rdx, r8=r8, r9=0, mx=mx, rax=rax))
+                        dcheck('%s %d %d' % c)
+                if n % 16 == 15:
+                    fullcheck('after note %d' % n)
+        else:
+            # 'random' / 'randomK': record sets of the base patch's records with random values -- in the id's range
+            # (0..255; floats from 0.0 to 1.0) and, one value in seven, wild ones -- a digest after each call, the
+            # whole heap after each set
+            # the range of an id: the plugin's own declared range where its id map gives one (jx_midi_tables.h,
+            # generated from the booted plugin), else the factory bank's values (the name's character pairs ...)
+            import re
+            decl = {int(m.group(1), 16): (int(m.group(2)), int(m.group(3))) for m in re.finditer(
+                r'\{ 0x([0-9A-F]{8})u, (-?\d+), (-?\d+), -?\d+ \}',
+                open(os.path.join(REPO, 'jx3p', 'src', 'jx_midi_tables.h')).read())}
+            fac = {}
+            for pat in recs:
+                for kind, pid, val in pat:
+                    if kind == 2:
+                        lo, hi = fac.get(pid, (val, val))
+                        fac[pid] = (min(lo, val), max(hi, val))
+            seed = int(loads[0][6:] or '1')
+            r = random.Random(1009 * seed + 17)
+            for k in range(RANDOM_SETS):
+                for kind, pid, val in recs[base]:
+                    if kind != 2 or pid in (0x0FFFC01D,):
+                        continue
+                    x = r.random()
+                    lo, hi = decl.get(pid, fac.get(pid, (0, 255)))
+                    if x < 1 / 7:                                  # wild: past every range
+                        v = r.choice((256, 300, 1000, 65535, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, r.getrandbits(32)))
+                    elif pid in floats:
+                        v = struct.unpack('<I', struct.pack('<f', r.random()))[0]
+                    elif x < 0.8:                                  # in the declared range
+                        v = r.randint(lo, hi) & 0xFFFFFFFF
+                    else:                                          # anywhere in the field's width
+                        v = r.randrange(256 if hi < 256 else 0x10000)
+                    host(pid, v)
+                    dcheck('set %d 0x%x=%d' % (k, pid, v))
+                fullcheck('random set %d' % k)
+        uc.hook_del(hook)
     else:
+        # the warm chain: a whole-heap CHECKPOINT after every patch (JX-26b: the JUNO's warm_chain gate compares
+        # after every step; the last heap alone could hide a wrong middle step)
+        import hashlib
         for p in loads:
             for kind, pid, val in recs[p]:
                 if kind == 2:
                     host(pid, val)
+            calls.append(dict(check=hashlib.sha256(bytes(uc.mem_read(J.HEAP_BASE, heap_end - J.HEAP_BASE))).hexdigest(),
+                              id=p))
     if jx.heap > heap_end:
         raise SystemExit('the judged calls allocated (heap 0x%x past 0x%x): the gate assumes none' % (jx.heap, heap_end))
     w('heap_post.bin', J.HEAP_BASE, heap_end - J.HEAP_BASE)
@@ -195,7 +329,7 @@ def oracle(ref, base, loads):
     json.dump(dict(base=base, loads=loads, img_base=J.IB, img_size=J.IMGSZ, stack_base=J.STACK_BASE,
                    stack_size=J.STACK_SIZE, heap_base=J.HEAP_BASE, heap_end=heap_end, buf_base=J.BUF_BASE,
                    buf_size=J.BUF_SIZE, rsp=rsp, host=jx.HOST, state=[jx.state[u] for u in range(9)],
-                   proc=[jx.proc[u] for u in range(9)], calls=calls), open(os.path.join(ref, 'meta.json'), 'w'))
+                   proc=[jx.proc[u] for u in range(9)], calls=calls, psets=psets), open(os.path.join(ref, 'meta.json'), 'w'))
     print('oracle: base %d, %d judged calls, heap 0x%x bytes' % (base, sum(1 for c in calls if 'fn' in c),
                                                                   heap_end - J.HEAP_BASE), flush=True)
 
@@ -210,6 +344,7 @@ def ctwin(ref, so):
     lib.jp8_host.restype = ctypes.c_void_p
     m = json.load(open(os.path.join(ref, 'meta.json')))
     heap_len = m['heap_end'] - m['heap_base']
+    psets = m.get('psets', [])
     for b, n in ((0, 0x100000), (m['img_base'], m['img_size']), (m['stack_base'], m['stack_size']),
                  (m['heap_base'], heap_len), (m['buf_base'], m['buf_size'])):
         if lib.jp8_map(b, n):
@@ -222,15 +357,32 @@ def ctwin(ref, so):
     cp = ctypes.addressof(cpu)
     bad, trap = 0, None
     import hashlib
-    skip = int(os.environ.get('JX_LIFT_SKIP', '-1'))       # TOOTH (--tooth-skip K): call K not replayed
+    skip = os.environ.get('JX_LIFT_SKIP', '-1')            # TOOTH (--tooth-skip K): call K not replayed
+    if skip == 'w':                                       # ... the call whose digest names the most pages it wrote
+        cl = m['calls']                                   # (the first writing call can rewrite the bytes it found:
+        w = [(len(psets[cl[k + 1]['s']]), -k) for k in range(len(cl) - 1)     # no change, no bite -- seen on the
+             if 'fn' in cl[k] and 'dcheck' in cl[k + 1]]                       # exhaustive load, 2026-10-11)
+        skip = -max(w)[1]
+    skip = int(skip)
     for k, c in enumerate(m['calls']):
         if k == skip:
             continue
         if 'check' in c:                          # the oracle's heap hash after one id's sweep
             if hashlib.sha256(ctypes.string_at(H(m['heap_base']), heap_len)).hexdigest() != c['check']:
                 bad += 1
-                print('  CHECKPOINT %d: the heap differs after %s 0x%x' % (k, 'script step' if m['loads'][0] in SCRIPTS else
-                                                                          'the sweep of id', c['id']))
+                print('  CHECKPOINT %d: the heap differs after %s' % (k, c['id'] if isinstance(c['id'], str) else '%s 0x%x' % (
+                    'script step' if m['loads'][0] in SCRIPTS else 'patch' if m['loads'][0] not in ('sweep', 'settings', 'modes')
+                    else 'the sweep of id', c['id'])))
+                if bad >= 3:
+                    break
+            continue
+        if 'dcheck' in c:                         # the oracle's digest of the pages the last call wrote (JX-26b)
+            h = hashlib.sha256()
+            for pg in psets[c['s']]:
+                h.update(ctypes.string_at(H(pg << 12), 4096))
+            if h.hexdigest() != c['dcheck']:
+                bad += 1
+                print('  DIGEST %d: the pages written by %s differ' % (k, c['id']))
                 if bad >= 3:
                     break
             continue
@@ -267,8 +419,10 @@ def ctwin(ref, so):
     sp = open(os.path.join(ref, 'stack_post.bin'), 'rb').read()
     sm = ctypes.string_at(H(m['stack_base']), m['stack_size'])
     sd = 0 if sp == sm else sum(1 for o in range(0, m['stack_size'], 4) if sp[o:o + 4] != sm[o:o + 4])
-    print('lifted: %d calls replayed (%d checkpoints), heap %s (%d dwords differ), stack %s' % (
-        sum(1 for c in m['calls'] if 'fn' in c), sum(1 for c in m['calls'] if 'check' in c), 'EXACT' if not nd else 'DIFFERS', nd, 'EXACT' if not sd else '%d dwords differ (reported)' % sd))
+    print('lifted: %d calls replayed (%d checkpoints, %d digests), heap %s (%d dwords differ), stack %s' % (
+        sum(1 for c in m['calls'] if 'fn' in c), sum(1 for c in m['calls'] if 'check' in c),
+        sum(1 for c in m['calls'] if 'dcheck' in c), 'EXACT' if not nd else 'DIFFERS', nd,
+        'EXACT' if not sd else '%d dwords differ (reported)' % sd))
     return bad
 
 
@@ -366,7 +520,8 @@ def pages(outs):
 def main():
     a = sys.argv[1:]
     if a[:1] == ['--oracle']:
-        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings') + tuple(SCRIPTS) else [int(x) for x in a[3].split(',')])
+        oracle(a[1], int(a[2]), [a[3]] if a[3] in ('sweep', 'all', 'modes', 'settings') + DIGEST_LOADS + tuple(SCRIPTS)
+               or a[3].startswith('random') else [int(x) for x in a[3].split(',')])
         return 0
     if a[:1] == ['--c']:
         return 1 if ctwin(a[1], a[2]) else 0
@@ -461,6 +616,10 @@ def main():
         'setSampleRate on the running engine through the lifted engine entry' if loads == 'rate' else
         'a fresh instance\'s first block (%s: the rate switch, initialize\'s records, the patch load) through the '
         'lifted entries' % loads if loads in BOOTS else
+        'every id of the host entry\'s map at every value 0..255 and past it, a digest after each' if loads == 'exhaustive' else
+        'every effect parameter and type at every value under each value of each effect type' if loads == 'fxmodes' else
+        'every note x every velocity through the lifted note entries' if loads == 'notevel' else
+        'records of random values (%s) through the lifted host entry' % loads if loads.startswith('random') else
         'warm loads %s through the lifted host entry' % loads,
         'EXACTLY 0 -- every return value and heap byte' if not r.returncode else 'RED'))
     return r.returncode

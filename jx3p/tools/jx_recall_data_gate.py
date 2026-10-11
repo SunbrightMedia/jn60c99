@@ -34,7 +34,7 @@ import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SNAP_V, SNAP_M, HI_LO, HI_SZ = 0x60000, 0xAAD000, 0xA60000, 0x4D000
-SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_render.c',
+SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_voice_render.c',
         'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
 
 

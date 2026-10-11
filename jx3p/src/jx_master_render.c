@@ -14,6 +14,9 @@
 #include <string.h>
 #include <math.h>
 #include "jx_voice_helpers.h"
+#ifndef JX_NAN_TOOTH
+#define JX_NAN_TOOTH 0
+#endif
 
 /* JX_G2H: a pointer the plugin stored in its own memory, as a host address. In the port's guest memory
  * (jx3p/gui/jx_bridge.c, JX-11) the cells hold the plugin's guest addresses and the bridge sets the delta;
@@ -2588,7 +2591,11 @@ LABEL_96:
    * the port emitted NaN. (The SECOND clamp below uses `jb`, which IS taken on
    * unordered, so its `>= 0.0` transcription is already correct -- do not
    * "fix" that one.) */
+#if JX_NAN_TOOTH   /* TOOTH (jx_nan_ab.py --tooth): the decompile's compare back -- NaN skips the clamp */
+  if ( (float)(*(float *)(st + 270160) - v479) <= 0.0f )
+#else
   if ( !((float)(*(float *)(st + 270160) - v479) > 0.0f) )
+#endif
     v482 = *(float *)(st + 270176);
   v483 = *(float *)(st + 270064) * v481;
   v484 = v481 * v480;

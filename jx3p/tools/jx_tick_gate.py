@@ -55,7 +55,7 @@ import jx_guest  # noqa: E402  (the committed guest images, inflated: no Unicorn
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_render.c',
+SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_voice_render.c',
         'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
 TICK = 0x3F84A0
 SIZES = (0x7A8, 0xFF0, 0xB0)

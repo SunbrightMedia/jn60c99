@@ -17,12 +17,12 @@ fi
 echo "=== 1. the standalone C engine ==="
 cc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -shared -fPIC \
    -o "$OUT/libjx3p.so" \
-   "$REPO/jx3p/gui/jx_bridge.c" "$REPO/jx3p/src/jx_recall.c" \
+   "$REPO/jx3p/gui/jx_bridge.c" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
    "$REPO/jx3p/src/jx_master_render.c" "$REPO/jx3p/src/jx_ftz.c" -lm -lz
 cc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -shared -fPIC \
    -DJX_FULL_TOOTH=1 -o "$OUT/libjx3p_tooth.so" \
-   "$REPO/jx3p/gui/jx_bridge.c" "$REPO/jx3p/src/jx_recall.c" \
+   "$REPO/jx3p/gui/jx_bridge.c" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
    "$REPO/jx3p/src/jx_master_render.c" "$REPO/jx3p/src/jx_ftz.c" -lm -lz
 # two modes (2026-10-10): ENGINE = the plugin's own engine render (six voices, the assigner clocks,

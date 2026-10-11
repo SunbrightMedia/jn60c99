@@ -489,6 +489,36 @@ every command's banks, histories, clipboard, selection, number format, autosave 
 dialogs, file operations, files and model calls EQUAL; teeth (the JUNO's PM_TOOTH set): 17 of 19 bite (each on a
 seed that reaches it); 18 and 19 are the bank name control's presses.
 
+## 3s. The JUNO-60's gate classes on the JX (2026-10-11, JX-26; docs/GATE_PARITY.tsv)
+
+The parity ledger (every JUNO gate CLASS with its JX twin, tools/verify/gate_parity.py) had not been re-mapped since
+August: 18 classes "MISSING" though later gates covered many, five "OK" on files no suite ran, twenty new JUNO gates
+in no row. Re-mapped: 55 classes; each owed one closed by an option of a gate that runs:
+- jx_lift_gate.py (the lifted parameter and note system, the whole heap): --loads exhaustive (every id of the host
+  entry's map, 744, at every value 0..255 and past it, the float ids by 1/256 and the IEEE edges: 252,750 calls, a
+  DIGEST after each -- the sha256 of every heap page the call wrote, named by a Unicorn write hook -- EXACTLY 0),
+  fxmodes (every effect parameter and type at every value under each value of EFFECT / DELAY / REVERB TYPE),
+  notevel (every note x every velocity), random / random2 (48 record sets of random values in each id's declared
+  range, wild ones among them), and the warm chain's heap after EVERY patch. Teeth: the call that wrote most dropped.
+- jx_product_gate.py through process(): --rerate (a host-rate change on the running instance: setActive(false),
+  setupProcessing(rate), setActive(true); PORTED as jx3p_setup_processing / jx3p_set_active -- the JUNO-60's
+  juno_gui_set_active: the automatic setting re-reads the engine's rate, the render object is looked up again,
+  found: its buffers, the tick phase and the note count start again, then the all-sound-off record), --state
+  sID=V (the voice count 4, 8, 3, 2 while notes sound), --vel (the wrapper's velocity rules: 0 a note-off at 64,
+  the edges, channels 1 and 10), the JUNO-60's 18 host rates (the render object's five play, 13 are silent), and
+  every factory patch with TEMPO SYNC (0x60006A) engaged and released under a held note at a host tempo.
+- jx_master_bisect.py (every unit and control object per chunk): --script (seeded polyphony, up to 10 keys over six
+  voices, the state right after each chunk's events too), --modes (the 19 voice-mode values no factory patch holds,
+  Script.xml's ranges, READ), --fxrender (each effect type at each value, every effect parameter at 0 / 128 / 255).
+- fuzz_gate.sh (run again; its tooth now a voice helper's slip -- the master tooth it first tried was never reached),
+  jx_nan_ab.py (a NaN in live cells: moved ones and READ-only parameters -- the chorus clamp's inputs are
+  parameters, never moved: 64 moved cells did not reach it), ramp_walk_gate.sh (now the PRODUCT's sweep and tick,
+  jx_bridge.c, not the retired jx_ramp.c), jx_conv_tables.py --check (the rate-setting header),
+  jx_provenance.py (jx3p/docs/PROVENANCE.tsv: every file, its role, maker and running proof -- its first run found
+  jx3p/src/jx_recall.c, the pool-model recall and its 197 KB table, built into every product and called by
+  nothing: taken out of every build), tools/verify/c99_gate.py and approx_audit.py --jx (playbook 213).
+BLOCKED on inputs the project does not have: the panel art (row 20) and the user's own JX-3P banks.
+
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
 The note store's step machine is the ARPEGGIATOR -- the JUNO-60 plugin's design (docs/HOST_RENDER_LAYER.md

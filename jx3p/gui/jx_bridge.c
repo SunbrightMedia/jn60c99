@@ -424,6 +424,9 @@ void jx3p_note_off(int note)
 
 /* ---- THE UNITS' WRAPPER AND RAMP RECORDS, the plugin's own (unit state +0x14 the flag, +0xAAC308 the
  * start-mute count, +0x58 the 40-byte ramp slots, +0x70 / +0x78 the active ids' vector) ---- */
+#ifndef JX_RAMP_TOOTH
+#define JX_RAMP_TOOTH 0
+#endif
 /* 0x3F4A40 -- one ramp slot's tick: 1 while it stays active */
 static int jxg_ramp_tick(uint8_t *s)
 {
@@ -466,9 +469,22 @@ static void jxg_ramp_sweep(uint8_t *st)
             uint64_t e = gq(st + 0x78);
             memmove(JXG_H(b), JXG_H(b + 4), (size_t)(e - (b + 4)));
             sq64(st + 0x78, e - 4);
+#if JX_RAMP_TOOTH   /* TOOTH (ramp_walk_gate.sh --tooth): the cursor also advances past a retired id -- the walk
+                     * skips the id compacted into its place */
+            if (b != gq(st + 0x78)) b += 4;
+#endif
         }
         if (b == gq(st + 0x78)) break;
     }
+}
+/* the sweep on one object for the seeded walk (jx3p/tools/ramp_walk_gate.sh, JX-26e): its +0x58 slot base and
+ * +0x70 / +0x78 id vector, each slot's target, host addresses -- only before a guest image opens (the delta is 0
+ * then, as the walk's records hold host pointers). Returns the live ids left, -1 with an image open. */
+int jx3p_ramp_sweep_obj(uint8_t *obj)
+{
+    if (G.hlen || jx_g2h_delta) return -1;
+    jxg_ramp_sweep(obj);
+    return (int)((gq(obj + 0x78) - gq(obj + 0x70)) / 4);
 }
 
 /* ---- THE OUTPUT PEAKS (JX-22; the meters' engine side, READ from the JX's render 0x3F9220) ----
@@ -789,6 +805,7 @@ static void jx_ro_engine(void *user, float *const *ptrs, int nch, int count)
     (void)user; (void)nch;
     jx3p_render(ptrs[0], ptrs[1], count);
 }
+static int g_setup_rate;            /* setupProcessing's stored rate (jx3p_setup_processing) */
 /* the object for (the engine's rate, host_rate); returns its kind (0 identity, 1 converter, 2 silence),
  * -1 without an engine or when a buffer cannot be allocated */
 int jx3p_product_open(int host_rate)
@@ -797,6 +814,7 @@ int jx3p_product_open(int host_rate)
     if (g_ro_on) juno_ro_free(&g_ro);
     juno_ro_init(&g_ro, (int)jxg_rate(), host_rate);
     g_ro_on = 1;
+    g_setup_rate = host_rate;
     g_drv_rate = host_rate; g_drv_ph = 0; g_drv_notes = 0; g_drv_ncarry = 0;   /* the driver at instance start */
     g_eng_req = (int)jxg_rate();              /* the setting's default (0: 96000) is the image's engine rate */
     g_drv_tempo = 120.0; g_drv_tempo_valid = 0; g_drv_tempo_last = -1;
@@ -1713,6 +1731,25 @@ void jx3p_product_tempo(int valid, double tempo)
     g_drv_tempo = valid ? tempo : 120.0;
 }
 static jx_drv_rec g_drv_work[2 * JX_DRV_QMAX];   /* one block's records (static: the WASM stack is 64 KB) */
+/* A HOST-RATE CHANGE ON A RUNNING INSTANCE (JX-26c; the JUNO-60's CLAIMS A28, gui/juno_bridge.c
+ * juno_gui_setup_processing / juno_gui_set_active -- the same wrapper code in the JX, jx3p/tools/fw_map.py): a host
+ * calls setActive(false), setupProcessing(rate), setActive(true). setupProcessing stores the setup and nothing
+ * else; setActive, either way, runs the core's setup at the stored rate -- the automatic engine-rate setting (5)
+ * re-reads the engine's rate --, gives the render object the rate and looks it up again for (engine rate, host
+ * rate): found, its buffers start from zeros and the tick phase and the note count go to 0; then the all-sound-off
+ * record (CC 120 at offset 0, which the engine's CC entry ignores). The engine itself is kept. */
+void jx3p_setup_processing(int host_rate) { g_setup_rate = host_rate; }
+void jx3p_set_active(int on)
+{
+    int k = jx_state_index(0x0FFFC015u);
+    (void)on;
+    if (!g_ro_on) return;
+    if (k >= 0 && (g_store[k] & 0x7F) == 5) g_eng_req = jx_engine_rate_now();
+    g_drv_rate = g_setup_rate;
+    g_ro.host = g_setup_rate;
+    if (juno_ro_lookup(&g_ro) > 0) { g_drv_ph = 0; g_drv_notes = 0; }
+    drv_pend(0, 0, 0xB0, 120, 0);
+}
 int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev)
 {
     jx_drv_rec *rec = g_drv_work;

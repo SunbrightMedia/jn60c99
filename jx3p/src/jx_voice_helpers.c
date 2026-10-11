@@ -535,6 +535,9 @@ float jx_h_39A250(float result, int a2)
  * reach minsd. Power products are staged left-to-right exactly as the asm
  * stages registers (v2 = x^3, v4 = x^5, v5 = x^7, v6 = x^9; each *v1*v1 step
  * is one mulsd). */
+#ifndef JX_HELPER_TOOTH
+#define JX_HELPER_TOOTH 0
+#endif
 double jx_h_3A2010(double a1)
 {
   double v1; /* xmm11 */
@@ -547,7 +550,11 @@ double jx_h_3A2010(double a1)
   v1 = fmin(fmax(a1, -20.0), 8.9);
   v2 = v1 * v1 * v1;
   v3 = (const double *)((const char *)&jx_tab_9C1400[0][0] + 208 * (int)(v1 + 20.0));
+#if JX_HELPER_TOOTH   /* TOOTH (fuzz_gate.sh --tooth): one ulp-scale slip in a term every voice runs */
+  v4 = v2 * v1 * v1 * 1.0000001;
+#else
   v4 = v2 * v1 * v1;
+#endif
   v5 = v4 * v1 * v1;
   v6 = v5 * v1 * v1;
   return v1 * v3[2]

@@ -1,0 +1,59 @@
+# JX-3P PROVENANCE -- every file of the port (jx3p/src, jx3p/gen, jx3p/gui and the shared files the product builds),
+# what it is, what made it, and the checks that prove it (JX-26e, docs/GATE_PARITY.tsv class provenance; the
+# JUNO-60's PROVENANCE.tsv is per constant: here the JX's constants live in files made by generators from the booted
+# plugin, each with a --check, or in code graded by the gates).
+# jx3p/tools/jx_provenance.py reads it: every file has a row; a proof is a file jx3p/tools/jx_verify.sh runs; a
+# RETIRED file is in no product build; every file the product builds has a row that is not RETIRED.
+# role: PORTED (by hand from the plugin's code) | TRANSCRIBED (from the decompile, fixed by hand) | LIFTED (machine
+#       code made C by the lifter) | GENERATED (from the booted plugin) | SHARED (the JUNO-60 port's file) |
+#       RUNTIME (support code) | WEB (built for the page) | DATA (a generator's input or output) | RETIRED (not built)
+# file	role	made_by	proof
+jx3p/gui/jx_bridge.c	PORTED	by hand: the host layer, render driver, DAW state, editor logic (jx3p/docs/HOST_LAYER.md)	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_state_gate.py + jx3p/tools/jx_patch_gate.py + jx3p/tools/jx_record_gate.py + jx3p/tools/jx_meter_gate.py + jx3p/tools/jx_zoom_fit_gate.py + jx3p/tools/jx_mutation_gate.py
+jx3p/gui/jx_pm_glue.c	PORTED	by hand: the patch manager's view calls on the bridge	jx3p/tools/jx_patch_manager_gate.py
+gui/juno_pm.c	SHARED	the JUNO-60's patch manager (CLAIMS A39), -DJPM_PRODUCT="PG-JX3P"	jx3p/tools/jx_patch_manager_gate.py
+src/juno_conv.c	SHARED	the JUNO-60's render object (CLAIMS A25); the JX's table and vectors equal	jx3p/tools/jx_conv_tables.py + jx3p/tools/jx_product_gate.py
+src/juno_conv.h	SHARED	its header	jx3p/tools/jx_product_gate.py
+src/conv_tables.h	SHARED	the JUNO-60's render-object table and vectors (tools/verify/gen_conv_tables.py); the JX's equal	jx3p/tools/jx_conv_tables.py
+jp8/src/jp8_rt.c	RUNTIME	the lifted code's runtime (the JUPITER-8 track's)	jx3p/tools/jx_lift_gate.py
+jp8/src/jp8_cpu.h	RUNTIME	the lifted code's CPU header (C99 helpers, playbook 213)	jx3p/tools/jx_lift_gate.py + tools/verify/c99_gate.py
+jx3p/src/jp8_cpu.h	RUNTIME	forwards to jp8/src/jp8_cpu.h	jx3p/tools/jx_lift_gate.py
+jx3p/src/jx_lift.c	LIFTED	jx3p/tools/jx_lift.py on jx3p/gen/jx_lift_reach.json + jx_lift_roots.json (--relift --write)	jx3p/tools/jx_lift_gate.py
+jx3p/src/jx_voice_render.c	TRANSCRIBED	jx3p/tools/translate_jx_voice.py from the decompile, fixed by hand (S3_TRANSCRIPTION.md)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_full_gate.sh + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh
+jx3p/src/jx_voice_helpers.c	TRANSCRIBED	by hand from the binary (the CRT's expf / tanf, the tables)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/fuzz_gate.sh
+jx3p/src/jx_voice_helpers.h	TRANSCRIBED	the helpers' declarations	jx3p/tools/ab_render_c.py
+jx3p/src/jx_master_render.c	TRANSCRIBED	jx3p/tools/translate_jx_master.py, the arguments from the asm (playbook 198)	jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py + jx3p/tools/jx_nan_ab.py
+jx3p/src/jx_ftz.c	RUNTIME	the FTZ / DAZ mode glue	tools/verify/c99_gate.py + jx3p/tools/ab_render_c.py
+jx3p/src/jx_midi_tables.h	GENERATED	jx3p/tools/jx_gen_midi_tables.py from the booted plugin	jx3p/tools/jx_gen_midi_tables.py
+jx3p/src/jx_state_tables.h	GENERATED	jx3p/tools/jx_gen_state_tables.py from the booted plugin	jx3p/tools/jx_gen_state_tables.py
+jx3p/src/jx_patch_tables.h	GENERATED	jx3p/tools/jx_gen_patch_tables.py from the plugin's own loads	jx3p/tools/jx_gen_patch_tables.py
+jx3p/src/jx_record_tables.h	GENERATED	jx3p/tools/jx_gen_record_tables.py from the plugin's serializer	jx3p/tools/jx_gen_record_tables.py
+jx3p/src/jx_srate.h	GENERATED	jx3p/tools/jx_conv_tables.py --emit from the booted plugin	jx3p/tools/jx_conv_tables.py
+jx3p/gen/jx_guest_44k.bin.gz	GENERATED	jx3p/tools/jx_guest_export.py: the plugin's heap before initialize, 44.1 kHz engine	jx3p/tools/jx_drive_gate.py
+jx3p/gen/jx_guest_96k.bin.gz	GENERATED	jx3p/tools/jx_guest_export.py --rate 96000	jx3p/tools/jx_drive_gate.py + jx3p/tools/jx_product_gate.py
+jx3p/gen/jx_lift_reach.json	GENERATED	jx3p/tools/jx_lift_gate.py --reach (the oracle's indirect targets)	jx3p/tools/jx_lift_gate.py
+jx3p/gen/jx_lift_roots.json	GENERATED	jx3p/tools/jx_lift_roots.py	jx3p/tools/jx_lift_gate.py
+jx3p/gen/jx_lift_pages.json	GENERATED	jx3p/tools/jx_lift_gate.py --pages (the pages the lifted code touches)	jx3p/tools/jx_drive_gate.py
+jx3p/gen/jx_patch_records.json	GENERATED	the plugin's patch-load and initialize records (jx_patch_census)	jx3p/tools/jx_drive_gate.py
+jx3p/gui/web/build.sh	WEB	the page's build script (emcc)	jx3p/tools/jx_wasm_check.py
+jx3p/gui/web/jx3p.js	WEB	jx3p/gui/web/build.sh	jx3p/tools/jx_wasm_check.py + jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/jx3p.wasm	WEB	jx3p/gui/web/build.sh	jx3p/tools/jx_wasm_check.py + jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/jx3p_artifact.js	WEB	jx3p/gui/web/build.sh (the single-file page)	jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/jx3p_artifact.wasm	WEB	jx3p/gui/web/build.sh	jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/index.html	WEB	by hand: the test page	jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/bank.bin.gz	WEB	jx3p/truth/preset_bank_1.bin, compressed	jx3p/tools/jx_page_check.mjs
+jx3p/gui/web/jx_guest_96k.bin.gz	WEB	a copy of jx3p/gen/jx_guest_96k.bin.gz (build.sh)	jx3p/tools/jx_wasm_check.py
+jx3p/gen/recall_luts.json	RETIRED	the pool-model recall's tables (gen_recall_c.py); the recall is the plugin's own, lifted since JX-11	-
+jx3p/gen/recall_sparse.json	RETIRED	the pool-model recall's sparse cells	-
+jx3p/gen/voice_cell_model.json	RETIRED	the pool-model recall's voice-cell model	-
+jx3p/src/jx_recall.c	RETIRED	the pool-model recall (jx_bank_apply): built into every product until 2026-10-11, called by nothing	-
+jx3p/src/jx_recall.h	RETIRED	its header	-
+jx3p/src/jx_recall_lut.h	RETIRED	its 197 KB table	-
+jx3p/src/jx_param_get.h	RETIRED	gen_param_get.py's table; included by nothing	-
+jx3p/src/jx_alloc.c	RETIRED	the note manager, transcribed; the note path is the plugin's own, lifted since JX-12b (playbook 203)	-
+jx3p/src/jx_nstore.c	RETIRED	the note store, transcribed (JX-12b)	-
+jx3p/src/jx_ktrack.c	RETIRED	the key tracker, transcribed (JX-12b)	-
+jx3p/src/jx_dispatch_note.c	RETIRED	the note dispatch, transcribed (JX-12b)	-
+jx3p/src/jx_seq.c	RETIRED	the step machine and clock tick, transcribed (JX-12b)	-
+jx3p/src/jx_gc.c	RETIRED	the note-expiry GC, transcribed (JX-12b)	-
+jx3p/src/jx_ramp.c	RETIRED	the ramp walker, transcribed; the product's is jx_bridge.c's (ramp_walk_gate.sh grades that)	-
+jx3p/src/jx_ramp.h	RETIRED	its header	-

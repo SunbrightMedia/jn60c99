@@ -20,6 +20,7 @@ the boots (static data) or the tool refuses. Then:
 
     python3 jx3p/tools/jx_conv_tables.py            exit 0 = the JX table + vectors == the JUNO's
     python3 jx3p/tools/jx_conv_tables.py --emit     also write jx3p/src/jx_srate.h
+    python3 jx3p/tools/jx_conv_tables.py --check    exit 1 unless the committed jx3p/src/jx_srate.h is this boot's
     python3 jx3p/tools/jx_conv_tables.py --tooth    one coefficient bit flipped on the JX side must be
                                                     seen (exit 0 = the comparison bites)
 """
@@ -134,6 +135,12 @@ def main():
         with open(OUT, 'w') as fh:
             fh.write(emit(srate))
         print('wrote %s' % os.path.relpath(OUT, REPO))
+    elif '--check' in args:                           # the committed header == this boot's table (JX-26e)
+        ok = open(OUT).read() == emit(srate)
+        print('jx_conv_tables --check: %s %s the booted plugin\'s setting table' % (
+            os.path.relpath(OUT, REPO), '==' if ok else 'DIFFERS FROM'))
+        if not ok:
+            return 1
     else:
         sys.stdout.write(emit(srate))
     print('jx_conv_tables: %s' % ('EQUAL -- the JX-3P uses the JUNO-60\'s table and vectors (src/juno_conv.c)'

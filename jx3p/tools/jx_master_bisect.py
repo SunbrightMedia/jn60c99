@@ -15,6 +15,16 @@ differing sample are listed with their values.
     python3 jx3p/tools/jx_master_bisect.py [--rate 44100|96000] [patch=0] [N=12000]
     python3 jx3p/tools/jx_master_bisect.py [--tooth] --variants '34:67=3;0:65=5' [N=12000]
     python3 jx3p/tools/jx_master_bisect.py --gate [N=12000]     (64 patches + VARIANTS + the tooth; ~30 min)
+    python3 jx3p/tools/jx_master_bisect.py --script SEEDS [--patches K,...] [--tooth-key] [N]
+    python3 jx3p/tools/jx_master_bisect.py --modes [N=4000] | --fxrender [N=4000]
+  --script (JX-26d; the JUNO-60's note_bcast_gate / steal_gate): seeded note events at chunk starts through the
+  engine's own note entries -- chords, up to 10 keys held (steals: six voices render), re-strikes, releases --
+  and every unit and control object compared right after each chunk's events as well as after its render (the
+  assigners keep the HOST's six voices; every unit renders, as in the full-chain gate); --tooth-key builds the
+  port with JX_FULL_TOOTH (its note entries take the key a semitone up): every run must differ.
+  --modes: every value of a voice mode no factory patch holds (Script.xml's ranges, READ; jx_master_bisect.schema),
+  one variant each on patch 0. --fxrender: each effect type (EFFECT / DELAY / REVERB TYPE) at each value with every
+  effect parameter at 0, 128 and 255, on patch 5.
   --variants: patches the factory bank does not hold -- a factory patch's own patch-load records with
   values changed (jx_records.variant_records), loaded by the plugin through its host entry and by the port
   through the lifted host entry (jx3p_records, JX-11). The master's two mode cells (records 67 and 65)
@@ -51,7 +61,7 @@ HI_LO, HI_SZ = 0xA60000, 0xAAC320 - 0xA60000
 VARIANTS = '34:67=3;34:67=4;0:67=4;0:65=1;0:65=3;0:65=4;0:65=5;34:67=4,65=5;40:65=3'
 TOOTH_VARIANTS = '34:67=3;34:67=4;0:65=5'          # one per effect-LFO site group the tooth reverts
 STATE_END = 0xAAC310       # a unit's state block; the master's parameter object follows it in the plugin's heap
-SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_render.c',
+SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_voice_render.c',
         'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
 
 
@@ -68,13 +78,124 @@ def clean(b):
 
 
 def schedule(n):
-    """(note_before, samples) per render call: the idle in chunks, then the note, then n"""
+    """(note_before, samples) per render call: the idle in chunks, then the note, then n; with JX_BISECT_SCRIPT
+    set, (events_before, samples): the seeded script (script_schedule)"""
+    if os.environ.get('JX_BISECT_SCRIPT'):
+        return script_schedule(int(os.environ['JX_BISECT_SCRIPT']), n)
     out = [(False, min(CH, IDLE - o)) for o in range(0, IDLE, CH)]
     first = True
     for o in range(0, n, CH):
         out.append((first, min(CH, n - o)))
         first = False
     return out
+
+
+def script_schedule(seed, n):
+    """--script SEED (JX-26d; the JUNO-60's note_bcast_gate.py and steal_gate.py): after the idle, at chunk starts,
+    seeded note events through the engine's own note entries -- chords, up to 10 keys held (more than the six voices
+    the HOST's count renders: steals), re-struck keys, releases, velocities 1..127 -- as (events, samples): events a
+    list of ('on', note, vel) / ('off', note)"""
+    import random
+    r = random.Random(65537 * seed + 3)
+    out = [([], min(CH, IDLE - o)) for o in range(0, IDLE, CH)]
+    held = []
+    for o in range(0, n, CH):
+        ev = []
+        if r.random() < 0.55:
+            for _ in range(r.choice((1, 1, 2, 3))):
+                if held and (len(held) >= 10 or r.random() < 0.4):
+                    ev.append(('off', held.pop(r.randrange(len(held)))))
+                else:
+                    note = r.choice(held) if held and r.random() < 0.15 else r.randrange(30, 100)
+                    ev.append(('on', note, r.randrange(1, 128)))
+                    if note not in held:
+                        held.append(note)
+        out.append((ev, min(CH, n - o)))
+    return out
+
+
+def schema():
+    """the patch parameters' host ids, names and declared ranges -- READ from the plugin's own Script.xml (the
+    'patch' struct tree: each struct's 7-bit address, its values in order, int2x4 two bytes, int8x4 eight)"""
+    import re
+    x = open(os.path.join(REPO, 'jx3p', 'truth', 'Script.xml'), encoding='utf-8', errors='replace').read()
+    st = {}
+    for m in re.finditer(r'<structType>(.*?)</structType>', x, re.S):
+        b = m.group(1)
+        vals = []
+        for v in re.finditer(r'<value>(.*?)</value>', b, re.S):
+            vb = v.group(1)
+            vt, vn, vr = (re.search(r'<%s>(.*?)</%s>' % (t, t), vb) for t in ('type', 'name', 'range'))
+            vals.append((vn.group(1) if vn else '?', vt.group(1).strip() if vt else '?', vr.group(1) if vr else ''))
+        st.setdefault(re.search(r'<type>(.*?)</type>', b).group(1).strip(), vals)
+    size = {'int1x7': 1, 'int2x4': 2, 'int4x4': 4, 'int8x4': 8}
+    pat = re.search(r'<structType>\s*<type>patch</type>(.*?)</structType>', x, re.S).group(1)
+    out = {}
+    for m in re.finditer(r'<struct>\s*<type>(.*?)</type>(?:\s*<name>.*?</name>)?\s*<address>(.*?)</address>', pat):
+        hi, lo = [int(h, 16) for h in m.group(2).split()]
+        off = 0
+        for vn, vt, vr in st.get(m.group(1), []):
+            n = size.get(vt)
+            if n is None:
+                g = re.match(r'string(\d+)x4', vt)
+                n = 2 * int(g.group(1)) if g else 0
+            if vr:
+                lo_, hi_ = (int(z) for z in vr.split(','))
+                out[0x600000 + hi * 128 + lo + off] = (vn, lo_, hi_)
+            off += n
+    return out
+
+
+# the voice parameters a variant renders (their DSP paths: oscillator, LFO, envelope trigger and VCA modes, the
+# assigner's modes, the bend gain); the arpeggiator's run through the clock tick (jx_tick_gate.py) instead
+MODE_NAMES = ('LFO WAVEFORM', 'LFO KEY TRIG', 'DCO1 WAVEFORM', 'DCO1 FREQ MOD', 'DCO1 RANGE', 'DCO2 WAVEFORM',
+              'DCO2 FREQ MOD', 'DCO2 RANGE', 'DCO2 CROSS MOD', 'LEGATO', 'ASSIGN MODE', 'TEMPO SYNC', 'VCA MODE',
+              'BEND GAIN', 'LFO TRIG ENV')
+FX_TYPES = ('EFFECT TYPE', 'DELAY TYPE', 'REVERB TYPE')
+FX_PARAMS = ('EFFECT LEVEL', 'REVERB LEVEL', 'DELAY LEVEL', 'DELAY TIME', 'EFFECT TONE', 'REVERB TIME')
+
+
+def _records():
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
+    sys.path.insert(0, HERE)
+    import jx_emu as J
+    return J.JX.records()['patches']
+
+
+def mode_variants():
+    """--modes: every value of each voice mode (MODE_NAMES, its declared range) that no factory patch holds, on
+    patch 0's records (one record changed per variant)"""
+    sch, recs = schema(), _records()
+    byname = {v[0]: (pid, v[1], v[2]) for pid, v in sch.items()}
+    idx = {pid: i for i, (kind, pid, val) in enumerate(recs[0]) if kind == 2}
+    out = []
+    for nm in MODE_NAMES:
+        pid, lo, hi = byname[nm]
+        seen = {val for pat in recs for kind, p2, val in pat if p2 == pid}
+        out += ['0:%d=%d' % (idx[pid], v) for v in range(lo, hi + 1) if v not in seen]
+    return out
+
+
+def fx_variants():
+    """--fxrender: each effect type (EFFECT / DELAY / REVERB TYPE) at each of its values with every effect
+    parameter at 0, 128 and 255 (patch 5's records: an effects patch)"""
+    sch, recs = schema(), _records()
+    byname = {v[0]: pid for pid, v in sch.items()}
+    idx = {pid: i for i, (kind, pid, val) in enumerate(recs[5]) if kind == 2}
+    out = []
+    for tn in FX_TYPES:
+        lo, hi = sch[byname[tn]][1:]
+        for t in range(lo, hi + 1):
+            for lvl in (0, 128, 255):
+                out.append('5:%d=%d,' % (idx[byname[tn]], t) + ','.join('%d=%d' % (idx[byname[p]], lvl) for p in FX_PARAMS))
+    return out
+
+
+def events_of(note):
+    """a schedule entry's events: the default schedule's flag means one note-on 60 / 100"""
+    if note is True:
+        return [('on', 60, 100)]
+    return note or []
 
 
 def oracle(k, n, fine=None, stop=None):
@@ -92,8 +213,14 @@ def oracle(k, n, fine=None, stop=None):
     uc = jx.uc
     res = []
     for i, (note, m) in enumerate(schedule(n)):
-        if note:
-            jx.note_on(60, 100)
+        for e in events_of(note):
+            if e[0] == 'on':
+                jx.note_on(e[1], e[2])
+            else:
+                jx.note_off(e[1])
+        if note and note is not True:                    # --script: every unit's state right after the events too
+            res.append(['ev'] + [hashlib.sha256(clean(bytes(uc.mem_read(jx.state[u], SNAP_V if u < 8 else SNAP_M)))).hexdigest()[:16]
+                                 for u in range(9)] + [hashlib.sha256(b).hexdigest()[:16] for b in GX.control_raw(jx)])
         if fine == i:                                    # sample by sample, the master after each
             out = []
             for s in range(m if stop is None else stop + 1):
@@ -133,9 +260,19 @@ def port(so, k, n, fine=None, stop=None):
         raise SystemExit('the lifted parameter system trapped: %s' % lib.jx3p_lift_error().decode())
     lib.jx3p_host_stage(0)
     res = []
+    sizes = (0x7A8, 0xFF0, 0xB0)
+    ctl_now = lambda: [ctypes.string_at(lib.jx3p_ctl(w, i), sizes[w]) for i in range(9) for w in range(3)] + \
+        [ctypes.string_at(lib.jx3p_ctl(3, i), 0x700) for i in range(9)]
     for i, (note, m) in enumerate(schedule(n)):
-        if note:
-            lib.jx3p_note_on(60, 100)
+        for e in events_of(note):
+            if e[0] == 'on':
+                lib.jx3p_note_on(e[1], e[2])
+            else:
+                lib.jx3p_note_off(e[1])
+        if note and note is not True:                    # --script: every unit's state right after the events too
+            res.append(['ev'] + [hashlib.sha256(clean(ctypes.string_at(lib.jx3p_vstate(u), SNAP_V) if u < 8 else
+                                                      ctypes.string_at(lib.jx3p_mstate(), SNAP_M))).hexdigest()[:16]
+                                 for u in range(9)] + [hashlib.sha256(b).hexdigest()[:16] for b in ctl_now()])
         Lb = (ctypes.c_float * m)(); Rb = (ctypes.c_float * m)()
         if fine == i:
             out = []
@@ -150,9 +287,7 @@ def port(so, k, n, fine=None, stop=None):
             return None
         lib.jx3p_render(Lb, Rb, m)
         bits = list(struct.unpack('<%dI' % m, bytes(Lb))) + list(struct.unpack('<%dI' % m, bytes(Rb)))
-        sizes = (0x7A8, 0xFF0, 0xB0)
-        ctl = [ctypes.string_at(lib.jx3p_ctl(w, i), sizes[w]) for i in range(9) for w in range(3)]
-        ctl += [ctypes.string_at(lib.jx3p_ctl(3, i), 0x700) for i in range(9)]
+        ctl = ctl_now()
         res.append([hashlib.sha256(clean(ctypes.string_at(lib.jx3p_vstate(u), SNAP_V) if u < 8 else
                                          ctypes.string_at(lib.jx3p_mstate(), SNAP_M))).hexdigest()[:16]
                     for u in range(9)] + [hashlib.sha256(struct.pack('<%dI' % (2 * m), *bits)).hexdigest()[:16]] +
@@ -201,6 +336,39 @@ def main():
               'objects and L/R equal to the plugin\'s: %s' % (len(VARIANTS.split(';')),
                                                             'GREEN' if not bad and bites else 'RED (%s)' % ' '.join(bad)))
         return 0 if not bad and bites else 1
+    if a[:1] == ['--script']:                            # seeded polyphony, every unit after every event (JX-26d)
+        seeds, rest = a[1].split(','), a[2:]
+        tv = '--tooth-key' in rest                       # TOOTH: the port's note entries a semitone up -- must differ
+        rest = [x for x in rest if x != '--tooth-key']
+        pats = rest[rest.index('--patches') + 1].split(',') if '--patches' in rest else ['0']
+        rest = [x for i, x in enumerate(rest) if x != '--patches' and (i == 0 or rest[i - 1] != '--patches')]
+        n = rest[0] if rest else '12000'
+        bad = 0
+        for sd in seeds:
+            for k in pats:
+                env = dict(os.environ, JX_BISECT_SCRIPT=sd)
+                if tv:                                   # (the bisect renders every unit on both sides -- the
+                    env['JX_BISECT_CFLAGS'] = '-DJX_FULL_TOOTH=1'   # HOST's count is the product path's -- so the
+                                                                    # count tooth cannot bite here: seen 2026-10-11)
+                if os.environ.get('JX_BISECT_VARIANT_FOR_SCRIPT'):
+                    env['JX_BISECT_VARIANT'] = os.environ['JX_BISECT_VARIANT_FOR_SCRIPT']
+                r = subprocess.run([sys.executable, __file__, k, n], env=env, capture_output=True, text=True)
+                evs = sum(len(e) for e, _ in script_schedule(int(sd), int(n)))
+                print('script seed %s (%d note events): %s' % (sd, evs, r.stdout.strip().splitlines()[0] if r.stdout.strip()
+                                                              else 'NO OUTPUT ' + r.stderr[-400:]), flush=True)
+                bad += 1 if r.returncode else 0
+        n_runs = len(seeds) * len(pats)
+        if tv:
+            print('jx_master_bisect --script --tooth-key: %s' % ('BITES (%d of %d differ)' % (bad, n_runs) if bad == n_runs
+                                                                    else 'DID NOT BITE on %d of %d' % (n_runs - bad, n_runs)))
+            return 0 if bad == n_runs else 1
+        print('jx_master_bisect --script: %d of %d runs differ' % (bad, n_runs))
+        return 1 if bad else 0
+    if a[:1] in (['--modes'], ['--fxrender']):           # the variants no factory patch holds (JX-26d)
+        specs = mode_variants() if a[0] == '--modes' else fx_variants()
+        n = a[1] if len(a) > 1 else '4000'
+        print('%s: %d variants' % (a[0], len(specs)), flush=True)
+        a = ['--variants', ';'.join(specs), n]
     if a[:1] == ['--tooth']:                             # the effect-LFO argument lost again: must be seen
         os.environ['JX_BISECT_TOOTH'] = '1'
         a = a[1:]
@@ -224,7 +392,8 @@ def main():
     tmp = tempfile.mkdtemp()
     atexit.register(shutil.rmtree, tmp, True)     # its builds and inflated images: never left behind
     so = os.path.join(tmp, 'libjx3p.so')
-    tooth = ['-DJX_MASTER_TOOTH=1'] if os.environ.get('JX_BISECT_TOOTH') == '1' else []
+    tooth = (['-DJX_MASTER_TOOTH=1'] if os.environ.get('JX_BISECT_TOOTH') == '1' else []) + \
+        os.environ.get('JX_BISECT_CFLAGS', '').split()          # a script tooth's build (--script --tooth-key)
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] + tooth +
                    [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
     run = lambda *x: json.loads(subprocess.run([sys.executable, __file__] + [str(y) for y in x],
@@ -233,8 +402,18 @@ def main():
     sched = schedule(n)
     first = next((i for i in range(len(o)) if o[i] != p[i]), None)
     if first is None:
-        print('patch %d: every chunk equal (%d chunks)' % (k, len(o)))
+        nev = sum(1 for x in o if x and x[0] == 'ev')
+        print('patch %d: every chunk equal (%d chunks%s)' % (k, len(o) - nev, ', %d event checkpoints' % nev if nev else ''))
         return 0
+    if os.environ.get('JX_BISECT_SCRIPT'):               # a script run: the checkpoint and the objects that differ
+        ctl_names = ['%s%d' % (w, i) for i in range(9) for w in ('mgr', 'ns', 'asg')] + ['proc%d' % i for i in range(9)]
+        names = (['ev'] + ['v%d' % u for u in range(8)] + ['master'] + ctl_names) if o[first][0] == 'ev' else \
+            (['v%d' % u for u in range(8)] + ['master', 'L/R'] + ctl_names + ['vhigh%d' % u for u in range(8)])
+        chunk = sum(1 for x in o[:first] if x[0] != 'ev')
+        print('patch %d: first difference %s chunk %d (%d samples after the idle): %s' % (
+            k, 'right after the events before' if o[first][0] == 'ev' else 'at the end of', chunk,
+            max(0, chunk * CH - IDLE), ' '.join(nm for nm, x, y in zip(names, o[first], p[first]) if x != y)))
+        return 1
     start = sum(m for _, m in sched[:first])
     names = ['v%d' % u for u in range(8)] + ['master', 'L/R'] + \
         ['%s%d' % (w, i) for i in range(9) for w in ('mgr', 'ns', 'asg')] + ['proc%d' % i for i in range(9)] + \

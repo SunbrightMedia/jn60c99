@@ -3690,3 +3690,21 @@ configurations: GENERIC (a C99 compiler on an unknown platform: nothing may be f
 build: only the FTZ / DAZ mode glue C99 has no words for). Replace an extension with exact C99 (64 x 64 products
 on 32-bit halves, a 128 / 64 long division, a binary-search clz, rint() for cvtsd2si), test the helper against the
 extension on millions of operands, and see the gate RED on the old tree before it is believed.
+
+## 214. A TOOTH MUST BE SEEN TO REACH ITS TARGET IN THE GATE'S OWN SPACE
+Paid 2026-10-11 (JX-3P, JX-26). Three new teeth did not bite at first, each for a reason in the gate's space, not
+in the port: the fuzz gate's master tooth (the effect-LFO argument) -- the factory patches the seeds draw never
+run those sites; the polyphony script's voice-count tooth -- the bisect renders every unit on both sides (the
+count is the product path's); the NaN gate's clamp tooth -- the clamp's inputs are PARAMETERS, never moved by a
+render, and the gate drew only moved cells (64 of them).
+### The rule
+Before a tooth is believed to stand for a defect class, check that the gate's own inputs reach the tooth's code
+(a NaN gate poisons read-only cells too; a fuzz tooth sits in code every voice runs; a script tooth in the path
+the script drives). "DID NOT BITE" is information: it says where the gate cannot see.
+
+## 215. A PRODUCT BUILD CARRIES WHAT NOBODY CALLS UNTIL A CENSUS OF ITS FILES SAYS SO
+Paid 2026-10-11 (JX-3P, JX-26e). jx3p/src/jx_recall.c -- the pool-model recall the JX left behind on 2026-10-10
+(JX-11: the recall became the plugin's own code, lifted) -- stayed in every build line, 197 KB of table in every
+library and the web page's WASM, called by nothing; eight more retired transcriptions sat beside the product's
+files. jx3p/tools/jx_provenance.py now names each file's role and running proof and refuses a RETIRED file in the
+product's units (SRCS and everything they include).

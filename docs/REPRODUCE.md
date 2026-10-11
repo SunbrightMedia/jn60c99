@@ -155,5 +155,5 @@ the targets) -- both must fail, and `make static` checks that they do.
 - The parked tracks (DAW parity steps 2-5, the Track B sonic-identity fork) hold no result beyond
   their harnesses (CLAUDE.md LIVE STATE); the next synths (jx3p/, jp8/, tb303/) are not this port
   and keep their own status pages.
-- `tools/verify/gate_parity.py` (the JUNO vs JX-3P gate-class ledger) is RED for the JX's owed gates;
-  it is about the next synth, not this port, and no target runs it.
+- `tools/verify/gate_parity.py` (the JUNO vs JX-3P gate-class ledger) is about the next synth, not this
+  port: `make verify-jx3p` runs it (GATE 6) since 2026-10-11, when every class got a running JX gate.

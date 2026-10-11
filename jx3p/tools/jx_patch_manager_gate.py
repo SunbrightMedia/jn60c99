@@ -39,7 +39,7 @@ G.FACTORY_PATH = os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin')
 G.REF_TAG = 'jx_'
 G.GATE_SCRIPT = os.path.abspath(__file__)
 LIBDIR = os.path.join(REPO, 'scratchpad', 'jx_pm')
-SRCS = ['jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c', 'jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c',
+SRCS = ['jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c', 'jx3p/gui/jx_bridge.c',
         'jx3p/src/jx_voice_render.c', 'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
 
 

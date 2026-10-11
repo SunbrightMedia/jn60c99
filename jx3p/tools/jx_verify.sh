@@ -114,6 +114,15 @@ python3 "$HERE/jx_master_bisect.py" --gate 12000
 # the same at the product's 96 kHz engine (JX-19): the voices take branches the 44.1 kHz engine does not -- a voice
 # filter's history that no audio gate sees (the mutation reach found it: playbook 208)
 python3 "$HERE/jx_master_bisect.py" --rate 96000 --gate 4000
+# (JX-26d) seeded polyphony -- chords, up to 10 keys held over six voices (steals), re-strikes -- every unit and
+# control object right after each chunk's events and after its render; its tooth: the port's keys a semitone up
+python3 "$HERE/jx_master_bisect.py" --script 1,2,3,4 --patches 0,5,20,49 24000
+python3 "$HERE/jx_master_bisect.py" --rate 96000 --script 5,6 --patches 0,34 12000
+python3 "$HERE/jx_master_bisect.py" --script 2 --patches 0 --tooth-key 6000
+# every voice-mode value no factory patch holds (Script.xml's ranges), and each effect type at each value with
+# every effect parameter at 0, 128 and 255 -- rendered, every unit's state per chunk
+python3 "$HERE/jx_master_bisect.py" --modes 4000
+python3 "$HERE/jx_master_bisect.py" --fxrender 4000
 echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object after every event; JX-7) ==="
 # 5 factory patches x 1,500 events, 12 variants of the plugin's own patch load (every step mode the
 # product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the port's tick,
@@ -175,6 +184,29 @@ python3 "$HERE/jx_product_gate.py" --tooth-recall --rates 48000 --patches 0 --po
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 33,34 --on 0.55 --off 2.0 --secs 2.4 \
         --tempo '120;95.5@0,140@1.2;x@0,200@0.7,x@1.5'
 python3 "$HERE/jx_product_gate.py" --tooth-tempo --rates 48000 --patches 34 --on 0.55 --off 2.0 --secs 2.4 --tempo '95.5@0,140@1.2'
+# (JX-26c) A HOST-RATE CHANGE ON THE RUNNING INSTANCE: setActive(false), setupProcessing(rate), setActive(true) --
+# identity, converters, silence and back, keys held; a setActive at one rate with the arpeggiator running; the
+# engine-rate settings 2 and automatic; tooth: the port's setActive dropped
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --on 0.55 --off 3.2 --secs 3.4 \
+        --rerate '44100@60,96000@120,88200@180,22050@240,48000@290'
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 34 --poly 1 --on 0.55 --secs 2.4 \
+        --rerate '48000@100;44100@100' --state 'r2@0;r5@0'
+python3 "$HERE/jx_product_gate.py" --tooth-rerate --rates 48000 --patches 0 --on 0.55 --off 3.2 --secs 3.4 \
+        --rerate '44100@60,96000@120,88200@180,22050@240,48000@290'
+# THE VOICE COUNT changed while notes sound (the DAW state's 0x0FFFC00E: 4, 8, 3, 2), seeded polyphony
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,34 --poly 1,2 --on 0.55 --secs 2.4 \
+        --state 's0FFFC00E=4@0.8,s0FFFC00E=8@1.2,s0FFFC00E=3@1.6,s0FFFC00E=2@2.0'
+# THE WRAPPER'S VELOCITY RULES: velocity 0 (a note-off at 64), the edges, MIDI channels 1 and 10; and after a
+# setState of velSense 0 (not in the state list: nothing changes)
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0,5 --vel --on 0.55 --secs 1.8
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --vel --on 0.55 --secs 1.8 --state 's0FFFC00D=0@0.2'
+# THE JUNO-60's OTHER HOST RATES (rate_sweep_gate.py's 18 less the table's five): no render object -- silent, both
+python3 "$HERE/jx_product_gate.py" --rates 8000,11025,16000,22050,32000,37800,47999,50000,64000,96001,176400,352800,384000 \
+        --patches 0 --on 0.55 --secs 1.0 --expect-silent
+# EVERY FACTORY PATCH through process() (the JUNO-60's bank_product_gate), each with TEMPO SYNC engaged and
+# released under the held note at a host tempo (script_ab's A5)
+python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0-63 --on 0.55 --off 1.4 --secs 1.6 \
+        --set '60006A=1@0.8,60006A=0@1.2' --tempo '140@0'
 # THE DAW STATE through process() (JX-17): seeded setState payloads between blocks; THE ENGINE-RATE SETTING (JX-15) on
 # the running engine (setSampleRate, LIFTED) and before the first block -- the plugin switches the rate BEFORE
 # initialize's records (JX-15b: the guest image holds none, jx3p_product_init queues them)
@@ -218,6 +250,19 @@ python3 "$HERE/jx_lift_gate.py" --base 34 --loads boot32
 python3 "$HERE/jx_lift_gate.py" --loads tempo --tooth-skip 152      # a tempo call dropped: must be seen
 python3 "$HERE/jx_lift_gate.py" --loads rate --tooth-skip 12        # a setSampleRate dropped: must be seen
 python3 "$HERE/jx_lift_gate.py" --loads boot --tooth-skip 164       # initialize's writePatch dropped: must be seen
+# (JX-26b) the JUNO-60's exhaustive, random-state and note x velocity spaces through the lifted entries: a DIGEST of
+# every heap page each call wrote, the whole heap after each id / set; each reference made once, its tooth on it
+python3 "$HERE/jx_lift_gate.py" --tooth-skip 80                     # the warm chain: a heap checkpoint per patch
+python3 "$HERE/jx_lift_gate.py" --loads random --keep
+python3 "$HERE/jx_lift_gate.py" --loads random --tooth-skip w
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads random2
+python3 "$HERE/jx_lift_gate.py" --loads notevel --keep
+python3 "$HERE/jx_lift_gate.py" --loads notevel --tooth-skip w
+python3 "$HERE/jx_lift_gate.py" --loads exhaustive --keep
+python3 "$HERE/jx_lift_gate.py" --loads exhaustive --tooth-skip w
+python3 "$HERE/jx_lift_gate.py" --loads fxmodes --keep
+python3 "$HERE/jx_lift_gate.py" --loads fxmodes --tooth-skip w
+python3 "$HERE/jx_lift_gate.py" --base 34 --loads fxmodes
 echo "=== JX GATE 3f: THE DAW STATE, THE UI TIMER, THE PATCH BROWSER (JX-16, JX-17) ==="
 # the tables from the booted plugin again (Unicorn, each its own process) and the committed ones equal to them
 python3 "$HERE/jx_state_census.py" >/dev/null
@@ -261,6 +306,21 @@ for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 1
   t=${ts%%:*}; r=${ts#*:}
   python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t | tail -1
 done
+echo "=== JX GATE 3i: SEEDS, NaN, RAMPS, TABLES (the JUNO-60's gate classes the JX lacked: docs/GATE_PARITY.tsv, JX-26e) ==="
+# the seeded fuzz of the render (patch x rate x warm x notes), its tooth a slip in a voice helper every voice runs
+sh "$HERE/fuzz_gate.sh" 0 24
+sh "$HERE/fuzz_gate.sh" --tooth 0 4
+# a NaN in live DSP cells -- moved ones and read-only parameters, the chorus clamp's inputs always -- every sample and
+# unit state; the tooth puts the decompile's ordered compare back at the clamp
+python3 "$HERE/jx_nan_ab.py" --seeds 1,2 --cells 16
+python3 "$HERE/jx_nan_ab.py" --tooth --seeds 1 --cells 4
+# the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
+sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
+sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"
+# the engine-rate setting table: the committed header == the booted plugin's; the render object's tables == the
+# JUNO-60's (src/juno_conv.c), its tooth one coefficient bit
+python3 "$HERE/jx_conv_tables.py" --check
+python3 "$HERE/jx_conv_tables.py" --tooth
 echo "=== JX GATE 3g: THE MUTATION REACH (docs/PORT_COMPLETENESS_CHARTER.md section 4) ==="
 # one plausible slip per part of the port, in lines that run (gcov), the library rebuilt, one fast gate on the
 # mutated tree: every mutation must be KILLED. It edits the tree it runs in (one file at a time, restored):
@@ -281,4 +341,9 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "[jx verify] FAIL -- no node: the delivered WASM cannot be graded"; exit 1
 fi
+echo "=== JX GATE 6: THE LEDGERS (every file's origin and proof; every JUNO gate class's JX twin) ==="
+python3 "$HERE/jx_provenance.py"
+python3 "$HERE/jx_provenance.py" --self-test
+python3 "$REPO/tools/verify/gate_parity.py"
+python3 "$REPO/tools/verify/gate_parity.py" --self-test
 echo "[jx verify] GREEN -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0; the clock and every step mode == the plugin's; process() == the product path at 3 host rates; the web engine == native"

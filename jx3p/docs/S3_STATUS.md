@@ -3,6 +3,21 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-11 (14) — THE JUNO-60's GATE CLASSES ON THE JX (JX-26): THE PARITY LEDGER RE-MAPPED; ISO C99
+
+A second census, by gate CLASS (docs/GATE_PARITY.tsv), disagreed with the scope table: 18 classes owed, 5 "OK" on
+files no suite ran, 20 JUNO gates unclassified -- by it the port stood near 55 %, not 96 % (playbook 212). Every
+class now has the JX gate the suite runs, or a written waiver, or names the input it waits for (HOST_LAYER.md 3s):
+the parameter space exhaustively (744 ids x every value: 252,750 calls, a digest of the pages each call wrote:
+EXACTLY 0) and at random, every note x velocity, a heap checkpoint after every patch of a warm chain, host-rate
+changes (PORTED: jx3p_set_active / jx3p_setup_processing), voice-count changes, the wrapper's velocity rules, the
+18 host rates, every factory patch with TEMPO SYNC through process(), seeded polyphony state, the voice modes and
+effect types no patch holds rendered, a NaN in live cells and parameters, the product's ramp sweep, the seeded
+fuzz again, every file's provenance (jx3p/docs/PROVENANCE.tsv). ISO C99 is now checked (tools/verify/c99_gate.py):
+the lift's and the voice helpers' __int128, builtins and x86 asm replaced by exact C99 (playbook 213). Found on
+the way: the dead pool-model recall (jx_recall.c, 197 KB table) built into every product -- taken out. BLOCKED on
+inputs: the panel art (row 20) and the user's own JX-3P banks. The full verify of the final commit is next.
+
 ## 2026-10-11 (13) — THE EDITOR'S OWN LOGIC (JX-22 .. JX-25), THE LOADS' HOST EDITS; ONE ROW OPEN: THE DRAWN PANEL
 
 The scope table had no rows for the editor's own logic -- the JUNO-60 port has it (CLAIMS A37-A40) and the JX's is

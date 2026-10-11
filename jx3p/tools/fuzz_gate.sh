@@ -9,16 +9,21 @@
 # Two processes, never one (the two-process rule): the Unicorn oracle writes
 # reference blobs, then a separate ctypes process replays them.
 #
-# usage: sh fuzz_gate.sh [lo=0] [hi=24]
+# usage: sh fuzz_gate.sh [--tooth] [lo=0] [hi=24]
+#   --tooth: the C engine built with JX_HELPER_TOOTH (one slip in a voice helper's polynomial every voice runs):
+#   every seed must diverge (2026-10-11; the master's effect-LFO tooth was tried first: the factory patches the
+#   seeds draw never reach those sites -- DID NOT BITE on 12 seeds)
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
 WORK=${JX_FUZZ_WORK:-$(mktemp -d)}
 mkdir -p "$WORK"
+TOOTH=
+if [ "${1:-}" = "--tooth" ]; then TOOTH=-DJX_HELPER_TOOTH=1; shift; fi
 LO=${1:-0}
 HI=${2:-24}
 
-cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC \
+cc -O2 -fno-strict-aliasing -ffp-contract=off -shared -fPIC $TOOTH \
    -o "$WORK/libjxengine.so" \
    "$REPO/jx3p/src/jx_voice_render.c" "$REPO/jx3p/src/jx_voice_helpers.c" \
    "$REPO/jx3p/src/jx_master_render.c" "$REPO/jx3p/src/jx_ftz.c" -lm
@@ -42,6 +47,10 @@ while [ "$s" -lt "$HI" ]; do
 done
 rm -rf "$WORK/ab"
 
+if [ -n "$TOOTH" ]; then
+  if [ "$fails" -eq $((HI-LO)) ]; then echo "[jx fuzz gate] --tooth: BITES ($fails of $((HI-LO)) seeds diverged)"; exit 0; fi
+  echo "[jx fuzz gate] --tooth: DID NOT BITE ($fails of $((HI-LO)) seeds diverged)"; exit 1
+fi
 if [ "$fails" -ne 0 ]; then
   echo "[jx fuzz gate] FAIL -- $fails seed(s) diverged"; exit 1
 fi

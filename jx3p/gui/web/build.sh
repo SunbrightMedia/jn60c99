@@ -19,7 +19,7 @@ rm -f jx3p/gui/web/jx_template.bin.gz jx3p/gui/web/jx_master_recall.bin.gz \
       jx3p/gui/web/jx_template_96k.bin.gz jx3p/gui/web/jx_master_recall_96k.bin.gz
 emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
   -sGROWABLE_ARRAYBUFFERS=0 \
-  jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
+  jx3p/gui/jx_bridge.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
   jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
   -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_init","_jx3p_product_load_patch","_jx3p_bank_open","_jx3p_product_block","_jx3p_product_param","_jx3p_product_note","_malloc","_free"]' \
@@ -53,7 +53,7 @@ touch docs/.nojekyll
 # single-file build for the claude.ai Artifact (classic script, wasm inlined)
 emcc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing \
   -sGROWABLE_ARRAYBUFFERS=0 \
-  jx3p/gui/jx_bridge.c jx3p/src/jx_recall.c \
+  jx3p/gui/jx_bridge.c \
   jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c \
   jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c \
   -s EXPORTED_FUNCTIONS='["_jx3p_init","_jx3p_recall","_jx3p_param","_jx3p_records","_jx3p_lift_error","_jx3p_note_on","_jx3p_note_off","_jx3p_render","_jx3p_render_dry","_jx3p_product_open","_jx3p_product_init","_jx3p_product_load_patch","_jx3p_bank_open","_jx3p_product_block","_jx3p_product_param","_jx3p_product_note","_malloc","_free"]' \

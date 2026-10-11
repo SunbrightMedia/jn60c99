@@ -44,7 +44,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 import led_meter_gate as LMG                           # noqa: E402  (the JUNO gate's seeded inputs: plain data)
 
-SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_recall.c', 'jx3p/src/jx_voice_render.c',
+SRCS = ['jx3p/gui/jx_bridge.c', 'jx3p/src/jx_voice_render.c',
         'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c', 'jx3p/src/jx_ftz.c']
 TAIL, TAIL_END = 0x3F96DA, 0x3F98F1                    # the render's gain + peak loop and merge, to the cookie check
 PEAK_READ, METER_TICK, BAR_DRAW = 0x34AE30, 0x31C34A, 0x31C0F0

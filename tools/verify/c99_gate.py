@@ -22,7 +22,7 @@ build with -std=c99 accepts them. Two checks, every product translation unit:
 
 The product units are what ships and what every gate builds: JUNO -- libjuno.so's (Makefile: gui/juno_bridge.c,
 gui/juno_pm.c, src/*.c); JX-3P -- jx3p/gui/jx_bridge.c (with the lifted code, the JP8 runtime, the render object it
-includes), jx3p/gui/jx_pm_glue.c with gui/juno_pm.c (-DJPM_PRODUCT), jx3p/src/jx_recall.c, jx_voice_render.c,
+includes), jx3p/gui/jx_pm_glue.c with gui/juno_pm.c (-DJPM_PRODUCT), jx3p/src/jx_voice_render.c,
 jx_voice_helpers.c, jx_master_render.c, jx_ftz.c.
 
     python3 tools/verify/c99_gate.py [--self-test]
@@ -42,7 +42,7 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 
 JUNO = ['gui/juno_bridge.c', 'gui/juno_pm.c'] + sorted('src/' + f for f in os.listdir(os.path.join(REPO, 'src'))
                                                       if f.endswith('.c'))
-JX = ['jx3p/gui/jx_bridge.c', 'jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c', 'jx3p/src/jx_recall.c',
+JX = ['jx3p/gui/jx_bridge.c', 'jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c',
       'jx3p/src/jx_voice_render.c', 'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c',
       'jx3p/src/jx_ftz.c']
 UNITS = [('JUNO-60', u, ['-Isrc', '-Igui']) for u in JUNO] + \
