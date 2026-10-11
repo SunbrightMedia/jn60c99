@@ -58,6 +58,7 @@ echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="
 # recorded value, the bank decode census (with its tooth), and that the
 # shipped template and aux come from ONE boot.
 python3 "$HERE/jx_drive_gate.py"
+python3 "$HERE/jx_drive_gate.py" --tooth                  # the base match RED on the heap after initialize's records
 echo "=== JX GATE 1/5: RECALL ON THE PLUGIN'S OWN PATCH LOAD (playbook 197) ==="
 python3 "$HERE/jx_recall_product_check.py" 0 49          # the drive == the booted plugin, every unit, word for word
 python3 "$HERE/jx_recall_product_check.py" --tooth       # one record left out must be seen

@@ -3622,3 +3622,17 @@ A survivor is a question, not a verdict: measure what the slip changes (state, a
 equivalent or a blind spot. Choose each mutation's gate by where the slip lands -- an audio gate for audio, a
 state gate for state -- and run state gates at the rates the PRODUCT runs, not only the rate the oracle started
 with.
+
+## 209. WHEN A SHIPPED ARTIFACT'S MOMENT CHANGES, EVERY GATE THAT RE-MAKES IT MUST MOVE WITH IT
+Paid 2026-10-11 (JX-3P, the first full verify after JX-15b).
+The guest image changed its moment: version 2 is the heap as setActive leaves it, BEFORE initialize's records
+(the port queues them for the first block, as the plugin does). The exporter, the bridge's loader (it refuses
+any other version) and the product gates moved; the drive gate's base match -- a fresh boot compared with the
+committed image, byte for byte -- still booted with initialize's records applied. Every gate run during the
+change was green (none of them was the drive gate); the full verify went RED in its first minute, at GATE 0.
+The fix: the base match boots with the exporter's own recipe and checks the version; its tooth (the later
+boot) must be RED (jx_drive_gate.py --tooth, in GATE 0).
+### The rule
+An artifact has READERS and RE-MAKERS. When its definition changes, find both: grep the file's name, and also
+every gate that rebuilds it from the binary to compare. Then run the finish line from the top, not only the
+gates the change touched -- a full run is the only list of re-makers that cannot be incomplete.

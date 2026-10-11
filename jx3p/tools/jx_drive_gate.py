@@ -137,10 +137,12 @@ def check_decode():
     return 0
 
 
-def check_base_match():
+def check_base_match(tooth=False):
     """playbook 89: the shipped data must be THIS boot. The committed guest images (jx3p/gen/jx_guest_44k.bin.gz and
-    _96k.bin.gz, jx_guest_export.py): every byte of the plugin's heap after its boot at that rate, the image pages the
-    lifted code reads, the patch records -- equal to a boot made now, or RED."""
+    _96k.bin.gz, jx_guest_export.py, version 2): every byte of the plugin's heap as setActive leaves it at that rate
+    (its static initializers, BUILD, FTZ, the rate -- initialize's records NOT applied: the port queues them for
+    the first block, as the plugin does, HOST_LAYER.md 3k), the image pages the lifted code reads, the patch
+    records -- equal to a boot made now with the export's own recipe, or RED."""
     import gzip
     import json as _json
     import struct as _st
@@ -148,8 +150,13 @@ def check_base_match():
     for rate, name in ((44100.0, "jx_guest_44k.bin.gz"), (96000.0, "jx_guest_96k.bin.gz")):
         path = os.path.join(REPO, "jx3p", "gen", name)
         b = gzip.open(path, "rb").read()
+        if b[:4] != b"JXG1" or _st.unpack_from("<I", b, 4)[0] != 2:
+            return fail("%s: not a version 2 guest image (the heap before initialize's records)" % name)
         hb, hlen, host = _st.unpack_from("<3Q", b, 8)
-        jx = J.JX().boot(rate, snap=False, product=True)
+        if tooth:                       # the tooth: a boot one step later (initialize's records applied) must be RED
+            jx = J.JX().boot(rate, snap=False, product=True)
+        else:
+            jx = J.JX().boot(rate, snap=False, static_init=True)  # jx_guest_export.py's boot
         uc = jx.uc
         if hb != J.HEAP_BASE or host != jx.HOST or hlen != ((jx.heap + 0xFFF) & ~0xFFF) - J.HEAP_BASE:
             return fail("%s: not this boot's heap (base, length or HOST)" % name)
@@ -181,6 +188,10 @@ def check_base_match():
 
 
 def main():
+    if "--tooth" in sys.argv:          # the base match must see a heap one step after the image's moment
+        bad = check_base_match(tooth=True)
+        print("jx_drive_gate --tooth: %s" % ("BITES" if bad else "BLIND (the base match passed a later heap)"))
+        sys.exit(0 if bad else 1)
     quick = "--quick" in sys.argv
     bad = check_abi() + check_boot() + check_decode()
     if not quick:
