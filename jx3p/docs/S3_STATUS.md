@@ -3,6 +3,35 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-11 (16) — NaN PARITY, SECOND PASS: EQUALITIES, HELPERS, THE COMPILER, THE WEB ENGINE
+
+The first pass (15) graded `<` `<=` `>` `>=` and min / max. Four more classes, found on the JUNO-60 and present here
+(playbooks 222-225; HOST_LAYER.md 3u):
+- EQUALITIES. Every float equality of the plugin is `ucomiss` (or `comiss`) with a bare je / jne: a NaN reads
+  EQUAL; C's `==` reads it unequal. The JX voice holds 53 such compares, the master 41 (4 of them jx_lfo_step's,
+  already written in the machine's form). nan_sites.py now grades `==` / `!=` by the instruction AND its flag
+  consumers (a parity test would make C right: none here). Rewritten jx_feq / jx_fne (jx_voice_helpers.h):
+  JX voice 53 sites, master 37.
+- HELPERS. Each helper the render code calls, alone at its rva against the port's function (nan_helpers.py: NaNs,
+  infinities, denormals, random bits): the wrap to [-1, 1) returned a signalling NaN unquieted (the machine's
+  `comiss x, -1; jae` falls into the fmod), the pitch spline's clamp gave 8.9 for a signalling NaN (fmax; maxsd
+  gives -20), the triangle's tests -- rewritten in the machine's form; tanf, expf and the CRT's fmodf equal.
+- THE COMPILER. GCC computed `x * 16384` as the negation of `x * -16384` (12 sites in the master: the read heads),
+  flipping a NaN's sign the plugin keeps; -frounding-math -fsignaling-nans keep the plugin's operations (no number
+  changes), nan_codegen.py proves it on GCC's output (tooth: no flags, 12 flips the C does not write).
+- THE WEB ENGINE. emcc's default float -> int gave 0 for a NaN where x86 gives INT_MIN: the page builds with
+  -mno-nontrapping-fptoint; wasm_fptoint_check.py scans the delivered build and probes NaN / past-range values.
+- THE CENSUS. Every float compare / min-max instruction that ran must be graded through a C site (a tie had let two
+  sites share one instruction and leave its twin ungraded); the 12 inline jx_lfo_step tests are listed READ. Its
+  tooth: line 1162 taken out, its instruction (rva 0x3A22FD) must be reported UNCLAIMED.
+RESULT (job mapfin2, EXIT 0): JX voice 332 C sites, all run, 0 WRONG / review / unmatched / conflicting, census
+302 / 302; master 204 sites, all run, 0 WRONG, census 175 graded + 12 READ, 0 UNCLAIMED; jx_nan_ab EQUAL on 68 live
+cells (its no-NaN control equal to the plugin); nan_helpers EQUAL on all 8 helpers, both teeth bite; nan_codegen
+clean (tooth: 12); the page's WASM == native on 64 patches at 3 rates (jx_wasm_check GREEN) and its conversions x86's
+(wasm_fptoint_check, tooth bites). The census also found a tool defect: the oracle read a compare's flag consumers
+12 instructions ahead only (playbook 225) -- it now follows every path. OPEN in row 23 until the full verify of
+de04f854 (job jxverify_de04) is GREEN.
+
 ## 2026-10-11 (15) — NaN AND DENORMAL PARITY: EVERY COMPARE AND MIN / MAX GRADED BY ITS OWN INSTRUCTION; THE GATES' FP MODE
 
 Two defect classes no gate could see (scope row 23; playbooks 219, 220, 221; HOST_LAYER.md 3t):

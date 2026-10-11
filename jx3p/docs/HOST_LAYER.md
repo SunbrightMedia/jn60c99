@@ -594,7 +594,9 @@ BLOCKED on inputs the project does not have: the panel art (row 20) and the user
   twin ungraded. An equality takes a candidate read by je / jne, a relation one read by jb / ja / jae / jbe; a
   compare of two C integers is graded by its C types first (master line 2619, `*v490 == 1`). Tooth: line 1162 taken
   out of the map, its instruction (ucomiss at rva 0x3A22FD, the cell +270208 it reads) must be reported UNCLAIMED.
-- RESULT: RESULT_3U
+- RESULT (job mapfin2): voice 332 / 332 sites run, 0 wrong, census 302 / 302; master 204 / 204 run, 0 wrong,
+  census 175 + 12 READ; jx_nan_ab EQUAL (68 cells); nan_helpers EQUAL (8 helpers); nan_codegen clean; the page's
+  WASM == native (64 patches, 3 rates) and its conversions x86's. GATE 3i of make verify-jx3p runs all of it.
 
 ## 3e. The arpeggiator's step modes (READ + EXECUTED, 2026-10-10)
 
