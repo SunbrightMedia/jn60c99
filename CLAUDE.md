@@ -304,7 +304,8 @@ mine is a hypothesis (playbook 80).
   (23 rows). The 64 factory patches through the host path at 48000, host blocks up to 4096: GREEN (job
   jp8_host_gate10; rows 5, 7). Drive v8 -- the host transport (only the tempo changes a word; playbook 243) and the
   editor's open + window zoom (E1, the host's IPlugFrame: the oracle had none and ran the zero page, playbook 242) --
-  EXACTLY 0 on patch 2. NEXT: jobs jp8_host_gate11 (v8, three rates), jp8_render_v3 and jp8_verify_eeb0 (EXITs owed),
+  EXACTLY 0 on patch 2. The render check on the new template GREEN (job jp8_render_v3). NEXT: jobs jp8_host_gate11 (v8, three
+  rates) and jp8_verify_eeb0 (EXITs owed),
   the JX verify (its lift includes jp8_cpu.h), the editor's meters / CC menu / patch window (the drawn panel needs the
   user's JP8 script file and art), a live app. Speed ~670 ms per
   second of audio here (the plugin ~410). The bit-exact JP8 is ~5.3x one S3.

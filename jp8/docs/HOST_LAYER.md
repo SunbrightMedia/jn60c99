@@ -273,9 +273,11 @@ playing flag (state & 2), position (ppq, if state & 0x200), tempo (if state & 0x
 start, end) into a transport record (rva 0x36C28B-0x36C2E0); the render driver (rva 0x33AD6C-0x33ADF9) hands its
 engine object the playing flag (slot 23), the position (slot 24) and the loop (slot 28) every block, and the tempo x
 10 (the .rdata constant 10.0 at rva 0xB56D48; rounded by rva 0x46EDE0, clamped to int32) when it changes and is
-valid (slot 20). kCycleActive (0x4) is never read. On the v8 drive only the tempo
-changes an output word; the position, the flag and the loop change the memory after (perturbed on the lifted path,
-which equals the plugin there).
+valid (slot 20). kCycleActive (0x4) is never read. The engine's methods for the flag, the position and the loop are EMPTY (`ret 0`
+at rva 0x36CCB0, 0x36CCA0, 0x36CC90: READ); the tempo's (rva 0x446A20) takes tempo x 10 in 400..3000 (40-300 BPM) and
+dispatches id 375 to the 9 units. So on any drive only the tempo can change the sound; on the v8 drive the position,
+the flag and the loop change no word but do change the memory after (perturbed on the lifted path, which equals the
+plugin there; where in memory: not traced).
 
 ## 6. Next
 

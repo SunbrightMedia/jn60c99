@@ -1,22 +1,17 @@
-# jp8_render (jp8/apps/jp8_render.c) graded against the plugin -- 2026-10-12
-# CLI: linked with job jp8_host_gate9's product objects (hlift_prd.o sha256 81cc07bf03d45155..., the v7 lift jp8_host_lift.c 7b6551e4995e781a...)
-# template: jp8/gen/jp8h_template.bin.gz (raw sha256 a30f59c6bf8095a5...); bank jp8/truth/1_Preset.bin; MIDI: jp8_render_check.py --write-midi (sha256 5ff22565ce23a4e5...)
-# render: patch 2 'BR JP PWM Brass', 5.56 s of audio at 48000 Hz in 3.75 s of CPU (674 ms per second of audio; this 4-core VM, three other jobs running); a second render: WAV and plan byte-identical (WAV sha256 9e5943216df3666a...)
-# plan: 522 blocks, 17 note events, 12 parameter points
-## the check (jp8_render_check.py 2 plan.txt out.wav 48000):
-[   4.8s] DllMain(PROCESS_ATTACH) -> 1
-[  20.3s] InitDll -> 1
-[  65.3s] IComponent::initialize -> 0x0
-[  65.4s] patch 2 'BR JP PWM Brass '; 522 blocks, 17 events, 12 points to replay
-[  66.3s] block 0 of 522, 0 words differ so far
-[ 175.3s] block 200 of 522, 0 words differ so far
-[ 291.9s] block 400 of 522, 0 words differ so far
+# 2026-10-12: job jp8_render_v3 (EXIT 0), the tree of a0d0261b: jp8/apps/render_check.sh 2 48000 on the shipped template raw 51be86b0... (v3: the editor imports' state, the host's frame)
+jp8_fast: 1257 functions (1 allocator stubs), 339063 statements after 4374 calls inlined; flags LOCAL (no flag live where functions meet)
+jp8_xlane: 1257 functions; lane write 89439, load cg 47665, store cg 37189, movss load 16113, copy 15013, movss store 12022, ldx 4549, head read 3935, stx 2704, read 2306, other write 344, whole write 169, fallback 132
+built /home/user/snap_jp8g11/build/jp8_render/jp8_render
+wrote /home/user/snap_jp8g11/build/jp8_render/check.mid
+patch 2 'BR JP PWM Brass '
+5.56 s of audio at 48000 Hz in 3.46 s of CPU (622 ms per second of audio) -> /home/user/snap_jp8g11/build/jp8_render/check.wav
+[   4.5s] DllMain(PROCESS_ATTACH) -> 1
+[  19.9s] InitDll -> 1
+[  76.3s] IComponent::initialize -> 0x0
+[  76.6s] patch 2 'BR JP PWM Brass '; 522 blocks, 17 events, 12 points to replay
+[  77.5s] block 0 of 522, 0 words differ so far
+[ 203.5s] block 200 of 522, 0 words differ so far
+[ 315.4s] block 400 of 522, 0 words differ so far
 JP8 RENDER CLI (patch 2, 267001 frames at 48000 Hz, 522 blocks): EXACTLY 0 -- every output word is the plugin's
-## the tooth (the same WAV, one bit flipped at frame 100000 R):
-[  88.0s] patch 2 'BR JP PWM Brass '; 522 blocks, 17 events, 12 points to replay
-[  88.9s] block 0 of 522, 0 words differ so far
-[ 220.8s] block 195 sample 160: oracle bd0b0dea bcd02adf CLI bd0b0dea bcd02ade
-[ 223.7s] block 200 of 522, 1 words differ so far
-[ 357.9s] block 400 of 522, 1 words differ so far
-JP8 RENDER CLI (patch 2, 267001 frames at 48000 Hz, 522 blocks): 1 frames differ -- NOT bit-exact
-rc=1
+render tooth bites: JP8 RENDER CLI (patch 2, 267001 frames at 48000 Hz, 522 blocks): 1 frames differ -- NOT bit-exact
+JP8 RENDER CHECK GREEN (patch 2 at 48000 Hz)

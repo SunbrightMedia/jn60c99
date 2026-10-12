@@ -166,8 +166,8 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    ran the zero page as code where a PC faults (playbook 242: a frame now, and a named stop for any zero-page run);
    tooth T13 forced flags the plugin's output never depends on (playbook 243: of the context only the tempo changes a
    word on the drive; the position, flag and loop are stored -- the memory after grades them). The template ships again
-   (raw 51be86b0..., v3: the editor imports' state and the frame). RUNNING: jp8_host_gate11 (v8 at three rates, 14
-   teeth), jp8_render_v3 (the render check on the new template).
+   (raw 51be86b0..., v3: the editor imports' state and the frame). The render check on it: GREEN (job jp8_render_v3, EXIT 0:
+   patch 2, 267,001 frames EXACTLY 0, its tooth bites). RUNNING: jp8_host_gate11 (v8 at three rates, 14 teeth).
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),
