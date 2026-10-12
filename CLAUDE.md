@@ -286,11 +286,14 @@ mine is a hypothesis (playbook 80).
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code
   lifter's three layer gates are EXACTLY 0 on drive2 with teeth; the PSI
   template + the oracle-recorded recall table are exported (jp8/gen/).
-  NEXT (the user's order, 2026-10-12): STEP 1 the FAST LIFTER --
-  jp8/tools/jp8_fast.py (registers and flags in C locals; playbook 230): the
-  JX voice lift 2,320 -> 371 ms per second of audio, the plugin's own code
-  159 ms; then jp8.h + jp8_engine.c (self-booting engine) + the full-chain
-  gate 64/64. The bit-exact JP8 is ~5.3x one S3.
+  The fast lifter (jp8/tools/jp8_fast.py, playbook 230) and THE SELF-BOOTING
+  ENGINE (jp8/src/jp8.h + jp8_engine.c: the template, the plugin's own boot
+  order, its own recall calls) are done: jp8_full_gate.sh -- the engine vs
+  drive2, every word + init / end memory EXACTLY 0 on 4 patches in the checked
+  and the product build, 4 teeth bite. NEXT: 64 patches + 96 kHz (job), speed
+  (the product build 939 ms per second of audio here, the plugin 188: one
+  delta for every region), the C-twin listen, the host RENDER path. The
+  bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.

@@ -69,12 +69,25 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    (logs/lift_reach64_drive2.log), and the fast pass's output (jp8_fast.py at a4ce65ac) 64 / 64 EXACTLY 0 on the same
    oracle runs (logs/lift_reach64_drive2_fast.log; job jp8_reach64_both, EXIT 0). The command was:
    `sh tools/run_job.sh jp8_reach64 sh jp8/tools/jp8_lift_reach.sh` -> logs/lift_reach64_drive2.log (~80 min).
-2. The self-booting engine: jp8/src/jp8.h + jp8_engine.c (SHIPPING_DESIGN.md report C section 2, CORRECTED for drive2:
-   no snap; build = replay FACTORY then BUILD at MXCSR 0x1F80, then 0x9FC0; host_init + recall from jp8_recall_tab.h;
-   render = the per-sample wrap calls with the stub's pointer layout; JP8_RELOC lane; setjmp -> JP8_E_TRAP, never abort).
-3. Full-chain gate (step 7): jp8_full_seq/emu/c + jp8_full_gate.sh — Control 1 (post-init hash == oracle), Run A (oracle
-   chunking, words + end hash EXACT), Run B (random chunks), teeth T1 note skew, T2 lift tooth 0x38633e, T3 a HOST tooth
-   (corrupt the constructed [HOST+8] on the C side), T4 template without the stack. 4 patches, then 64 via run_job.
+2. DONE 2026-10-12: THE SELF-BOOTING ENGINE, jp8/src/jp8.h + jp8/src/jp8_engine.c (JP8_RELOC). jp8_init(template, rate)
+   maps the JP8T regions, then the drive2 order of jp8_emu.JP8.boot: FACTORY + BUILD at MXCSR 0x1F80 (the HOST and the
+   unit pointers checked against the READ facts), FTZ 0x9FC0, SETSR (the rate as a float in xmm1), the controller's
+   default push (jp8_hostinit_tab); jp8_recall = the oracle's recorded HOSTPARAM calls (jp8_recall_tab.h); notes =
+   NOTEON / NOTEOFF; render = per host sample VOICE_WRAP x8 + MASTER_WRAP in jp8_lift_seq.py's call layout. Every lifted
+   call goes through jp8_call_x (the layer gates' call path); a trap kills the engine (JP8_E_TRAP, zeros out, nothing
+   aborts); the host MXCSR is saved and restored. No snap, no latch clear, no replayed oracle call.
+3. DONE 2026-10-12 (4 patches; the 64-patch run and 96000 are the next job): THE FULL-CHAIN GATE, jp8_full_seq.py /
+   jp8_full_emu.py / jp8_full_c.py / jp8_full_gate.sh (job jp8full_gate1, EXIT 0, logs/full_gate_44100.log). CONTROL 0
+   (the template == the oracle's post-static-init memory), CONTROL 1 (sha256 of the image + the heap after jp8_init ==
+   the oracle's), RUN A (whole render events) and RUN B (re-init + random chunks of 1..300): every output word, the end
+   hash and the bump pointer EXACTLY 0 on patches 2, 63, 0 (a patch change under a held note) and 12 (ten keys on eight
+   voices), 17,096-22,096 samples each, in BOTH builds: CHECKED (the lift, every access bounds-checked, -O1) and PRODUCT
+   (jp8_fast.py's pass, no check, -O2). Teeth, each seen to fail: T1 a note one key up (sample 4096, voice 7), T2 the
+   FINE TUNE addss turned subss (CONTROL 1), T3 one bit of [HOST+8] (CONTROL 1), T4 the template without its stack
+   (CONTROL 1). SPEED (44.1 kHz, a note held, this shared Xeon): the product build 939 ms per second of audio (init
+   205 ms, a recall 0.9 ms); the same fast pass on the identity map 472-520 ms; the plugin's own code natively 188 ms.
+   The band table costs ~1.9x: every guest access reloads jp8_bdelta (any store may alias it). Next lever: ONE delta for
+   every region (one reservation), held in a local per function.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),
