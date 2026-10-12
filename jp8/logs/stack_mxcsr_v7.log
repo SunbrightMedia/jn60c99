@@ -1,0 +1,42 @@
+# 2026-10-12: job jp8_host_gate9 (drive v7) RED on the guest stack only -- located and fixed (playbook 241)
+## gate9, the checked build at 48000 (bench/jobs/jp8_host_gate9/log):
+[ 170.5s] STACK hash differs: C 9f258a273e533026 oracle 8bae8fb0055740fc
+[ 170.5s] 2599 steps, 1849808 words (0 differ), 60636 state bytes, 9044 performEdits, 30124 worker jobs, heap 112436 live / 146 free blocks, end EXACT, stack differs (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): 1 differences -- NOT bit-exact
+## the old oracle (thread MXCSR 0) re-run keeping its stack; the gate9 product build vs it (the 29 words):
+[  15.8s] STACK hash differs: C 9f258a273e533026 oracle 8bae8fb0055740fc
+[  16.5s]   29 stack words differ, 0x201eef4f0 .. 0x201fefe00
+[  16.5s]   0x201eef4f0: C 0000000000000000 oracle 0000000000009fc0
+[  16.5s]   0x201eef4f8: C 0000000000000000 oracle 00000001807959fd
+[  16.5s]   0x201eef500: C 0000000000000000 oracle 0000000000009fc0
+[  16.5s]   0x201eef520: C 0000000000000000 oracle 0000000201eef5f8
+[  16.5s]   0x201eef528: C 0000000000000000 oracle 000000018079558a
+[  16.5s]   0x201eef540: C 0000000000009ff5 oracle 0000000000000000
+[  16.5s]   0x201eef548: C 0000000180795a92 oracle 0000000000000000
+[  16.5s]   0x201eef550: C 0000000000000000 oracle 0000000201eef691
+[  16.5s]   0x201eef558: C 0000000000000000 oracle 0000000180795659
+[  16.5s]   0x201eef560: C 0000000000000000 oracle 0000000201eef610
+[  16.5s]   0x201eef570: C 0000000000009ff5 oracle 0000000000009fc0
+[  16.5s]   0x201eef580: C 0000000000009ff5 oracle 0000000200008040
+[  16.5s]   0x201eef588: C 0000000000000000 oracle 0000000201eef5f0
+[  16.5s]   0x201eef590: C 0000000000000000 oracle 0000000000000001
+[  16.5s]   0x201eef5b0: C 0000000000009ff5 oracle 0000000000008040
+[  16.5s]   0x201eef5b8: C 0000000000009ff5 oracle 0000000000009fc0
+## the new runtime (guest MXCSR exact) vs the OLD oracle, then vs the FIXED oracle (thread MXCSR 0x1F80):
+[  14.1s] 2599 steps, 1849808 words (0 differ), 60636 state bytes, 9044 performEdits, 30124 worker jobs, heap 112436 live / 146 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+--- libjp8host_prd.so vs the FIXED oracle (thread MXCSR 0x1F80)
+[  13.9s] 2599 steps, 1849808 words (0 differ), 60636 state bytes, 9044 performEdits, 30124 worker jobs, heap 112436 live / 146 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+--- libjp8host_sfp2.so vs the FIXED oracle (thread MXCSR 0x1F80)
+[  94.2s] 2599 steps, 1849808 words (0 differ), 60636 state bytes, 9044 performEdits, 30124 worker jobs, heap 112436 live / 146 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+## the fixed oracle vs the old one (meta):
+tail: cannot open '/tmp/claude-0/-home-user-jn60c99/923a3004-b1f0-5a0a-a8db-7d989010b124/scratchpad/tasks/by1mv1j07.output' for reading: No such file or directory
+## the oracle's float modes (jp8_unicorn_fp_probe.py):
+unicorn 2.1.4
+  a thread starts at MXCSR 0x0 (Windows: 0x1F80 -- the emulators set it, playbooks 228 / 241)
+  FTZ: 1e-20f * 1e-20f at 0x9FC0 stores 0x000116c2 (NOT flushed: no FTZ)
+  DAZ: denormal 0x100 * 1.0 at 0x9FC0 -> 0x00000000, at 0x9F80 (DAZ off) -> 0x00000100
+  flags: MXCSR after an inexact mulss 0x9fc0 (no sticky flag)
+the known answers of Unicorn 2.1.4: ALL HOLD

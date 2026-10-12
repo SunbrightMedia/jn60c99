@@ -100,11 +100,13 @@ if h.com_next != com_init:
     raise SystemExit('the host-object area grew during the drive: 0x%x -> 0x%x' % (com_init, h.com_next))
 edits = [[e[1], struct.unpack('<Q', struct.pack('<d', e[2]))[0]] for e in h.edits[e0:] if e[0] == 'performEdit']
 open(os.path.join(out, 'words.bin'), 'wb').write(bytes(words))
+stack = bytes(uc.mem_read(Q.STACK_BASE, Q.STACK_SIZE))    # the guest stack after the drive (graded by hash; kept so a
+open(os.path.join(out, 'stack.bin.z'), 'wb').write(zlib.compress(stack, 6))   # difference can be located)
 open(os.path.join(out, 'states.bin'), 'wb').write(bytes(state_bytes))
 json.dump(dict(rate=Q.RATE, patches=Q.PATCHES, rates=Q.RATES, nsteps=len(ST), results=results, init_hash=init_hash,
                end_hash=memhash(), heap_end=h.heap, com_next_end=h.com_next, jobs=len(h.jobs) - j0, edits=edits,
                heap_live=len(h._live), heap_free=sum(len(v) for v in h._freel.values()),
-               stack_hash=hashlib.sha256(bytes(uc.mem_read(Q.STACK_BASE, Q.STACK_SIZE))).hexdigest(),
+               stack_hash=hashlib.sha256(stack).hexdigest(),
                template_sha256=hashlib.sha256(body).hexdigest()), open(os.path.join(out, 'meta.json'), 'w'))
 log('wrote %s: %d steps, %d blocks, %d words, %d state bytes, %d performEdits, %d worker jobs' % (
     out, len(ST), nblock, len(words) // 4, len(state_bytes), len(edits), len(h.jobs) - j0))

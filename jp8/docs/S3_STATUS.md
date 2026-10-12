@@ -147,6 +147,16 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    is seen; 674 ms per second of audio (one core, three jobs running). The template ships (jp8/gen/jp8h_template.bin.gz,
    8.1 MB; raw sha256 a30f59c6...) and the host gate checks it (stage 2b, tooth T11). One command:
    jp8/apps/render_check.sh. NEXT: a live app (audio device, MIDI in) and the software-float builds (scope row 18).
+3g. 2026-10-12: GATE9 (drive v7, three first rates) RED -- ON THE GUEST STACK ONLY. 1,849,808 words, 60,636 state
+   bytes, 9,044 performEdits, 30,124 jobs, the heap and the memory after EXACT; 29 stack words differ (the CRT's float
+   error handler: the oracle's raise path, the port's masked path). Cause: the host oracle's thread started at MXCSR 0
+   (playbook 228, fixed in the JUNO / JX emulators, not in jp8_emu.py) and the C runtime ran a guest 0 as 0x9FC0 and let
+   the host CPU's sticky flags show through stmxcsr. Fixed both (playbook 241): with the new runtime the product and
+   SOFTFP=2 builds are EXACTLY 0 against the old oracle and against the fixed one, stack included. Software floats:
+   SOFTFP=1 and 2 EXACTLY 0 on v7 (words, memory after); no software flush (tooth T12) changes the memory after; the
+   oracle has DAZ but no FTZ (MEASURED; scope row 23: no graded drive makes a denormal result). AArch64: the render CLI
+   (SOFTFP=2, qemu) byte-identical to the graded x86 render. The shipped template re-exported (raw f43e2d35...).
+   NEXT: the full verify (A-E) on this commit; the JX's verify too (its lifted code includes jp8_cpu.h).
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

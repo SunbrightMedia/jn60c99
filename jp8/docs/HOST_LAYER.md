@@ -214,6 +214,16 @@ three threaded runs EXACTLY 0 -- 15 runs -- and the 6 teeth bite (T1 74,668 diff
 Drive v6 at the three first rates: GREEN (job jp8_host_gate8, S3_STATUS 3d). Scope NOT covered yet (owed): the v7 sweep's gate (jp8/docs/SCOPE_AUDIT.md rows 1-4); the editor (and the drawn panel:
 the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only).
 
+THE MXCSR (2026-10-12, playbook 241; job jp8_host_gate9 RED on the stack only): the oracle's thread now starts at
+0x1F80, as every Windows thread does (jp8_emu.JX.__init__; it started at Unicorn's 0, so the plugin's ScopedNoDenormals
+made 0x8040 with every exception unmasked and the CRT's float error handler, rva 0x797050, took its raise path). The C
+runtime models the guest's MXCSR exactly: c->mxcsr is what the plugin loaded and stmxcsr reads it back (never the host
+CPU's sticky flags, which the CRT reads); the host runs at its FTZ / DAZ / rounding with every exception masked
+(JP8_FPENV); JP8_SOFTFP follows its DAZ and FTZ bits in software (mode 2 the hardware's, mode 1 the oracle's: DAZ only --
+Unicorn has no FTZ, jp8_unicorn_fp_probe.py). Against the v7 drive the product and SOFTFP=2 builds are EXACTLY 0 with
+the old oracle and with the fixed one, stack included; the fixed oracle changes only the stack and the template's MXCSR
+(words, states, the memory after: identical). The host gate grades the software floats (a fourth build) and tooth T12.
+
 THE RENDER CLI (2026-10-12): jp8/apps/jp8_render.c (ISO C99) runs this host path as a program -- jp8h_init on the
 shipped template (jp8/gen/jp8h_template.bin.gz, the oracle's memory before setupProcessing; the host gate's stage 2b
 checks it, tooth T11), the plugin's own patch load of a factory record, then a MIDI file (format 0 / 1, the tempo map;

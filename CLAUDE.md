@@ -294,13 +294,17 @@ mine is a hypothesis (playbook 80).
   template taken BEFORE the host knows its rate (playbook 235); both sides'
   heaps reuse freed blocks (playbook 238). jp8_host_gate.sh GREEN on drive v6
   at the first rates 48000 / 44100 / 96000 (job jp8_host_gate8: checked,
-  product = lanes + non-volatile memory, threads; 4 patches; 9 teeth). SCOPE:
-  jp8/docs/SCOPE_AUDIT.md (22 rows, measured) -- rows 1-4 (every panel
-  parameter's positions, effects, arpeggiator, assign modes) close with the
-  v7 sweep's gate (owed; its reach runs in pieces). NEXT: that gate, the
-  mutation gate (jp8_mutation_gate.py), the editor (needs the user's JP8
-  script file and art), speed (~640 ms per second of audio here; the plugin
-  ~410). The bit-exact JP8 is ~5.3x one S3.
+  product = lanes + non-volatile memory, threads; 4 patches; 9 teeth). Drive
+  v7 (every panel parameter's positions, effects, arpeggiator, assign modes):
+  gate9 RED on the guest stack only -- the JP8 emulator missed playbook 228's
+  MXCSR 0x1F80 and the runtime showed host flags; both fixed (playbook 241:
+  EXACTLY 0, stack included, product and software floats). The render CLI
+  (jp8/apps/jp8_render.c, MIDI file -> WAV) is EXACTLY 0 against the plugin
+  (render_check.sh); AArch64 render equal. SCOPE: jp8/docs/SCOPE_AUDIT.md
+  (23 rows). NEXT: verify-jp8 A-E on the newest commit, the JX verify (its
+  lift includes jp8_cpu.h), 64 patches + max block 4096 (rows 5, 7), the
+  editor (the user's JP8 script file and art), a live app. Speed ~670 ms per
+  second of audio here (the plugin ~410). The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.

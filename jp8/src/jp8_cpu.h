@@ -20,9 +20,10 @@
  * JP8_RELOC        guest addresses stay the oracle's 64-bit values; every access is translated to a host arena through
  *                  a 256 MB band table (no MAP_FIXED, no fixed host address; wasm32 / AArch64 / any 64-bit host).
  * JP8_RELOC_CHECK  + bounds check on every access: an access outside every mapped region traps (gate RED).
- * JP8_SOFTFP=1     FTZ/DAZ in software, the ORACLE's semantics (Unicorn 2.1.4): DAZ on inputs, a denormal IEEE result
- *                  becomes a signed zero, min/max compare the flushed values but return the ORIGINAL bits, MXCSR flags
- *                  never set. For hosts without x86 FTZ/DAZ (WASM, ARM) and for the oracle-judged gates.
+ * JP8_SOFTFP=1     DAZ in software, the ORACLE's semantics (Unicorn 2.1.4): DAZ on inputs when MXCSR bit 6 is set, a
+ *                  denormal result NEVER flushed (Unicorn has no FTZ: PROVEN by jp8/tools/jp8_unicorn_fp_probe.py, mulss
+ *                  1e-20 * 1e-20 at 0x9FC0 stores 0x000116C2; playbook 120 found it on the JX), min/max compare the
+ *                  flushed values but return the ORIGINAL bits, MXCSR flags never set. For the oracle-judged gates.
  * JP8_SOFTFP=2     FTZ/DAZ in software, x86 HARDWARE semantics: tininess AFTER rounding (a product/quotient/narrowing
  *                  that rounds to FLT_MIN/DBL_MIN only through gradual underflow is flushed), min/max return the
  *                  flushed operand. (Flags are not modelled in either mode.) */
@@ -281,17 +282,29 @@ static inline uint64_t sext(int sz, uint64_t v) { return sz == 64 ? v : sz == 32
 #define JP8_SQRTSD(a) sqrt(a)
 #define JP8_DAZF(a) (a)
 #define JP8_DAZD(a) (a)
-#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); _mm_setcsr((c)->mxcsr); } while (0)
-#define JP8_STMXCSR(c) _mm_getcsr()
+/* THE GUEST'S MXCSR is c->mxcsr, exactly: what the plugin last loaded (stmxcsr reads it back, as the oracle's does --
+ * Unicorn 2.1.4 never sets an exception flag, so the host CPU's own sticky flags must not show; the plugin's CRT reads
+ * them: playbook 241). The host runs at the guest's FTZ / DAZ / rounding with every exception masked, so a guest mode
+ * with exceptions unmasked is modeled, never trapped. */
+#define JP8_FPENV(c) _mm_setcsr((c)->mxcsr | 0x1F80u)
+#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); JP8_FPENV(c); } while (0)
+#define JP8_STMXCSR(c) ((c)->mxcsr)
 #else
 static inline uint32_t jp8_fb(float x) { uint32_t u; memcpy(&u, &x, 4); return u; }
 static inline float jp8_bf(uint32_t u) { float x; memcpy(&x, &u, 4); return x; }
 static inline uint64_t jp8_db(double x) { uint64_t u; memcpy(&u, &x, 8); return u; }
 static inline double jp8_bd(uint64_t u) { double x; memcpy(&x, &u, 8); return x; }
-/* DAZ (and FTZ of an already-rounded result): exponent field 0 -> zero of the same sign. Hardware == oracle here. */
-/* branchless on purpose: a branch per operand costs ~20 cycles in code this large (BTB misses; measured 5x) */
-static inline float jp8_dazf(float x) { uint32_t u = jp8_fb(x); return jp8_bf(u & (0x80000000u | (0u - (uint32_t)((u & 0x7F800000u) != 0)))); }
-static inline double jp8_dazd(double x) { uint64_t u = jp8_db(x); return jp8_bd(u & (0x8000000000000000ULL | (0ULL - (uint64_t)((u & 0x7FF0000000000000ULL) != 0)))); }
+/* THE GUEST'S FLUSH MODES, from its MXCSR (set at every ldmxcsr and call entry, JP8_FPENV): 1 = that flush is OFF.
+ * The plugin's own ScopedNoDenormals turns DAZ and FTZ on inside process() and back off after; outside it (and in
+ * the CRT's error handler, whose _ctrlfp rewrites the control word) a Windows thread runs IEEE (MXCSR 0x1F80). */
+extern JP8_TLS uint32_t jp8_daz_off, jp8_ftz_off;
+/* DAZ of an input / FTZ of an already-rounded result: exponent field 0 -> zero of the same sign, when that flush is on.
+ * Hardware == oracle here. Branchless on purpose: a branch per operand costs ~20 cycles in code this large (BTB
+ * misses; measured 5x). */
+static inline float jp8_dazf(float x) { uint32_t u = jp8_fb(x); return jp8_bf(u & (0x80000000u | (0u - (uint32_t)(((u & 0x7F800000u) != 0) | jp8_daz_off)))); }
+static inline double jp8_dazd(double x) { uint64_t u = jp8_db(x); return jp8_bd(u & (0x8000000000000000ULL | (0ULL - (uint64_t)(((u & 0x7FF0000000000000ULL) != 0) | jp8_daz_off)))); }
+static inline float jp8_ftzf(float x) { uint32_t u = jp8_fb(x); return jp8_bf(u & (0x80000000u | (0u - (uint32_t)(((u & 0x7F800000u) != 0) | jp8_ftz_off)))); }
+static inline double jp8_ftzd(double x) { uint64_t u = jp8_db(x); return jp8_bd(u & (0x8000000000000000ULL | (0ULL - (uint64_t)(((u & 0x7FF0000000000000ULL) != 0) | jp8_ftz_off)))); }
 #if defined(__GNUC__)
 #define JP8_RARE(x) __builtin_expect(!!(x), 0)
 #else
@@ -317,7 +330,7 @@ static inline float jp8_fixf(float r, float a, float b) {
         if ((ub & 0x7FFFFFFFu) > 0x7F800000u) return jp8_bf(ub | 0x00400000u);
         return jp8_bf(0xFFC00000u);
     }
-    return jp8_dazf(r);
+    return jp8_ftzf(r);
 }
 static inline double jp8_fixd(double r, double a, double b) {
     uint64_t u = jp8_db(r);
@@ -327,7 +340,7 @@ static inline double jp8_fixd(double r, double a, double b) {
         if ((ub & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL) return jp8_bd(ub | 0x0008000000000000ULL);
         return jp8_bd(0xFFF8000000000000ULL);
     }
-    return jp8_dazd(r);
+    return jp8_ftzd(r);
 }
 static inline float jp8_addss(float a, float b) { a = jp8_dazf(a); b = jp8_dazf(b); return jp8_fixf(a + b, a, b); }
 static inline float jp8_subss(float a, float b) { a = jp8_dazf(a); b = jp8_dazf(b); return jp8_fixf(a - b, a, b); }
@@ -336,28 +349,28 @@ static inline double jp8_subsd(double a, double b) { a = jp8_dazd(a); b = jp8_da
 static inline float jp8_mulss(float a, float b) {
     float r; a = jp8_dazf(a); b = jp8_dazf(b); r = a * b;
 #if JP8_SOFTFP == 2
-    if (JP8_RARE(jp8_isminf(r)) && fabsf((a * 0x1p64f) * b) < 0x1p-62f) return jp8_sz_f(r);
+    if (JP8_RARE(jp8_isminf(r)) && !jp8_ftz_off && fabsf((a * 0x1p64f) * b) < 0x1p-62f) return jp8_sz_f(r);
 #endif
     return jp8_fixf(r, a, b);
 }
 static inline float jp8_divss(float a, float b) {
     float r; a = jp8_dazf(a); b = jp8_dazf(b); r = a / b;
 #if JP8_SOFTFP == 2
-    if (JP8_RARE(jp8_isminf(r)) && fabsf((a * 0x1p64f) / b) < 0x1p-62f) return jp8_sz_f(r);
+    if (JP8_RARE(jp8_isminf(r)) && !jp8_ftz_off && fabsf((a * 0x1p64f) / b) < 0x1p-62f) return jp8_sz_f(r);
 #endif
     return jp8_fixf(r, a, b);
 }
 static inline double jp8_mulsd(double a, double b) {
     double r; a = jp8_dazd(a); b = jp8_dazd(b); r = a * b;
 #if JP8_SOFTFP == 2
-    if (JP8_RARE(jp8_ismind(r)) && fabs((a * 0x1p600) * b) < 0x1p-422) return jp8_sz_d(r);
+    if (JP8_RARE(jp8_ismind(r)) && !jp8_ftz_off && fabs((a * 0x1p600) * b) < 0x1p-422) return jp8_sz_d(r);
 #endif
     return jp8_fixd(r, a, b);
 }
 static inline double jp8_divsd(double a, double b) {
     double r; a = jp8_dazd(a); b = jp8_dazd(b); r = a / b;
 #if JP8_SOFTFP == 2
-    if (JP8_RARE(jp8_ismind(r)) && fabs((a * 0x1p600) / b) < 0x1p-422) return jp8_sz_d(r);
+    if (JP8_RARE(jp8_ismind(r)) && !jp8_ftz_off && fabs((a * 0x1p600) / b) < 0x1p-422) return jp8_sz_d(r);
 #endif
     return jp8_fixd(r, a, b);
 }
@@ -367,9 +380,9 @@ static inline float jp8_cvtsd2ss(double x) {
         return jp8_bf((uint32_t)(ux >> 32 & 0x80000000u) | 0x7FC00000u | (uint32_t)((ux >> 29) & 0x003FFFFFu));
     x = jp8_dazd(x); r = (float)x;
 #if JP8_SOFTFP == 2
-    if (JP8_RARE(jp8_isminf(r)) && fabs(x) < 0x1.ffffffp-127) return jp8_sz_f(r);   /* 2^-126 - 2^-151, exact in double */
+    if (JP8_RARE(jp8_isminf(r)) && !jp8_ftz_off && fabs(x) < 0x1.ffffffp-127) return jp8_sz_f(r);   /* 2^-126 - 2^-151, exact in double */
 #endif
-    return jp8_dazf(r);
+    return jp8_ftzf(r);
 }
 #define JP8_ADDSS(a,b) jp8_addss((a),(b))
 #define JP8_SUBSS(a,b) jp8_subss((a),(b))
@@ -391,9 +404,23 @@ static inline double jp8_sqrtsd(double x) { x = jp8_dazd(x); return jp8_fixd(sqr
 #define JP8_CVTSD2SS(a) jp8_cvtsd2ss(a)
 #define JP8_SQRTSS(a) jp8_sqrtss(a)
 #define JP8_SQRTSD(a) jp8_sqrtsd(a)
-/* MXCSR is a software register: the engine is only defined at FTZ|DAZ|RNE (0x9FC0 class); any other mode traps. The
- * oracle never sets exception flags (PROVEN: stmxcsr after an inexact mulss reads 0x9FC0 under Unicorn 2.1.4). */
-#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); if (((c)->mxcsr & 0xE040u) != 0x8040u) jp8_trap((c), 0, "ldmxcsr: mode other than FTZ|DAZ|RNE"); } while (0)
+/* MXCSR is a software register: its DAZ and FTZ bits set the flush modes above; any rounding other than to nearest
+ * traps (no reached code changes it). The oracle never sets exception flags (PROVEN: stmxcsr after an inexact mulss
+ * reads 0x9FC0 under Unicorn 2.1.4), so stmxcsr reads back what was loaded. */
+static inline void jp8_fpenv(CPU *c) {
+    if (c->mxcsr & 0x6000u) jp8_trap(c, 0, "MXCSR: rounding other than to nearest");
+    jp8_daz_off = !(c->mxcsr & 0x40u);
+#if JP8_SOFTFP == 2
+    jp8_ftz_off = !(c->mxcsr & 0x8000u);      /* the hardware's FTZ */
+#else
+    jp8_ftz_off = 1;                          /* the oracle's: Unicorn never flushes a result */
+#endif
+#ifdef JP8_SOFTFP_TOOTH_NOFLUSH                /* the host gate's tooth T12: no software DAZ / FTZ at all */
+    jp8_daz_off = jp8_ftz_off = 1;
+#endif
+}
+#define JP8_FPENV(c) jp8_fpenv(c)
+#define JP8_LDMXCSR(c,v) do { (c)->mxcsr=(v); JP8_FPENV(c); } while (0)
 #define JP8_STMXCSR(c) ((c)->mxcsr)
 #endif
 

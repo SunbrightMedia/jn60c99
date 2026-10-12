@@ -257,12 +257,11 @@ int jp8_call_f(CPU *c, uint64_t rva, uint64_t rcx, float f) {
     c->r[1] = rcx; memset(&c->x[1], 0, 16); c->x[1].f[0] = f;
     return jp8_call_x(c, rva);
 }
-int jp8_call_x(CPU *c, uint64_t rva) {
-#ifndef JP8_SOFTFP
-    _mm_setcsr(c->mxcsr ? c->mxcsr : 0x9FC0);
-#else
-    if (!c->mxcsr) c->mxcsr = 0x9FC0;
+#ifdef JP8_SOFTFP
+JP8_TLS uint32_t jp8_daz_off, jp8_ftz_off;      /* the guest's flush modes (jp8_cpu.h JP8_FPENV) */
 #endif
+int jp8_call_x(CPU *c, uint64_t rva) {
+    JP8_FPENV(c);                               /* the guest's MXCSR, exactly (no default: 0 is a mode too) */
 #ifdef JP8_RELOC
     jp8_cur = c;
 #endif

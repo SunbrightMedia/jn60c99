@@ -28,7 +28,9 @@
 #      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236); T9 the
 #      lane pass swaps lanes a and b in every store of a register to the CPU struct (JP8_XLANE_TOOTH=1); T10 host
 #      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded); T11
-#      one byte of the shipped template flipped (jp8_template_check.py --tooth: stage 2b must see it)
+#      one byte of the shipped template flipped (jp8_template_check.py --tooth: stage 2b must see it); T12 the
+#      software-float build with no software DAZ / FTZ at all (-DJP8_SOFTFP_TOOTH_NOFLUSH: denormals reach the
+#      engine's state on this drive -- the memory after must see it)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -77,6 +79,10 @@ THR="$PRD -D_POSIX_C_SOURCE=200809L -DJP8H_THREADS"      # the platform layer: t
 cc $THR -w -c -o "$OUT/hlift_thr.o" "$OUT/jp8_host_lift_xl.c"
 cc $THR -c -o "$OUT/hrt_thr.o" "$REPO/jp8/src/jp8_rt.c"; cc $THR -c -o "$OUT/hhost_thr.o" "$REPO/jp8/src/jp8_host.c"
 cc -shared -o "$OUT/libjp8host_thr.so" "$OUT/hlift_thr.o" "$OUT/hrt_thr.o" "$OUT/hhost_thr.o" -lm -lpthread
+SFP="$PRD -DJP8_SOFTFP=2"                                 # a host without x86 FTZ / DAZ: the float modes in software
+cc $SFP -w -c -o "$OUT/hlift_sfp.o" "$OUT/jp8_host_lift_xl.c"
+cc $SFP -c -o "$OUT/hrt_sfp.o" "$REPO/jp8/src/jp8_rt.c"; cc $SFP -c -o "$OUT/hhost_sfp.o" "$REPO/jp8/src/jp8_host.c"
+cc -shared -o "$OUT/libjp8host_sfp.so" "$OUT/hlift_sfp.o" "$OUT/hrt_sfp.o" "$OUT/hhost_sfp.o" -lm
 for R in $RATES; do
     RREF="$OUT/ref_${R%.*}"
     echo "=== 2. the oracle at $R: template + references ==="
@@ -93,6 +99,10 @@ for R in $RATES; do
         if ! JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_thr.so" > "$L" 2>&1; then cat "$L"; exit 1; fi
         tail -1 "$L"
     done
+    if [ "$R" = "$RATE" ]; then
+        echo "=== 3. the C side at $R: software floats (JP8_SOFTFP=2: DAZ / FTZ from the guest's MXCSR, in C) ==="
+        JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_sfp.so"
+    fi
 done
 echo "=== 4. the teeth ==="
 bite() {    # bite <name> <refdir> <lib>: the run must FAIL
@@ -144,6 +154,11 @@ JP8_XLANE_TOOTH=1 python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT
 cc $PRD -w -c -o "$OUT/hlift_t9.o" "$OUT/jp8_host_lift_t9.c"
 cc -shared -o "$OUT/libjp8host_t9.so" "$OUT/hlift_t9.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T9 "$REF" "$OUT/libjp8host_t9.so"
+cc $SFP -DJP8_SOFTFP_TOOTH_NOFLUSH -c -o "$OUT/hrt_t12.o" "$REPO/jp8/src/jp8_rt.c"   # the flush modes are set in jp8_rt.c / jp8_host.c
+cc $SFP -DJP8_SOFTFP_TOOTH_NOFLUSH -c -o "$OUT/hhost_t12.o" "$REPO/jp8/src/jp8_host.c"
+cc $SFP -DJP8_SOFTFP_TOOTH_NOFLUSH -w -c -o "$OUT/hlift_t12.o" "$OUT/jp8_host_lift_xl.c"
+cc -shared -o "$OUT/libjp8host_t12.so" "$OUT/hlift_t12.o" "$OUT/hrt_t12.o" "$OUT/hhost_t12.o" -lm
+bite T12 "$REF" "$OUT/libjp8host_t12.so"
 if python3 "$HERE/jp8_template_check.py" "$REPO/jp8/gen/jp8h_template.bin.gz" "$REF/meta.json" --tooth > "$OUT/tooth_T11.log" 2>&1; then echo "*** TOOTH T11 DID NOT BITE ***"; exit 1; fi
 echo "tooth T11 bites (the shipped template, one byte flipped): $(tail -1 "$OUT/tooth_T11.log" | cut -c1-150)"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, 11 teeth bite"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, software floats EXACTLY 0, 12 teeth bite"

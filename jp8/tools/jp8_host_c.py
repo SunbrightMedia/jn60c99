@@ -210,7 +210,16 @@ eh = memhash()
 if not trap and eh != meta['end_hash']: bad += 1; log('END hash differs: C %s oracle %s' % (eh[:16], meta['end_hash'][:16]))
 sh = hashlib.sha256(region(Q.STACK_BASE, Q.STACK_SIZE)).hexdigest()
 threaded = bool(lib.jp8h_threaded())       # the workers on threads: their stacks are their own, the main stack differs
-if not trap and not threaded and sh != meta['stack_hash']: bad += 1; log('STACK hash differs: C %s oracle %s' % (sh[:16], meta['stack_hash'][:16]))
+if not trap and not threaded and sh != meta['stack_hash']:
+    bad += 1; log('STACK hash differs: C %s oracle %s' % (sh[:16], meta['stack_hash'][:16]))
+    zp = os.path.join(refdir, 'stack.bin.z')
+    if os.path.exists(zp):                 # where: the 8-byte words that differ (the oracle's stack is kept by jp8_host_ref.py)
+        import zlib
+        ost, cst = zlib.decompress(open(zp, 'rb').read()), region(Q.STACK_BASE, Q.STACK_SIZE)
+        dw = [i for i in range(0, Q.STACK_SIZE, 8) if ost[i:i + 8] != cst[i:i + 8]]
+        log('  %d stack words differ, 0x%x .. 0x%x' % (len(dw), Q.STACK_BASE + dw[0], Q.STACK_BASE + dw[-1]))
+        for i in dw[:16]:
+            log('  0x%x: C %016x oracle %016x' % (Q.STACK_BASE + i, struct.unpack_from('<Q', cst, i)[0], struct.unpack_from('<Q', ost, i)[0]))
 log('%d steps, %d words (%d differ), %d state bytes, %d performEdits, %d worker jobs, heap %d live / %d free blocks, end %s, stack %s (%s)' % (
     len(results) + 1, nw, len(diffs), len(got_states), len(mine), lib.jp8h_jobs(), hl.value, hf.value, 'EXACT' if eh == meta['end_hash'] else 'DIFFERS',
     'EXACT' if sh == meta['stack_hash'] else 'differs', 'reported: threads' if threaded else 'graded'))

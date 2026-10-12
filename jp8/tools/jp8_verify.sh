@@ -10,6 +10,8 @@
 #      96000 -- the checked, the product and the threaded builds, the teeth.
 #   D. MUTATION REACH (jp8_mutation_gate.py) on C's build: one-instruction slips, each counting its runs and changes;
 #      exit 0 only when no slip SURVIVED (changed values the gate did not see).
+#   E. THE PRODUCT (jp8/apps/render_check.sh): the render CLI built from C's lift, its WAV replayed through the plugin's
+#      own process() on the oracle, EXACTLY 0, and its tooth.
 # Long: run it as a job from a snapshot (tools/snap_tree.sh):  sh tools/run_job.sh jp8_verify sh jp8/tools/jp8_verify.sh
 # env: JP8_VERIFY_SKIP="A B" (sections left out -- printed as SKIPPED, never as green)
 HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"; rc=0
@@ -27,7 +29,8 @@ sec B "the self-booting engine at 44100" sh jp8/tools/jp8_full_gate.sh
 sec B "the self-booting engine at 96000" env JP8_FULL_RATE=96000 sh jp8/tools/jp8_full_gate.sh
 sec C "the host path at 48000, 44100, 96000" env JP8_HOST_RATES="48000 44100 96000" sh jp8/tools/jp8_host_gate.sh
 sec D "mutation reach on the host path's build" python3 jp8/tools/jp8_mutation_gate.py build/jp8_host/ref_48000 --n 40
+sec E "the render CLI against the plugin (patch 2, its tooth)" sh jp8/apps/render_check.sh 2 48000
 echo "--- the scope table's OPEN rows (jp8/docs/SCOPE_AUDIT.md): what this run does not prove"
 grep -E '^\| [0-9]+ \|' jp8/docs/SCOPE_AUDIT.md | grep -v '\*\*CLOSED' | sed 's/^| \([0-9]*\) | \([^|]*\)| \*\*\([^*]*\)\*\*.*/  row \1 -\2: \3/' | cut -c1-160
-[ $rc = 0 ] && echo "JP8 VERIFY GREEN (sections A-D)" || echo "JP8 VERIFY RED"
+[ $rc = 0 ] && echo "JP8 VERIFY GREEN (sections A-E)" || echo "JP8 VERIFY RED"
 exit $rc

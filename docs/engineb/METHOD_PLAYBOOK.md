@@ -4201,3 +4201,32 @@ and only the rest is a blind spot.
 (Near miss the same day: a new tool written under the name of an existing one -- jp8_param_census.py, the D4 cell
 census cited by S3_STATUS and PORT_LESSONS -- caught by `git status` before the commit and restored. Check
 `git ls-files` before naming a new file.)
+
+## 241. A FIX MADE IN TWO EMULATORS IS NOT MADE IN THE THIRD -- AND A GRADED STACK SEES WHAT THE OUTPUT NEVER WILL
+Paid 2026-10-12 (JUPITER-8 job jp8_host_gate9, drive v7, the first run that grades the guest stack). Every one of
+1,849,808 output words, 60,636 state bytes, 9,044 performEdits, 30,124 worker jobs, the heap and the memory after
+were EXACT; the stack hash was not. The oracle now keeps its stack (stack.bin.z) and the C side lists the 8-byte
+words that differ: 29, in the worker stack, holding return addresses into the CRT's float error handler (rva
+0x797050: its _ctrlfp, then _handle_exc 0x796E6C or the raise path 0x795634) and MXCSR images -- the oracle 0x8040,
+the C side 0x9FF5 / 0x9FF0. Three faults, each invisible in the output:
+- THE ORACLE'S THREAD STARTED AT MXCSR 0. Playbook 228 set 0x1F80 (a Windows thread's) in e2e_emu.py and
+  tools/verify/jx_emu.py; jp8/tools/jp8_emu.py sets it in call() only, and the host oracle has its own call(). So the
+  plugin's ScopedNoDenormals made 0x8040 (every exception unmasked), and when a CRT math function reported an
+  underflow (the masked path then sets UE | PE, 0x30), its handler read the unmasked control word and took the raise
+  path no DAW takes (which function: not yet named -- INFERRED from the handler's frames). Fixed at construction, as in the other
+  two emulators (a fix shared by copies must be grepped for in every copy: `grep -rn UC_X86_REG_MXCSR`).
+- THE C SIDE INVENTED A MODE. jp8_call_x ran a guest MXCSR of 0 as 0x9FC0 (a convenience from the engine path), so the
+  port took the masked path: a different path from its own oracle.
+- THE HOST CPU'S FLAGS LEAKED. stmxcsr read the real MXCSR, whose sticky flags the C code's own arithmetic sets
+  (0x35: IE ZE UE PE); the oracle never sets one (Unicorn 2.1.4) and the CRT reads them (_statusfp 0x7A4528).
+Fix (jp8_cpu.h): the guest's MXCSR is c->mxcsr, exactly -- stmxcsr reads back what ldmxcsr loaded; the host runs at
+its FTZ / DAZ / rounding with every exception masked (JP8_FPENV); the software floats (JP8_SOFTFP) follow its DAZ and
+FTZ bits separately, so the IEEE mode outside process() is modeled, not trapped. PROVEN: with that runtime the product
+and the SOFTFP=2 builds are EXACTLY 0 against the OLD oracle, stack included (the C side now follows whatever the
+oracle's thread holds); then against the fixed oracle.
+Side finding the same day: removing the software flush entirely (a tooth) changes no output word of the v7 drive, only
+the memory after (denormals reach the engine's state in the long tail) -- the end hash is what grades the flush.
+### The rule
+Grade the state the output does not show (the stack, the memory after): a divergence in a path whose result is
+discarded is still a divergence. When a fix lands in one copy of shared harness code, find every copy before
+calling it fixed. A runtime models the guest's machine state exactly -- no defaults, no host state showing through.

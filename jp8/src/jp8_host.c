@@ -329,7 +329,7 @@ void jp8_hook(CPU *c, uint64_t rva) {
     if (rva == JOBS_DUE) {
         uint32_t mx = c->mxcsr;
         jobs_threaded(c, c->r[1] - DONE_LOCK, (c->r[4] - 0x100000ULL) & ~0xFULL);
-        _mm_setcsr(mx); c->mxcsr = mx;
+        c->mxcsr = mx; JP8_FPENV(c);
         return;
     }
 #endif
@@ -356,10 +356,7 @@ void jp8_hook(CPU *c, uint64_t rva) {
             H.in_job = 0;
             if (gi(job + 0x34) != 0) { jp8_trap(c, WORKER, "a worker parked with its job not done"); return; }
         }
-#ifndef JP8_SOFTFP
-        _mm_setcsr(mx);                                  /* the render's MXCSR (the oracle restores its context) */
-#endif
-        c->mxcsr = mx;
+        c->mxcsr = mx; JP8_FPENV(c);                     /* the render's MXCSR (the oracle restores its context) */
         return;
     }
     if (rva == WORKER_PARK) {
