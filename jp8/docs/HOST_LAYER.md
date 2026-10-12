@@ -168,6 +168,20 @@ V6 (2026-10-12): WHAT A DAW ASKS THE CONTROLLER, AND A HOST THAT DOES NOT LEAK.
   audio, threads 992 ms, the same checksum; the heap grows 1.75 MB over the first ~220 blocks (the deques' map) and
   then not at all. Callgrind (one second): the eight voice-unit renders are 78 % of the instructions, ~7,470 host
   instructions per voice per engine sample (the plugin's own: 3,632).
+- SPEED WORK (2026-10-12, playbook 239). A per-guest-instruction profile (callgrind on a -g1 build: each line of the
+  fast lift is one guest instruction, its mnemonic in the comment; the cost of every line summed by mnemonic, and the
+  host instructions each line compiles to counted with objdump -l) found two causes. (1) The fast pass held each xmm
+  register in the union X; GCC splits it into two 64-bit integer halves, so a scalar float instruction went to an
+  xmm register, came back, was masked, merged and spilled: movss / mulss / addss / subss cost 3.1 / 3.1 / 3.7 / 3.9
+  host instructions each (a ucomiss 11). jp8/tools/jp8_xlane.py keeps every xmm register in three scalars (the float
+  lane, bits 32-63, bits 64-127): 2.0 / 1.5 / 1.3 / 1.7. (2) Guest memory was volatile (JP8_MQ, from the plain
+  lift's era, when dropping it gained nothing): -DJP8_MQ= gains 18 % on the fast pass. Both EXACTLY 0 on the v6
+  development drive (746 steps, the memory after). MEASURED (jp8_host_speed.py, patch 2, four keys, 48000, this
+  loaded 4-core machine, runs interleaved): 1,004-1,027 ms per second of audio -> 818-863 (non-volatile) -> 674-766
+  (non-volatile + lanes); the voice render 5,010 host instructions per voice per engine sample (1.38x the
+  plugin's 3,632). What remains: the calls (the caller stores every register the callee may read or write and
+  reloads the ones it may write -- a math-library callee saves and restores xmm6-15, so they all move; ~15 % with
+  the function entries and returns) and the comiss / ucomiss flag work (~6 %).
 
 SPEED (the product build, 48000 host, the 96 kHz engine, four keys held, this shared Xeon with three other jobs):
 950 ms per second of audio (init 176 ms, a patch load 4 ms) -- inside real time with no margin; the plugin's own

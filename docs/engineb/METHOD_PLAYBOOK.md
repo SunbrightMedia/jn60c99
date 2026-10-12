@@ -4138,3 +4138,23 @@ area moves after jp8h_init.
 Equality between a port and its oracle says nothing about resources they both consume. For every product entry,
 count what one call takes (heap, host buffers, handles) over thousands of calls -- a short gate drive cannot show a
 slow leak -- and make "does not grow" a graded property where the design allows it.
+
+## 239. PROFILE THE GENERATED CODE PER GUEST INSTRUCTION -- AND KEEP A HOT SCALAR OUT OF A UNION
+Paid 2026-10-12: the JUPITER-8's lifted host path ran ~7,470 host instructions per voice per engine sample against
+the plugin's own 3,632. A whole-function profile only says "the voice render". A per-line one says why: build the
+fast lift with -g1 (each source line is one guest instruction, its mnemonic in the line's comment), profile with
+callgrind, sum the cost of every line by that mnemonic, and count the host instructions each line compiles to
+(objdump -l). The float work itself was the cost (movss 17.5 %, mulss 16.3 %, addss 11.5 % of the run) at 3 to 4
+host instructions per guest instruction (a ucomiss 11). The machine code showed the cause: the fast pass held each
+xmm register in a union (float / double / integer views) and GCC, which cannot keep such a union in an SSE register,
+split it into two 64-bit integer halves -- every scalar float op went to an xmm register, came back, was masked,
+merged and spilled (one guest addss: 7 host instructions). A second cause: guest memory was `volatile` (a qualifier
+from the plain lift's era, when every value lived in the CPU struct anyway and dropping it gained nothing): on the
+fast pass, non-volatile is 18 % faster and EXACTLY 0. jp8_xlane.py keeps each xmm register in three scalars (the
+float lane, bits 32-63, bits 64-127): addss 1.3, mulss 1.5, movss 2.0 host instructions; with non-volatile memory
+the voice render fell from ~7,470 to ~5,010 host instructions per voice per engine sample (the plugin: 3,632) and a
+second of audio from ~1,015 ms to ~720 ms on the loaded machine, EXACTLY 0 on the development drive.
+### The rule
+Before optimizing generated code, profile it per source construct (here: per guest instruction) and read the machine
+code of the costliest lines. Never hand a hot scalar to the compiler inside a union with integer views; and re-measure
+an old "no gain" (volatile) when the code around it has changed.
