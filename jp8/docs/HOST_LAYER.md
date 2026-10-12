@@ -247,8 +247,40 @@ at a 1920 x 1080 screen (the JUNO's rule 3 gives a fit of 47 for that panel: so 
 default zoom, INFERRED). Ten imports answered by default during the attach (InvalidateRect 33, HeapSize 7, SetTimer 3
 ...), as on the JUNO.
 
+THE EDITOR ON THE C SIDE (E1, EXECUTED 2026-10-12; scope row 21). jp8h_screen (the machine's virtual screen:
+GetSystemMetrics 78 / 79), jp8h_attach_editor (createView("editor") = the controller's slot 17, then the view's
+setFrame = slot 12 with the HOST'S IPlugFrame, then attached = slot 4 on parent 0x10010, "HWND"), jp8h_window_zoom (a
+window's zoom getter, the window found by its fit's call -- the lifter hooks 0x31B790), jp8h_windows and
+jp8h_frame_size (the last size the view asked the frame for). The editor's open makes 335 calls of 36 imports
+(jp8/logs/editor_imports.log): jp8_host.c gui_import answers each as the oracle does (probes/b6/wrapper_emu.py,
+jp8_emu.py), and the state those answers keep -- DIB sections, singly linked lists, GDI+ images, the skin images'
+sizes, the last error -- travels in template v3 (jp8_host_ref.py). Two things paid on the way:
+- bswap (memcmp's tail, rva 0x72F9A8): the lifter had none; it has now (jp8_bswap64, plain C99).
+- THE HOST'S FRAME (playbook 242): the view calls frame->resizeView with no null check (rva 0x448106), then its own
+  onSize. The oracle's host never set a frame, so it ran the zero page as code (524,293 instructions) where a PC
+  faults. JP8Host makes an IPlugFrame with its other host objects (template fact 'frame'; resizeView takes the size,
+  kResultTrue, and records it) and a code hook stops any run in the zero page by name (PluginNullCall:
+  jp8/tools/jp8_null_guard_check.py opens the editor without the frame and sees the stop at rva 0x448109).
+RESULT (drive v8 on patch 2 at 48000: jp8/logs/editor_e1_patch2.log): 828 steps, 117,760 words, 58,680 state bytes,
+2,036 performEdits, 1,380 jobs, the heap, the memory after and the stack EXACTLY 0 -- the editor's row is the window
+3940 x 2004, attached's result, the view, the size asked of the frame (-196 x -99: the fit is -5 % with no screen)
+and the zoom on four screens: -5, 24, 24, 24 (the first positive fit is kept for the window's life). Teeth: T14 swaps
+the screen's width and height (zoom 18, not 24); T13 scales the host tempo by 1.5 (83,843 differences;
+jp8/logs/editor_e1_teeth.log).
+
+THE HOST TRANSPORT (drive v8, jp8_host_seq.transport; jp8/logs/ctx_census_v8.log). process() copies the context's
+playing flag (state & 2), position (ppq, if state & 0x200), tempo (if state & 0x400) and loop (if state & 0x1000:
+start, end) into a transport record (rva 0x36C28B-0x36C2E0); the render driver (rva 0x33AD6C-0x33ADF9) hands its
+engine object the playing flag (slot 23), the position (slot 24) and the loop (slot 28) every block, and the tempo x
+10 (the .rdata constant 10.0 at rva 0xB56D48; rounded by rva 0x46EDE0, clamped to int32) when it changes and is
+valid (slot 20). kCycleActive (0x4) is never read. On the v8 drive only the tempo
+changes an output word; the position, the flag and the loop change the memory after (perturbed on the lifted path,
+which equals the plugin there).
+
 ## 6. Next
 
 1. Other first rates: DONE on drive v5 (job jp8_host_gate7) and v6 (job jp8_host_gate8).
-2. The controller's parameter info in the C API: DONE (v6, gate8). The editor: owed (the user's script file and art).
+2. The controller's parameter info in the C API: DONE (v6, gate8). The editor: E1 (the open, the frame, the main
+   window's zoom) EXACTLY 0 on patch 2; the gate at three rates (job jp8_host_gate11); the meters, the CC menu and the
+   patch window next; the drawn panel waits for the user's script file and art.
 3. The speed: the lifted path must gain margin before it is a product (the fast lifter's next steps, S3_STATUS).

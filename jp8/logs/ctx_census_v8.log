@@ -1,0 +1,27 @@
+# 2026-10-12: jp8_ctx_census.py on drive v8 (patch 2, 48000, no sweep): the ProcessContext bytes process() reads, and the readers of the transport record it builds
+[ 152.5s] 827 steps, blocks {'without': 92, 'with a context': 24}
+  +0   state                    4 bytes  by rva 0x36c28b  x24
+  +0   state                    4 bytes  by rva 0x36c299  x21
+  +0   state                    4 bytes  by rva 0x36c2af  x24
+  +0   state                    4 bytes  by rva 0x36c2c5  x23
+  +40  projectTimeMusic (ppq)   8 bytes  by rva 0x36c2a5  x24
+  +56  cycleStartMusic          8 bytes  by rva 0x36c2d1  x6
+  +64  cycleEndMusic            8 bytes  by rva 0x36c2db  x6
+  +72  tempo                    8 bytes  by rva 0x36c2bb  x23
+fields read: cycleEndMusic, cycleStartMusic, projectTimeMusic (ppq), state, tempo
+the transport record (at 0x201feff30) -- its readers while process() runs:
+  +0x0   playing      4 bytes  by rva 0x33ad6c  x116
+  +0x8   ppq          8 bytes  by rva 0x33adda  x116
+  +0x10  tempo valid  1 bytes  by rva 0x33adb2  x6
+  +0x18  tempo        8 bytes  by rva 0x33ad74  x116
+  +0x20  cycle valid  1 bytes  by rva 0x33adf9  x116
+  +0x28  cycle start  8 bytes  by rva 0x33adf4  x116
+  +0x30  cycle end    8 bytes  by rva 0x33adef  x116
+record fields read: cycle end, cycle start, cycle valid, playing, ppq, tempo, tempo valid
+
+# perturbation probes on the C side (lift of reach_e4, equal to the plugin on this drive: probe 0 is the control) -- the context changed in every block
+probe 0 (none (control)): 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end EXACT, stack EXACT (graded)
+probe 1 (ppq + 0.37): 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end DIFFERS, stack EXACT (graded)
+probe 5 (playing forced on, kCycleActive (0x4) cleared): 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end EXACT, stack EXACT (graded)
+probe 6 (playing cleared): 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end DIFFERS, stack EXACT (graded)
+probe 10 (cycle end + 0.25): 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end DIFFERS, stack EXACT (graded)

@@ -157,6 +157,17 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    oracle has DAZ but no FTZ (MEASURED; scope row 23: no graded drive makes a denormal result). AArch64: the render CLI
    (SOFTFP=2, qemu) byte-identical to the graded x86 render. The shipped template re-exported (raw f43e2d35...).
    NEXT: the full verify (A-E) on this commit; the JX's verify too (its lifted code includes jp8_cpu.h).
+3h. 2026-10-12: 64 PATCHES THROUGH THE HOST PATH; DRIVE v8 -- THE TRANSPORT AND THE EDITOR (E1). Job
+   jp8_host_gate10 (EXIT 0, the tree of ade5bf3a): drive v7 with the sweep over the 64 factory patches at 48000, host
+   maximum block 4096 (blocks of 4096 and 4095 down to 1) -- checked, product, threads and software floats EXACTLY 0,
+   12 teeth bite (scope rows 5 and 7 closed at 48000). Drive v8 adds the host transport under a synced arpeggio and
+   the editor's open: on patch 2 at 48000 EXACTLY 0 with the memory after and the stack (828 steps; scope rows 3, 21;
+   HOST_LAYER.md "THE EDITOR ON THE C SIDE"). Paid: the lifter had no bswap; the oracle's host set no IPlugFrame and
+   ran the zero page as code where a PC faults (playbook 242: a frame now, and a named stop for any zero-page run);
+   tooth T13 forced flags the plugin's output never depends on (playbook 243: of the context only the tempo changes a
+   word on the drive; the position, flag and loop are stored -- the memory after grades them). The template ships again
+   (raw 51be86b0..., v3: the editor imports' state and the frame). RUNNING: jp8_host_gate11 (v8 at three rates, 14
+   teeth), jp8_render_v3 (the render check on the new template).
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

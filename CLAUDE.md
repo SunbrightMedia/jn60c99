@@ -301,9 +301,12 @@ mine is a hypothesis (playbook 80).
   EXACTLY 0, stack included, product and software floats). The render CLI
   (jp8/apps/jp8_render.c, MIDI file -> WAV) is EXACTLY 0 against the plugin
   (render_check.sh); AArch64 render equal. SCOPE: jp8/docs/SCOPE_AUDIT.md
-  (23 rows). NEXT: verify-jp8 A-E on the newest commit, the JX verify (its
-  lift includes jp8_cpu.h), 64 patches + max block 4096 (rows 5, 7), the
-  editor (the user's JP8 script file and art), a live app. Speed ~670 ms per
+  (23 rows). The 64 factory patches through the host path at 48000, host blocks up to 4096: GREEN (job
+  jp8_host_gate10; rows 5, 7). Drive v8 -- the host transport (only the tempo changes a word; playbook 243) and the
+  editor's open + window zoom (E1, the host's IPlugFrame: the oracle had none and ran the zero page, playbook 242) --
+  EXACTLY 0 on patch 2. NEXT: jobs jp8_host_gate11 (v8, three rates), jp8_render_v3 and jp8_verify_eeb0 (EXITs owed),
+  the JX verify (its lift includes jp8_cpu.h), the editor's meters / CC menu / patch window (the drawn panel needs the
+  user's JP8 script file and art), a live app. Speed ~670 ms per
   second of audio here (the plugin ~410). The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
