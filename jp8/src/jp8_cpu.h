@@ -43,12 +43,19 @@ typedef struct {
     long ninstr;
 } CPU;
 
+/* JP8H_THREADS (a platform layer, not ISO C99): the host runtime runs the plugin's engine workers on threads, as the
+ * plugin does; the runtime's trap state is then per thread */
+#ifdef JP8H_THREADS
+#define JP8_TLS __thread
+#else
+#define JP8_TLS
+#endif
 #ifdef JP8_RELOC
 #define JP8_NBANDS 128u                          /* 256 MB bands: guest addresses below 0x800000000 */
 extern uintptr_t jp8_bdelta[JP8_NBANDS];         /* host = (uintptr_t)guest + delta (mod the host pointer width) */
 extern uint32_t jp8_blo[JP8_NBANDS], jp8_bhi[JP8_NBANDS];  /* mapped band offsets [lo, hi); 0,0 = unmapped */
 extern void jp8_fault(uint64_t a, unsigned n);   /* longjmps to the caller of jp8_call (gate RED); never returns */
-extern uint32_t jp8_badacc;                      /* CHECK=2: sticky "an access missed every region", tested after each call */
+extern JP8_TLS uint32_t jp8_badacc;              /* CHECK=2: sticky "an access missed every region", tested after each call */
 extern unsigned char jp8_sink[64];               /* CHECK=2: where such an access lands instead */
 /* an access may run past its band's top into the next band when one region spans both at one offset (JP8_FLAT's
  * multi-band regions: a heap block across 0x320000000): its band mapped to the top, the next from 0, the same delta */

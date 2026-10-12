@@ -2,10 +2,12 @@
 """jp8_host_c.py -- C side (process B) of the JUPITER-8 host gate: ctypes-loads a host library (jp8_host.c +
 jp8_rt.c + the lifted host path) and drives only its API (jp8h.h): jp8h_init from the JP8H v2 template process A
 wrote (the setup calls at the drive's first rate), then the same steps (jp8_host_seq.steps): patch loads, process()
-blocks, getState / setState, host-rate changes, setActive.
+blocks, getState / setState, host-rate changes, setActive, the UI timer, MIDI learn, the edit controller's calls, what
+a DAW asks the controller at load (parameter and unit infos, the MIDI mapping, its own state) and setComponentState.
   CONTROL 1  after jp8h_init: the image + heap + host-object hash == the oracle's after its setup().
   RUN        every step's result, every output word, every state byte, the performEdit calls (ids and value bits),
-             the worker jobs, the bump pointer, the host-object allocator and the end hash: EXACTLY the oracle's.
+             the worker jobs, the bump pointer, the heap's reuse layer (live and free blocks), the host-object
+             allocator (which must not move after jp8h_init) and the end hash: EXACTLY the oracle's.
 No unicorn here (two-process rule), no plugin logic (plumbing only). exit 0 = EXACTLY 0.
 usage: jp8_host_c.py <refdir> <lib.so>"""
 import sys, os, json, struct, ctypes, hashlib, time
@@ -27,6 +29,12 @@ class EV(ctypes.Structure):
     _fields_ = [('on', ctypes.c_int), ('offset', ctypes.c_int), ('channel', ctypes.c_int), ('pitch', ctypes.c_int), ('velocity', ctypes.c_float)]
 class PAR(ctypes.Structure):
     _fields_ = [('id', ctypes.c_uint32), ('offset', ctypes.c_int), ('value', ctypes.c_double)]
+class PINFO(ctypes.Structure):          # jp8h_pinfo (VST3 ParameterInfo)
+    _fields_ = [('id', ctypes.c_uint32), ('title', ctypes.c_uint16 * 128), ('short', ctypes.c_uint16 * 128), ('units', ctypes.c_uint16 * 128),
+                ('steps', ctypes.c_int32), ('default', ctypes.c_double), ('unit', ctypes.c_int32), ('flags', ctypes.c_int32)]
+class UINFO(ctypes.Structure):          # jp8h_uinfo (VST3 UnitInfo)
+    _fields_ = [('id', ctypes.c_int32), ('parent', ctypes.c_int32), ('name', ctypes.c_uint16 * 128), ('plist', ctypes.c_int32)]
+assert ctypes.sizeof(PINFO) == 792 and ctypes.sizeof(UINFO) == 268
 class CTX(ctypes.Structure):
     _fields_ = [('state', ctypes.c_uint32), ('ppq', ctypes.c_double), ('cycle_start', ctypes.c_double), ('cycle_end', ctypes.c_double),
                 ('tempo', ctypes.c_double)]
@@ -46,6 +54,42 @@ lib.jp8h_error.restype = ctypes.c_char_p
 lib.jp8h_guest.argtypes = [ctypes.c_uint64, ctypes.c_size_t]; lib.jp8h_guest.restype = ctypes.c_void_p
 for f in ('jp8h_heap_top', 'jp8h_jobs', 'jp8h_com_next'): getattr(lib, f).restype = ctypes.c_uint64
 lib.jp8h_edits.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+I32, U32 = ctypes.c_int32, ctypes.c_uint32
+lib.jp8h_param_info.argtypes = [I32, ctypes.POINTER(PINFO), ctypes.POINTER(U32)]
+lib.jp8h_unit_info.argtypes = [I32, ctypes.POINTER(UINFO), ctypes.POINTER(U32)]
+lib.jp8h_midi_assignment.argtypes = [I32, ctypes.c_int16, ctypes.c_int16, ctypes.POINTER(U32), ctypes.POINTER(U32)]
+lib.jp8h_select_unit.argtypes = [I32, ctypes.POINTER(U32)]
+lib.jp8h_ctl_get_state.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(U32)]
+for f in ('jp8h_ctl_set_state', 'jp8h_component_state'): getattr(lib, f).argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(U32)]
+lib.jp8h_heap_stats.argtypes = [ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64)]
+def info_step(a, cstates):
+    """jp8_host_emu.JP8Host.info_step through the C API: (rc, row)"""
+    what = a[0]; tag = '/'.join(str(x) for x in a); hr = U32(0); n = I32(0)
+    if what == 'count':
+        r = lib.jp8h_param_count(ctypes.byref(n)); return r, ['info', tag, n.value & 0xFFFFFFFF, '']
+    if what == 'param':
+        pi = PINFO(); r = lib.jp8h_param_info(a[1], ctypes.byref(pi), ctypes.byref(hr)); return r, ['info', tag, hr.value, bytes(pi).hex()]
+    if what == 'midi':
+        v = U32(0); r = lib.jp8h_midi_assignment(a[1], a[2], a[3], ctypes.byref(v), ctypes.byref(hr))
+        return r, ['info', tag, hr.value, struct.pack('<I', v.value).hex()]
+    if what == 'units':
+        r = lib.jp8h_unit_count(ctypes.byref(n)); return r, ['info', tag, n.value & 0xFFFFFFFF, '']
+    if what == 'unit':
+        ui = UINFO(); r = lib.jp8h_unit_info(a[1], ctypes.byref(ui), ctypes.byref(hr)); return r, ['info', tag, hr.value, bytes(ui).hex()]
+    if what == 'lists':
+        r = lib.jp8h_program_list_count(ctypes.byref(n)); return r, ['info', tag, n.value & 0xFFFFFFFF, '']
+    if what == 'selected':
+        r = lib.jp8h_selected_unit(ctypes.byref(n)); return r, ['info', tag, n.value & 0xFFFFFFFF, '']
+    if what == 'select':
+        r = lib.jp8h_select_unit(a[1], ctypes.byref(hr)); return r, ['info', tag, hr.value, '']
+    if what == 'cgetstate':
+        nb = ctypes.c_size_t(0); CAP = 1 << 16; buf = ctypes.create_string_buffer(CAP)
+        r = lib.jp8h_ctl_get_state(buf, CAP, ctypes.byref(nb), ctypes.byref(hr))
+        if not r and nb.value > CAP: raise SystemExit('a controller state of %d bytes: above the %d this driver takes' % (nb.value, CAP))
+        cstates[a[1]] = buf.raw[:nb.value]; return r, ['info', tag, hr.value, cstates[a[1]].hex()]
+    if what == 'csetstate':
+        b = cstates[a[1]]; r = lib.jp8h_ctl_set_state(b, len(b), ctypes.byref(hr)); return r, ['info', tag, hr.value, '']
+    raise SystemExit('unknown info step %r' % (a,))
 IMGSZ = 0xDE7000
 K_PLAYING, K_PPQ, K_TEMPO, K_CYCLE = 0x2, 0x200, 0x400, 0x1000      # host_process_emu's ProcessContext flags
 def region(a, n):
@@ -68,10 +112,10 @@ def ctx_of(c):
 bad = 0
 rc = lib.jp8h_init(tm, len(tm), ST[0][1], Q.MAXBLOCK)
 if rc: sys.exit('jp8h_init rc %d: %s' % (rc, lib.jp8h_error().decode()))
-ih = memhash()
+ih = memhash(); com_init = lib.jp8h_com_next()
 if ih != meta['init_hash']: bad += 1; log('CONTROL 1 differs: init hash C %s oracle %s' % (ih[:16], meta['init_hash'][:16]))
 else: log('CONTROL 1: the memory after jp8h_init (the setup at %g) is the oracle\'s (image + heap + host objects)' % ST[0][1])
-bank = B.bank_bytes(); got = bytearray(); got_states = bytearray(); states = {}; results = []; trap = None
+bank = B.bank_bytes(); got = bytearray(); got_states = bytearray(); states = {}; cstates = {}; results = []; trap = None
 for i, st in enumerate(ST[1:]):
     k = st[0]
     if k == 'patch':
@@ -115,6 +159,11 @@ for i, st in enumerate(ST[1:]):
         r = lib.jp8h_cc_learn(st[1]); res = [k, st[1], 0]
     elif k == 'forget':
         r = lib.jp8h_cc_forget(st[1]); res = [k, st[1], 0]
+    elif k == 'compstate':
+        out_r = ctypes.c_uint32(0); s = Q.state_variant(states[st[1]], st[2])
+        r = lib.jp8h_component_state(s, len(s), ctypes.byref(out_r)); res = [k, '%s/%s' % (st[1], st[2]), out_r.value]
+    elif k == 'info':
+        r, res = info_step(st[1:], cstates)
     else:
         raise SystemExit('unknown step %r' % (st,))
     if r: trap = 'step %d %r: rc %d %s' % (i + 1, st[:2], r, lib.jp8h_error().decode()); break
@@ -151,11 +200,15 @@ if mine != meta['edits']:
 if lib.jp8h_jobs() != meta['jobs']: bad += 1; log('worker jobs C %d oracle %d' % (lib.jp8h_jobs(), meta['jobs']))
 if lib.jp8h_heap_top() != meta['heap_end']: bad += 1; log('bump pointer C 0x%x oracle 0x%x' % (lib.jp8h_heap_top(), meta['heap_end']))
 if lib.jp8h_com_next() != meta['com_next_end']: bad += 1; log('host-object allocator C 0x%x oracle 0x%x' % (lib.jp8h_com_next(), meta['com_next_end']))
+if lib.jp8h_com_next() != com_init: bad += 1; log('the host-object area grew after jp8h_init: 0x%x -> 0x%x' % (com_init, lib.jp8h_com_next()))
+hl, hf = ctypes.c_uint64(0), ctypes.c_uint64(0); lib.jp8h_heap_stats(ctypes.byref(hl), ctypes.byref(hf))
+if (hl.value, hf.value) != (meta['heap_live'], meta['heap_free']):
+    bad += 1; log('the heap\'s reuse layer: C %d live / %d free blocks, oracle %d / %d' % (hl.value, hf.value, meta['heap_live'], meta['heap_free']))
 eh = memhash()
 if not trap and eh != meta['end_hash']: bad += 1; log('END hash differs: C %s oracle %s' % (eh[:16], meta['end_hash'][:16]))
 sh = hashlib.sha256(region(Q.STACK_BASE, Q.STACK_SIZE)).hexdigest()
-log('%d steps, %d words (%d differ), %d state bytes, %d performEdits, %d worker jobs, end %s, stack %s (reported)' % (
-    len(results) + 1, nw, len(diffs), len(got_states), len(mine), lib.jp8h_jobs(), 'EXACT' if eh == meta['end_hash'] else 'DIFFERS',
+log('%d steps, %d words (%d differ), %d state bytes, %d performEdits, %d worker jobs, heap %d live / %d free blocks, end %s, stack %s (reported)' % (
+    len(results) + 1, nw, len(diffs), len(got_states), len(mine), lib.jp8h_jobs(), hl.value, hf.value, 'EXACT' if eh == meta['end_hash'] else 'DIFFERS',
     'EXACT' if sh == meta['stack_hash'] else 'differs'))
 print('JP8 HOST PATH (process(), patch load, setup, rate changes, state; %g Hz, patches %s): %s' % (Q.RATE, Q.PATCHES,
       'EXACTLY 0 -- every step, word, state byte, edit, job and the memory after' if not bad else '%d differences -- NOT bit-exact' % bad))

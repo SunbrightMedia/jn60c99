@@ -137,6 +137,28 @@ worker job skipped) T3 (one template byte) T4 (the setActive after a new rate dr
 off) T6 (the UI timer never drains) each FAIL. The lifter learned pcmpeqb / pcmpeqw on the way (strnlen's SSE2 scan,
 reached by setState at 0x776499).
 
+V6 (2026-10-12): WHAT A DAW ASKS THE CONTROLLER, AND A HOST THAT DOES NOT LEAK.
+- The controller's load-time calls, lifted and in the API (jp8h.h): getParameterCount (226) and every
+  getParameterInfo (jp8h_pinfo, VST3's 792 bytes), IMidiMapping::getMidiControllerAssignment (CC n -> 0x0FFFC100 + n,
+  128 aftertouch, 129 bend; bus 1 kResultFalse), IUnitInfo (2 units: Root 0, Others 2; 0 program lists;
+  getSelectedUnit / selectUnit), IEditController::getState / setState (READ: `xor eax,eax; ret` -- the controller
+  keeps no state of its own) and setComponentState (a DAW hands the controller the component's state after setState;
+  no handler call, it moves the controller's model). An index outside [0, count) makes the plugin THROW (EXECUTED:
+  std::vector::at, a C++ throw at rva 0x72e9a5): the API refuses it (JP8H_E_ARG) -- a real host never asks.
+  getUnitByBus and setUnitProgramData answer kResultFalse, getProgramListInfo has no list to give (READ): not in the
+  API. The IMidiMapping and IUnitInfo pointers come from the plugin's own queryInterface, once, in jp8h_init.
+- THE LEAK (playbook 238). The oracle answers HeapFree with a no-op and the C runtime mirrored it: EXACTLY 0, and
+  both sides leaked. MEASURED per call: a patch load 1.32 MB of heap, setState 35 KB, getState 15 KB, a process()
+  block 8 KB (that one is MSVC's std::deque<float> -- 16-byte blocks for the 300,000-sample rings at HOST + 0x50 and
+  + 0x78, kept by the deque and bounded by its 131,072-slot map at 4 MB: not a leak); and every host call that hands
+  the plugin a buffer took new bytes of the 4 MB host-object area (about 200 patch loads filled it). Now, on both
+  sides from the template's point: a freed block goes on the free list of its rounded size, the next allocation of
+  that size takes the last one back (LIFO), zero-filled (jp8_host_emu.JP8Host.heap_reuse_on, jp8_rt.c
+  jp8_heap_reuse); every host buffer is a fixed slot of one scratch area (jp8_host_emu.SCR, jp8_host.c SCR_*),
+  cleared before use; one stream object serves every state call. MEASURED: 160 patch loads cycling the 64 factory
+  patches grow the heap 31 MB and then stop (259 blocks kept by the plugin). The gate grades the reuse layer's live
+  and free block counts, and the oracle stops if the host-object area moves after the setup.
+
 SPEED (the product build, 48000 host, the 96 kHz engine, four keys held, this shared Xeon with three other jobs):
 950 ms per second of audio (init 176 ms, a patch load 4 ms) -- inside real time with no margin; the plugin's own
 code natively is about 2.3x faster (188 ms per second at 44.1 kHz, the full-chain measurement, scaled to 96 kHz).
@@ -150,12 +172,17 @@ spills: the sixteen guest registers and the temporaries do not fit the host's si
 the plugin's own: it renders its eight voices on eight threads; the runtime runs those jobs one after another. A job
 never allocates (a counted drive, patch 2: 0 of 50,504 allocations inside a job), so the jobs are independent and
 could run in parallel; what stands in the way is the jobs' bookkeeping -- the done count and the lock words are
-read-modify-write instructions that would then have to be atomic, which ISO C99 cannot say (a platform layer can).
+read-modify-write instructions that would then have to be atomic, which ISO C99 cannot say. DONE the same day, as a
+platform layer (JP8H_THREADS: POSIX threads, __thread; the default build stays sequential ISO C99): each flagged job
+runs on its own thread with the render's registers and its own stack; all render at once; at rva 0x44580A (a new
+hook: the job's render loop has ended) each waits for its turn, and the bookkeeping runs one job at a time in unit
+order -- the sequential transport's order, so no atomics are needed and the result is the same. Patch 2's v5 drive:
+EXACTLY 0 in 10 of 10 runs; 711 ms per second of audio against the sequential 1,058, on this 4-core machine with
+two other jobs running (an idle machine with 8 cores gains more). The gate grades it as a third build.
 
-Scope NOT covered yet (owed): the controller's parameter info (getParameterCount / getParameterInfo -- census
-only: jp8_controller_census.py -> jp8/gen/jp8_controller.json); other first setup rates
-(44100, 96000: jp8_reach_merge.py takes their reaches); the editor (and the drawn panel: the script file truth/
-lacks).
+Scope NOT covered yet (owed): other first setup rates (44100, 96000: jp8_reach_merge.py takes their reaches;
+job jp8_host_gate7 runs them on the v5 drive); the editor (and the drawn panel: the script file truth/ lacks);
+IEditController2 (knob mode, help, about: GUI only).
 
 ## 6. Next
 

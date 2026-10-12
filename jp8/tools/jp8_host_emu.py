@@ -25,6 +25,7 @@ USE (separate process from any ctypes port: two-process rule)
     h = X.JP8Host(); h.start(48000.0, 512)
     L, R = h.process(512, events=[('on', 0, 0, 60, 0.8)])
 """
+import collections
 import importlib.util
 import os
 import struct
@@ -36,7 +37,7 @@ sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 sys.path.insert(0, os.path.join(REPO, 'probes', 'b6'))
 sys.path.insert(0, HERE)
 import jp8_emu as J                                          # noqa: E402
-from unicorn.x86_const import UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RCX, UC_X86_REG_RDX  # noqa: E402
+from unicorn.x86_const import UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8  # noqa: E402
 
 WORKER = 0x445670          # a voice unit's worker thread body (rcx = job, edx = unit; READ)
 WORKER_PARK = 0x4456F0     # where a worker parks between jobs: the top of its loop (the acquire of its lock),
@@ -79,6 +80,13 @@ def _load(name, path, **inject):
 W = _load('jp8_wrapper_emu', os.path.join(REPO, 'probes', 'b6', 'wrapper_emu.py'), PROFILE=PROFILE)
 H = _load('jp8_host_process_emu', os.path.join(REPO, 'tools', 'verify', 'host_process_emu.py'), W_MODULE=W)
 IB = J.IB
+IID_IMIDIMAPPING = W.vst_iid(0xDF0FF9F7, 0x49B74669, 0xB63AB732, 0x7ADBF5E5)
+IID_IUNITINFO = W.vst_iid(0x3D4BD6B5, 0x913A4FD2, 0xA886E768, 0xA5EB92C1)
+# THE HOST'S SCRATCH AREA (host_setup; jp8_host.c the same): one block of the host-object area for every buffer a host
+# call hands the plugin, at fixed offsets, cleared before each use -- (offset, size)
+SCR = dict(setup=(0x0, 24), qi=(0x20, 0x40), str=(0x60, 256), text=(0x160, 256), val=(0x260, 8), info=(0x270, 792),
+           unit=(0x590, 268), vec=(0x6A0, 24), patch=(0x6C0, 0x10000))
+SCR_SIZE = 0x106C0
 
 
 class JP8Host(H.HostProcess):
@@ -111,6 +119,10 @@ class JP8Host(H.HostProcess):
                                           open(os.path.join(REPO, 'jp8', 'truth', f), 'rb').read()
                                           for f in ['Script.xml'] + extra if f.endswith('.xml')) + b'<control>')
         self._skip = None              # (rip, rsp) the render resumes at: its stop fires once
+        self._live = None              # the heap's reuse layer (heap_reuse_on): block -> size; free lists by size
+        self._freel = None
+        self.scr = None                # the scratch area and the one stream object (host_setup)
+        self._stream1 = None
         self._in_job = False
         self.jobs = []                 # (unit, block) of every worker job run, in order
         self._job_w = None             # the worker object of the job running
@@ -171,6 +183,195 @@ class JP8Host(H.HostProcess):
         self.assign = [q(self.HOST + 0xB8 + 64 * i) for i in range(9)]
         self.noteobj = None
         return self
+
+    # ------------------------------------------------------------ the host's heap: freed blocks reused (v6)
+    # PLUMBING: the plugin's malloc / free end in the host's HeapAlloc / HeapFree, which this oracle answers (jp8_emu
+    # JX.bump: a bump pointer, HeapFree a no-op). With nothing ever reused, a long session runs out of heap: every patch
+    # load took 1.32 MB, every process() block 8 KB (MEASURED 2026-10-12). From heap_reuse_on() a block the plugin frees
+    # (HeapFree's r8; free / operator delete's rcx) goes on the free list of its rounded size, and the next allocation of
+    # that size takes the last one back (LIFO), zero-filled as a new block; a block allocated before (the boot) is never
+    # reused. jp8_rt.c (jp8_heap_reuse) has the same rule: the two sides keep the same addresses. MEASURED with it: 160
+    # patch loads cycling the 64 factory patches grow the heap 31 MB and then stop (the plugin keeps 259 blocks).
+    def heap_reuse_on(self):
+        self._live, self._freel = {}, collections.defaultdict(list)
+
+    def bump(self, sz):
+        if self._live is None:
+            return super().bump(sz)
+        r = (sz + 15) & ~15 or 16
+        if r > 0x2000000:
+            r = 0x2000000
+        fl = self._freel.get(r)
+        if fl:
+            p = fl.pop()
+            self.uc.mem_write(p, b'\0' * r)
+        else:
+            p = super().bump(sz)
+        self._live[p] = r
+        return p
+
+    def _imp(self, uc, address, size, user):
+        if self._live is not None:
+            nm = self.stub2name.get(address)
+            if nm is not None and nm[1] in ('HeapFree', 'free', '??3@YAXPEAX@Z'):
+                if self._in_job:
+                    raise RuntimeError('a worker job frees a block (the threaded transport assumes none does)')
+                r = self._live.pop(uc.reg_read(UC_X86_REG_R8 if nm[1] == 'HeapFree' else UC_X86_REG_RCX), None)
+                if r is not None:
+                    self._freel[r].append(uc.reg_read(UC_X86_REG_R8 if nm[1] == 'HeapFree' else UC_X86_REG_RCX))
+        return super()._imp(uc, address, size, user)
+
+    # ------------------------------------------------------------ the host's setup and its scratch (v6)
+    def scratch(self, name):
+        """the address of a scratch slot, cleared"""
+        off, n = SCR[name]
+        self.uc.mem_write(self.scr + off, b'\0' * n)
+        return self.scr + off
+
+    def _qi(self, iid):
+        b = self.scratch('qi')
+        self.uc.mem_write(b, iid)
+        r = self.vcall(self.ctrl, 0, b, b + 0x30) & 0xFFFFFFFF
+        if r:
+            raise RuntimeError('the controller does not answer an interface (0x%x)' % r)
+        return struct.unpack('<Q', self.uc.mem_read(b + 0x30, 8))[0]
+
+    def host_setup(self, host_sr, max_block, npq):
+        """the host's setup as jp8h_init makes it (jp8_host.c, in this order): setup() (setupProcessing, setActive(1), the
+        blocks' objects), npq parameter queues, the CC records' ids (the plugin's own lookup), the scratch area, the
+        controller's IMidiMapping and IUnitInfo (queryInterface), its parameter and unit counts, the one stream object
+        every state call reuses"""
+        self.setup(host_sr, max_block)
+        while len(self._pq) < npq:
+            self._pq.append(self.new_obj('pqueue', id=0, points=[]))
+        self.cc_index_table()
+        self.scr = self.alloc_com(SCR_SIZE)
+        self.mm = self._qi(IID_IMIDIMAPPING)
+        self.ui = self._qi(IID_IUNITINFO)
+        self.nparam = self.vcall(self.ctrl, 8) & 0xFFFFFFFF       # the bounds jp8h_param_info / _unit_info check (an
+        self.nunit = self.vcall(self.ui, 3) & 0xFFFFFFFF          # index past them makes the plugin throw)
+        self._stream1 = self.new_obj('stream', data=bytearray(), pos=0)
+        return self
+
+    def stream(self, data=b''):
+        if self._stream1 is None:
+            return super().stream(data)
+        o = self.objs[self._stream1]
+        o['data'], o['pos'] = bytearray(data), 0
+        return self._stream1
+
+    def load_patch(self, rec_tail):
+        """the plugin's own patch load (wrapper_emu.load_patch), the record in the scratch area once host_setup ran"""
+        if self.scr is None:
+            return super().load_patch(rec_tail)
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        if len(rec_tail) + 16 > SCR['patch'][1]:
+            raise ValueError('a record of %d bytes: above the scratch area' % len(rec_tail))
+        data, vec = self.scratch('patch'), self.scratch('vec')
+        self.uc.mem_write(data, rec_tail)
+        self.uc.mem_write(vec, struct.pack('<QQQ', data, data + len(rec_tail), data + len(rec_tail)))
+        n0 = len(self.queue())
+        self.call(W.PATCH_LOAD, rcx=vec, rdx=q(self.comp + 280 + 8), r8=0, r9=0, count=4_000_000_000)
+        return self.queue()[n0:]
+
+    def setup_processing(self, host_sr, max_block=None):
+        """host_process_emu.setup_processing, the ProcessSetup in the scratch area once host_setup ran"""
+        if self.scr is None:
+            return super().setup_processing(host_sr, max_block)
+        mb = self.max_block if max_block is None else max_block
+        if mb > self.max_block:
+            raise ValueError('max block %d above the %d start() allocated' % (mb, self.max_block))
+        setup = self.scratch('setup')
+        self.uc.mem_write(setup, struct.pack('<iii4xd', 0, 0, mb, float(host_sr)))
+        r = self.vcall(self.audio, 7, setup, count=4_000_000_000) & 0xFFFFFFFF
+        if r != 0:
+            raise RuntimeError('setupProcessing -> 0x%x' % r)
+        self.host_sr = float(host_sr)
+
+    # ------------------------------------------------------------ one step of the host gate's drive (jp8_host_seq)
+    def run_step(self, st, blob, variant, states, cstates):
+        """one step as the host makes it (jp8_host_seq.steps; jp8_host_c.py makes the same through the C API): blob(p)
+        a patch's record, variant(bytes, how) the drive's state edits, states / cstates the component's / controller's
+        states kept by key; returns (the result row, the output words, the state bytes) -- shared by the references
+        and the reach"""
+        uc = self.uc
+        k = st[0]; words = b''; sbytes = b''
+        u32 = lambda v: v & 0xFFFFFFFF
+        if k == 'patch':
+            self.load_patch(blob(st[1])); row = [k, st[1], 0]
+        elif k == 'block':
+            _, n, evs, pars, ctx = st
+            L, R = self.process(n, events=evs, params=pars, ctx=ctx)
+            words = struct.pack('<%dI' % n, *L) + struct.pack('<%dI' % n, *R); row = [k, n, 0]
+        elif k == 'getstate':
+            sbytes = self.get_state(); states[st[1]] = sbytes; row = [k, st[1], len(sbytes)]
+        elif k == 'setstate':
+            row = [k, '%s/%s' % (st[1], st[2]), self.set_state(variant(states[st[1]], st[2]))]
+        elif k == 'rate':
+            self.set_active(0); self.setup_processing(st[1]); self.set_active(1); row = [k, st[1], 0]
+        elif k == 'active':
+            self.set_active(st[1]); row = [k, st[1], 0]
+        elif k == 'ctl':
+            _, op, pid, arg = st
+            if op == 'str':
+                b = self.scratch('str'); r, x = self.ctl(10, pid, arg, 0, b); x = 0; extra = bytes(uc.mem_read(b, 256)).hex()
+            elif op == 'parse':
+                t = arg.encode('utf-16-le') + b'\0\0'
+                if len(t) > SCR['text'][1]:
+                    raise ValueError('a text of %d characters' % len(arg))
+                sp = self.scratch('text'); uc.mem_write(sp, t); vp = self.scratch('val')
+                r, x = self.ctl(11, pid, 0.0, sp, vp); x = 0; extra = bytes(uc.mem_read(vp, 8)).hex()   # (xmm0: not a result)
+            else:
+                r, x = self.ctl({'get': 14, 'set': 15, 'plain': 12, 'norm': 13}[op], pid, arg); extra = ''
+            row = [k, '%s/%x/%r' % (op, pid, arg), r, x, extra]
+        elif k == 'drain':
+            self.ui_drain(); row = [k, 0, 0]
+        elif k == 'learn':
+            self.cc_learn(st[1]); row = [k, st[1], 0]
+        elif k == 'forget':
+            self.cc_forget(st[1]); row = [k, st[1], 0]
+        elif k == 'compstate':
+            r = u32(self.vcall(self.ctrl, 5, self.stream(variant(states[st[1]], st[2])), count=4_000_000_000))
+            row = [k, '%s/%s' % (st[1], st[2]), r]
+        elif k == 'info':
+            row = self.info_step(st[1:], cstates)
+        else:
+            raise SystemExit('unknown step %r' % (st,))
+        return row, words, sbytes
+
+    def info_step(self, a, cstates):
+        """the controller's information calls (jp8_host_seq: 'info'); the row the C driver makes too"""
+        uc = self.uc
+        u32 = lambda v: v & 0xFFFFFFFF
+        what = a[0]; tag = '/'.join(str(x) for x in a)
+        if what == 'count':
+            return ['info', tag, u32(self.vcall(self.ctrl, 8)), '']
+        if what == 'param':
+            b = self.scratch('info'); r = u32(self.vcall(self.ctrl, 9, a[1], b))
+            return ['info', tag, r, bytes(uc.mem_read(b, 792)).hex()]
+        if what == 'midi':
+            # getMidiControllerAssignment(bus, channel, number, ParamID&): the fourth argument at [rsp + 0x28] at entry
+            b = self.scratch('val'); fn = struct.unpack('<Q', uc.mem_read(struct.unpack('<Q', uc.mem_read(self.mm, 8))[0] + 24, 8))[0]
+            uc.mem_write(self._top() - 8 + 0x28, struct.pack('<Q', b))
+            r = u32(self.call(fn, rcx=self.mm, rdx=a[1], r8=a[2], r9=a[3], count=2_000_000_000))
+            return ['info', tag, r, bytes(uc.mem_read(b, 4)).hex()]
+        if what == 'units':
+            return ['info', tag, u32(self.vcall(self.ui, 3)), '']
+        if what == 'unit':
+            b = self.scratch('unit'); r = u32(self.vcall(self.ui, 4, a[1], b))
+            return ['info', tag, r, bytes(uc.mem_read(b, 268)).hex()]
+        if what == 'lists':
+            return ['info', tag, u32(self.vcall(self.ui, 5)), '']
+        if what == 'selected':
+            return ['info', tag, u32(self.vcall(self.ui, 11)), '']
+        if what == 'select':
+            return ['info', tag, u32(self.vcall(self.ui, 12, a[1])), '']
+        if what == 'cgetstate':
+            st = self.stream(); r = u32(self.vcall(self.ctrl, 7, st)); cstates[a[1]] = bytes(self.objs[st]['data'])
+            return ['info', tag, r, cstates[a[1]].hex()]
+        if what == 'csetstate':
+            return ['info', tag, u32(self.vcall(self.ctrl, 6, self.stream(cstates[a[1]]))), '']
+        raise SystemExit('unknown info step %r' % (a,))
 
     # ------------------------------------------------------------ the UI timer and MIDI learn
     # the core's CC records (core + 24 .. core + 32, 24 bytes each) and their functions -- the JUNO-60's, byte-equal

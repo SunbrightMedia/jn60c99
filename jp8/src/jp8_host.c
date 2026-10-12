@@ -47,6 +47,27 @@ extern void jp8_hc_set(uint64_t hc);
 extern uint64_t jp8_heap_get(void);
 extern void jp8_run(CPU *c, uint64_t rva);
 extern const char *jp8_import_names[]; extern const int jp8_nimports;
+extern void jp8_heap_reuse(int on);
+extern void jp8_heap_free(uint64_t p);
+extern void jp8_heap_stats(uint64_t *live, uint64_t *nfree);
+extern void jp8_heap_close_thread(void);
+
+/* THE HOST'S SCRATCH AREA (jp8_host_emu.SCR, the same offsets): one block of the host-object area, made in jp8h_init,
+ * for every buffer a host call hands the plugin, cleared before each use -- the host-object area does not grow after
+ * jp8h_init (before v6 every call took new bytes: a long session would have run past its end) */
+#define SCR_SETUP   0x0
+#define SCR_QI      0x20
+#define SCR_STR     0x60
+#define SCR_TEXT    0x160
+#define SCR_VAL     0x260
+#define SCR_INFO    0x270
+#define SCR_UNIT    0x590
+#define SCR_VEC     0x6A0
+#define SCR_PATCH   0x6C0
+#define SCR_PATCH_N 0x10000
+#define SCR_SIZE    0x106C0
+static const uint8_t IID_IMIDIMAPPING[16] = { 0xF7, 0xF9, 0x0F, 0xDF, 0xB7, 0x49, 0x69, 0x46, 0xB6, 0x3A, 0xB7, 0x32, 0x7A, 0xDB, 0xF5, 0xE5 };
+static const uint8_t IID_IUNITINFO[16] = { 0xB5, 0xD6, 0x4B, 0x3D, 0x3A, 0x91, 0xD2, 0x4F, 0xA8, 0x86, 0xE7, 0x68, 0xA5, 0xEB, 0x92, 0xC1 };
 
 typedef struct { uint64_t addr; char name[48]; } stub_t;
 typedef struct { uint32_t off; uint8_t b[48]; } ev_t;
@@ -72,6 +93,8 @@ static struct {
     uint32_t *edit_id; double *edit_val; int nedit, edit_cap;
     /* the thread transport */
     uint64_t job; jmp_buf park; int in_job; uint64_t njobs;
+    /* v6: the scratch area, the controller's IMidiMapping and IUnitInfo, the end of the host-object region */
+    uint64_t scr, mm, ui, com_end; int32_t nparam, nunit;
     uint64_t reg[16], xreg[16][2], eflags;   /* the oracle's registers at template time */
 } H;
 
@@ -114,6 +137,9 @@ static void record_edit(uint32_t id, double v) {
     }
     H.edit_id[H.nedit] = id; H.edit_val[H.nedit] = v; H.nedit++;
 }
+#ifdef JP8H_THREADS
+static int w_self_free_check(void);              /* a worker thread? (the threaded transport, below) */
+#endif
 static int pq_index(uint64_t this_) { int i; for (i = 0; i < NPQ; i++) if (H.pq[i] == this_) return i; return -1; }
 void jp8_hostcall(CPU *c, uint64_t target) {
     const char *n = stub_name(target); uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
@@ -201,7 +227,12 @@ void jp8_hostcall(CPU *c, uint64_t target) {
         !strcmp(n, "AcquireSRWLockShared") || !strcmp(n, "ReleaseSRWLockShared") ||
         !strcmp(n, "EnterCriticalSection") || !strcmp(n, "LeaveCriticalSection")) { c->r[0] = 1; return; }   /* e2e_emu: 1 */
     if (!strcmp(n, "GetCurrentThreadId") || !strcmp(n, "GetCurrentProcessId")) { c->r[0] = 0x1000; return; }
-    if (!strcmp(n, "HeapFree") || !strcmp(n, "free")) { c->r[0] = 1; return; }
+    if (!strcmp(n, "HeapFree") || !strcmp(n, "free") || !strcmp(n, "??3@YAXPEAX@Z")) {   /* the block back to the reuse layer */
+#ifdef JP8H_THREADS
+        if (w_self_free_check()) { jp8_trap(c, target, "a worker job frees a block (the threaded transport assumes none does)"); return; }
+#endif
+        jp8_heap_free(!strcmp(n, "HeapFree") ? r8 : rcx); c->r[0] = 1; return;
+    }
     if (!strcmp(n, "EncodePointer") || !strcmp(n, "DecodePointer")) { c->r[0] = rcx; return; }
     /* the editor's focus calls a setState makes when it moves the GUI model (rva 0x31bd8b): no window here -- the
      * oracle's own answer (e2e_emu's default for an import it does not model: 0) */
@@ -223,7 +254,86 @@ void jp8_hostcall(CPU *c, uint64_t target) {
 }
 
 /* ---------------------------------------------------------------- the thread transport */
+#define RENDER_DONE 0x44580AULL      /* in the worker: its render loop has ended, its bookkeeping begins (READ) */
+#ifdef JP8H_THREADS
+/* ---------------------------------------------------------------- THE THREADED TRANSPORT (a platform layer: POSIX
+ * threads, not ISO C99). The plugin renders its units on eight threads; here too. Each flagged job starts on its own
+ * thread with the render's registers and its own stack (128 KB apart, 1 MB below the render's); all render at once;
+ * at RENDER_DONE each waits for its turn, and the bookkeeping -- flag 0, the done count, the condition, the unlocks --
+ * runs one job at a time in unit order, the sequential transport's order: only the render overlaps. A job never
+ * allocates (a counted drive: 0 of 50,504 allocations inside a job). The gate grades this build like the others. */
+#include <pthread.h>
+#include <semaphore.h>
+typedef struct {
+    pthread_t th; sem_t go, rendered, turn, parked; CPU cpu; uint64_t job; jmp_buf park; int up, trapped; char msg[256];
+} wslot;
+static wslot WS[8];
+static JP8_TLS wslot *w_self;                   /* the worker slot of this thread; NULL on the render's */
+static int w_self_free_check(void) { return w_self != NULL; }
+static void *w_main(void *arg) {
+    wslot *w = (wslot *)arg; w_self = w;
+    jp8_heap_close_thread();                     /* a job never allocates (a counted drive): if one does, it traps */
+    for (;;) {
+        sem_wait(&w->go);
+        if (!setjmp(w->park)) {
+            if (jp8_call_x(&w->cpu, WORKER)) snprintf(w->msg, sizeof w->msg, "%s", jp8_last_trap());
+            else snprintf(w->msg, sizeof w->msg, "a worker returned instead of parking");
+            w->trapped = 1; sem_post(&w->rendered); sem_post(&w->parked);       /* no one waits forever */
+            continue;
+        }
+        sem_post(&w->parked);
+    }
+    return NULL;
+}
+static int w_start(void) {
+    int u;
+    for (u = 0; u < 8; u++) {
+        if (WS[u].up) continue;
+        if (sem_init(&WS[u].go, 0, 0) || sem_init(&WS[u].rendered, 0, 0) || sem_init(&WS[u].turn, 0, 0) ||
+            sem_init(&WS[u].parked, 0, 0) || pthread_create(&WS[u].th, NULL, w_main, &WS[u])) return -1;
+        WS[u].up = 1;
+    }
+    return 0;
+}
+static void jobs_threaded(CPU *c, uint64_t host, uint64_t top) {
+    int u, k, n = 0, fl[8];
+    if (w_start()) { jp8_trap(c, JOBS_DUE, "the worker threads cannot start"); return; }
+    for (u = 0; u < 8; u++) {
+        uint64_t job = host + JOB_BASE + JOB_STRIDE * (uint64_t)u, t = (top - 0x20000ULL * (uint64_t)u) & ~0xFULL;
+        wslot *w = &WS[u];
+        if (gi(job + 0x34) != 1) continue;
+#ifdef JP8H_TOOTH_SKIPJOB
+        if (u == 7) continue;
+#endif
+        memcpy(&w->cpu, c, sizeof w->cpu); w->cpu.r[4] = t; wq(t - 8, H.ret);
+        w->cpu.r[1] = job; w->cpu.r[2] = (uint64_t)u; w->job = job; w->trapped = 0; H.njobs++; fl[n++] = u;
+    }
+    for (k = 0; k < n; k++) sem_post(&WS[fl[k]].go);
+    for (k = 0; k < n; k++) sem_wait(&WS[fl[k]].rendered);
+    for (k = 0; k < n; k++) {                    /* the bookkeeping, one job at a time, in unit order */
+        wslot *w = &WS[fl[k]];
+        if (!w->trapped) sem_post(&w->turn);
+        sem_wait(&w->parked);
+    }
+    for (k = 0; k < n; k++) if (WS[fl[k]].trapped) { jp8_trap(c, WORKER, WS[fl[k]].msg); return; }
+    for (k = 0; k < n; k++) if (gi(WS[fl[k]].job + 0x34) != 0) { jp8_trap(c, WORKER, "a worker parked with its job not done"); return; }
+}
+#endif
 void jp8_hook(CPU *c, uint64_t rva) {
+#ifdef JP8H_THREADS
+    if (w_self) {                                /* a worker thread */
+        if (rva == RENDER_DONE) { sem_post(&w_self->rendered); sem_wait(&w_self->turn); return; }
+        if (rva == WORKER_PARK) { if (gi(w_self->job + 0x34) == 0) longjmp(w_self->park, 1); return; }
+        jp8_trap(c, rva, "engine render reached from inside a worker job"); return;
+    }
+    if (rva == JOBS_DUE) {
+        uint32_t mx = c->mxcsr;
+        jobs_threaded(c, c->r[1] - DONE_LOCK, (c->r[4] - 0x100000ULL) & ~0xFULL);
+        _mm_setcsr(mx); c->mxcsr = mx;
+        return;
+    }
+#endif
+    if (rva == RENDER_DONE) return;              /* the sequential transport: the bookkeeping follows at once */
     if (rva == JOBS_DUE) {
         uint64_t host = c->r[1] - DONE_LOCK, top = (c->r[4] - 0x100000ULL) & ~0xFULL; int u;
         uint32_t mx = c->mxcsr;
@@ -355,6 +465,9 @@ static int load(const unsigned char *b, size_t len) {
 }
 
 static uint64_t alloc_com(uint64_t n) { uint64_t p = H.com_next; H.com_next += (n + 15) & ~15ULL; return p; }
+static uint64_t scratch(uint64_t off, size_t n) {   /* jp8_host_emu.JP8Host.scratch: a slot of the scratch area, cleared */
+    void *p = jp8h_guest(H.scr + off, n); if (p) memset(p, 0, n); return H.scr + off;
+}
 static uint64_t new_obj(uint64_t vt) { uint64_t p = alloc_com(16); wq(p, vt); return p; }   /* wrapper_emu.new_obj */
 static int live(void) { return H.st == 1 ? JP8H_OK : H.st == 2 ? JP8H_E_TRAP : err(JP8H_E_STATE, "not initialized"); }
 /* wrapper_emu.vcall: the method at slot of obj's vtable, rcx = obj, then up to three arguments (absent ones 0) */
@@ -364,7 +477,7 @@ static int vcall(uint64_t obj, int slot, uint64_t a1, uint64_t a2, uint64_t a3, 
     return JP8H_OK;
 }
 static int setup_processing(double rate) {      /* host_process_emu.setup_processing: ProcessSetup {0, 0, max, rate} */
-    uint8_t b[24]; int32_t v[3]; uint64_t setup = alloc_com(24); uint32_t hr; int rc;
+    uint8_t b[24]; int32_t v[3]; uint64_t setup = H.scr ? scratch(SCR_SETUP, 24) : alloc_com(24); uint32_t hr; int rc;
     v[0] = 0; v[1] = 0; v[2] = (int32_t)H.maxblock;
     memset(b, 0, sizeof b); memcpy(b, v, 12); memcpy(b + 16, &rate, 8); wmem(setup, b, 24);
     if ((rc = vcall(H.audio, 7, setup, 0, 0, &hr))) return rc;
@@ -378,12 +491,28 @@ static int set_active(int on) {                  /* host_process_emu.set_active 
     return hr ? err(JP8H_E_STATE, "setActive returned an error") : JP8H_OK;
 }
 
+static int qi(const uint8_t iid[16], uint64_t *out) {    /* jp8_host_emu.JP8Host._qi: queryInterface, the controller */
+    uint64_t b = scratch(SCR_QI, 0x40); uint32_t hr; int rc;
+    wmem(b, iid, 16);
+    if ((rc = vcall(H.ctrl, 0, b, b + 0x30, 0, &hr))) return rc;
+    if (hr) return err(JP8H_E_STATE, "the controller does not answer an interface");
+    *out = gq(b + 0x30);
+    return JP8H_OK;
+}
 int jp8h_init(const void *tmpl, size_t len, double rate, int max_block) {
     int rc, i;
     H.st = 0; H.msg[0] = 0; H.nedit = 0; H.njobs = 0; H.in_job = 0; H.s_addr = 0; H.s_len = 0; H.s_pos = 0;
+    H.scr = 0; H.mm = 0; H.ui = 0; H.com_end = 0; H.nparam = 0; H.nunit = 0;
     if (!tmpl) return err(JP8H_E_ARG, "no template");
     if (max_block <= 0 || !(rate > 0.0)) return err(JP8H_E_ARG, "rate or block size");
     if ((rc = load((const unsigned char *)tmpl, len)) != JP8H_OK) return rc;
+#ifdef JP8H_TOOTH_NOREUSE                               /* the gate's tooth: the C side never reuses a freed block */
+    jp8_heap_reuse(0);
+#else
+    jp8_heap_reuse(1);                  /* freed blocks reused from the template's point (jp8_host_emu.heap_reuse_on) */
+#endif
+    for (i = 0; i < H.nreg; i++) if (H.rbase[i] <= H.com_next && H.com_next < H.rbase[i] + H.rsize[i]) H.com_end = H.rbase[i] + H.rsize[i];
+    if (!H.com_end) return err(JP8H_E_TEMPLATE, "template: the host-object area is in no region");
     memset(&H.cpu, 0, sizeof H.cpu); H.cpu.mxcsr = (uint32_t)H.mx0;
     {   /* the oracle's registers: they persist between its calls (only rsp, rcx, rdx, r8, r9 are written per call) */
         int r_;
@@ -413,6 +542,20 @@ int jp8h_init(const void *tmpl, size_t len, double rate, int max_block) {
         }
         H.ncc = (int)n;
     }
+    /* jp8_host_emu.JP8Host.host_setup's rest, in its order: the scratch area, the controller's IMidiMapping and
+     * IUnitInfo (queryInterface), its parameter and unit counts (the bounds this API checks: an index past them makes
+     * the plugin throw), the one stream object every state call reuses */
+    H.scr = alloc_com(SCR_SIZE);
+    if ((rc = qi(IID_IMIDIMAPPING, &H.mm)) || (rc = qi(IID_IUNITINFO, &H.ui))) return rc;
+    {
+        uint32_t hr;
+        if ((rc = vcall(H.ctrl, 8, 0, 0, 0, &hr))) return rc;
+        H.nparam = (int32_t)hr;
+        if ((rc = vcall(H.ui, 3, 0, 0, 0, &hr))) return rc;
+        H.nunit = (int32_t)hr;
+    }
+    H.s_addr = new_obj(H.vt_stream);
+    if (H.com_next > H.com_end) return err(JP8H_E_STATE, "the host objects do not fit the host-object region");
     return JP8H_OK;
 }
 int jp8h_set_rate(double rate) {                 /* a host-rate change: setActive(0), setupProcessing, setActive(1) */
@@ -455,8 +598,9 @@ int jp8h_cc_forget(uint32_t id) {                /* jp8_host_emu.cc_forget: an i
     if (k < 0) return JP8H_OK;
     return call(IB + CC_FORGET, H.core + 24, (uint64_t)k, 0, 0) ? JP8H_E_TRAP : JP8H_OK;
 }
-static int new_stream(const void *data, size_t n) {    /* wrapper_emu.stream(data) */
-    H.s_addr = new_obj(H.vt_stream); H.s_len = 0; H.s_pos = 0;
+static int new_stream(const void *data, size_t n) {    /* jp8_host_emu.JP8Host.stream(data): the one stream object */
+    if (!H.s_addr) return err(JP8H_E_STATE, "no stream object");
+    H.s_len = 0; H.s_pos = 0;
     if (n > H.s_cap) {
         unsigned char *d = (unsigned char *)realloc(H.s_data, n); if (!d) return err(JP8H_E_ARG, "no memory");
         H.s_data = d; H.s_cap = n;
@@ -504,7 +648,7 @@ int jp8h_param_to_norm(uint32_t id, double plain, double *v) { uint64_t x; int r
 int jp8h_param_string(uint32_t id, double v, uint16_t out[128], uint32_t *hr) {      /* String128: UTF-16, 0-ended */
     uint64_t buf; int rc = live();
     if (rc) return rc;
-    buf = alloc_com(256);
+    buf = scratch(SCR_STR, 256);
     if ((rc = ctl(10, id, v, 0, buf, hr, NULL))) return rc;
     if (out) memcpy(out, jp8h_guest(buf, 256), 256);
     return JP8H_OK;
@@ -514,7 +658,8 @@ int jp8h_param_parse(uint32_t id, const uint16_t *text, double *v, uint32_t *hr)
     if (rc) return rc;
     if (!text) return err(JP8H_E_ARG, "no text");
     while (text[n]) n++;
-    sp = alloc_com(2 * (n + 1)); wmem(sp, text, 2 * (n + 1)); vp = alloc_com(8);
+    if (2 * (n + 1) > 256) return err(JP8H_E_ARG, "a text above 127 characters");
+    sp = scratch(SCR_TEXT, 256); wmem(sp, text, 2 * (n + 1)); vp = scratch(SCR_VAL, 8);
     if ((rc = ctl(11, id, 0.0, sp, vp, hr, NULL))) return rc;
     if (v) memcpy(v, jp8h_guest(vp, 8), 8);
     return JP8H_OK;
@@ -525,11 +670,118 @@ int jp8h_ctl_raw(int slot, uint32_t id, double v, uint32_t *hr, uint64_t *x0) {
     return ctl(slot, id, v, 0, 0, hr, x0);
 }
 
+/* ---------------------------------------------------------------- what a DAW asks the controller (v6; jp8_host_emu
+ * JP8Host.info_step: the same calls, the same scratch slots) */
+int jp8h_param_count(int32_t *n) {
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = vcall(H.ctrl, 8, 0, 0, 0, &hr))) return rc;
+    if (n) *n = (int32_t)hr;
+    return JP8H_OK;
+}
+int jp8h_param_info(int32_t index, jp8h_pinfo *info, uint32_t *result) {
+    uint64_t b; uint32_t hr; const unsigned char *g; int rc = live();
+    if (rc) return rc;
+    if (index < 0 || index >= H.nparam) return err(JP8H_E_ARG, "a parameter index outside [0, count) (the plugin throws)");
+    b = scratch(SCR_INFO, 792);
+    if ((rc = vcall(H.ctrl, 9, (uint64_t)(uint32_t)index, b, 0, &hr))) return rc;
+    if (result) *result = hr;
+    g = (const unsigned char *)jp8h_guest(b, 792);
+    if (info && g) {                           /* VST3 ParameterInfo, field by field */
+        memcpy(&info->id, g, 4); memcpy(info->title, g + 4, 256); memcpy(info->short_title, g + 260, 256);
+#ifdef JP8H_TOOTH_INFO                                   /* the gate's tooth: the short title copied from the title */
+        memcpy(info->short_title, g + 4, 256);
+#endif
+        memcpy(info->units, g + 516, 256); memcpy(&info->step_count, g + 772, 4); memcpy(&info->default_value, g + 776, 8);
+        memcpy(&info->unit_id, g + 784, 4); memcpy(&info->flags, g + 788, 4);
+    }
+    return JP8H_OK;
+}
+int jp8h_midi_assignment(int32_t bus, int16_t channel, int16_t cc, uint32_t *id, uint32_t *result) {
+    uint64_t b; uint32_t v; int rc = live();
+    if (rc) return rc;
+    b = scratch(SCR_VAL, 8);
+    wq(H.rsp + 0x20, b);                       /* the ParamID& at [rsp + 0x28] at entry (the call pushes its return) */
+    if (call(gq(gq(H.mm) + 8 * 3), H.mm, (uint64_t)(int64_t)bus, (uint64_t)(int64_t)channel, (uint64_t)(int64_t)cc)) return JP8H_E_TRAP;
+    if (result) *result = (uint32_t)H.cpu.r[0];
+    v = (uint32_t)gi(b);
+    if (id) *id = v;
+    return JP8H_OK;
+}
+int jp8h_unit_count(int32_t *n) {
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = vcall(H.ui, 3, 0, 0, 0, &hr))) return rc;
+    if (n) *n = (int32_t)hr;
+    return JP8H_OK;
+}
+int jp8h_unit_info(int32_t index, jp8h_uinfo *info, uint32_t *result) {
+    uint64_t b; uint32_t hr; const unsigned char *g; int rc = live();
+    if (rc) return rc;
+    if (index < 0 || index >= H.nunit) return err(JP8H_E_ARG, "a unit index outside [0, count) (the plugin throws)");
+    b = scratch(SCR_UNIT, 268);
+    if ((rc = vcall(H.ui, 4, (uint64_t)(uint32_t)index, b, 0, &hr))) return rc;
+    if (result) *result = hr;
+    g = (const unsigned char *)jp8h_guest(b, 268);
+    if (info && g) {                           /* VST3 UnitInfo */
+        memcpy(&info->id, g, 4); memcpy(&info->parent_id, g + 4, 4); memcpy(info->name, g + 8, 256); memcpy(&info->program_list_id, g + 264, 4);
+    }
+    return JP8H_OK;
+}
+int jp8h_program_list_count(int32_t *n) {
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = vcall(H.ui, 5, 0, 0, 0, &hr))) return rc;
+    if (n) *n = (int32_t)hr;
+    return JP8H_OK;
+}
+int jp8h_selected_unit(int32_t *id) {
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = vcall(H.ui, 11, 0, 0, 0, &hr))) return rc;
+    if (id) *id = (int32_t)hr;
+    return JP8H_OK;
+}
+int jp8h_select_unit(int32_t id, uint32_t *result) {
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = vcall(H.ui, 12, (uint64_t)(int64_t)id, 0, 0, &hr))) return rc;
+    if (result) *result = hr;
+    return JP8H_OK;
+}
+int jp8h_ctl_get_state(void *buf, size_t cap, size_t *n, uint32_t *result) {   /* IEditController::getState */
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if ((rc = new_stream(NULL, 0)) || (rc = vcall(H.ctrl, 7, H.s_addr, 0, 0, &hr))) return rc;
+    if (result) *result = hr;
+    if (n) *n = H.s_len;
+    if (buf && cap) memcpy(buf, H.s_data, H.s_len < cap ? H.s_len : cap);
+    return JP8H_OK;
+}
+int jp8h_ctl_set_state(const void *data, size_t n, uint32_t *result) {          /* IEditController::setState */
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if (n && !data) return err(JP8H_E_ARG, "no state");
+    if ((rc = new_stream(data, n)) || (rc = vcall(H.ctrl, 6, H.s_addr, 0, 0, &hr))) return rc;
+    if (result) *result = hr;
+    return JP8H_OK;
+}
+int jp8h_component_state(const void *data, size_t n, uint32_t *result) {        /* IEditController::setComponentState */
+    uint32_t hr; int rc = live();
+    if (rc) return rc;
+    if (n && !data) return err(JP8H_E_ARG, "no state");
+    if ((rc = new_stream(data, n)) || (rc = vcall(H.ctrl, 5, H.s_addr, 0, 0, &hr))) return rc;
+    if (result) *result = hr;
+    return JP8H_OK;
+}
+void jp8h_heap_stats(uint64_t *live_blocks, uint64_t *free_blocks) { jp8_heap_stats(live_blocks, free_blocks); }
+
 int jp8h_load_patch(const void *rec, size_t n) {
     uint64_t data, vec; int rc = live();
     if (rc) return rc;
-    data = alloc_com(n + 16); wmem(data, rec, n);           /* wrapper_emu.load_patch: the record's bytes after its name */
-    vec = alloc_com(24); wq(vec, data); wq(vec + 8, data + n); wq(vec + 16, data + n);
+    if (n + 16 > SCR_PATCH_N) return err(JP8H_E_ARG, "a record above the scratch area");
+    data = scratch(SCR_PATCH, SCR_PATCH_N); vec = scratch(SCR_VEC, 24);   /* jp8_host_emu.JP8Host.load_patch */
+    wmem(data, rec, n); wq(vec, data); wq(vec + 8, data + n); wq(vec + 16, data + n);
     return call(H.patch_fn, vec, gq(H.comp + 280 + 8), 0, 0) ? JP8H_E_TRAP : JP8H_OK;   /* rdx read now, as the oracle does */
 }
 

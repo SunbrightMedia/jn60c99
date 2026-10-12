@@ -1,6 +1,9 @@
 /* jp8h.h -- the JUPITER-8 as a DAW runs it (jp8_host.c): the plugin's own process(), patch load, setupProcessing,
- * setActive, getState / setState and engine, lifted, on the memory the host oracle had after booting the plugin up to
- * the point a host learns its sample rate (a JP8H v2 template). One instance per process. */
+ * setActive, getState / setState, UI timer, MIDI learn, edit controller and engine, lifted, on the memory the host
+ * oracle had after booting the plugin up to the point a host learns its sample rate (a JP8H v2 template). One
+ * instance per process. Build: ISO C99 (-std=c99) with the lifted source and jp8_rt.c; or, for the plugin's own
+ * parallelism (its eight engine workers on eight threads), add -D_POSIX_C_SOURCE=200809L -DJP8H_THREADS and -lpthread:
+ * the same output, bit for bit (jp8_host_gate.sh grades both). */
 #ifndef JP8H_API_H
 #define JP8H_API_H
 #include <stddef.h>
@@ -23,7 +26,7 @@ int  jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, i
 int  jp8h_get_state(void *buf, size_t cap, size_t *n);              /* IComponent::getState: *n bytes, cap copied */
 int  jp8h_set_state(const void *data, size_t n, uint32_t *result);  /* IComponent::setState; *result its answer */
 /* the edit controller (IEditController): a parameter's normalized value, set, plain <-> normalized, its display string,
- * a string parsed (each string call takes 256 bytes of the host-object area, as the plugin's host oracle does) */
+ * a string parsed (the strings in the host's scratch area: the host-object area does not grow after jp8h_init) */
 int  jp8h_param_get(uint32_t id, double *v);
 int  jp8h_param_set(uint32_t id, double v, uint32_t *result);
 int  jp8h_param_to_plain(uint32_t id, double v, double *plain);
@@ -31,6 +34,25 @@ int  jp8h_param_to_norm(uint32_t id, double plain, double *v);
 int  jp8h_param_string(uint32_t id, double v, uint16_t out[128], uint32_t *result);
 int  jp8h_param_parse(uint32_t id, const uint16_t *text, double *v, uint32_t *result);
 int  jp8h_ctl_raw(int slot, uint32_t id, double v, uint32_t *result, uint64_t *xmm0);
+/* what a DAW asks the controller when it loads the plugin -- the plugin's own answers: the parameters (VST3
+ * ParameterInfo; an index outside [0, count) is refused: the plugin itself throws), the MIDI mapping (IMidiMapping: CC n,
+ * 128 aftertouch, 129 pitch bend -> the parameter id process() takes), the units (IUnitInfo), the controller's own state
+ * (empty: the plugin writes none) and setComponentState (the component's state handed to the controller, as a DAW does
+ * after jp8h_set_state). Strings are UTF-16, 0-ended. */
+typedef struct { uint32_t id; uint16_t title[128], short_title[128], units[128]; int32_t step_count; double default_value;
+                 int32_t unit_id, flags; } jp8h_pinfo;                                     /* 792 bytes, VST3's */
+typedef struct { int32_t id, parent_id; uint16_t name[128]; int32_t program_list_id; } jp8h_uinfo;   /* 268 bytes */
+int  jp8h_param_count(int32_t *n);
+int  jp8h_param_info(int32_t index, jp8h_pinfo *info, uint32_t *result);
+int  jp8h_midi_assignment(int32_t bus, int16_t channel, int16_t cc, uint32_t *id, uint32_t *result);  /* result 0: mapped */
+int  jp8h_unit_count(int32_t *n);
+int  jp8h_unit_info(int32_t index, jp8h_uinfo *info, uint32_t *result);
+int  jp8h_program_list_count(int32_t *n);
+int  jp8h_selected_unit(int32_t *id);
+int  jp8h_select_unit(int32_t id, uint32_t *result);
+int  jp8h_ctl_get_state(void *buf, size_t cap, size_t *n, uint32_t *result);
+int  jp8h_ctl_set_state(const void *data, size_t n, uint32_t *result);
+int  jp8h_component_state(const void *data, size_t n, uint32_t *result);
 const char *jp8h_error(void);
 /* gates */
 void    *jp8h_guest(uint64_t gaddr, size_t len);
@@ -38,4 +60,5 @@ uint64_t jp8h_heap_top(void);
 uint64_t jp8h_jobs(void);
 uint64_t jp8h_com_next(void);
 int      jp8h_edits(uint32_t *id, double *val, int cap);           /* the performEdit calls so far (all, count returned) */
+void     jp8h_heap_stats(uint64_t *live_blocks, uint64_t *free_blocks); /* the heap's reuse layer (jp8_rt.c) */
 #endif

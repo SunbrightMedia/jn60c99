@@ -4119,3 +4119,22 @@ jp8_host_gate.sh now reaches its own drive (~8 min) and unites it with the 64-pa
 ### The rule
 Lift from the union of the broad reach (variety) and the exact drive the gate grades (its history). A product built
 from a reach carries the same caveat: what no reach saw traps, so the reach's drives are part of the product's scope.
+
+## 238. A GATE OF EQUALITY CANNOT SEE A LEAK BOTH SIDES SHARE -- MEASURE WHAT EACH CALL CONSUMES
+Paid 2026-10-12: the JUPITER-8 host path was EXACTLY 0 against its oracle, and a product built on it would have died
+in a long session. The oracle answers the plugin's HeapFree with a no-op (a bump allocator: nothing is ever reused) and
+the C runtime mirrors it, so the two agreed byte for byte while both leaked. Measured per call on the oracle: a patch
+load took 1.32 MB of heap, a setState 35 KB, a getState 15 KB, a process() block 8 KB; and every host call that hands
+the plugin a buffer (a patch record, a string, a stream) took new bytes of the 4 MB host-object area -- about 200
+patch loads filled it. (The 8 KB per block was NOT a leak: MSVC's std::deque<float> takes 16-byte blocks for a
+300,000-sample ring at HOST + 0x50 / + 0x78 and keeps them; its 131,072-slot map bounds it at 4 MB. The patch load's
+was: with nothing reused, every load adds its 1.32 MB -- the bump pointer only rises.) Fixed as plumbing on both sides: from the template's point a freed block
+goes on the free list of its rounded size and the next allocation of that size takes the last one back
+(jp8_host_emu.heap_reuse_on, jp8_rt.c jp8_heap_reuse: one rule, the same addresses); every host buffer is a fixed slot
+of one scratch area, cleared before use, and one stream object is reused. MEASURED after: 160 loads cycling the 64
+factory patches grow the heap 31 MB, then nothing (the plugin keeps 259 blocks); the gate stops if the host-object
+area moves after jp8h_init.
+### The rule
+Equality between a port and its oracle says nothing about resources they both consume. For every product entry,
+count what one call takes (heap, host buffers, handles) over thousands of calls -- a short gate drive cannot show a
+slow leak -- and make "does not grow" a graded property where the design allows it.

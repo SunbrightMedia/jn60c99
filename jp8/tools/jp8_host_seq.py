@@ -18,6 +18,18 @@ oracle's boot_host: the template is taken there), then STEPS, each side making t
                           does; an id without a record arms index 0xFFFFFFFF); ('forget', id) its other choice
                           (rva 0x324F00) -- the record index from the plugin's own lookup (rva 0x325870), read once
                           after setup by both sides
+  ('info', what, *args)   what a DAW asks the controller when it loads the plugin (v6): 'count' (getParameterCount,
+                          slot 8), 'param' i (getParameterInfo, slot 9: the 792 bytes it writes), 'midi' bus ch cc
+                          (IMidiMapping::getMidiControllerAssignment), 'units' / 'unit' i / 'lists' / 'selected' /
+                          'select' id (IUnitInfo: getUnitCount, getUnitInfo (268 bytes), getProgramListCount,
+                          getSelectedUnit, selectUnit), 'cgetstate' key / 'csetstate' key (IEditController::getState /
+                          setState: the controller's own state, kept under key) -- the IMidiMapping and IUnitInfo
+                          pointers are queried once, after setup (queryInterface, slot 0)
+  ('compstate', key, how) IEditController::setComponentState of the bytes kept under key, through state_variant(how):
+                          a DAW hands the controller the component's state after IComponent::setState (v6)
+The host's own buffers (the patch record, the strings, the infos, the stream, a new rate's setup) are one scratch area
+and one stream object made after setup and reused, cleared before each use, on both sides: the host-object area does
+not grow after setup (v6; before, every call took new bytes and a long session would have filled it).
 Per patch: idle, a note, a chord of ten keys on the eight voices (stealing), their release, host automation of two
 of the plugin's own parameters (jp8/gen/jp8_controller.json, the controller's census) and of MASTER TUNE and an id
 the plugin does not have, block sizes 480 and 32, idle again, the state. Then the MIDI controllers through process()
@@ -140,10 +152,25 @@ def learn_steps():
             ('learn', 0x7FFF0000), blk([(cc(7), 0, 0.5)]), ('drain',), ('getstate', 'forgotten')]
 
 
+NPARAM = _CTL['count']                               # getParameterCount (the census; an index past it makes the plugin throw)
+
+
+def info_steps():
+    """what a DAW asks the edit controller when it loads the plugin: the parameter count and every parameter's info,
+    the MIDI mapping of every controller number (bus 0 on channels 0 and 15; channel 16, numbers 130 and 131, bus 1),
+    the units, the program lists, the selected unit (and one selected), the controller's own state"""
+    out = [('info', 'count')] + [('info', 'param', i) for i in range(NPARAM)]
+    out += [('info', 'midi', 0, 0, k) for k in range(132)] + [('info', 'midi', 0, 15, k) for k in range(0, 132, 3)]
+    out += [('info', 'midi', 0, 16, 1), ('info', 'midi', 1, 0, 1), ('info', 'midi', 0, 0, 255)]
+    out += [('info', 'units'), ('info', 'unit', 0), ('info', 'unit', 1), ('info', 'lists'), ('info', 'selected'),
+            ('info', 'select', 2), ('info', 'selected'), ('info', 'select', 0), ('info', 'cgetstate', 'c0')]
+    return out
+
+
 def steps(patches=None):
     """the whole drive, in order (the reach runs the same steps over its patch list)"""
     patches = PATCHES if patches is None else patches
-    out = [('setup', RATE)]
+    out = [('setup', RATE)] + info_steps()
     for p in patches:
         out.append(('patch', p))
         out += [('block',) + b for b in blocks(p)]
@@ -158,6 +185,12 @@ def steps(patches=None):
     out += ctl_steps() + [('block', 512, [("on", 0, 0, 60, 0.8)], [], None), ('getstate', 'after_ctl'),
                           ('block', 512, [("off", 0, 0, 60, 0.0)], [], None)]
     for how in VARIANTS:
-        out += [('setstate', 'p%d' % patches[0], how), ('block', 512, [("on", 0, 0, 62, 0.8)], [], None),
+        out += [('setstate', 'p%d' % patches[0], how), ('compstate', 'p%d' % patches[0], how),
+                ('ctl', 'get', PANEL[2], 0.0), ('ctl', 'get', MASTER_TUNE, 0.0),
+                ('block', 512, [("on", 0, 0, 62, 0.8)], [], None),
                 ('block', 512, [("off", 0, 0, 62, 0.0)], [], None), ('getstate', 'after_' + how)]
+    # a DAW's project load: the component's state, the controller's view of it, the controller's own state
+    out += [('setstate', 'learned', 'as is'), ('compstate', 'learned', 'as is'), ('info', 'csetstate', 'c0'),
+            ('ctl', 'get', PANEL[5], 0.0), ('block', 512, [("on", 0, 0, 60, 0.8)], [(MIDI_BASE + 3, 0, 0.4)], None),
+            ('drain',), ('getstate', 'project'), ('info', 'cgetstate', 'c1')]
     return out

@@ -11,16 +11,19 @@
 #      from the plugin's own vtables
 #   1. lift: those roots, every indirect call target of the reach; --alloc-tailcall (a jmp to operator new is a tail
 #      call, never a body to follow: playbook 234); --hostcalls (every stub call answered by jp8_host.c), --hook
-#      0x4460E7 (the jobs) and 0x4456F0 (a worker's park); build CHECKED (every access bounds-checked, -O1) and
-#      PRODUCT (the fast pass, -O2), both on the one-offset map (JP8_FLAT) with the oracle's TEB as the gs base
+#      0x4460E7 (the jobs), 0x4456F0 (a worker's park) and 0x44580A (a job's render done); build CHECKED (every
+#      access bounds-checked, -O1), PRODUCT (the fast pass, -O2) and THREADS (the product with the workers on POSIX
+#      threads, JP8H_THREADS: a platform layer), all on the one-offset map (JP8_FLAT), the oracle's TEB as gs base
 #   2. the oracle: the template and the references
-#   3. both builds: CONTROL 1 (after the setup calls), then every step's result, every output word, every state
-#      byte, every performEdit, the worker jobs and the memory after
+#   3. the three builds (THREADS three times): CONTROL 1 (after the setup calls), then every step's result, every
+#      output word, every state byte, every performEdit, the worker jobs and the memory after
 #   4. the teeth, each must FAIL: T1 ONE addss of the lift turned subss (the FINE TUNE setter 0x38633e, reached by every
 #      patch load); T2 the last flagged unit's job skipped by the transport (-DJP8H_TOOTH_SKIPJOB); T3 one heap byte of
 #      the template changed (CONTROL 1 must bite); T4 the setActive after a new host rate dropped (-DJP8H_TOOTH_RATE);
 #      T5 every state value the IBStream hands setState one off (-DJP8H_TOOTH_STREAM); T6 the UI timer never drains
-#      (-DJP8H_TOOTH_NODRAIN: the learned CC map and the store stay as they were)
+#      (-DJP8H_TOOTH_NODRAIN: the learned CC map and the store stay as they were); T7 the C side's heap never reuses a
+#      freed block (-DJP8H_TOOTH_NOREUSE: the oracle's does); T8 a parameter info's short title copied from its title
+#      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -50,7 +53,7 @@ python3 "$HERE/jp8_reach_merge.py" "$LREACH" "$REACH" $GREACHES
 ROOTS=$(python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['roots']; print(','.join('0x%x' % v for v in sorted(set(r.values()))))" "$LREACH")
 echo "roots: $ROOTS"
 echo "=== 1. lift + build ==="
-python3 "$HERE/jp8_lift.py" "$SRC" "$ROOTS" --dyn "$LREACH" --alloc 0x6F5B04 --alloc-tailcall --name host --hostcalls --hook 0x4460E7,0x4456F0
+python3 "$HERE/jp8_lift.py" "$SRC" "$ROOTS" --dyn "$LREACH" --alloc 0x6F5B04 --alloc-tailcall --name host --hostcalls --hook 0x4460E7,0x4456F0,0x44580A
 python3 "$HERE/jp8_fast.py" "$SRC" "$OUT/jp8_host_lift_fast.c"
 cc $CHK -w -c -o "$OUT/hlift_chk.o" "$SRC"
 cc $CHK -c -o "$OUT/hrt_chk.o" "$REPO/jp8/src/jp8_rt.c"; cc $CHK -c -o "$OUT/hhost_chk.o" "$REPO/jp8/src/jp8_host.c"
@@ -58,6 +61,10 @@ cc -shared -o "$OUT/libjp8host_chk.so" "$OUT/hlift_chk.o" "$OUT/hrt_chk.o" "$OUT
 cc $PRD -w -c -o "$OUT/hlift_prd.o" "$OUT/jp8_host_lift_fast.c"
 cc $PRD -c -o "$OUT/hrt_prd.o" "$REPO/jp8/src/jp8_rt.c"; cc $PRD -c -o "$OUT/hhost_prd.o" "$REPO/jp8/src/jp8_host.c"
 cc -shared -o "$OUT/libjp8host_prd.so" "$OUT/hlift_prd.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
+THR="$PRD -D_POSIX_C_SOURCE=200809L -DJP8H_THREADS"      # the platform layer: the workers on POSIX threads
+cc $THR -w -c -o "$OUT/hlift_thr.o" "$OUT/jp8_host_lift_fast.c"
+cc $THR -c -o "$OUT/hrt_thr.o" "$REPO/jp8/src/jp8_rt.c"; cc $THR -c -o "$OUT/hhost_thr.o" "$REPO/jp8/src/jp8_host.c"
+cc -shared -o "$OUT/libjp8host_thr.so" "$OUT/hlift_thr.o" "$OUT/hrt_thr.o" "$OUT/hhost_thr.o" -lm -lpthread
 for R in $RATES; do
     RREF="$OUT/ref_${R%.*}"
     echo "=== 2. the oracle at $R: template + references ==="
@@ -66,6 +73,12 @@ for R in $RATES; do
     JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_chk.so"
     echo "=== 3. the C side at $R: product build ==="
     JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_prd.so"
+    echo "=== 3. the C side at $R: product build, the workers on threads (3 runs: a race would show) ==="
+    for k in 1 2 3; do                       # (no pipe: set -e must see the driver's own exit status)
+        L="$OUT/threads_${R%.*}_$k.log"
+        if ! JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_thr.so" > "$L" 2>&1; then cat "$L"; exit 1; fi
+        tail -1 "$L"
+    done
 done
 echo "=== 4. the teeth ==="
 bite() {    # bite <name> <refdir> <lib>: the run must FAIL
@@ -89,7 +102,7 @@ EOF
 cc $BASE -O1 -DJP8_RELOC_CHECK=0 -w -c -o "$OUT/hlift_t1.o" "$OUT/jp8_host_lift_t1.c"
 cc -shared -o "$OUT/libjp8host_t1.so" "$OUT/hlift_t1.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T1 "$REF" "$OUT/libjp8host_t1.so"
-for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN; do
+for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN 7:NOREUSE 8:INFO; do
     cc $PRD -DJP8H_TOOTH_${t#*:} -c -o "$OUT/hhost_t${t%%:*}.o" "$REPO/jp8/src/jp8_host.c"
     cc -shared -o "$OUT/libjp8host_t${t%%:*}.so" "$OUT/hlift_prd.o" "$OUT/hrt_prd.o" "$OUT/hhost_t${t%%:*}.o" -lm
     bite "T${t%%:*}" "$REF" "$OUT/libjp8host_t${t%%:*}.so"
@@ -113,4 +126,4 @@ m = json.load(open(src + "/meta.json")); m["template_sha256"] = hashlib.sha256(b
 json.dump(m, open(dst + "/meta.json", "w"))
 EOF
 bite T3 "$OUT/ref_t3" "$OUT/libjp8host_prd.so"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller, workers; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product builds EXACTLY 0, 6 teeth bite"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 8 teeth bite"

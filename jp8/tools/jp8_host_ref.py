@@ -7,8 +7,10 @@ component and the controller initialized and connected, the handler, setComponen
     audio processor, the core, the patch load, the vtables of the host objects it creates, the bump pointer, the
     fake-handle counter, MXCSR, the registers) and the name of every stub address (imports and host-object methods).
     It holds no sample rate: the C side's jp8h_init makes the host's setup calls itself, with the rate it is given;
-  * the REFERENCES of the drive (jp8_host_seq.steps): per step the host call's result, every output word of every
-    block, every state byte, then the performEdit calls the plugin made, the worker jobs, and the memory hashes.
+  * the REFERENCES of the drive (jp8_host_seq.steps, run by jp8_host_emu.JP8Host.run_step): per step the host call's
+    result (and the bytes a controller call wrote), every output word of every block, every state byte, then the
+    performEdit calls the plugin made, the worker jobs, and the memory hashes. From the template on the host's heap
+    reuses freed blocks (JP8Host.heap_reuse_on) and the host-object area must not grow after the setup (a stop).
 Plumbing only. FORMAT JP8H v2 (little endian): "JP8H" u32 2 u32 nregions; per region u64 base u64 size u32 nruns,
 per run u32 off u32 len bytes; u32 nfacts, per fact char key[24] u64 value; u32 nstubs, per stub u64 addr u32 len
 name; u32 crc32 of every byte before it.
@@ -80,55 +82,28 @@ def memhash():
 ST = Q.steps()
 assert ST[0][0] == 'setup'
 e0 = len(h.edits); j0 = len(h.jobs)
-h.setup(ST[0][1], Q.MAXBLOCK)                      # setupProcessing + setActive(1) + the blocks' host objects
-while len(h._pq) < Q.NPQ:                          # every queue a block may use exists before the drive
-    h._pq.append(h.new_obj('pqueue', id=0, points=[]))
-h.cc_index_table()                                 # the CC records' ids, read once (the C side: in jp8h_init)
-init_hash = memhash()
+h.heap_reuse_on()                                  # the host's heap reuses freed blocks from here (jp8h_init: the same)
+h.host_setup(ST[0][1], Q.MAXBLOCK, Q.NPQ)          # setupProcessing, setActive(1), the host objects, the CC ids, the
+init_hash = memhash()                              # scratch, IMidiMapping / IUnitInfo, the stream (jp8h_init's order)
+com_init = h.com_next
 log('setup %g: the host objects end at 0x%x, %d edits, %d jobs' % (ST[0][1], h.com_next, len(h.edits) - e0, len(h.jobs) - j0))
-bank = B.bank_bytes(); words = bytearray(); results = []; states = {}; state_bytes = bytearray(); nblock = 0
+bank = B.bank_bytes(); words = bytearray(); results = []; states = {}; cstates = {}; state_bytes = bytearray(); nblock = 0
+blob = lambda p: B.patch_blob(bank, p)
 for st in ST[1:]:
     k = st[0]
-    if k == 'patch':
-        h.load_patch(B.patch_blob(bank, st[1])); results.append([k, st[1], 0])
-    elif k == 'block':
-        _, n, evs, pars, ctx = st
-        L, R = h.process(n, events=evs, params=pars, ctx=ctx)
-        words += struct.pack('<%dI' % n, *L) + struct.pack('<%dI' % n, *R); nblock += 1
-        results.append([k, n, 0])
-    elif k == 'getstate':
-        s = h.get_state(); states[st[1]] = s; state_bytes += s; results.append([k, st[1], len(s)])
-    elif k == 'setstate':
-        r = h.set_state(Q.state_variant(states[st[1]], st[2])); results.append([k, '%s/%s' % (st[1], st[2]), r])
-    elif k == 'rate':
-        h.set_active(0); h.setup_processing(st[1]); h.set_active(1); results.append([k, st[1], 0])
-    elif k == 'active':
-        h.set_active(st[1]); results.append([k, st[1], 0])
-    elif k == 'ctl':
-        _, op, pid, arg = st
-        if op == 'str':
-            buf = h.alloc_com(256); r, x = h.ctl(10, pid, arg, 0, buf); x = 0; extra = bytes(h.uc.mem_read(buf, 256)).hex()
-        elif op == 'parse':
-            t = arg.encode('utf-16-le') + b'\0\0'; sp = h.alloc_com(len(t)); h.uc.mem_write(sp, t); vp = h.alloc_com(8)
-            r, x = h.ctl(11, pid, 0.0, sp, vp); x = 0; extra = bytes(h.uc.mem_read(vp, 8)).hex()   # (xmm0: not a result)
-        else:
-            r, x = h.ctl({'get': 14, 'set': 15, 'plain': 12, 'norm': 13}[op], pid, arg); extra = ''
-        results.append([k, '%s/%x/%r' % (op, pid, arg), r, x, extra])
-    elif k == 'drain':
-        h.ui_drain(); results.append([k, 0, 0])
-    elif k == 'learn':
-        h.cc_learn(st[1]); results.append([k, st[1], 0])
-    elif k == 'forget':
-        h.cc_forget(st[1]); results.append([k, st[1], 0])
-    else:
-        raise SystemExit('unknown step %r' % (st,))
+    row, w, sb = h.run_step(st, blob, Q.state_variant, states, cstates)
+    results.append(row); words += w; state_bytes += sb; nblock += k == 'block'
     if k in ('patch', 'rate', 'setstate'):
-        log('%s %s: %d blocks, %d words so far, %d edits, %d jobs' % (k, st[1], nblock, len(words) // 4, len(h.edits) - e0, len(h.jobs) - j0))
+        log('%s %s: %d blocks, %d words so far, %d edits, %d jobs, heap 0x%x' % (k, st[1], nblock, len(words) // 4, len(h.edits) - e0,
+            len(h.jobs) - j0, h.heap))
+if h.com_next != com_init:
+    raise SystemExit('the host-object area grew during the drive: 0x%x -> 0x%x' % (com_init, h.com_next))
 edits = [[e[1], struct.unpack('<Q', struct.pack('<d', e[2]))[0]] for e in h.edits[e0:] if e[0] == 'performEdit']
 open(os.path.join(out, 'words.bin'), 'wb').write(bytes(words))
 open(os.path.join(out, 'states.bin'), 'wb').write(bytes(state_bytes))
 json.dump(dict(rate=Q.RATE, patches=Q.PATCHES, rates=Q.RATES, nsteps=len(ST), results=results, init_hash=init_hash,
                end_hash=memhash(), heap_end=h.heap, com_next_end=h.com_next, jobs=len(h.jobs) - j0, edits=edits,
+               heap_live=len(h._live), heap_free=sum(len(v) for v in h._freel.values()),
                stack_hash=hashlib.sha256(bytes(uc.mem_read(Q.STACK_BASE, Q.STACK_SIZE))).hexdigest(),
                template_sha256=hashlib.sha256(body).hexdigest()), open(os.path.join(out, 'meta.json'), 'w'))
 log('wrote %s: %d steps, %d blocks, %d words, %d state bytes, %d performEdits, %d worker jobs' % (
