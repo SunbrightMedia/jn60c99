@@ -1,0 +1,71 @@
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  16.0s] InitDll -> 1
+[  67.6s] IComponent::initialize -> 0x0
+[  67.8s] roots (the plugin's vtables): process 0x36bf30, setupProcessing 0x449ee0, setActive 0x36c600, getState 0x36ba50, setState 0x36c650, patch_load 0x355f90, worker 0x445670, ui_drain 0x33a290, cc_index 0x325870, cc_learn 0x326660, cc_forget 0x324f00, ctl_qi 0x369754, ctl_compstate 0x369ae0, ctl_setstate 0x36a300, ctl_getstate 0x3691b0, ctl_count 0x450400, ctl_info 0x450420, midi_assign 0x369120, unit_count 0x3691d0, unit_info 0x450bc0, unit_lists 0x450970, unit_selected 0x3691a0, unit_select 0x369ad0, ctl10 0x450270, ctl11 0x4502d0, ctl12 0x450fd0, ctl13 0x451180, ctl14 0x369150, ctl15 0x36a2b0
+[ 108.8s] patch 0 'PD Jupiter Glide': executed 43677 (+43200), 547 indirect sites, 13 stub names
+[ 144.5s] patch 1 'PD Jupiter Str  ': executed 53274 (+9597), 565 indirect sites, 13 stub names
+[ 180.0s] patch 2 'BR JP PWM Brass ': executed 54214 (+940), 575 indirect sites, 13 stub names
+[ 213.5s] patch 3 'SQ JP Arpeggio  ': executed 64744 (+10530), 597 indirect sites, 13 stub names
+[ 246.8s] patch 4 'PL Poly Stack   ': executed 65090 (+346), 597 indirect sites, 13 stub names
+[ 282.0s] patch 5 'SY 1964 SciWiFi ': executed 66612 (+1522), 610 indirect sites, 13 stub names
+[ 327.1s] patch 6 'BS Ba-Bass      ': executed 66689 (+77), 611 indirect sites, 13 stub names
+[ 366.4s] patch 7 "LD Siren's Chant": executed 70842 (+4153), 613 indirect sites, 13 stub names
+[ 404.9s] patch 8 'PD JP Square Pad': executed 70844 (+2), 613 indirect sites, 13 stub names
+[ 440.9s] patch 9 'KY XMod Electric': executed 71992 (+1148), 643 indirect sites, 13 stub names
+[ 474.8s] patch 10 'PD JP Soft Pad  ': executed 72036 (+44), 643 indirect sites, 13 stub names
+[ 505.2s] patch 11 'KY Warship      ': executed 76240 (+4204), 643 indirect sites, 13 stub names
+[ 538.1s] patch 12 'SQ 8th Peaks    ': executed 76247 (+7), 643 indirect sites, 13 stub names
+[ 571.2s] patch 13 'LD Hawk Lead    ': executed 76648 (+401), 646 indirect sites, 13 stub names
+[ 606.0s] patch 14 'PD JP Phaser Pad': executed 76648 (+0), 646 indirect sites, 13 stub names
+[ 639.9s] patch 15 'BR Grind Tpt    ': executed 79603 (+2955), 646 indirect sites, 13 stub names
+[ 672.0s] patch 16 'LD Jupiter Lead ': executed 79603 (+0), 646 indirect sites, 13 stub names
+[ 703.0s] patch 17 'BS So Smooth    ': executed 79668 (+65), 648 indirect sites, 13 stub names
+[ 738.1s] patch 18 'PD Lush City    ': executed 79668 (+0), 648 indirect sites, 13 stub names
+[ 770.8s] patch 19 "SQ Jumpin' Arpg ": executed 79944 (+276), 660 indirect sites, 13 stub names
+[ 802.3s] patch 20 'SY Spit Sinker  ': executed 80409 (+465), 660 indirect sites, 13 stub names
+[ 836.5s] patch 21 "BS Thrillin' Bs ": executed 80572 (+163), 660 indirect sites, 13 stub names
+[ 869.7s] patch 22 'PD Phased Dirt  ': executed 80572 (+0), 660 indirect sites, 13 stub names
+[ 902.1s] patch 23 'PD Jupiter Str2 ': executed 80576 (+4), 660 indirect sites, 13 stub names
+[ 935.4s] patch 24 'SQ Deep Ocean   ': executed 83647 (+3071), 660 indirect sites, 13 stub names
+[ 968.3s] patch 25 'SY Silk Fives   ': executed 83648 (+1), 660 indirect sites, 13 stub names
+[1000.4s] patch 26 'LD ELK Sitar    ': executed 83660 (+12), 660 indirect sites, 13 stub names
+[1034.9s] patch 27 'BS Waver Bass   ': executed 84034 (+374), 665 indirect sites, 13 stub names
+[1068.4s] patch 28 'PD Warm Pad     ': executed 84034 (+0), 665 indirect sites, 13 stub names
+[1098.6s] patch 29 'PD 4-Seen Voices': executed 84037 (+3), 665 indirect sites, 13 stub names
+[1130.2s] patch 30 'SQ Compu-Spike  ': executed 84093 (+56), 665 indirect sites, 13 stub names
+[1160.9s] patch 31 'DR Percussion   ': executed 84094 (+1), 665 indirect sites, 13 stub names
+[1191.7s] patch 32 'SQ Arpg Hardball': executed 84094 (+0), 665 indirect sites, 13 stub names
+[1226.6s] patch 33 'PD JP Pad Mach  ': executed 84094 (+0), 665 indirect sites, 13 stub names
+[1259.8s] patch 34 'SQ Arpg Terra   ': executed 84148 (+54), 665 indirect sites, 13 stub names
+[1291.7s] patch 35 'PD Lunar Breeze ': executed 84148 (+0), 665 indirect sites, 13 stub names
+[1325.3s] patch 36 'PL Stac Echo    ': executed 84151 (+3), 665 indirect sites, 13 stub names
+[1359.3s] patch 37 'PL PWM Plucking ': executed 84151 (+0), 665 indirect sites, 13 stub names
+[1392.3s] patch 38 'SY Jupiter PWM  ': executed 84151 (+0), 665 indirect sites, 13 stub names
+[1427.2s] patch 39 'SQ Peppercorn   ': executed 84151 (+0), 665 indirect sites, 13 stub names
+[1456.5s] patch 40 '1981 NEG Pluck  ': executed 84153 (+2), 665 indirect sites, 13 stub names
+[1486.8s] patch 41 '1981 Cars Sync  ': executed 84155 (+2), 665 indirect sites, 13 stub names
+[1518.3s] patch 42 '1981 Hammer Lead': executed 84155 (+0), 665 indirect sites, 13 stub names
+[1546.4s] patch 43 '1981 Clav       ': executed 84155 (+0), 665 indirect sites, 13 stub names
+[1580.6s] patch 44 '1981 Echo Piano ': executed 84155 (+0), 665 indirect sites, 13 stub names
+[1612.9s] patch 45 '1981 Honky Tonk ': executed 84155 (+0), 665 indirect sites, 13 stub names
+[1645.1s] patch 46 '1981 Xylo       ': executed 84155 (+0), 665 indirect sites, 13 stub names
+[1674.4s] patch 47 '1981 Harp       ': executed 84159 (+4), 665 indirect sites, 13 stub names
+[1706.6s] patch 48 '1981 Lo Strings ': executed 84159 (+0), 665 indirect sites, 13 stub names
+[1739.5s] patch 49 '1981 Hi Strings ': executed 84159 (+0), 665 indirect sites, 13 stub names
+[1769.8s] patch 50 '1981 Mellow Str ': executed 84189 (+30), 665 indirect sites, 13 stub names
+[1801.5s] patch 51 '1981 Lo Brass   ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1830.8s] patch 52 '1981 Hi Brass   ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1861.6s] patch 53 '1981 S/H Brass  ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1895.3s] patch 54 '1981 Pipe Organ ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1927.7s] patch 55 '1981 Drawbar Org': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1955.7s] patch 56 '1981 Solo Voice ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[1987.9s] patch 57 '1981 Choir Voice': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2020.6s] patch 58 '1981 Fat Fifth  ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2050.6s] patch 59 '1981 Fuzzy Fifth': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2079.8s] patch 60 '1981 Hard Blip  ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2108.0s] patch 61 '1981 Flute      ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2133.6s] patch 62 '1981 Whistle    ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2164.7s] patch 63 '1981 Chime      ': executed 84189 (+0), 665 indirect sites, 13 stub names
+[2501.4s] the steps after the patches (controllers, rates, setActive, states): executed 111848 (+27659), 796 indirect sites, 20 stub names
+[2501.4s] stubs reached: HeapFree x214701, GetCurrentThreadId x24840, AcquireSRWLockExclusive x12420, ReleaseSRWLockExclusive x12420, COM:handler:4 x7508, COM:events:4 x1595, COM:events:3 x375, COM:pchanges:4 x274, COM:pqueue:4 x274, COM:pqueue:5 x274, COM:pqueue:3 x274, COM:stream:4 x168, RaiseException x144, COM:pchanges:3 x80, COM:stream:5 x34, COM:stream:3 x32, EnterCriticalSection x22, LeaveCriticalSection x22, GetFocus x3, SetFocus x3
+[2501.4s] wrote build/jp8_hostreach_48000_v6.json
