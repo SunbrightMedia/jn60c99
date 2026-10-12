@@ -64,7 +64,8 @@ PROFILE = dict(
     INITIALIZE=None,                  # the component vtable's slot 3
     PATCH_LOAD=0x355F90,              # the patch browser's load (the JUNO 0x335850's first 20 instructions, normalized)
     ENGINE_RENDER=JOBS_DUE,           # where the render service stops (see the docstring)
-    ZOOM_GET=0, WINDOW_FIT=0,         # the editor: not used by this oracle yet
+    ZOOM_GET=0x2ACC30, WINDOW_FIT=0x31B790,  # the editor (jp8_fw_near.py leads, EXECUTED 2026-10-12: attach_editor's fit
+                                      # fires on the 3940 x 2004 main panel window; its getter returns 37 at 1920 x 1080)
 )
 
 

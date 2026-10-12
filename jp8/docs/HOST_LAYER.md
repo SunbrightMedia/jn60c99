@@ -240,7 +240,12 @@ rest (fw_map's normalized streams, difflib) and is checked on the 16 known pairs
 (jp8/logs/fw_near_jp8.log). Nearest: setState 0x36C650 (0.992), core initialize 0x33A590 (0.993), render driver
 0x33AC90 (0.980), non-note MIDI path 0x3395D0 (0.869), ManagePatch handler 0x33CFE0 (0.787), patch manager 0x358A40
 (0.667), window zoom getter 0x2ACC30 (0.897), window fit 0x31B790 (0.857). The editor is lifted from these once the
-oracle runs them (its editor attached, as the JUNO's is: CLAIMS A40).
+oracle runs them (its editor attached, as the JUNO's is: CLAIMS A40). EXECUTED the same day: with WINDOW_FIT 0x31B790
+and ZOOM_GET 0x2ACC30 in the PROFILE, attach_editor (createView("editor"), IPlugView::attached) builds the editor in
+2.3 s; the fit fires on the main panel window, 3940 x 2004 (its Script.xml size), and that window's getter returns 37
+at a 1920 x 1080 screen (the JUNO's rule 3 gives a fit of 47 for that panel: so 37 is the value under the fit -- the
+default zoom, INFERRED). Ten imports answered by default during the attach (InvalidateRect 33, HeapSize 7, SetTimer 3
+...), as on the JUNO.
 
 ## 6. Next
 
