@@ -61,6 +61,10 @@ int  jp8h_attach_editor(uint64_t *view, uint32_t *result);
 int  jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom);
 int  jp8h_windows(int32_t *wh, int cap);
 int  jp8h_frame_size(int32_t *w, int32_t *h, int32_t *n);   /* the last size the view asked the host's frame for; n asks */
+/* v9: THE WINDOW-MESSAGE MODEL -- the editor's windows get their creation messages (ATL's thunk run as the oracle runs
+ * it); jp8h_gui_tick is the host's message loop: every live timer (InitDll's 50 ms one and the editor's) gets WM_TIMER */
+int  jp8h_gui_tick(int ticks, int32_t *dispatched);
+int  jp8h_gui_counts(int32_t *ntimers, int32_t *nwindows);
 const char *jp8h_error(void);
 /* gates */
 void    *jp8h_guest(uint64_t gaddr, size_t len);

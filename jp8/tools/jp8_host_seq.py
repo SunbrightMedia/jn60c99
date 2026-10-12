@@ -74,6 +74,7 @@ _POS = json.load(open(os.path.join(HERE, '..', 'gen', 'jp8_param_positions.json'
 POSITIONS = {p['id']: p['positions'] for p in _POS['params']}
 BYNAME = {p['title']: p['id'] for p in _CTL['params'] if p['id'] < MIDI_BASE}
 SWEEP = os.environ.get('JP8_HOST_SWEEP', '1') == '1'  # v7: the sweep of every panel parameter at the drive's end (0: without)
+MREACH = os.environ.get('JP8_HOST_MREACH', '1') == '1'   # v9: the mutation-reach segments (reach_steps)
 SWEEP_PATCH = 2
 
 
@@ -324,11 +325,44 @@ def editor_steps():
     it: the first positive fit is kept for the window's life (the JUNO's rule 4), the zoom value clamped to it (rule
     1) -- and the state after, which holds the zoom"""
     w, h = MAIN_PANEL
-    return [('screen', 0, 0), ('editor',), ('zoomconv', w, h), ('getstate', 'editor0'),
+    return [('screen', 0, 0), ('editor',), ('guitick', 2), ('zoomconv', w, h), ('getstate', 'editor0'),
             ('screen', 1024, 768), ('zoomconv', w, h), ('getstate', 'editor1'),
             ('screen', 3840, 2160), ('zoomconv', w, h), ('screen', 640, 480), ('zoomconv', w, h),
-            ('block', 512, [("on", 0, 0, 60, 0.8)], [], None), ('block', 512, [("off", 0, 0, 60, 0.0)], [], None),
+            # v9: the GUI's timers run while a key sounds (the host's message loop between blocks: the meters, the scope)
+            ('block', 512, [("on", 0, 0, 60, 0.8)], [], None), ('guitick', 3), ('block', 512, [], [], None), ('guitick', 3),
+            ('block', 512, [("off", 0, 0, 60, 0.0)], [], None), ('guitick', 2),
             ('getstate', 'editor2')]
+
+
+def reach_steps():
+    """v9: the MUTATION-REACH segments (jp8_mutation_gate.py, playbook 245). The v7 drive ran these code paths for one or
+    two blocks before a patch load reset them: a slip there changed state the gate never graded (survivors 9, 12, 19,
+    23, 34 of jp8_verify_eeb0). Each segment HOLDS its configuration (a chord, its parameters modulated) and ends with
+    the memory ('memhash': image + heap + host objects, graded at that step on both sides). Measured on the C side
+    first (the mutation build with and without each slip): A shows 34 in the words and 19 / 23 in the memory, B shows 9,
+    C shows 12."""
+    keys = ((36, 0.9), (55, 0.5), (67, 0.7), (79, 0.3))
+    on = [("on", i, 0, k, v) for i, (k, v) in enumerate(keys)]
+    off = [("off", i, 0, k, 0.0) for i, (k, _) in enumerate(keys)]
+    tail = [('block', 512, off, [], None)] + [('block', 512, [], [], None)] * 4
+    groups = (('VCO1 CROSS MOD', 'VCO LFO MOD', 'LFO RATE', 'VCO PWM DEPTH'), ('VCO ENV MOD', 'VCO1 RANGE', 'BEND SENS VCO', 'MIXER VCO2'),
+              ('VCO1 MOD', 'LFO WAVE', 'VCO PWM SOURCE', 'PORTAMENTO'))
+    mod = lambda i: [(BYNAME[n], 0, ((i * (j + 3)) % 11) / 10.0) for j, n in enumerate(groups[i % 3])]
+    # A: VCO1 WAVE at its fifth position (the code of survivors 19, 23, 34), 120 blocks, 12 parameters modulated
+    out = [('patch', 2), ('block', 512, on, [(BYNAME['VCO1 WAVE'], 0, 0.8008)], None)]
+    out += [('block', 512, [], mod(i), None) for i in range(120)] + tail + [('memhash', 'mr_vco1')]
+    # B: the engine-rate setting 3 (survivor 9's filter), a chord held 60 blocks under a filter sweep, then the state back
+    out += [('patch', 2), ('block', 512, [], [], None), ('getstate', 'mr_p2'), ('setstate', 'mr_p2', 'rate3'),
+            ('compstate', 'mr_p2', 'rate3'), ('block', 512, on, [], None)]
+    out += [('block', 512, [], [(BYNAME['VCF CUTOFF'], 0, (i % 20) / 20.0), (BYNAME['VCF RESONANCE'], 0, ((i * 7) % 20) / 20.0)], None)
+            for i in range(60)]
+    out += tail + [('memhash', 'mr_rate3'), ('setstate', 'mr_p2', 'as is'), ('compstate', 'mr_p2', 'as is')]
+    # C: VCO2 WAVE at its second position (survivor 12's code), 40 blocks, sync on and off
+    out += [('patch', 2), ('block', 512, on, [(BYNAME['VCO2 WAVE'], 0, 0.1992)], None)]
+    out += [('block', 512, [], [(BYNAME['VCO2 MOD'], 0, (i % 10) / 10.0), (BYNAME['VCO2 FINE TUNE'], 0, ((i * 3) % 10) / 10.0),
+                                (BYNAME['VCO2 SYNC'], 0, (i % 2) * 1.0), (BYNAME['VCO ENV MOD'], 0, ((i * 9) % 10) / 10.0)], None)
+            for i in range(40)]
+    return out + tail + [('memhash', 'mr_vco2')]
 
 
 def steps(patches=None):
@@ -365,6 +399,8 @@ def steps(patches=None):
             ('ctl', 'get', PANEL[5], 0.0), ('block', 512, [("on", 0, 0, 60, 0.8)], [(MIDI_BASE + 3, 0, 0.4)], None),
             ('drain',), ('getstate', 'project'), ('info', 'cgetstate', 'c1')]
     out += editor_steps()
+    if MREACH:
+        out += reach_steps()
     if SWEEP:
         out += sweep_steps()
     return out

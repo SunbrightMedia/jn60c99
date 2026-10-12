@@ -89,6 +89,19 @@ SCR = dict(setup=(0x0, 24), qi=(0x20, 0x40), str=(0x60, 256), text=(0x160, 256),
            unit=(0x590, 268), vec=(0x6A0, 24), patch=(0x6C0, 0x10000), edname=(0x106C0, 16), edtype=(0x106D0, 16))
 SCR_SIZE = 0x106E0
 
+# v9: THE WINDOW-MESSAGE MODEL (a host's Win32, the part the editor's windows need): CreateWindowEx sends the new window
+# WM_NCCREATE, WM_NCCALCSIZE (wParam FALSE, the window's rect) and WM_CREATE through its class's window procedure, as
+# user32 does, and fails if WM_NCCREATE answers FALSE or WM_CREATE -1; window longs (GWLP_WNDPROC: ATL's start procedure
+# swaps in its run-time thunk); DefWindowProc (TRUE for WM_NCCREATE, else 0); SetTimer / KillTimer, and the host's
+# WM_TIMER ticks (gui_tick). Each message runs nested, on a stack 1 MB below the caller's (the jobs' rule).
+WM_CREATE, WM_NCCREATE, WM_NCCALCSIZE, WM_TIMER = 0x0001, 0x0081, 0x0083, 0x0113
+WND_IMPORTS = frozenset(('RegisterClassExA', 'RegisterClassExW', 'CreateWindowExA', 'CreateWindowExW', 'SetWindowLongPtrA',
+                         'SetWindowLongPtrW', 'GetWindowLongPtrA', 'GetWindowLongPtrW', 'DefWindowProcA', 'DefWindowProcW',
+                         'SetTimer', 'KillTimer', 'CallWindowProcA', 'CallWindowProcW', 'IsWindow', 'InvalidateRect',
+                         'SetWindowPos', 'IsWindowVisible'))
+GWL_STYLE, GWL_EXSTYLE, WS_VISIBLE, SWP_SHOWWINDOW, SWP_HIDEWINDOW = -16, -20, 0x10000000, 0x40, 0x80
+NWND_MAX = 64                                    # jp8_host.c's window table (a parent chain is never longer)
+
 
 class PluginNullCall(RuntimeError):
     """the plugin jumped into the zero page (a call through a null pointer): on a PC an access violation; .rva: the
@@ -118,6 +131,16 @@ class JP8Host(H.HostProcess):
         self.vt['frame'] = self._vtable('frame', 4)
         self.frame = self.new_obj('frame')
         self.frame_sizes = []                     # every resizeView's new size: (left, top, right, bottom)
+        # v9: the window-message model's state (none of it exists at template time: jp8_host_ref.py checks)
+        self.wclass = {}                          # atom -> the class's window procedure
+        self.next_atom = 0xC001
+        self.wnds = {}                            # hwnd -> dict(proc, longs, parent)
+        self.timers = []                          # [hwnd, id, ms, proc], in creation order
+        self.next_timer = 1                       # SetTimer(NULL, ...)'s ids
+        self.gui_ticks = 0
+        self._wnd_made = None
+        self.wbuf = self.alloc_com(0x60)          # the creation messages' CREATESTRUCT (+0) and RECT (+0x50): windows are
+                                                  # made from InitDll on, before the host's scratch area exists
         # THE JUPITER-8's SCRIPT FOLDER: its Script.xml draws on eight more script files the plugin ships (truth/:
         # ScriptResourceCmn.xml defines 43 of its bitmaps, the others the About / Auth / Browse / Header / Manage / Setup
         # / Tweak panels) and on its TextCodeTable.dat. Without them its view manager refuses the root panel ("Unable to
@@ -236,7 +259,10 @@ class JP8Host(H.HostProcess):
         self._live[p] = r
         return p
 
-    def _imp(self, uc, address, size, user):
+    def _imp_heap(self, uc, address, size, user):
+        """the heap's reuse layer on HeapFree / free / operator delete, then the base answer (the window model's _imp
+        below calls this one for every import that is not a window import: ONE _imp per class -- a second def would
+        hide this one, and the v9 oracle ran without block reuse until this was found, playbook 244)"""
         if self._live is not None:
             nm = self.stub2name.get(address)
             if nm is not None and nm[1] in ('HeapFree', 'free', '??3@YAXPEAX@Z'):
@@ -340,6 +366,130 @@ class JP8Host(H.HostProcess):
         self.view = view
         return view, r
 
+    # ------------------------------------------------------------ v9: the window-message model
+    def _imp(self, uc, address, size, user):
+        nm = self.stub2name.get(address)
+        if nm is None or nm[1] not in WND_IMPORTS:
+            return self._imp_heap(uc, address, size, user)
+        name = nm[1]; self.calls[name] += 1
+        rcx, rdx = uc.reg_read(UC_X86_REG_RCX), uc.reg_read(UC_X86_REG_RDX)
+        r8, r9 = uc.reg_read(H.UC_X86_REG_R8), uc.reg_read(H.UC_X86_REG_R9)
+        q = lambda a: struct.unpack('<Q', bytes(uc.mem_read(a, 8)))[0]
+        ret = lambda v: self._ret(uc, v)
+        if name.startswith('RegisterClassEx'):            # WNDCLASSEX: lpfnWndProc at +8; a fresh atom
+            atom = self.next_atom; self.next_atom += 1; self.wclass[atom] = q(rcx + 8)
+            return ret(atom)
+        if name.startswith('CreateWindowEx'):
+            rsp = uc.reg_read(UC_X86_REG_RSP)
+            if self._skip == (address, rsp):              # back from its creation messages: the handle, or 0
+                self._skip = None
+                return ret(self._wnd_made)
+            atom = rdx & 0xFFFF if rdx <= 0xFFFF else None
+            if atom not in self.wclass:
+                raise RuntimeError('CreateWindowEx of a class this host did not register (0x%x)' % rdx)
+            i32 = lambda a: struct.unpack('<i', bytes(uc.mem_read(a, 4)))[0]   # the stack arguments 5..12, 8 bytes each
+            x, y, w, h = (i32(rsp + 0x28 + 8 * k) for k in range(4))
+            parent, menu, inst, param = (q(rsp + 0x48 + 8 * k) for k in range(4))
+            self._hc = getattr(self, '_hc', 0x9000) + 16; hwnd = self._hc
+            self.wnds[hwnd] = dict(proc=self.wclass[atom], longs={GWL_STYLE: r9 & 0xFFFFFFFF, GWL_EXSTYLE: rcx & 0xFFFFFFFF},
+                                   parent=parent)       # the style is the window's GWL_STYLE long (WS_VISIBLE in it)
+            cs = dict(param=param, inst=inst, menu=menu, parent=parent, cy=h, cx=w, y=y, x=x, style=r9 & 0xFFFFFFFF,
+                      name=r8, cls=rdx, exstyle=rcx & 0xFFFFFFFF)
+            self._req = dict(kind='wndmsgs', ctx=uc.context_save(), rip=address, rsp=rsp, hwnd=hwnd, cs=cs)
+            uc.emu_stop()
+            return
+        if name.startswith('SetWindowLongPtr') or name.startswith('GetWindowLongPtr'):
+            wnd = self.wnds.get(rcx); i = struct.unpack('<i', struct.pack('<I', rdx & 0xFFFFFFFF))[0]
+            if wnd is None:
+                return ret(0)
+            old = wnd['proc'] if i == -4 else wnd['longs'].get(i, 0)
+            if name.startswith('Set'):
+                if i == -4:
+                    wnd['proc'] = r8
+                else:
+                    wnd['longs'][i] = r8
+            return ret(old)
+        if name.startswith('DefWindowProc'):
+            return ret(1 if (rdx & 0xFFFFFFFF) == WM_NCCREATE else 0)
+        if name.startswith('CallWindowProc'):              # (prev, hwnd, msg, wParam, lParam): ATL's chain to the
+            prev = self.stub2name.get(rcx)                  # window's super procedure, DefWindowProc here
+            if prev is None or not prev[1].startswith('DefWindowProc'):
+                raise RuntimeError('CallWindowProc to 0x%x: only DefWindowProc is modeled' % rcx)
+            return ret(1 if (r8 & 0xFFFFFFFF) == WM_NCCREATE else 0)
+        if name == 'SetWindowPos' and rcx in self.wnds:      # uFlags (argument 7): SWP_SHOWWINDOW / SWP_HIDEWINDOW
+            fl = struct.unpack('<I', bytes(uc.mem_read(uc.reg_read(UC_X86_REG_RSP) + 0x38, 4)))[0]
+            st = self.wnds[rcx]['longs'].get(GWL_STYLE, 0)
+            if fl & SWP_SHOWWINDOW: st |= WS_VISIBLE
+            if fl & SWP_HIDEWINDOW: st &= ~WS_VISIBLE
+            self.wnds[rcx]['longs'][GWL_STYLE] = st
+        if name in ('IsWindow', 'InvalidateRect', 'SetWindowPos'):   # TRUE for a window that exists (InvalidateRect:
+            return ret(1 if rcx in self.wnds or (name == 'InvalidateRect' and rcx == 0) else 0)   # NULL = every window)
+        if name == 'IsWindowVisible':                    # the window and every parent this host made have WS_VISIBLE; the
+            h, k = rcx, 0                                 # host's own window (the editor's parent) is shown
+            if h not in self.wnds:
+                return ret(0)
+            while h in self.wnds and k < NWND_MAX:
+                if not self.wnds[h]['longs'].get(GWL_STYLE, 0) & WS_VISIBLE:
+                    return ret(0)
+                h, k = self.wnds[h]['parent'], k + 1
+            return ret(1)
+        if name == 'SetTimer':
+            if rcx and rcx not in self.wnds:
+                return ret(0)
+            if rcx:
+                tid = rdx
+                self.timers = [t for t in self.timers if not (t[0] == rcx and t[1] == tid)]
+            else:
+                tid = self.next_timer; self.next_timer += 1
+            self.timers.append([rcx, tid, r8 & 0xFFFFFFFF, r9])
+            return ret(tid)
+        if name == 'KillTimer':
+            n = len(self.timers)
+            self.timers = [t for t in self.timers if not (t[0] == rcx and t[1] == rdx)]
+            return ret(1 if len(self.timers) < n else 0)
+        raise RuntimeError('window import %s not modeled' % name)
+
+    def _wnd_msgs(self, req):
+        """the creation messages of a window CreateWindowEx made (req): each through the window's procedure as it is at
+        that message (ATL swaps in its thunk at the first), nested 1 MB below the caller's stack; the result the
+        handle, or 0 when WM_NCCREATE answers FALSE or WM_CREATE -1 (the window then dropped)"""
+        uc, hwnd, cs = self.uc, req['hwnd'], req['cs']
+        prev = self._nested_top
+        self._nested_top = (req['rsp'] - 0x100000) & ~0xF
+        made = hwnd
+        try:
+            for msg in (WM_NCCREATE, WM_NCCALCSIZE, WM_CREATE):
+                uc.mem_write(self.wbuf, b'\0' * 0x60)
+                if msg == WM_NCCALCSIZE:
+                    lp = self.wbuf + 0x50
+                    uc.mem_write(lp, struct.pack('<4i', cs['x'], cs['y'], cs['x'] + cs['cx'], cs['y'] + cs['cy']))
+                else:
+                    lp = self.wbuf                 # CREATESTRUCT (x64), written again for each message
+                    uc.mem_write(lp, struct.pack('<QQQQiiiiI4xQQI', cs['param'], cs['inst'], cs['menu'], cs['parent'], cs['cy'],
+                                                 cs['cx'], cs['y'], cs['x'], cs['style'], cs['name'], cs['cls'], cs['exstyle']))
+                    # (x64 CREATESTRUCT: style at +0x30, 4 bytes of padding, lpszName +0x38, lpszClass +0x40, dwExStyle +0x48)
+                r = self.call(self.wnds[hwnd]['proc'], hwnd, msg, 0, lp, count=4_000_000_000) & 0xFFFFFFFFFFFFFFFF
+                if (msg == WM_NCCREATE and (r & 0xFFFFFFFF) == 0) or (msg == WM_CREATE and (r & 0xFFFFFFFF) == 0xFFFFFFFF):
+                    made = 0
+                    break
+        finally:
+            self._nested_top = prev
+        if not made:
+            del self.wnds[hwnd]
+        return made
+
+    def gui_tick(self):
+        """one tick of every live timer, in the order they were set (a host's message loop dispatching WM_TIMER): a
+        window's timer through its window procedure (wParam the id), a timer with a TIMERPROC through that procedure
+        (lParam the tick count, 50 ms a tick here); a window-less timer without one reaches no code"""
+        self.gui_ticks += 1; n = 0
+        for hwnd, tid, ms, proc in list(self.timers):
+            if proc:
+                self.call(proc, hwnd, WM_TIMER, tid, 50 * self.gui_ticks, count=4_000_000_000); n += 1
+            elif hwnd in self.wnds:
+                self.call(self.wnds[hwnd]['proc'], hwnd, WM_TIMER, tid, 0, count=4_000_000_000); n += 1
+        return n
+
     def gui_state(self):
         """the oracle's own answers the GUI's imports keep between calls (wrapper_emu / jp8_emu), for the template:
         the DIB sections (CreateDIBSection / GetObjectA), the interlocked singly linked lists, the GDI+ images, the
@@ -347,7 +497,11 @@ class JP8Host(H.HostProcess):
         return dict(dibs=sorted(self.__dict__.get('dibs', {}).items()),
                     slists=sorted((k, list(v)) for k, v in self.__dict__.get('slists', {}).items()),
                     gdip=sorted((k, (v['w'], v['h'], v['fmt'])) for k, v in self.__dict__.get('gdip_imgs', {}).items()),
-                    skin=sorted(self.skin.items()), lasterr=getattr(self, 'lasterr', 0))
+                    skin=sorted(self.skin.items()), lasterr=getattr(self, 'lasterr', 0),
+                    # v9: the window-message model (InitDll already makes a window and its 50 ms timer)
+                    classes=sorted(self.wclass.items()), next_atom=self.next_atom, next_timer=self.next_timer,
+                    wnds=[(hw, w['proc'], w['parent'], sorted(w['longs'].items())) for hw, w in sorted(self.wnds.items())],
+                    timers=[tuple(t) for t in self.timers], gui_ticks=self.gui_ticks)
 
     def _com(self, uc, name, this, a1, a2, a3):
         """v8 (E1): the host's IPlugFrame -- resizeView(view, newSize) is taken (the size recorded, kResultTrue); the
@@ -360,6 +514,16 @@ class JP8Host(H.HostProcess):
         return super()._com(uc, name, this, a1, a2, a3)
 
     # ------------------------------------------------------------ one step of the host gate's drive (jp8_host_seq)
+    def mem_hash(self):
+        """sha256 of the image, the heap up to the bump pointer and the host objects (jp8_host_c.py memhash: the same
+        regions, the same order) -- the end hash, and since v9 the 'memhash' steps"""
+        import hashlib
+        import jp8_host_seq as Q
+        m = hashlib.sha256(); uc = self.uc
+        m.update(bytes(uc.mem_read(IB, J.IMGSZ))); m.update(bytes(uc.mem_read(Q.HEAP_BASE, self.heap - Q.HEAP_BASE)))
+        m.update(bytes(uc.mem_read(Q.COM_BASE, self.com_next - Q.COM_BASE)))
+        return m.hexdigest()
+
     def run_step(self, st, blob, variant, states, cstates):
         """one step as the host makes it (jp8_host_seq.steps; jp8_host_c.py makes the same through the C API): blob(p)
         a patch's record, variant(bytes, how) the drive's state edits, states / cstates the component's / controller's
@@ -370,6 +534,8 @@ class JP8Host(H.HostProcess):
         u32 = lambda v: v & 0xFFFFFFFF
         if k == 'patch':
             self.load_patch(blob(st[1])); row = [k, st[1], 0]
+        elif k == 'memhash':                      # v9: the memory at this step (a slip whose state a later reset hides)
+            row = [k, st[1], self.mem_hash()]
         elif k == 'block':
             _, n, evs, pars, ctx = st
             L, R = self.process(n, events=evs, params=pars, ctx=ctx)
@@ -415,6 +581,9 @@ class JP8Host(H.HostProcess):
                    len(self.frame_sizes)]
         elif k == 'zoomconv':                     # v8: a coordinate conversion of a panel window: its zoom getter
             row = [k, '%dx%d' % (st[1], st[2]), self.window_conv((st[1], st[2]))]
+        elif k == 'guitick':                      # v9: the host's message loop: every live timer ticks st[1] times
+            n = sum(self.gui_tick() for _ in range(st[1]))
+            row = [k, st[1], n, len(self.timers), len(self.wnds)]
         else:
             raise SystemExit('unknown step %r' % (st,))
         return row, words, sbytes
@@ -513,6 +682,13 @@ class JP8Host(H.HostProcess):
                 if rip != RET:
                     raise RuntimeError('call to 0x%x stopped at rva 0x%x' % (fn - IB, rip - IB))
                 return uc.reg_read(H.UC_X86_REG_RAX)
+            if req.get('kind') == 'wndmsgs':                       # v9: a window's creation messages, nested
+                made = self._wnd_msgs(req)
+                uc.context_restore(req['ctx'])
+                self._wnd_made = made
+                self._skip = (req['rip'], req['rsp'])
+                start = req['rip']
+                continue
             if self._nested_top is not None:
                 raise RuntimeError('engine render reached from inside a worker job')
             self._run_jobs(req)

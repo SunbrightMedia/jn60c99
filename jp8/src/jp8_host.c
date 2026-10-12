@@ -75,6 +75,20 @@ extern void jp8_heap_close_thread(void);
 #define NGD_MAX     4096
 #define NSKIN_MAX   1024
 #define NWIN_MAX    16
+#define NCLS_MAX    16               /* v9: the window-message model (jp8_host_emu.JP8Host; template v4) */
+#define NWND_MAX    64
+#define NLONG_MAX   16
+#define NTMR_MAX    64
+#define WM_CREATE_     0x0001u
+#define WM_NCCREATE_   0x0081u
+#define WM_NCCALCSIZE_ 0x0083u
+#define WM_TIMER_      0x0113u
+#define GWL_STYLE_      (-16)
+#define GWL_EXSTYLE_    (-20)
+#define WS_VISIBLE_     0x10000000u
+#define SWP_SHOWWINDOW_ 0x40u
+#define SWP_HIDEWINDOW_ 0x80u
+#define IMG_SIZE    0xDE7000ULL      /* the image's span (jp8_emu IMGSZ): a procedure outside it is ATL's run-time thunk */
 static const uint8_t IID_IMIDIMAPPING[16] = { 0xF7, 0xF9, 0x0F, 0xDF, 0xB7, 0x49, 0x69, 0x46, 0xB6, 0x3A, 0xB7, 0x32, 0x7A, 0xDB, 0xF5, 0xE5 };
 static const uint8_t IID_IUNITINFO[16] = { 0xB5, 0xD6, 0x4B, 0x3D, 0x3A, 0x91, 0xD2, 0x4F, 0xA8, 0x86, 0xE7, 0x68, 0xA5, 0xEB, 0x92, 0xC1 };
 
@@ -109,6 +123,11 @@ static struct {
     int32_t scr_cx, scr_cy;                 /* the machine's virtual screen: GetSystemMetrics 78 / 79 (others 0) */
     uint64_t lasterr, fake_heap, view, frame;   /* frame: the host's IPlugFrame (template fact) */
     int32_t fr_w, fr_h, fr_n;               /* the last resizeView's new size, the number of them */
+    /* v9: the window-message model -- classes, windows (their procedure and longs), timers (InitDll makes one of each) */
+    uint64_t wbuf, next_timer, gui_ticks; uint32_t next_atom;
+    int ncls; struct { uint32_t atom; uint64_t proc; } cls[NCLS_MAX];
+    int nwnd; struct { uint64_t hwnd, proc, parent; int nl; struct { int32_t i; uint64_t v; } l[NLONG_MAX]; } wnd[NWND_MAX];
+    int ntmr; struct { uint64_t hwnd, id, proc; uint32_t ms; } tmr[NTMR_MAX];
     int ndib; struct { uint64_t hb, bits; int32_t w, h; uint32_t bpp, stride; } dib[NDIB_MAX];
     int nsl; struct { uint64_t head; int n, cap; uint64_t *e; } sl[NSL_MAX];
     int ngd; struct { uint64_t hd; uint32_t w, h, fmt; } gd[NGD_MAX];
@@ -183,8 +202,131 @@ static int sl_of(CPU *c, uint64_t head) {                                      /
     if (!(H.sl[i].e = (uint64_t *)malloc(16 * sizeof(uint64_t)))) { jp8_trap(c, 0, "no memory"); return -1; }
     return i;
 }
+/* v9: THE WINDOW-MESSAGE MODEL (jp8_host_emu.JP8Host: _imp, _wnd_msgs, gui_tick) -- classes, windows and timers; a
+ * window's creation messages run nested, on a copy of the caller's registers, 1 MB below its stack (the jobs' rule) */
+static int wnd_find(uint64_t hwnd) { int i; for (i = 0; i < H.nwnd; i++) if (H.wnd[i].hwnd == hwnd) return i; return -1; }
+static uint64_t *wnd_long(int i, int32_t ix) {     /* window i's long at index ix, or NULL */
+    int j; for (j = 0; j < H.wnd[i].nl; j++) if (H.wnd[i].l[j].i == ix) return &H.wnd[i].l[j].v;
+    return NULL;
+}
+static uint64_t thunk_target(uint64_t fn, uint64_t *this_) {   /* ATL's x64 thunk: mov rcx, this; mov rax, proc; jmp rax */
+    uint8_t t[22]; uint64_t proc; void *p = jp8h_guest(fn, 22);
+    if (!p) return 0;
+    memcpy(t, p, 22);
+    if (t[0] != 0x48 || t[1] != 0xB9 || t[10] != 0x48 || t[11] != 0xB8 || t[20] != 0xFF || t[21] != 0xE0) return 0;
+    memcpy(this_, t + 2, 8); memcpy(&proc, t + 12, 8);
+    return proc;
+}
+int jp8_thunk(CPU *c, uint64_t target) {          /* an indirect call to run-time code: ATL's thunk, run as its three
+                                                     instructions (StartWindowProc calls the thunk it just installed) */
+    uint64_t th = 0, t = thunk_target(target, &th);
+    if (!t || t - IB >= IMG_SIZE) return 0;
+    c->r[1] = th; c->r[0] = t; jp8_icall(c, t); return 1;
+}
+static uint64_t wnd_entry(CPU *n, uint64_t fn) {   /* the procedure's code: through ATL's thunk as the oracle runs it */
+    if (fn - IB >= IMG_SIZE) {
+        uint64_t th = 0, t = thunk_target(fn, &th);
+        if (!t || t - IB >= IMG_SIZE) { jp8_trap(n, 0, "a window procedure neither in the image nor ATL's thunk"); return 0; }
+        n->r[1] = th; n->r[0] = t; return t;
+    }
+    return fn;
+}
+static uint64_t wnd_create(CPU *c, uint64_t exstyle, uint64_t cls, uint64_t name, uint64_t style) {
+    static const uint32_t msgs[3] = { WM_NCCREATE_, WM_NCCALCSIZE_, WM_CREATE_ };
+    uint64_t sp = c->r[4], hwnd, top, lp, parent, menu, inst, param, made; int32_t x, y, w, h; int ci, i, k; CPU nc; uint8_t z[0x60];
+    for (ci = 0; ci < H.ncls && !(cls <= 0xFFFF && H.cls[ci].atom == (uint32_t)cls); ci++) {}
+    if (ci == H.ncls) { jp8_trap(c, 0, "CreateWindowEx of a class this host did not register"); return 0; }
+    if (H.nwnd >= NWND_MAX) { jp8_trap(c, 0, "too many windows"); return 0; }
+    x = gi(sp + 0x28); y = gi(sp + 0x30); w = gi(sp + 0x38); h = gi(sp + 0x40);         /* the stack arguments 5..12 */
+    parent = gq(sp + 0x48); menu = gq(sp + 0x50); inst = gq(sp + 0x58); param = gq(sp + 0x60);
+    hwnd = made = jp8_hc_next();
+    i = H.nwnd++; H.wnd[i].hwnd = hwnd; H.wnd[i].proc = H.cls[ci].proc; H.wnd[i].parent = parent;
+    H.wnd[i].nl = 2; H.wnd[i].l[0].i = GWL_STYLE_; H.wnd[i].l[0].v = (uint32_t)style;     /* the style is a window long */
+    H.wnd[i].l[1].i = GWL_EXSTYLE_; H.wnd[i].l[1].v = (uint32_t)exstyle;
+    memcpy(&nc, c, sizeof nc); top = (sp - 0x100000ULL) & ~0xFULL;
+    for (k = 0; k < 3; k++) {
+        memset(z, 0, sizeof z);
+        if (msgs[k] == WM_NCCALCSIZE_) {
+            int32_t r4[4]; r4[0] = x; r4[1] = y; r4[2] = x + w; r4[3] = y + h; memcpy(z + 0x50, r4, 16); lp = H.wbuf + 0x50;
+        } else {                                       /* CREATESTRUCT (x64): style +0x30, 4 bytes of padding, name +0x38 */
+            uint32_t st = (uint32_t)style, ex = (uint32_t)exstyle;
+            memcpy(z, &param, 8); memcpy(z + 0x08, &inst, 8); memcpy(z + 0x10, &menu, 8); memcpy(z + 0x18, &parent, 8);
+            memcpy(z + 0x20, &h, 4); memcpy(z + 0x24, &w, 4); memcpy(z + 0x28, &y, 4); memcpy(z + 0x2C, &x, 4); memcpy(z + 0x30, &st, 4);
+            memcpy(z + 0x38, &name, 8); memcpy(z + 0x40, &cls, 8); memcpy(z + 0x48, &ex, 4); lp = H.wbuf;
+        }
+        wmem(H.wbuf, z, sizeof z);
+        nc.r[1] = hwnd; nc.r[2] = msgs[k]; nc.r[8] = 0; nc.r[9] = lp;
+        nc.r[4] = top - 8; wq(top - 8, H.ret);
+        { uint64_t fn = wnd_entry(&nc, H.wnd[wnd_find(hwnd)].proc); jp8_run(&nc, fn - IB); }
+        if ((msgs[k] == WM_NCCREATE_ && (uint32_t)nc.r[0] == 0) || (msgs[k] == WM_CREATE_ && (uint32_t)nc.r[0] == 0xFFFFFFFFu)) { made = 0; break; }
+    }
+    JP8_FPENV(c);                                      /* the caller's float modes (the oracle restores its context) */
+    if (!made) { i = wnd_find(hwnd); memmove(&H.wnd[i], &H.wnd[i + 1], sizeof H.wnd[0] * (size_t)(H.nwnd - i - 1)); H.nwnd--; }
+    return made;
+}
+static int wnd_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0: not a window import */
+    uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
+    if (!strcmp(n, "RegisterClassExA") || !strcmp(n, "RegisterClassExW")) {        /* WNDCLASSEX: lpfnWndProc at +8 */
+        if (H.ncls >= NCLS_MAX) { jp8_trap(c, 0, "too many window classes"); return 1; }
+        H.cls[H.ncls].atom = H.next_atom++; H.cls[H.ncls].proc = gq(rcx + 8); c->r[0] = H.cls[H.ncls++].atom; return 1;
+    }
+    if (!strcmp(n, "CreateWindowExA") || !strcmp(n, "CreateWindowExW")) { c->r[0] = wnd_create(c, rcx, rdx, r8, r9); return 1; }
+    if (!strncmp(n, "SetWindowLongPtr", 16) || !strncmp(n, "GetWindowLongPtr", 16)) {
+        int i = wnd_find(rcx), j; int32_t ix = (int32_t)(uint32_t)rdx; uint64_t old = 0;
+        if (i < 0) { c->r[0] = 0; return 1; }
+        if (ix == -4) old = H.wnd[i].proc;                                           /* GWLP_WNDPROC */
+        else for (j = 0; j < H.wnd[i].nl; j++) if (H.wnd[i].l[j].i == ix) { old = H.wnd[i].l[j].v; break; }
+        if (n[0] == 'S') {
+            if (ix == -4) H.wnd[i].proc = r8;
+            else {
+                for (j = 0; j < H.wnd[i].nl && H.wnd[i].l[j].i != ix; j++) {}
+                if (j == H.wnd[i].nl) { if (j >= NLONG_MAX) { jp8_trap(c, 0, "too many window longs"); return 1; } H.wnd[i].nl++; H.wnd[i].l[j].i = ix; }
+                H.wnd[i].l[j].v = r8;
+            }
+        }
+        c->r[0] = old; return 1;
+    }
+    if (!strcmp(n, "DefWindowProcA") || !strcmp(n, "DefWindowProcW")) { c->r[0] = (uint32_t)rdx == WM_NCCREATE_; return 1; }
+    if (!strcmp(n, "CallWindowProcA") || !strcmp(n, "CallWindowProcW")) {        /* ATL's chain to DefWindowProc */
+        const char *prev = stub_name(rcx);
+        if (!prev || strncmp(prev, "DefWindowProc", 13)) { jp8_trap(c, 0, "CallWindowProc to a procedure other than DefWindowProc"); return 1; }
+        c->r[0] = (uint32_t)r8 == WM_NCCREATE_; return 1;
+    }
+    if (!strcmp(n, "SetWindowPos") && wnd_find(rcx) >= 0) {      /* uFlags (argument 7): SWP_SHOWWINDOW / SWP_HIDEWINDOW */
+        uint32_t fl = (uint32_t)gq(c->r[4] + 0x38); uint64_t *st = wnd_long(wnd_find(rcx), GWL_STYLE_);
+        if (st) { if (fl & SWP_SHOWWINDOW_) *st |= WS_VISIBLE_; if (fl & SWP_HIDEWINDOW_) *st &= ~(uint64_t)WS_VISIBLE_; }
+    }
+    if (!strcmp(n, "IsWindow") || !strcmp(n, "SetWindowPos")) { c->r[0] = wnd_find(rcx) >= 0; return 1; }
+    if (!strcmp(n, "IsWindowVisible")) {          /* the window and every parent this host made have WS_VISIBLE; the host's
+                                                     own window (the editor's parent) is shown */
+        int i = wnd_find(rcx), k = 0; c->r[0] = i >= 0;
+        while (i >= 0 && k++ < NWND_MAX) {
+            uint64_t *st = wnd_long(i, GWL_STYLE_);
+            if (!st || !(*st & WS_VISIBLE_)) { c->r[0] = 0; break; }
+            i = wnd_find(H.wnd[i].parent);
+        }
+        return 1;
+    }
+    if (!strcmp(n, "InvalidateRect")) { c->r[0] = rcx == 0 || wnd_find(rcx) >= 0; return 1; }   /* NULL: every window */
+    if (!strcmp(n, "SetTimer")) {
+        uint64_t tid; int i, j;
+        if (rcx && wnd_find(rcx) < 0) { c->r[0] = 0; return 1; }
+        if (rcx) { tid = rdx; for (i = j = 0; i < H.ntmr; i++) if (!(H.tmr[i].hwnd == rcx && H.tmr[i].id == tid)) H.tmr[j++] = H.tmr[i]; H.ntmr = j; }
+        else tid = H.next_timer++;
+        if (H.ntmr >= NTMR_MAX) { jp8_trap(c, 0, "too many timers"); return 1; }
+        H.tmr[H.ntmr].hwnd = rcx; H.tmr[H.ntmr].id = tid; H.tmr[H.ntmr].ms = (uint32_t)r8; H.tmr[H.ntmr].proc = r9; H.ntmr++;
+        c->r[0] = tid; return 1;
+    }
+    if (!strcmp(n, "KillTimer")) {
+        int i, j, n0 = H.ntmr;
+        for (i = j = 0; i < H.ntmr; i++) if (!(H.tmr[i].hwnd == rcx && H.tmr[i].id == rdx)) H.tmr[j++] = H.tmr[i];
+        H.ntmr = j; c->r[0] = H.ntmr < n0; return 1;
+    }
+    return 0;
+}
 static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0: not a GUI import */
     uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
+    if (wnd_import(c, n)) return 1;                  /* v9: the window-message model first */
     if (!strcmp(n, "GetSystemMetrics")) {                             /* the screen dict holds 78 and 79 only */
         uint32_t i = (uint32_t)rcx;
 #ifdef JP8H_TOOTH_EDITOR    /* the gate's tooth: the screen's width and height swapped (the zoom's fit must see it) */
@@ -195,8 +337,7 @@ static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0:
     if (!strcmp(n, "LoadCursorA") || !strcmp(n, "LoadCursorW") || !strcmp(n, "FlushInstructionCache") ||
         !strcmp(n, "AllocateAndInitializeSid") || !strcmp(n, "WakeAllConditionVariable") || !strcmp(n, "WakeConditionVariable") ||
         !strcmp(n, "DeleteObject") || !strcmp(n, "DeleteDC") || !strcmp(n, "ReleaseDC")) { c->r[0] = 1; return 1; }
-    if (!strcmp(n, "RegisterClassExA") || !strcmp(n, "RegisterClassExW") || !strcmp(n, "RegisterClassA") ||
-        !strcmp(n, "RegisterClassW")) { c->r[0] = 0xC001; return 1; }
+    if (!strcmp(n, "RegisterClassA") || !strcmp(n, "RegisterClassW")) { c->r[0] = 0xC001; return 1; }
     if (!strcmp(n, "SelectObject")) { c->r[0] = 0x77770; return 1; }
     if (!strcmp(n, "GetLastError")) { c->r[0] = H.lasterr & 0xFFFFFFFFu; return 1; }
     if (!strcmp(n, "SetLastError")) { H.lasterr = rcx & 0xFFFFFFFFu; c->r[0] = 0; return 1; }
@@ -206,9 +347,8 @@ static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0:
     if (!strcmp(n, "GetCurrentProcess")) { c->r[0] = 0; return 1; }
     if (!strncmp(n, "Create", 6) && strcmp(n, "CreateDIBSection") && strncmp(n, "CreateFile", 10)) { c->r[0] = jp8_hc_next(); return 1; }
     /* the imports the oracle does not model: its default answer, 0 (e2e_emu / jp8_emu: counted, unhandled) */
-    if (!strcmp(n, "GetClassInfoExA") || !strcmp(n, "HeapSize") || !strcmp(n, "SetTimer") || !strcmp(n, "InvalidateRect") ||
-        !strcmp(n, "SetWindowPos") || !strcmp(n, "EnumThreadWindows") || !strcmp(n, "GetDesktopWindow") || !strcmp(n, "IsWindow") ||
-        !strcmp(n, "DestroyWindow") || !strcmp(n, "LoadLibraryExA") || !strcmp(n, "KillTimer")) { c->r[0] = 0; return 1; }
+    if (!strcmp(n, "GetClassInfoExA") || !strcmp(n, "HeapSize") || !strcmp(n, "EnumThreadWindows") || !strcmp(n, "GetDesktopWindow") ||
+        !strcmp(n, "DestroyWindow") || !strcmp(n, "LoadLibraryExA")) { c->r[0] = 0; return 1; }
     if (!strcmp(n, "MultiByteToWideChar")) {
         uint64_t outp = stack_arg(c, 4); uint32_t outn = (uint32_t)stack_arg(c, 5), cnt = (uint32_t)r9, len, k;
         if (cnt == 0xFFFFFFFFu) { for (len = 0; len < 1200 && gb(r8 + len); len++) {} len++; }   /* rstr + '\0' */
@@ -573,6 +713,11 @@ static int call(uint64_t fn, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r
 #endif
     c->r[4] = H.rsp; wq(H.rsp - 8, H.ret);
     c->r[1] = rcx; c->r[2] = rdx; c->r[8] = r8; c->r[9] = r9;
+    if (fn - IB >= IMG_SIZE) {                       /* v9: a window procedure behind ATL's thunk (the host's WM_TIMER) */
+        uint64_t th = 0, t = thunk_target(fn, &th);
+        if (!t || t - IB >= IMG_SIZE) return err(JP8H_E_STATE, "a call to code neither in the image nor ATL's thunk");
+        c->r[1] = th; c->r[0] = t; fn = t;
+    }
     if (jp8_call_x(c, fn - IB)) {
         snprintf(H.msg, sizeof H.msg, "%s (call rva 0x%llx)", jp8_last_trap(), (unsigned long long)(fn - IB));
         if (getenv("JP8H_DEBUG")) {                     /* the image addresses on the stack at the trap: the call chain */
@@ -596,7 +741,7 @@ static int call(uint64_t fn, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r
 /* ---------------------------------------------------------------- the template (JP8H v2 / v3, jp8_host_ref.py) */
 static int load(const unsigned char *b, size_t len) {
     size_t p = 12; uint32_t nreg, r, k, nkv, ns, ver;
-    if (len < 16 || memcmp(b, "JP8H", 4) || ((ver = le32(b + 4)) != 2 && ver != 3)) return err(JP8H_E_TEMPLATE, "template: not JP8H version 2 or 3");
+    if (len < 16 || memcmp(b, "JP8H", 4) || (ver = le32(b + 4)) < 2 || ver > 4) return err(JP8H_E_TEMPLATE, "template: not JP8H version 2 .. 4");
     if (crc32_of(b, len - 4) != le32(b + len - 4)) return err(JP8H_E_TEMPLATE, "template: crc32 mismatch");
     nreg = le32(b + 8);
     if (nreg > NREG_MAX || (H.nreg && (uint32_t)H.nreg != nreg)) return err(JP8H_E_TEMPLATE, "template: regions");
@@ -643,6 +788,7 @@ static int load(const unsigned char *b, size_t len) {
                 if (r_ >= 0 && r_ < 16) H.xreg[r_][t[0] == 'h'] = v;
             }
             KV("eflags", H.eflags); KV("lasterr", H.lasterr); KV("fake_heap", H.fake_heap); KV("frame", H.frame);
+            KV("wbuf", H.wbuf); KV("next_atom", H.next_atom); KV("next_timer", H.next_timer); KV("gui_ticks", H.gui_ticks);
 #undef KV
         }
         if (!H.audio || !H.comp || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream)
@@ -663,8 +809,10 @@ static int load(const unsigned char *b, size_t len) {
     H.nstub = (int)ns;
     for (k = 0; k < (uint32_t)H.nsl; k++) free(H.sl[k].e);
     H.ndib = H.nsl = H.ngd = H.nskin = H.nwin = 0; H.view = 0; H.scr_cx = H.scr_cy = 0; H.fr_w = H.fr_h = H.fr_n = 0;
+    H.ncls = H.nwnd = H.ntmr = 0;
+    if (ver < 4) { H.next_atom = 0xC001u; H.next_timer = 1; H.gui_ticks = 0; H.wbuf = 0; }
     if (!H.fake_heap) H.fake_heap = 0x4242000000ULL;               /* jp8_emu.FAKE_HEAP (a v2 template names none) */
-    if (ver == 3) {                                                   /* the GUI's import state */
+    if (ver >= 3) {                                                   /* the GUI's import state */
         uint32_t nd, nl, ng, nk, j;
         if (p + 4 > len - 4 || (nd = le32(b + p)) > NDIB_MAX) return err(JP8H_E_TEMPLATE, "template: DIB sections");
         p += 4;
@@ -704,6 +852,34 @@ static int load(const unsigned char *b, size_t len) {
             H.skin[k].w = le32(b + p); H.skin[k].h = le32(b + p + 4); p += 8;
         }
         H.nskin = (int)nk;
+    }
+    if (ver >= 4) {                                                   /* the window-message model */
+        uint32_t nc, nw, nt, j;
+        if (p + 4 > len - 4 || (nc = le32(b + p)) > NCLS_MAX) return err(JP8H_E_TEMPLATE, "template: classes");
+        p += 4;
+        for (k = 0; k < nc; k++, p += 12) {
+            if (p + 12 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated class");
+            H.cls[k].atom = le32(b + p); H.cls[k].proc = le64(b + p + 4);
+        }
+        H.ncls = (int)nc;
+        if (p + 4 > len - 4 || (nw = le32(b + p)) > NWND_MAX) return err(JP8H_E_TEMPLATE, "template: windows");
+        p += 4;
+        for (k = 0; k < nw; k++) {
+            uint32_t nl_;
+            if (p + 28 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated window");
+            H.wnd[k].hwnd = le64(b + p); H.wnd[k].proc = le64(b + p + 8); H.wnd[k].parent = le64(b + p + 16); nl_ = le32(b + p + 24); p += 28;
+            if (nl_ > NLONG_MAX || p + 12 * (size_t)nl_ > len - 4) return err(JP8H_E_TEMPLATE, "template: window longs");
+            for (j = 0; j < nl_; j++, p += 12) { H.wnd[k].l[j].i = (int32_t)le32(b + p); H.wnd[k].l[j].v = le64(b + p + 4); }
+            H.wnd[k].nl = (int)nl_;
+        }
+        H.nwnd = (int)nw;
+        if (p + 4 > len - 4 || (nt = le32(b + p)) > NTMR_MAX) return err(JP8H_E_TEMPLATE, "template: timers");
+        p += 4;
+        for (k = 0; k < nt; k++, p += 28) {
+            if (p + 28 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated timer");
+            H.tmr[k].hwnd = le64(b + p); H.tmr[k].id = le64(b + p + 8); H.tmr[k].ms = le32(b + p + 16); H.tmr[k].proc = le64(b + p + 20);
+        }
+        H.ntmr = (int)nt;
     }
     if (p != len - 4) return err(JP8H_E_TEMPLATE, "template: trailing bytes");
     return JP8H_OK;
@@ -1119,6 +1295,33 @@ int jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom) {  /* host_process_emu
     if (i == H.nwin) return err(JP8H_E_ARG, "no window of that size has laid itself out");
     if (call(IB + ZOOM_GET, H.win[i].win, 0, 0, 0)) return JP8H_E_TRAP;
     if (zoom) *zoom = (int32_t)(uint32_t)H.cpu.r[0];
+    return JP8H_OK;
+}
+int jp8h_gui_tick(int ticks, int32_t *dispatched) {   /* v9: the host's message loop -- every live timer ticks (WM_TIMER) */
+    int t, i, nd = 0, rc = live(); if (rc) return rc;
+    for (t = 0; t < ticks; t++) {
+        int nt = H.ntmr; uint64_t hw[NTMR_MAX], id[NTMR_MAX], pr[NTMR_MAX];
+        H.gui_ticks++;
+        for (i = 0; i < nt; i++) { hw[i] = H.tmr[i].hwnd; id[i] = H.tmr[i].id; pr[i] = H.tmr[i].proc; }   /* as the tick starts */
+        for (i = 0; i < nt; i++) {
+            if (pr[i]) { if (call(pr[i], hw[i], WM_TIMER_, id[i], 50 * H.gui_ticks)) return JP8H_E_TRAP; nd++; }
+            else {
+                int w = wnd_find(hw[i]);
+                if (w < 0) continue;
+#ifdef JP8H_TOOTH_TIMERID         /* the gate's tooth: WM_TIMER carries the wrong id (the window's handler must be graded) */
+                id[i] += 1;
+#endif
+                if (call(H.wnd[w].proc, hw[i], WM_TIMER_, id[i], 0)) return JP8H_E_TRAP;
+                nd++;
+            }
+        }
+    }
+    if (dispatched) *dispatched = nd;
+    return JP8H_OK;
+}
+int jp8h_gui_counts(int32_t *ntimers, int32_t *nwindows) {   /* v9: the live timers and windows */
+    if (ntimers) *ntimers = H.ntmr;
+    if (nwindows) *nwindows = H.nwnd;
     return JP8H_OK;
 }
 int jp8h_frame_size(int32_t *w, int32_t *h, int32_t *n) {   /* the last size the view asked the host's frame for */

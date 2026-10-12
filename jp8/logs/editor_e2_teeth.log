@@ -1,0 +1,36 @@
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   1.7s] step results differ from step 820: C ['zoomconv', '3940x2004', 18] oracle ['zoomconv', '3940x2004', 24]
+[   1.7s] state bytes differ: C 58680 bytes, oracle 58680, first at byte 55635
+[   2.1s] END hash differs: C 35791f6af60ec4ad oracle ea930e6c61af2b4d
+[   2.2s] STACK hash differs: C 9998814bd9f4a759 oracle ea3d739db92a2d28
+[   2.9s]   8 stack words differ, 0x201fefbc0 .. 0x201fefc78
+[   2.9s]   0x201fefbc0: C 0000000000000012 oracle 0000000000000018
+[   2.9s]   0x201fefbd0: C 0000000000000012 oracle 0000000000000018
+[   2.9s]   0x201fefc50: C 0000000800000242 oracle 0000000b00000303
+[   2.9s]   0x201fefc58: C 0000001e00000267 oracle 0000002800000335
+[   2.9s]   0x201fefc60: C 000000040000023e oracle 00000007000002ff
+[   2.9s]   0x201fefc68: C 000000220000026b oracle 0000002c00000339
+[   2.9s]   0x201fefc70: C 000000040000023e oracle 00000007000002ff
+[   2.9s]   0x201fefc78: C 000000220000026b oracle 0000002c00000339
+[   2.9s] 833 steps, 118784 words (0 differ), 58680 state bytes, 2036 performEdits, 1396 worker jobs, heap 48016 live / 86 free blocks, end DIFFERS, stack differs (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): 4 differences -- NOT bit-exact
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   1.9s] END hash differs: C 2eee381bf3534e90 oracle ea930e6c61af2b4d
+[   2.0s] STACK hash differs: C 32dc964f004559bf oracle ea3d739db92a2d28
+[   2.7s]   14 stack words differ, 0x201fefc38 .. 0x201feff28
+[   2.7s]   0x201fefc38: C 000000031fb12edc oracle 0000000310f58d38
+[   2.7s]   0x201fefc40: C 0000000000000580 oracle 0000000000000002
+[   2.7s]   0x201fefc88: C 00000001803658ad oracle 00000003104e6738
+[   2.7s]   0x201fefcb8: C 0000000100000060 oracle 00000003104e6738
+[   2.7s]   0x201fefd08: C 0000000000000002 oracle 00000003104e6738
+[   2.7s]   0x201fefe50: C 000000031fce5d70 oracle 000000031fce5d80
+[   2.7s]   0x201fefe68: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s]   0x201fefe78: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s]   0x201fefec0: C 000000031fce5d70 oracle 000000031fce5d80
+[   2.7s]   0x201fefec8: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s]   0x201fefed0: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s]   0x201fefed8: C 000000f400000000 oracle 000000f4000001b0
+[   2.7s]   0x201feff20: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s]   0x201feff28: C 000000031fce5d74 oracle 000000031fce5d84
+[   2.7s] 833 steps, 118784 words (0 differ), 58680 state bytes, 2036 performEdits, 1396 worker jobs, heap 48016 live / 86 free blocks, end DIFFERS, stack differs (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): 2 differences -- NOT bit-exact

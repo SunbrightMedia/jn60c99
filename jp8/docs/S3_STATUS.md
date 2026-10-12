@@ -168,6 +168,18 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    word on the drive; the position, flag and loop are stored -- the memory after grades them). The template ships again
    (raw 51be86b0..., v3: the editor imports' state and the frame). The render check on it: GREEN (job jp8_render_v3, EXIT 0:
    patch 2, 267,001 frames EXACTLY 0, its tooth bites). RUNNING: jp8_host_gate11 (v8 at three rates, 14 teeth).
+3i. 2026-10-12: DRIVE v9 -- THE EDITOR'S WINDOW MESSAGES AND GUI TIMER (E2); THE MUTATION SURVIVORS (scope rows 20, 21).
+   jp8_verify_eeb0 (drive v7, EXIT 1): A, B (44100, 96000), C, E GREEN; D RED -- 8 of 41 mutations survive (the same 8
+   at all three rates). Counters per step and page diffs: five ran only in the one or two blocks the sweep gave a
+   position and the next patch load reset them; three change only 0.0-vs-denormal values or meet a 0.0 coefficient
+   (playbook 246). Drive v9: reach_steps hold those configurations and end each with a graded memory step (memhash);
+   jp8/tools/jp8_mutation_prescreen.py (the C side alone) shows 5 of the 8 at 48000 / 44100 / 96000. E2: the window
+   model on both sides (creation messages, window longs, the style, timers, WM_TIMER) -- EXACTLY 0 on patch 2 at 48000
+   with the memory after and the stack; T15 (the timer id) bites. Paid: ATL calls the thunk it writes at run time (the
+   C side runs its three instructions, playbook 245); the oracle answered IsWindowVisible 0 by default (both sides now
+   model WS_VISIBLE); a second `_imp` in the oracle's class hid its heap reuse (playbook 244; tools/verify/
+   dup_method_gate.py in make static). Template v4 ships (raw e618cfbd...). OWED: gate12 (v9 at three rates, 15
+   teeth), the mutation gate on its references, 16 / 18 / 39, the render check on template v4.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

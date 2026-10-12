@@ -176,6 +176,12 @@ for i, st in enumerate(ST[1:]):
         fw, fh, fn_ = ctypes.c_int32(0), ctypes.c_int32(0), ctypes.c_int32(0); lib.jp8h_frame_size(ctypes.byref(fw), ctypes.byref(fh), ctypes.byref(fn_))
         res = [k, ' '.join('%dx%d' % p_ for p_ in sorted((wh[2 * j], wh[2 * j + 1]) for j in range(min(nwin, 16)))), out_r.value, view.value,
                '%dx%d' % (fw.value, fh.value), fn_.value]
+    elif k == 'memhash':                          # v9: the memory at this step (image + heap + host objects)
+        r = 0; res = [k, st[1], memhash()]
+    elif k == 'guitick':                          # v9: the host's message loop: every live timer gets WM_TIMER
+        nd, nt, nw = ctypes.c_int32(0), ctypes.c_int32(0), ctypes.c_int32(0)
+        r = lib.jp8h_gui_tick(st[1], ctypes.byref(nd)); lib.jp8h_gui_counts(ctypes.byref(nt), ctypes.byref(nw))
+        res = [k, st[1], nd.value, nt.value, nw.value]
     elif k == 'zoomconv':                         # v8 (E1): a panel window's zoom getter
         z = ctypes.c_int32(0); r = lib.jp8h_window_zoom(st[1], st[2], ctypes.byref(z)); res = [k, '%dx%d' % (st[1], st[2]), z.value]
     else:

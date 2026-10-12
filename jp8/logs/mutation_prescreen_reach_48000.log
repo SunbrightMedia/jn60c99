@@ -1,0 +1,9 @@
+k=9   SEEN: words differ in 69 blocks (first at step 128), 2 memhash steps differ, memory after differs; JP8_MUT 9: ran 207239, changed 124
+k=12  SEEN: words differ in 46 blocks (first at step 195), 1 memhash steps differ, memory after differs; JP8_MUT 12: ran 47098, changed 47098
+k=16  NOT SEEN: words differ in 0 blocks (first at step -), 0 memhash steps differ, memory after equal; JP8_MUT 16: ran 0, changed 0
+k=18  NOT SEEN: words differ in 0 blocks (first at step -), 0 memhash steps differ, memory after equal; JP8_MUT 18: ran 0, changed 0
+k=19  SEEN: words differ in 0 blocks (first at step -), 1 memhash steps differ, memory after equal; JP8_MUT 19: ran 128064, changed 128064
+k=23  SEEN: words differ in 0 blocks (first at step -), 1 memhash steps differ, memory after equal; JP8_MUT 23: ran 128064, changed 128064
+k=34  SEEN: words differ in 123 blocks (first at step 5), 3 memhash steps differ, memory after differs; JP8_MUT 34: ran 128064, changed 128064
+k=39  NOT SEEN: words differ in 0 blocks (first at step -), 0 memhash steps differ, memory after equal; JP8_MUT 39: ran 0, changed 0
+prescreen: 5 of 8 mutations seen by this segment at 48000 Hz

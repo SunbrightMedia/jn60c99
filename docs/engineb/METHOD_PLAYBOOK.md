@@ -4265,3 +4265,49 @@ on an input that changes nothing never bites, and the gate's claim about that in
 drive", stated as such (a read census says what is read; only a perturbation says what matters). A probe
 whose answer is "no effect" is evidence only next to a control that shows the same probe acting (a second input it
 does change) -- otherwise the probe itself may be the thing that did nothing.
+
+## 244. ONE NAME, TWO DEFINITIONS -- THE ORACLE LOST ITS HEAP REUSE AND NOTHING SAID SO
+Paid 2026-10-12 (JUPITER-8 drive v9, the window-message model). The host oracle's class JP8Host had an `_imp` (the
+heap's block reuse on HeapFree, v6); the window model added a second `_imp` to the same class. Python raises nothing: the
+second def replaced the first, so the v9 oracle never reused a freed block (83,348 live / 0 free blocks at the end, v8:
+47,501 / 88). Every step before the editor still matched (no address is graded there); the first graded address -- the
+editor's view, 0x31FE3CA90 in the oracle, 0x31FB67CD0 on the C side, which reuses blocks as the oracle had -- differed.
+Fix: the heap layer is `_imp_heap`, the window model's `_imp` calls it for every other import; the new references end at
+48,016 / 86 and the view at 0x31FB67CD0. A static gate now reads every tracked .py file: no class defines a method
+twice (tools/verify/dup_method_gate.py in `make static`; its --self-test must find a planted repeat).
+### The rule
+In a harness, a second definition of a method is a silent deletion of the first. Extend a host model by calling the
+layer below by name, never by re-defining the entry point; and let a static check, not care, keep it so.
+
+## 245. CODE THE PLUGIN WRITES AT RUN TIME, AND THE ANSWERS A HOST MODEL GIVES BY DEFAULT
+Paid 2026-10-12 (JUPITER-8 v9, the editor's window). ATL's StartWindowProc (rva 0x3191A0) writes a 22-byte thunk on the
+heap (`mov rcx, this; mov rax, proc; jmp rax`), installs it as the window's procedure and then CALLS it itself. Under
+Unicorn the bytes simply run; the lift cannot hold code that does not exist until run time, so the C side trapped
+("indirect target not lifted", a heap address). Fix: in a --hostcalls lift an indirect call outside the image tries
+jp8_thunk (jp8/src/jp8_host.c): ONLY that exact byte pattern, run as its three instructions (rcx, rax, then the
+lifted procedure on the same stack); anything else still traps. Next, the WM_TIMER handler asked IsWindowVisible: the
+oracle answered 0 by default (an unnamed import answers 0) -- an editor that is never shown -- while the C side trapped
+("not shimmed"). The plugin creates its windows WS_CHILD | WS_VISIBLE (0x50000000, rva 0x318EEA); both sides now keep
+the style as the window's GWL_STYLE long, SetWindowPos's SWP_SHOW/HIDEWINDOW change it, and IsWindowVisible walks the
+parents (the host's own window is shown).
+### The rule
+Run-time code is lifted by recognizing its exact bytes and running their meaning, never by guessing; anything else is a
+named stop. And a default answer in the oracle is a silent model decision: the C side's trap on an unnamed import is
+the honest signal -- name the import on BOTH sides from what the machine would do, before the references are made.
+
+## 246. A SLIP IN CODE THE DRIVE RUNS FOR ONE BLOCK IS A SLIP NO GATE SEES -- HOLD IT, PRE-SCREEN IT, HASH IT
+Paid 2026-10-12 (JUPITER-8 mutation reach, jp8_verify_eeb0 section D: 8 of 41 mutations SURVIVED). Probes at each site
+(the mutation build's guards turned into counters, per drive step) and page diffs (the memory, step by step, with and
+without the slip) showed why: five sites ran only in the one or two blocks the sweep gave a parameter position (VCO1
+WAVE's fifth and sixth, the engine-rate setting 3, VCO2 WAVE's second) and the next patch load reset what they changed;
+two changed only values that are denormal or 0.0 (read as 0 under the plugin's DAZ); one multiplies by a coefficient
+that is 0.0 in every run seen. Fix: drive v9's reach_steps HOLD each configuration (a chord, 40-120 blocks, its
+parameters modulated) and end each with a 'memhash' step (image + heap + host objects, graded at that step). Measured
+FIRST on the C side alone (scratch prescreen: the mutation build with and without each slip on the candidate segment,
+no oracle): at 48 / 44.1 / 96 kHz the segments change the words for 9, 12 and 34 and the memory step for 19 and 23.
+16, 18 and 39 run in other modes and stay open (SCOPE_AUDIT row 20).
+### The rule
+A survivor is first a question about the DRIVE: where does the slip run, for how long, and what erases it before the
+gate looks. Answer it with counters and page diffs, then extend the drive where it holds the state longer -- and test
+the extension on the C side before paying for references. A graded memory step after a segment sees state that the
+next reset would hide.

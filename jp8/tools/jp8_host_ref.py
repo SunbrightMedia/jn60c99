@@ -11,12 +11,14 @@ component and the controller initialized and connected, the handler, setComponen
     result (and the bytes a controller call wrote), every output word of every block, every state byte, then the
     performEdit calls the plugin made, the worker jobs, and the memory hashes. From the template on the host's heap
     reuses freed blocks (JP8Host.heap_reuse_on) and the host-object area must not grow after the setup (a stop).
-Plumbing only. FORMAT JP8H v3 (little endian): "JP8H" u32 3 u32 nregions; per region u64 base u64 size u32 nruns,
+Plumbing only. FORMAT JP8H v4 (little endian): "JP8H" u32 4 u32 nregions; per region u64 base u64 size u32 nruns,
 per run u32 off u32 len bytes; u32 nfacts, per fact char key[24] u64 value; u32 nstubs, per stub u64 addr u32 len
 name; THE GUI's IMPORT STATE (v3, the oracle's own answers kept between calls: jp8_host_emu.gui_state) -- u32 ndibs,
 per DIB u64 handle i32 w i32 h u32 bpp u32 stride u64 bits; u32 nlists, per singly linked list u64 head u32 n, n x u64
 entry; u32 nimages, per GDI+ image u64 handle u32 w u32 h u32 format; u32 nskin, per skin image u32 len name (lower
-case) u32 w u32 h; u32 crc32 of every byte before it.
+case) u32 w u32 h; THE WINDOW-MESSAGE MODEL (v4: jp8_host_emu, InitDll already makes a window) -- u32 nclasses, per
+class u32 atom u64 procedure; u32 nwindows, per window u64 handle u64 procedure u64 parent u32 nlongs, per long i32
+index u64 value; u32 ntimers, per timer u64 window u64 id u32 ms u64 timer procedure; u32 crc32 of every byte before it.
 usage: jp8_host_ref.py <outdir>"""
 import sys, os, json, struct, time, hashlib, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,7 +68,9 @@ facts['eflags'] = uc.reg_read(XC.UC_X86_REG_EFLAGS)
 stubs = sorted((a, nm[1]) for a, nm in h.stub2name.items())
 gs = h.gui_state()
 facts['lasterr'] = gs['lasterr']; facts['fake_heap'] = J.FAKE_HEAP; facts['frame'] = h.frame   # v8: the host's IPlugFrame
-body = bytearray(b'JP8H' + struct.pack('<II', 3, len(REGIONS)))
+facts['wbuf'] = h.wbuf; facts['next_atom'] = gs['next_atom']; facts['next_timer'] = gs['next_timer']   # v9: windows
+facts['gui_ticks'] = gs['gui_ticks']
+body = bytearray(b'JP8H' + struct.pack('<II', 4, len(REGIONS)))
 for base, size in REGIONS:
     rr = runs_of(region_bytes(base, size))
     body += struct.pack('<QQI', base, size, len(rr))
@@ -83,15 +87,19 @@ body += struct.pack('<I', len(gs['gdip']))
 for hd, (w_, h_, fmt) in gs['gdip']: body += struct.pack('<QIII', hd, w_, h_, fmt)
 body += struct.pack('<I', len(gs['skin']))
 for nm, (w_, h_) in gs['skin']: body += struct.pack('<I', len(nm)) + nm.encode('latin1') + struct.pack('<II', w_, h_)
+body += struct.pack('<I', len(gs['classes']))                                    # v4: the window-message model
+for atom, proc in gs['classes']: body += struct.pack('<IQ', atom, proc)
+body += struct.pack('<I', len(gs['wnds']))
+for hw, proc, parent, longs in gs['wnds']:
+    body += struct.pack('<QQQI', hw, proc, parent, len(longs)) + b''.join(struct.pack('<iQ', i, v) for i, v in longs)
+body += struct.pack('<I', len(gs['timers']))
+for hw, tid, ms, proc in gs['timers']: body += struct.pack('<QQIQ', hw, tid, ms, proc)
 body += struct.pack('<I', zlib.crc32(bytes(body)) & 0xFFFFFFFF)
 open(os.path.join(out, 'jp8_host_template.bin'), 'wb').write(body)
 log('template (before setupProcessing): %d regions, %d facts, %d stubs, %.1f MB (sha256 %s)' % (len(REGIONS), len(facts), len(stubs),
     len(body) / 1e6, hashlib.sha256(body).hexdigest()[:16]))
 def memhash():
-    m = hashlib.sha256()
-    m.update(bytes(uc.mem_read(IB, J.IMGSZ))); m.update(bytes(uc.mem_read(Q.HEAP_BASE, h.heap - Q.HEAP_BASE)))
-    m.update(bytes(uc.mem_read(Q.COM_BASE, h.com_next - Q.COM_BASE)))
-    return m.hexdigest()
+    return h.mem_hash()                           # image + heap + host objects (the 'memhash' steps use the same)
 ST = Q.steps()
 assert ST[0][0] == 'setup'
 e0 = len(h.edits); j0 = len(h.jobs)

@@ -114,6 +114,18 @@ for i, st in enumerate(ST[1:hi], start=2):
     h.run_step(st, blob, Q.state_variant, states, cstates)
     if k == 'editor':                                # v8 (E1): IPlugView::attached, a method of the view just made
         roots['view_attached'] = slot(h.view, 4); roots['view_setframe'] = slot(h.view, 12)
+    if k in ('editor', 'guitick'):                   # v9: the window procedures the host calls (a class's, ATL's
+        for atom, proc in h.wclass.items():          # thunk's target) and the timers' procedures
+            roots['wclass_%x' % atom] = proc - IB
+        for hw, wd in h.wnds.items():
+            p_ = wd['proc']; b_ = bytes(h.uc.mem_read(p_, 22)) if p_ >= 0x10000 else b''
+            if IB <= p_ < IB + 0xDE7000:
+                roots['wnd_%x' % hw] = p_ - IB
+            elif b_[:2] == b'\x48\xb9' and b_[10:12] == b'\x48\xb8' and b_[20:22] == b'\xff\xe0':
+                roots['wnd_%x' % hw] = struct.unpack_from('<Q', b_, 12)[0] - IB
+        for t_ in h.timers:
+            if t_[3]:
+                roots['tmr_%x_%x' % (t_[0], t_[1])] = t_[3] - IB
     if k == 'getstate' and cur is not None and st[1] == 'p%d' % cur:     # a patch's steps end with its state
         log('patch %d %r: executed %d (+%d), %d indirect sites, %d stub names' % (
             cur, B.patch_name(bank, cur), len(executed), len(executed) - n0, len(indirect), len(stubs)))

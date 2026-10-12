@@ -1,0 +1,3 @@
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   2.2s] 833 steps, 118784 words (0 differ), 58680 state bytes, 2036 performEdits, 1396 worker jobs, heap 48016 live / 86 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after

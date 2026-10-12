@@ -268,6 +268,27 @@ and the zoom on four screens: -5, 24, 24, 24 (the first positive fit is kept for
 the screen's width and height (zoom 18, not 24); T13 scales the host tempo by 1.5 (83,843 differences;
 jp8/logs/editor_e1_teeth.log).
 
+THE EDITOR'S WINDOW MESSAGES AND GUI TIMER (E2, drive v9, EXECUTED 2026-10-12; scope row 21). Both sides model the
+windows a host gives a plugin: RegisterClassEx (an atom, the class procedure), CreateWindowEx (the handle, then the
+creation messages WM_NCCREATE, WM_NCCALCSIZE, WM_CREATE through the window's procedure as it is at that message -- the
+x64 CREATESTRUCT in a host scratch block -- nested 1 MB below the caller's stack; NCCREATE FALSE or CREATE -1 drops the
+window), Set/GetWindowLongPtr (GWLP_WNDPROC and the longs; GWL_STYLE / GWL_EXSTYLE are the creation styles),
+DefWindowProc / CallWindowProc to it (TRUE only for WM_NCCREATE), IsWindow, InvalidateRect, SetWindowPos (its
+SWP_SHOW/HIDEWINDOW change WS_VISIBLE), IsWindowVisible (the window and every parent this host made have WS_VISIBLE; the
+host's own window is shown), SetTimer / KillTimer. The plugin's windows are ATL's: StartWindowProc (rva 0x3191A0)
+writes the run-time thunk `mov rcx, this; mov rax, proc (0x3192D0); jmp rax` on the heap, makes it the window's
+procedure and calls it; the C side runs exactly that byte pattern as its three instructions (jp8_thunk: in a
+--hostcalls lift, an indirect call outside the image tries it; anything else traps). The 'guitick' step is the host's
+message loop: every live timer once per tick (a window's timer through its procedure, wParam the id; a TIMERPROC
+through that procedure), 50 ms a tick. The editor sets 3 timers on 4 windows (the 50 ms GUI timer from rva 0x318F1C).
+The state travels in template v4 (classes, windows with their longs, timers, the next atom / timer id, the ticks).
+RESULT (drive v9 on patch 2 at 48000: jp8/logs/editor_e2_patch2.log): 833 steps, 118,784 words, 58,680 state bytes,
+2,036 performEdits, 1,396 jobs, the heap (48,016 live / 86 free blocks), the memory after and the stack EXACTLY 0; the
+editor's row (the view 0x31FB67CD0, attached 0) and four 'guitick' rows (6, 9, 9, 6 messages; 3 timers, 4 windows).
+Teeth: T14 (zoom 18, not 24) and T15 (WM_TIMER's id off by one: the memory after differs) bite
+(jp8/logs/editor_e2_teeth.log). The drive's reach_steps (drive v9, playbook 246) follow the editor steps: three held
+configurations, each ended by a graded memory step ('memhash': image + heap + host objects).
+
 THE HOST TRANSPORT (drive v8, jp8_host_seq.transport; jp8/logs/ctx_census_v8.log). process() copies the context's
 playing flag (state & 2), position (ppq, if state & 0x200), tempo (if state & 0x400) and loop (if state & 0x1000:
 start, end) into a transport record (rva 0x36C28B-0x36C2E0); the render driver (rva 0x33AD6C-0x33ADF9) hands its
