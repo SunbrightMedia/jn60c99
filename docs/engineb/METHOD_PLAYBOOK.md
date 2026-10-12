@@ -4086,3 +4086,36 @@ both builds: 7168 output words, 96 performEdits, 256 worker jobs and the memory 
 ### The rule
 A lifter must treat a jmp to any function it answers itself (allocator, host call, hook) as call + return. Look for it
 first when a lift reaches code its oracle reaches only by a call.
+
+## 235. TAKE THE TEMPLATE BEFORE THE RATE IS KNOWN -- THEN ONE TEMPLATE SERVES EVERY RATE, AND THE SETUP IS GRADED
+Paid 2026-10-12: the JUPITER-8's lifted host path (jp8/src/jp8_host.c) first started from the oracle's memory after
+setupProcessing and setActive at 48000 -- one template per host rate, and the setup calls themselves never ran in C.
+The JP8H v2 template is the memory after boot_host (the DAW has created, initialized and connected the plugin but
+not told it a rate); jp8h_init then makes the host's own setup calls through the lifted code at the rate it is
+given and creates the blocks' host objects in the oracle's order (one bump allocator: the same guest addresses).
+CONTROL 1 (the memory after jp8h_init == the oracle's after its setup) held at once, and the host-rate chain
+(44100 / 96000 / 88200 / 22050 / back) ran on the same template EXACTLY 0.
+### The rule
+Cut the template at the last point that does not depend on a host choice (rate, block size, state); make every call
+after it on both sides. The template then has one version, and the calls it no longer hides are graded.
+
+## 236. A TOOTH KEYED TO THE CALL PATTERN CAN MISS -- KEY IT TO THE CONTENT
+Paid 2026-10-12: the JUPITER-8 host gate's stream tooth (T5) flipped byte 8 of the IBStream "on the first read of more
+than 8 bytes"; it did NOT bite -- the plugin's setState reads the stream in small pieces (4 bytes, then 8 per
+entry), so the condition never held and the run was EXACTLY 0 with the tooth in. Keyed to the content instead (every
+entry's value, whichever read covers it), it bites: the performEdits differ and a changed state takes a path outside
+the lift (a trap). Seen to fail, as mantra 5 asks -- and the first version would have been believed without it.
+### The rule
+A tooth that patches a harness's answer must find its target by what the bytes ARE (an offset in the stream, a field),
+not by how the plugin happens to ask for them; and it is not a tooth until a run has shown it failing.
+
+## 237. A DYNAMIC REACH COVERS THE HISTORY IT SAW -- THE GATE'S OWN DRIVE MUST BE IN IT
+Paid 2026-10-12: the JUPITER-8 host gate (job jp8_host_gate3b) lifted the host path from a reach of 64 patches and
+then the same post-patch steps; the gate drives 4 patches and the same steps. It ran 85 steps EXACTLY 0, then the
+block after a crafted state (every value at the int32 maximum) called an indirect target the long drive never had --
+the same step after another patch history takes another branch. The lift is a closure over what the reach saw, not
+over what the code can do: a missing target traps, loud, never wrong -- but the gate went RED on its own drive.
+jp8_host_gate.sh now reaches its own drive (~8 min) and unites it with the 64-patch reach (jp8_reach_merge.py).
+### The rule
+Lift from the union of the broad reach (variety) and the exact drive the gate grades (its history). A product built
+from a reach carries the same caveat: what no reach saw traps, so the reach's drives are part of the product's scope.

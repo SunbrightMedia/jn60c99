@@ -221,8 +221,14 @@ class HostProcess(W.Wrapper):
     def start(self, host_sr, max_block=MAXBLOCK, setting=None, state=None, log=lambda s: None):
         """boot as a host does; optional DAW state (bytes) and/or vm.vs.sampleRate index;
         setupProcessing(host_sr, max_block); setActive(1)"""
-        uc = self.uc
         self.boot_host(log=log)
+        return self.setup(host_sr, max_block, setting=setting, state=state)
+
+    def setup(self, host_sr, max_block=MAXBLOCK, setting=None, state=None):
+        """start() after boot_host: the optional DAW state and engine-rate setting, setupProcessing,
+        setActive(1), then the host objects of the blocks (buffers, bus, context, process data, event
+        list, parameter changes) -- the point a host reaches once it knows its sample rate"""
+        uc = self.uc
         q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
         if state is not None or setting is not None:
             st = state if state is not None else self.get_state()

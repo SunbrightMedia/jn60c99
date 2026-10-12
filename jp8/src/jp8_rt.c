@@ -84,7 +84,15 @@ void jp8_fault(uint64_t a, unsigned n) {
     if (jp8_cur) jp8_trap(jp8_cur, 0, msg);
     fprintf(stderr, "%s\n", msg); abort();
 }
-static int jp8_span_ok(uint64_t a, uint64_t n) { uint64_t i = a >> 28; return i < JP8_NBANDS && (a & 0x0FFFFFFFu) >= jp8_blo[i] && (a & 0x0FFFFFFFu) + n <= jp8_bhi[i]; }
+static int jp8_span_ok(uint64_t a, uint64_t n) {       /* [a, a+n) mapped, at one delta (it may span bands: JP8_FLAT) */
+    uint64_t i = a >> 28, last = (a + n - 1) >> 28, k;
+    if (!n || last >= JP8_NBANDS) return 0;
+    for (k = i; k <= last; k++) {
+        uint64_t lo = k == i ? (a & 0x0FFFFFFFu) : 0, hi = k == last ? ((a + n - 1) & 0x0FFFFFFFu) + 1 : 0x10000000ULL;
+        if (!jp8_bhi[k] || lo < jp8_blo[k] || hi > jp8_bhi[k] || jp8_bdelta[k] != jp8_bdelta[i]) return 0;
+    }
+    return 1;
+}
 #else
 /* map [base, base+size) at exactly base; returns 0 on success */
 int jp8_map(uint64_t base, uint64_t size) {

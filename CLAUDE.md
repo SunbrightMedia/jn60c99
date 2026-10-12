@@ -283,17 +283,21 @@ mine is a hypothesis (playbook 80).
   is fast (then a lifted render closes it by construction).
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
-  builds the HOST, recall through HOSTPARAM, no snap). The machine-code
-  lifter's three layer gates are EXACTLY 0 on drive2 with teeth; the PSI
-  template + the oracle-recorded recall table are exported (jp8/gen/).
-  The fast lifter (jp8/tools/jp8_fast.py, playbook 230) and THE SELF-BOOTING
-  ENGINE (jp8/src/jp8.h + jp8_engine.c: the template, the plugin's own boot
-  order, its own recall calls) are done: jp8_full_gate.sh -- the engine vs
-  drive2, every word + init / end memory EXACTLY 0 on 4 patches in the checked
-  and the product build, 4 teeth bite. NEXT: 64 patches + 96 kHz (job), speed
-  (the product build 939 ms per second of audio here, the plugin 188: one
-  delta for every region), the C-twin listen, the host RENDER path. The
-  bit-exact JP8 is ~5.3x one S3.
+  builds the HOST, recall through HOSTPARAM, no snap). THE SELF-BOOTING
+  ENGINE (jp8/src/jp8.h + jp8_engine.c, the fast lifter's output) is
+  bit-exact: jp8_full_gate.sh EXACTLY 0 on 64/64 patches at 44100 and 4 at
+  96000, both builds, 4 teeth. THE HOST PATH (jp8/docs/HOST_LAYER.md):
+  jp8/src/jp8_host.c + jp8h.h run the plugin's own setupProcessing,
+  setActive, process(), getState / setState, patch load, UI-timer drain,
+  MIDI learn, edit-controller calls and engine workers, LIFTED, on a template
+  taken BEFORE the host knows its rate (playbook 235); jp8_host_gate.sh
+  GREEN (drive v5: MIDI controllers, the host-rate chain, 16 setState
+  inputs, 150 controller calls; 4 patches, both builds EXACTLY 0, 6 teeth;
+  the lift from the 64-patch reach united with the gate's own drive,
+  playbook 237; job jp8_host_gate5). NEXT: other first rates, the controller's
+  parameter info in the C API, the editor (needs the user's missing JP8
+  script), speed (950 ms per second of audio here; the plugin ~2.3x
+  faster). The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.

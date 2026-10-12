@@ -1,0 +1,3760 @@
+{
+"count": 226,
+"params": [
+{
+"index": 0,
+"result": 0,
+"id": 6291456,
+"title": "LFO WAVE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 1,
+"result": 0,
+"id": 6291458,
+"title": "LFO DELAY TIME",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 2,
+"result": 0,
+"id": 6291460,
+"title": "LFO RATE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.6862745098039216,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 3,
+"result": 0,
+"id": 6291462,
+"title": "VCO LFO MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 4,
+"result": 0,
+"id": 6291464,
+"title": "VCF LFO MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 5,
+"result": 0,
+"id": 6291466,
+"title": "VCA LFO MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 6,
+"result": 0,
+"id": 6291468,
+"title": "LFO KEY TRIG",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 7,
+"result": 0,
+"id": 6291470,
+"title": "VCO1 WAVE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 8,
+"result": 0,
+"id": 6291472,
+"title": "VCO PWM DEPTH",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 9,
+"result": 0,
+"id": 6291474,
+"title": "VCO PWM SOURCE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 10,
+"result": 0,
+"id": 6291476,
+"title": "VCO1 RANGE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.6,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 11,
+"result": 0,
+"id": 6291478,
+"title": "VCO1 CROSS MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 12,
+"result": 0,
+"id": 6291480,
+"title": "VCO2 WAVE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 13,
+"result": 0,
+"id": 6291486,
+"title": "VCO2 RANGE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.6,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 14,
+"result": 0,
+"id": 6291488,
+"title": "VCO2 FINE TUNE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 15,
+"result": 0,
+"id": 6291490,
+"title": "VCO2 LOW FREQ",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 16,
+"result": 0,
+"id": 6291492,
+"title": "VCO2 SYNC",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 17,
+"result": 0,
+"id": 6291494,
+"title": "VCO2 SUB RANGE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 18,
+"result": 0,
+"id": 6291496,
+"title": "MIXER VCO1",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 19,
+"result": 0,
+"id": 6291498,
+"title": "MIXER VCO2",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 20,
+"result": 0,
+"id": 6291508,
+"title": "VCO ENV MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 21,
+"result": 0,
+"id": 6291514,
+"title": "VCF CUTOFF",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 22,
+"result": 0,
+"id": 6291518,
+"title": "VCF RESONANCE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 23,
+"result": 0,
+"id": 6291520,
+"title": "HPF CUTOFF",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 24,
+"result": 0,
+"id": 6291522,
+"title": "VCF ENV MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 25,
+"result": 0,
+"id": 6291524,
+"title": "ENV1 ATTACK",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 26,
+"result": 0,
+"id": 6291526,
+"title": "ENV1 DECAY",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 27,
+"result": 0,
+"id": 6291528,
+"title": "ENV1 SUSTAIN",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 28,
+"result": 0,
+"id": 6291530,
+"title": "ENV1 RELEASE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 29,
+"result": 0,
+"id": 6291532,
+"title": "VCF KEY FOLLOW",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 30,
+"result": 0,
+"id": 6291534,
+"title": "ENV2 ATTACK",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 31,
+"result": 0,
+"id": 6291536,
+"title": "ENV2 DECAY",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 32,
+"result": 0,
+"id": 6291538,
+"title": "ENV2 SUSTAIN",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 33,
+"result": 0,
+"id": 6291540,
+"title": "ENV2 RELEASE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 34,
+"result": 0,
+"id": 6291542,
+"title": "VCA TONE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 35,
+"result": 0,
+"id": 6291544,
+"title": "EFFECT LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 36,
+"result": 0,
+"id": 6291546,
+"title": "REVERB LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 37,
+"result": 0,
+"id": 6291548,
+"title": "DELAY LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 38,
+"result": 0,
+"id": 6291550,
+"title": "DELAY TIME",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 39,
+"result": 0,
+"id": 6291552,
+"title": "PORTAMENTO",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 40,
+"result": 0,
+"id": 6291554,
+"title": "LEGATO",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 41,
+"result": 0,
+"id": 6291556,
+"title": "ASSIGN MODE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 42,
+"result": 0,
+"id": 6291558,
+"title": "BEND RANGE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.08695652173913043,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 43,
+"result": 0,
+"id": 6291562,
+"title": "TEMPO SYNC",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 44,
+"result": 0,
+"id": 6291576,
+"title": "VCA LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 45,
+"result": 0,
+"id": 6291580,
+"title": "BEND SW VCO1",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 46,
+"result": 0,
+"id": 6291582,
+"title": "BEND SW VCO2",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 47,
+"result": 0,
+"id": 6291720,
+"title": "ARPEGGIO SW",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 48,
+"result": 0,
+"id": 6291728,
+"title": "ARPEGGIO MODE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 49,
+"result": 0,
+"id": 6291736,
+"title": "ARPEGGIO RANGE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 50,
+"result": 0,
+"id": 6291760,
+"title": "OCTAVE SHIFT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 51,
+"result": 0,
+"id": 6291768,
+"title": "KEY HOLD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 52,
+"result": 0,
+"id": 6291904,
+"title": "ENV1 KEY FOLLOW",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 53,
+"result": 0,
+"id": 6291912,
+"title": "ENV2 KEY FOLLOW",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 54,
+"result": 0,
+"id": 6291920,
+"title": "CONDITION",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 55,
+"result": 0,
+"id": 6291936,
+"title": "BEND SENS VCO",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 56,
+"result": 0,
+"id": 6291944,
+"title": "BEND SENS VCF",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 57,
+"result": 0,
+"id": 6291952,
+"title": "MOD SENS VCO",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 58,
+"result": 0,
+"id": 6291960,
+"title": "MOD SENS VCF",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 59,
+"result": 0,
+"id": 6291976,
+"title": "LFO TRIG ENV",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 60,
+"result": 0,
+"id": 6291984,
+"title": "VCO1 MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 61,
+"result": 0,
+"id": 6292008,
+"title": "VCO2 MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 62,
+"result": 0,
+"id": 6292040,
+"title": "VCF ENV MOD SOURCE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 63,
+"result": 0,
+"id": 6292048,
+"title": "VCF SLOPE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.4,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 64,
+"result": 0,
+"id": 6292056,
+"title": "EFFECT TYPE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 65,
+"result": 0,
+"id": 6292064,
+"title": "EFFECT CTRL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 66,
+"result": 0,
+"id": 6292072,
+"title": "DELAY TYPE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 67,
+"result": 0,
+"id": 6292080,
+"title": "REVERB TYPE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.4,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 68,
+"result": 0,
+"id": 6292088,
+"title": "REVERB TIME",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 69,
+"result": 0,
+"id": 6291928,
+"title": "BEND GAIN",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 70,
+"result": 0,
+"id": 10485760,
+"title": "LFO RATE H",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.9950594413937546,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 71,
+"result": 0,
+"id": 10496000,
+"title": "VCF VELOCITY SENS",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 72,
+"result": 0,
+"id": 10496002,
+"title": "VCF CUTOFF H",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 73,
+"result": 0,
+"id": 10498048,
+"title": "VCA VELOCITY SENS",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 74,
+"result": 0,
+"id": 10506240,
+"title": "DELAY TAP TIME",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 75,
+"result": 0,
+"id": 10506241,
+"title": "DELAY FEEDBACK",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.47058823529411764,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 76,
+"result": 0,
+"id": 10506243,
+"title": "DELAY HIGH CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 77,
+"result": 0,
+"id": 10506262,
+"title": "DELAY HF DAMP",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 78,
+"result": 0,
+"id": 10506270,
+"title": "DELAY HF DAMP FREQ",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 79,
+"result": 0,
+"id": 10506246,
+"title": "DELAY LF DAMP",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 80,
+"result": 0,
+"id": 10506254,
+"title": "DELAY LF DAMP FREQ",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 81,
+"result": 0,
+"id": 10506244,
+"title": "DELAY DIRECT LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 82,
+"result": 0,
+"id": 10508288,
+"title": "CHORUS PRE DELAY",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.25,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 83,
+"result": 0,
+"id": 10508289,
+"title": "CHORUS LOW CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.11764705882352941,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 84,
+"result": 0,
+"id": 10508290,
+"title": "CHORUS HIGH CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.9285714285714286,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 85,
+"result": 0,
+"id": 10510336,
+"title": "FLANGER MANUAL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 86,
+"result": 0,
+"id": 10510338,
+"title": "FLANGER RESONANCE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.9019607843137255,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 87,
+"result": 0,
+"id": 10510342,
+"title": "FLANGER LOW CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.11764705882352941,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 88,
+"result": 0,
+"id": 10514432,
+"title": "REVERB PRE DELAY",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.2,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 89,
+"result": 0,
+"id": 10514433,
+"title": "REVERB LOW CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.11764705882352941,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 90,
+"result": 0,
+"id": 10514434,
+"title": "REVERB HIGH CUT",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7857142857142857,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 91,
+"result": 0,
+"id": 10514435,
+"title": "REVERB DENSITY",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 92,
+"result": 0,
+"id": 10514436,
+"title": "REVERB DIRECT LEVEL",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 1.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 93,
+"result": 0,
+"id": 2,
+"title": "MASTER TUNE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 94,
+"result": 0,
+"id": 6291560,
+"title": "PORTA TYPE",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 95,
+"result": 0,
+"id": 6292024,
+"title": "CIRCUIT MOD",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 0,
+"flags": 1
+},
+{
+"index": 96,
+"result": 0,
+"id": 268419328,
+"title": "CC 0",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 97,
+"result": 0,
+"id": 268419329,
+"title": "CC 1",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 98,
+"result": 0,
+"id": 268419330,
+"title": "CC 2",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 99,
+"result": 0,
+"id": 268419331,
+"title": "CC 3",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 100,
+"result": 0,
+"id": 268419332,
+"title": "CC 4",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 101,
+"result": 0,
+"id": 268419333,
+"title": "CC 5",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 102,
+"result": 0,
+"id": 268419334,
+"title": "CC 6",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 103,
+"result": 0,
+"id": 268419335,
+"title": "CC 7",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 104,
+"result": 0,
+"id": 268419336,
+"title": "CC 8",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 105,
+"result": 0,
+"id": 268419337,
+"title": "CC 9",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 106,
+"result": 0,
+"id": 268419338,
+"title": "CC 10",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 107,
+"result": 0,
+"id": 268419339,
+"title": "CC 11",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 108,
+"result": 0,
+"id": 268419340,
+"title": "CC 12",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 109,
+"result": 0,
+"id": 268419341,
+"title": "CC 13",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 110,
+"result": 0,
+"id": 268419342,
+"title": "CC 14",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 111,
+"result": 0,
+"id": 268419343,
+"title": "CC 15",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 112,
+"result": 0,
+"id": 268419344,
+"title": "CC 16",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 113,
+"result": 0,
+"id": 268419345,
+"title": "CC 17",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 114,
+"result": 0,
+"id": 268419346,
+"title": "CC 18",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 115,
+"result": 0,
+"id": 268419347,
+"title": "CC 19",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 116,
+"result": 0,
+"id": 268419348,
+"title": "CC 20",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 117,
+"result": 0,
+"id": 268419349,
+"title": "CC 21",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 118,
+"result": 0,
+"id": 268419350,
+"title": "CC 22",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 119,
+"result": 0,
+"id": 268419351,
+"title": "CC 23",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 120,
+"result": 0,
+"id": 268419352,
+"title": "CC 24",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 121,
+"result": 0,
+"id": 268419353,
+"title": "CC 25",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 122,
+"result": 0,
+"id": 268419354,
+"title": "CC 26",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 123,
+"result": 0,
+"id": 268419355,
+"title": "CC 27",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 124,
+"result": 0,
+"id": 268419356,
+"title": "CC 28",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 125,
+"result": 0,
+"id": 268419357,
+"title": "CC 29",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 126,
+"result": 0,
+"id": 268419358,
+"title": "CC 30",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 127,
+"result": 0,
+"id": 268419359,
+"title": "CC 31",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 128,
+"result": 0,
+"id": 268419360,
+"title": "CC 32",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 129,
+"result": 0,
+"id": 268419361,
+"title": "CC 33",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 130,
+"result": 0,
+"id": 268419362,
+"title": "CC 34",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 131,
+"result": 0,
+"id": 268419363,
+"title": "CC 35",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 132,
+"result": 0,
+"id": 268419364,
+"title": "CC 36",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 133,
+"result": 0,
+"id": 268419365,
+"title": "CC 37",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 134,
+"result": 0,
+"id": 268419366,
+"title": "CC 38",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 135,
+"result": 0,
+"id": 268419367,
+"title": "CC 39",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 136,
+"result": 0,
+"id": 268419368,
+"title": "CC 40",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 137,
+"result": 0,
+"id": 268419369,
+"title": "CC 41",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 138,
+"result": 0,
+"id": 268419370,
+"title": "CC 42",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 139,
+"result": 0,
+"id": 268419371,
+"title": "CC 43",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 140,
+"result": 0,
+"id": 268419372,
+"title": "CC 44",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 141,
+"result": 0,
+"id": 268419373,
+"title": "CC 45",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 142,
+"result": 0,
+"id": 268419374,
+"title": "CC 46",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 143,
+"result": 0,
+"id": 268419375,
+"title": "CC 47",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 144,
+"result": 0,
+"id": 268419376,
+"title": "CC 48",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 145,
+"result": 0,
+"id": 268419377,
+"title": "CC 49",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 146,
+"result": 0,
+"id": 268419378,
+"title": "CC 50",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 147,
+"result": 0,
+"id": 268419379,
+"title": "CC 51",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 148,
+"result": 0,
+"id": 268419380,
+"title": "CC 52",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 149,
+"result": 0,
+"id": 268419381,
+"title": "CC 53",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 150,
+"result": 0,
+"id": 268419382,
+"title": "CC 54",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 151,
+"result": 0,
+"id": 268419383,
+"title": "CC 55",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 152,
+"result": 0,
+"id": 268419384,
+"title": "CC 56",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 153,
+"result": 0,
+"id": 268419385,
+"title": "CC 57",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 154,
+"result": 0,
+"id": 268419386,
+"title": "CC 58",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 155,
+"result": 0,
+"id": 268419387,
+"title": "CC 59",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 156,
+"result": 0,
+"id": 268419388,
+"title": "CC 60",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 157,
+"result": 0,
+"id": 268419389,
+"title": "CC 61",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 158,
+"result": 0,
+"id": 268419390,
+"title": "CC 62",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 159,
+"result": 0,
+"id": 268419391,
+"title": "CC 63",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 160,
+"result": 0,
+"id": 268419392,
+"title": "CC 64",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 161,
+"result": 0,
+"id": 268419393,
+"title": "CC 65",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 162,
+"result": 0,
+"id": 268419394,
+"title": "CC 66",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 163,
+"result": 0,
+"id": 268419395,
+"title": "CC 67",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 164,
+"result": 0,
+"id": 268419396,
+"title": "CC 68",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 165,
+"result": 0,
+"id": 268419397,
+"title": "CC 69",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 166,
+"result": 0,
+"id": 268419398,
+"title": "CC 70",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 167,
+"result": 0,
+"id": 268419399,
+"title": "CC 71",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 168,
+"result": 0,
+"id": 268419400,
+"title": "CC 72",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 169,
+"result": 0,
+"id": 268419401,
+"title": "CC 73",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 170,
+"result": 0,
+"id": 268419402,
+"title": "CC 74",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 171,
+"result": 0,
+"id": 268419403,
+"title": "CC 75",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 172,
+"result": 0,
+"id": 268419404,
+"title": "CC 76",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 173,
+"result": 0,
+"id": 268419405,
+"title": "CC 77",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 174,
+"result": 0,
+"id": 268419406,
+"title": "CC 78",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 175,
+"result": 0,
+"id": 268419407,
+"title": "CC 79",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 176,
+"result": 0,
+"id": 268419408,
+"title": "CC 80",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 177,
+"result": 0,
+"id": 268419409,
+"title": "CC 81",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 178,
+"result": 0,
+"id": 268419410,
+"title": "CC 82",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 179,
+"result": 0,
+"id": 268419411,
+"title": "CC 83",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 180,
+"result": 0,
+"id": 268419412,
+"title": "CC 84",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 181,
+"result": 0,
+"id": 268419413,
+"title": "CC 85",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 182,
+"result": 0,
+"id": 268419414,
+"title": "CC 86",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 183,
+"result": 0,
+"id": 268419415,
+"title": "CC 87",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 184,
+"result": 0,
+"id": 268419416,
+"title": "CC 88",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 185,
+"result": 0,
+"id": 268419417,
+"title": "CC 89",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 186,
+"result": 0,
+"id": 268419418,
+"title": "CC 90",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 187,
+"result": 0,
+"id": 268419419,
+"title": "CC 91",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 188,
+"result": 0,
+"id": 268419420,
+"title": "CC 92",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 189,
+"result": 0,
+"id": 268419421,
+"title": "CC 93",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 190,
+"result": 0,
+"id": 268419422,
+"title": "CC 94",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 191,
+"result": 0,
+"id": 268419423,
+"title": "CC 95",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 192,
+"result": 0,
+"id": 268419424,
+"title": "CC 96",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 193,
+"result": 0,
+"id": 268419425,
+"title": "CC 97",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 194,
+"result": 0,
+"id": 268419426,
+"title": "CC 98",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 195,
+"result": 0,
+"id": 268419427,
+"title": "CC 99",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 196,
+"result": 0,
+"id": 268419428,
+"title": "CC 100",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 197,
+"result": 0,
+"id": 268419429,
+"title": "CC 101",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 198,
+"result": 0,
+"id": 268419430,
+"title": "CC 102",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 199,
+"result": 0,
+"id": 268419431,
+"title": "CC 103",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 200,
+"result": 0,
+"id": 268419432,
+"title": "CC 104",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 201,
+"result": 0,
+"id": 268419433,
+"title": "CC 105",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 202,
+"result": 0,
+"id": 268419434,
+"title": "CC 106",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 203,
+"result": 0,
+"id": 268419435,
+"title": "CC 107",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 204,
+"result": 0,
+"id": 268419436,
+"title": "CC 108",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 205,
+"result": 0,
+"id": 268419437,
+"title": "CC 109",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 206,
+"result": 0,
+"id": 268419438,
+"title": "CC 110",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 207,
+"result": 0,
+"id": 268419439,
+"title": "CC 111",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 208,
+"result": 0,
+"id": 268419440,
+"title": "CC 112",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 209,
+"result": 0,
+"id": 268419441,
+"title": "CC 113",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 210,
+"result": 0,
+"id": 268419442,
+"title": "CC 114",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 211,
+"result": 0,
+"id": 268419443,
+"title": "CC 115",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 212,
+"result": 0,
+"id": 268419444,
+"title": "CC 116",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 213,
+"result": 0,
+"id": 268419445,
+"title": "CC 117",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 214,
+"result": 0,
+"id": 268419446,
+"title": "CC 118",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 215,
+"result": 0,
+"id": 268419447,
+"title": "CC 119",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 216,
+"result": 0,
+"id": 268419448,
+"title": "CC 120",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 217,
+"result": 0,
+"id": 268419449,
+"title": "CC 121",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 218,
+"result": 0,
+"id": 268419450,
+"title": "CC 122",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 219,
+"result": 0,
+"id": 268419451,
+"title": "CC 123",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 220,
+"result": 0,
+"id": 268419452,
+"title": "CC 124",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 221,
+"result": 0,
+"id": 268419453,
+"title": "CC 125",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 222,
+"result": 0,
+"id": 268419454,
+"title": "CC 126",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 223,
+"result": 0,
+"id": 268419455,
+"title": "CC 127",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.7874015748031497,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 224,
+"result": 0,
+"id": 268419456,
+"title": "After Touch",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.0,
+"unit": 2,
+"flags": 1
+},
+{
+"index": 225,
+"result": 0,
+"id": 268419457,
+"title": "Pitch Bend",
+"short": "",
+"units": "",
+"steps": 0,
+"default": 0.5000305194408838,
+"unit": 2,
+"flags": 1
+}
+],
+"midi_mapping": true,
+"cc": {
+"0:0": [
+0,
+268419328
+],
+"0:1": [
+0,
+268419329
+],
+"0:2": [
+0,
+268419330
+],
+"0:3": [
+0,
+268419331
+],
+"0:4": [
+0,
+268419332
+],
+"0:5": [
+0,
+268419333
+],
+"0:6": [
+0,
+268419334
+],
+"0:7": [
+0,
+268419335
+],
+"0:8": [
+0,
+268419336
+],
+"0:9": [
+0,
+268419337
+],
+"0:10": [
+0,
+268419338
+],
+"0:11": [
+0,
+268419339
+],
+"0:12": [
+0,
+268419340
+],
+"0:13": [
+0,
+268419341
+],
+"0:14": [
+0,
+268419342
+],
+"0:15": [
+0,
+268419343
+],
+"0:16": [
+0,
+268419344
+],
+"0:17": [
+0,
+268419345
+],
+"0:18": [
+0,
+268419346
+],
+"0:19": [
+0,
+268419347
+],
+"0:20": [
+0,
+268419348
+],
+"0:21": [
+0,
+268419349
+],
+"0:22": [
+0,
+268419350
+],
+"0:23": [
+0,
+268419351
+],
+"0:24": [
+0,
+268419352
+],
+"0:25": [
+0,
+268419353
+],
+"0:26": [
+0,
+268419354
+],
+"0:27": [
+0,
+268419355
+],
+"0:28": [
+0,
+268419356
+],
+"0:29": [
+0,
+268419357
+],
+"0:30": [
+0,
+268419358
+],
+"0:31": [
+0,
+268419359
+],
+"0:32": [
+0,
+268419360
+],
+"0:33": [
+0,
+268419361
+],
+"0:34": [
+0,
+268419362
+],
+"0:35": [
+0,
+268419363
+],
+"0:36": [
+0,
+268419364
+],
+"0:37": [
+0,
+268419365
+],
+"0:38": [
+0,
+268419366
+],
+"0:39": [
+0,
+268419367
+],
+"0:40": [
+0,
+268419368
+],
+"0:41": [
+0,
+268419369
+],
+"0:42": [
+0,
+268419370
+],
+"0:43": [
+0,
+268419371
+],
+"0:44": [
+0,
+268419372
+],
+"0:45": [
+0,
+268419373
+],
+"0:46": [
+0,
+268419374
+],
+"0:47": [
+0,
+268419375
+],
+"0:48": [
+0,
+268419376
+],
+"0:49": [
+0,
+268419377
+],
+"0:50": [
+0,
+268419378
+],
+"0:51": [
+0,
+268419379
+],
+"0:52": [
+0,
+268419380
+],
+"0:53": [
+0,
+268419381
+],
+"0:54": [
+0,
+268419382
+],
+"0:55": [
+0,
+268419383
+],
+"0:56": [
+0,
+268419384
+],
+"0:57": [
+0,
+268419385
+],
+"0:58": [
+0,
+268419386
+],
+"0:59": [
+0,
+268419387
+],
+"0:60": [
+0,
+268419388
+],
+"0:61": [
+0,
+268419389
+],
+"0:62": [
+0,
+268419390
+],
+"0:63": [
+0,
+268419391
+],
+"0:64": [
+0,
+268419392
+],
+"0:65": [
+0,
+268419393
+],
+"0:66": [
+0,
+268419394
+],
+"0:67": [
+0,
+268419395
+],
+"0:68": [
+0,
+268419396
+],
+"0:69": [
+0,
+268419397
+],
+"0:70": [
+0,
+268419398
+],
+"0:71": [
+0,
+268419399
+],
+"0:72": [
+0,
+268419400
+],
+"0:73": [
+0,
+268419401
+],
+"0:74": [
+0,
+268419402
+],
+"0:75": [
+0,
+268419403
+],
+"0:76": [
+0,
+268419404
+],
+"0:77": [
+0,
+268419405
+],
+"0:78": [
+0,
+268419406
+],
+"0:79": [
+0,
+268419407
+],
+"0:80": [
+0,
+268419408
+],
+"0:81": [
+0,
+268419409
+],
+"0:82": [
+0,
+268419410
+],
+"0:83": [
+0,
+268419411
+],
+"0:84": [
+0,
+268419412
+],
+"0:85": [
+0,
+268419413
+],
+"0:86": [
+0,
+268419414
+],
+"0:87": [
+0,
+268419415
+],
+"0:88": [
+0,
+268419416
+],
+"0:89": [
+0,
+268419417
+],
+"0:90": [
+0,
+268419418
+],
+"0:91": [
+0,
+268419419
+],
+"0:92": [
+0,
+268419420
+],
+"0:93": [
+0,
+268419421
+],
+"0:94": [
+0,
+268419422
+],
+"0:95": [
+0,
+268419423
+],
+"0:96": [
+0,
+268419424
+],
+"0:97": [
+0,
+268419425
+],
+"0:98": [
+0,
+268419426
+],
+"0:99": [
+0,
+268419427
+],
+"0:100": [
+0,
+268419428
+],
+"0:101": [
+0,
+268419429
+],
+"0:102": [
+0,
+268419430
+],
+"0:103": [
+0,
+268419431
+],
+"0:104": [
+0,
+268419432
+],
+"0:105": [
+0,
+268419433
+],
+"0:106": [
+0,
+268419434
+],
+"0:107": [
+0,
+268419435
+],
+"0:108": [
+0,
+268419436
+],
+"0:109": [
+0,
+268419437
+],
+"0:110": [
+0,
+268419438
+],
+"0:111": [
+0,
+268419439
+],
+"0:112": [
+0,
+268419440
+],
+"0:113": [
+0,
+268419441
+],
+"0:114": [
+0,
+268419442
+],
+"0:115": [
+0,
+268419443
+],
+"0:116": [
+0,
+268419444
+],
+"0:117": [
+0,
+268419445
+],
+"0:118": [
+0,
+268419446
+],
+"0:119": [
+0,
+268419447
+],
+"0:120": [
+0,
+268419448
+],
+"0:121": [
+0,
+268419449
+],
+"0:122": [
+0,
+268419450
+],
+"0:123": [
+0,
+268419451
+],
+"0:124": [
+0,
+268419452
+],
+"0:125": [
+0,
+268419453
+],
+"0:126": [
+0,
+268419454
+],
+"0:127": [
+0,
+268419455
+],
+"0:128": [
+0,
+268419456
+],
+"0:129": [
+0,
+268419457
+],
+"15:0": [
+0,
+268419328
+],
+"15:1": [
+0,
+268419329
+],
+"15:2": [
+0,
+268419330
+],
+"15:3": [
+0,
+268419331
+],
+"15:4": [
+0,
+268419332
+],
+"15:5": [
+0,
+268419333
+],
+"15:6": [
+0,
+268419334
+],
+"15:7": [
+0,
+268419335
+],
+"15:8": [
+0,
+268419336
+],
+"15:9": [
+0,
+268419337
+],
+"15:10": [
+0,
+268419338
+],
+"15:11": [
+0,
+268419339
+],
+"15:12": [
+0,
+268419340
+],
+"15:13": [
+0,
+268419341
+],
+"15:14": [
+0,
+268419342
+],
+"15:15": [
+0,
+268419343
+],
+"15:16": [
+0,
+268419344
+],
+"15:17": [
+0,
+268419345
+],
+"15:18": [
+0,
+268419346
+],
+"15:19": [
+0,
+268419347
+],
+"15:20": [
+0,
+268419348
+],
+"15:21": [
+0,
+268419349
+],
+"15:22": [
+0,
+268419350
+],
+"15:23": [
+0,
+268419351
+],
+"15:24": [
+0,
+268419352
+],
+"15:25": [
+0,
+268419353
+],
+"15:26": [
+0,
+268419354
+],
+"15:27": [
+0,
+268419355
+],
+"15:28": [
+0,
+268419356
+],
+"15:29": [
+0,
+268419357
+],
+"15:30": [
+0,
+268419358
+],
+"15:31": [
+0,
+268419359
+],
+"15:32": [
+0,
+268419360
+],
+"15:33": [
+0,
+268419361
+],
+"15:34": [
+0,
+268419362
+],
+"15:35": [
+0,
+268419363
+],
+"15:36": [
+0,
+268419364
+],
+"15:37": [
+0,
+268419365
+],
+"15:38": [
+0,
+268419366
+],
+"15:39": [
+0,
+268419367
+],
+"15:40": [
+0,
+268419368
+],
+"15:41": [
+0,
+268419369
+],
+"15:42": [
+0,
+268419370
+],
+"15:43": [
+0,
+268419371
+],
+"15:44": [
+0,
+268419372
+],
+"15:45": [
+0,
+268419373
+],
+"15:46": [
+0,
+268419374
+],
+"15:47": [
+0,
+268419375
+],
+"15:48": [
+0,
+268419376
+],
+"15:49": [
+0,
+268419377
+],
+"15:50": [
+0,
+268419378
+],
+"15:51": [
+0,
+268419379
+],
+"15:52": [
+0,
+268419380
+],
+"15:53": [
+0,
+268419381
+],
+"15:54": [
+0,
+268419382
+],
+"15:55": [
+0,
+268419383
+],
+"15:56": [
+0,
+268419384
+],
+"15:57": [
+0,
+268419385
+],
+"15:58": [
+0,
+268419386
+],
+"15:59": [
+0,
+268419387
+],
+"15:60": [
+0,
+268419388
+],
+"15:61": [
+0,
+268419389
+],
+"15:62": [
+0,
+268419390
+],
+"15:63": [
+0,
+268419391
+],
+"15:64": [
+0,
+268419392
+],
+"15:65": [
+0,
+268419393
+],
+"15:66": [
+0,
+268419394
+],
+"15:67": [
+0,
+268419395
+],
+"15:68": [
+0,
+268419396
+],
+"15:69": [
+0,
+268419397
+],
+"15:70": [
+0,
+268419398
+],
+"15:71": [
+0,
+268419399
+],
+"15:72": [
+0,
+268419400
+],
+"15:73": [
+0,
+268419401
+],
+"15:74": [
+0,
+268419402
+],
+"15:75": [
+0,
+268419403
+],
+"15:76": [
+0,
+268419404
+],
+"15:77": [
+0,
+268419405
+],
+"15:78": [
+0,
+268419406
+],
+"15:79": [
+0,
+268419407
+],
+"15:80": [
+0,
+268419408
+],
+"15:81": [
+0,
+268419409
+],
+"15:82": [
+0,
+268419410
+],
+"15:83": [
+0,
+268419411
+],
+"15:84": [
+0,
+268419412
+],
+"15:85": [
+0,
+268419413
+],
+"15:86": [
+0,
+268419414
+],
+"15:87": [
+0,
+268419415
+],
+"15:88": [
+0,
+268419416
+],
+"15:89": [
+0,
+268419417
+],
+"15:90": [
+0,
+268419418
+],
+"15:91": [
+0,
+268419419
+],
+"15:92": [
+0,
+268419420
+],
+"15:93": [
+0,
+268419421
+],
+"15:94": [
+0,
+268419422
+],
+"15:95": [
+0,
+268419423
+],
+"15:96": [
+0,
+268419424
+],
+"15:97": [
+0,
+268419425
+],
+"15:98": [
+0,
+268419426
+],
+"15:99": [
+0,
+268419427
+],
+"15:100": [
+0,
+268419428
+],
+"15:101": [
+0,
+268419429
+],
+"15:102": [
+0,
+268419430
+],
+"15:103": [
+0,
+268419431
+],
+"15:104": [
+0,
+268419432
+],
+"15:105": [
+0,
+268419433
+],
+"15:106": [
+0,
+268419434
+],
+"15:107": [
+0,
+268419435
+],
+"15:108": [
+0,
+268419436
+],
+"15:109": [
+0,
+268419437
+],
+"15:110": [
+0,
+268419438
+],
+"15:111": [
+0,
+268419439
+],
+"15:112": [
+0,
+268419440
+],
+"15:113": [
+0,
+268419441
+],
+"15:114": [
+0,
+268419442
+],
+"15:115": [
+0,
+268419443
+],
+"15:116": [
+0,
+268419444
+],
+"15:117": [
+0,
+268419445
+],
+"15:118": [
+0,
+268419446
+],
+"15:119": [
+0,
+268419447
+],
+"15:120": [
+0,
+268419448
+],
+"15:121": [
+0,
+268419449
+],
+"15:122": [
+0,
+268419450
+],
+"15:123": [
+0,
+268419451
+],
+"15:124": [
+0,
+268419452
+],
+"15:125": [
+0,
+268419453
+],
+"15:126": [
+0,
+268419454
+],
+"15:127": [
+0,
+268419455
+],
+"15:128": [
+0,
+268419456
+],
+"15:129": [
+0,
+268419457
+]
+}
+}

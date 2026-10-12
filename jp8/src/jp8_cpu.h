@@ -50,14 +50,21 @@ extern uint32_t jp8_blo[JP8_NBANDS], jp8_bhi[JP8_NBANDS];  /* mapped band offset
 extern void jp8_fault(uint64_t a, unsigned n);   /* longjmps to the caller of jp8_call (gate RED); never returns */
 extern uint32_t jp8_badacc;                      /* CHECK=2: sticky "an access missed every region", tested after each call */
 extern unsigned char jp8_sink[64];               /* CHECK=2: where such an access lands instead */
+/* an access may run past its band's top into the next band when one region spans both at one offset (JP8_FLAT's
+ * multi-band regions: a heap block across 0x320000000): its band mapped to the top, the next from 0, the same delta */
+static inline uint32_t jp8_cont(uint32_t k, uint32_t off, unsigned n) {
+    uint32_t k1 = (k + 1u) & (JP8_NBANDS - 1u);
+    return (uint32_t)(jp8_bhi[k] == 0x10000000u) & (uint32_t)(jp8_blo[k1] == 0u) & (uint32_t)(jp8_bdelta[k1] == jp8_bdelta[k]) &
+           (uint32_t)(off + n - 0x10000000u <= jp8_bhi[k1]);
+}
 static inline void *jp8_h(uint64_t a, unsigned n) {
     uint64_t i = a >> 28; uint32_t k = (uint32_t)(i & (JP8_NBANDS - 1));
 #if JP8_RELOC_CHECK == 1                         /* gates: trap at the access (branchy: ~3.7x slower, measured) */
     uint32_t off = (uint32_t)(a & 0x0FFFFFFFu);
-    if (i >= JP8_NBANDS || off < jp8_blo[k] || off + n > jp8_bhi[k]) jp8_fault(a, n);
+    if (i >= JP8_NBANDS || off < jp8_blo[k] || (off + n > jp8_bhi[k] && !jp8_cont(k, off, n))) jp8_fault(a, n);
 #elif JP8_RELOC_CHECK == 2                       /* ship: branchless, the bad access is diverted and reported after the call */
     uint32_t off = (uint32_t)(a & 0x0FFFFFFFu);
-    uint32_t bad = (uint32_t)(i >= JP8_NBANDS) | (uint32_t)(off < jp8_blo[k]) | (uint32_t)(off + n > jp8_bhi[k]);
+    uint32_t bad = (uint32_t)(i >= JP8_NBANDS) | (uint32_t)(off < jp8_blo[k]) | ((uint32_t)(off + n > jp8_bhi[k]) & (jp8_cont(k, off, n) ^ 1u));
     jp8_badacc |= bad;
     return bad ? (void *)jp8_sink : (void *)((uintptr_t)a + jp8_bdelta[k]);
 #endif

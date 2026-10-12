@@ -1,7 +1,7 @@
 # JUPITER-8 — THE HOST LAYER (the plugin as a DAW runs it)
 
-Status 2026-10-12: the oracle boots and plays the plugin through its own process() (EXECUTED); nothing of the host
-layer is in the C engine yet (jp8/src/jp8_engine.c drives the units directly, the drive2 path). Labels: READ = static
+Status 2026-10-12: the oracle boots and plays the plugin through its own process() (EXECUTED), and the C side runs
+the plugin's own host entries, lifted, bit-exact against it: jp8_host_gate.sh GREEN on 4 patches, 6 teeth (section 5). Labels: READ = static
 reading of the JUPITER-8 image, EXECUTED = run under Unicorn, INFERRED = neither.
 
 ## 1. The wrapper is the Roland Cloud framework (READ)
@@ -83,10 +83,82 @@ the JUPITER-8 booted at 48000 / 4096: every answer is the JUNO-60's (docs/HOST_C
 | setIoMode, setProcessing, getRoutingInfo | kNotImplemented (0x80004001); setProcessing changes nothing |
 | activateBus(.., 1) | kResultOk; the core's first 1 KB or a unit's first 512 bytes change (on the JUNO: the bus flags, which its render never reads -- bus_audio_census.py; not yet asked here) |
 
-## 5. Next
+## 5. The C side (EXECUTED 2026-10-12): the host path, lifted
 
-1. The patch path: the plugin's own patch load (the patch browser) or the DAW state (setState), located and driven.
-2. The C side: the lift rooted at the VST3 entries (process, setupProcessing, setActive, getState, setState) with
-   the template = the oracle's memory after start(), the thread transport as two hooks in the lifted code (the jobs
-   at 0x4460E7, the park at 0x4456F0), and the host objects (event list, parameter changes, process context, bus
-   buffers) as C plumbing. Gate: process() blocks, plugin vs port, every output word.
+jp8/src/jp8_host.c + jp8h.h run the plugin's own VST3 entries -- setupProcessing 0x449EE0, setActive 0x36C600,
+process() 0x36BF30, getState 0x36BA50, setState 0x36C650 -- its patch load 0x355F90 and its engine workers 0x445670,
+all LIFTED (jp8_lift.py --hostcalls --hook --alloc-tailcall: jp8/src/jp8_host_lift.c, ~970 functions, ~130,000
+instructions; the roots are read from the plugin's own vtables by the reach), on the JP8H v2 template: the oracle's
+memory after boot_host (DllMain, the factory, the component and controller initialized and connected, the handler,
+setComponentState) -- the point a DAW reaches BEFORE it knows its sample rate. jp8h_init(template, rate, max block)
+then makes the host's own setup calls (setupProcessing, setActive(1)) through the lifted code and creates the blocks'
+host objects in the oracle's order (one bump allocator: the same guest addresses). Plumbing only: the host objects
+(IEventList, IParameterChanges, IParamValueQueue, IComponentHandler, IBStream) and the imports the path reaches
+(HeapFree, GetCurrentThreadId, the SRW locks) answer as the oracle's; the thread transport is two hooks (the jobs at
+0x4460E7, a worker's park at 0x4456F0). An unlifted path, an unknown host call or an unshimmed import TRAPS (named).
+
+The gate (jp8_host_gate.sh; drive jp8_host_seq.steps, v4): per patch the patch load and 8 process() blocks (a note,
+ten keys on eight voices, their release, host automation of two of the plugin's own parameters (from the controller
+census), MASTER TUNE and an id the plugin does not have, a host clock, block sizes 480 / 32) and getState; then the
+MIDI controllers through process() (IMidiMapping's ids: the mod wheel, expression, the sustain pedal held across a
+key's release, aftertouch, bend down / up / back, all notes off under held keys, CC 7, a panel parameter swept); the
+JUNO-60's host-rate chain (48000 -> 44100 -> 96000 -> 88200 -> 22050 (no converter: silence, no worker job) -> 48000,
+a key held across each change); setActive off / on; the UI timer's drain (the core's vtable slot 1, rva 0x33A290)
+and MIDI learn as the GUI's CC menu makes it (Learn rva 0x326660, Forget 0x324F00 on core + 24, the record index
+from the plugin's own lookup 0x325870 -- the JUNO-60's functions, byte-equal; CC 3 learned to a panel parameter,
+drained, moved, forgotten, a learn of an id with no record); then the EDIT CONTROLLER as a DAW asks it (IEditController
+slots 10-15: getParamNormalized, setParamNormalized at 0, 0.75, 1, 1.5 and -0.1, getParamStringByValue,
+normalizedParamToPlain, plainParamToNormalized, getParamValueByString of "64" and "xyz") on four panel parameters,
+MASTER TUNE, a MIDI-mapped id and an id the plugin does not have -- 150 calls, each graded by its answer, its double
+(xmm0) and the bytes it wrote (the display string, the parsed value); then sixteen setState inputs, each followed by a note
+and getState: a CC assigned to a panel parameter, a CC assigned to an id the plugin does not have (it corrects it),
+every value at the int32 maximum and at -5 (it clamps 86 of them), a state cut after 20 entries, a count of 0 and
+an empty stream (kResultFalse), the engine-rate setting (the state's 0x0FFFC015) at 1..5 and 6 (no converter:
+silence), the voice count (0x0FFFC00E) at 4 and 1 (9 makes the plugin throw: a real host never sends it), and the
+first patch's state as written. Graded: every step's result, every output word, every state byte, every performEdit
+(id and value bits), the worker jobs, the bump pointer, the host-object allocator and the memory after (the image,
+the heap, the host objects). The imports the crafted states and settings reach answer as the oracle does: GetFocus /
+SetFocus 0 (the editor's focus, rva 0x31bd8b), RaiseException 0 for an exception the plugin handles itself, a C++
+throw (0xE06D7363) traps, named; the controller's Enter / LeaveCriticalSection 1.
+THE REACH (playbook 237): the lift is the closure of the 64-patch reach UNITED with the reach of the gate's own drive
+-- the v3 gate (job jp8_host_gate3b) ran 85 steps EXACTLY 0 on the 64-patch reach alone, then a crafted state's next
+block called an indirect target the long drive never had. The checked build's band check learned regions that span
+256 MB bands at one offset (jp8_cpu.h jp8_cont, jp8_rt.c jp8_span_ok): with four patches the heap crosses
+0x320000000.
+THE GATE (job jp8_host_gate5, jp8/logs/host_gate_48000.log), patches 2, 63, 0, 12 on the united reach: 305 steps,
+97,280 output words, 44,988 state bytes, 1,652 performEdits, 1,687 worker jobs and the memory after EXACTLY 0 in the
+CHECKED and the PRODUCT build; the lift: 1,218 functions, 165,514 instructions (jp8/src/jp8_host_lift.c, generated
+by the gate); teeth T1 74,668 differences, T2 a trap (the render then waits for a worker: CreateSemaphoreA), T3
+CONTROL 1, T4 27,643, T5 a trap (a changed state's path is not in the lift), T6 9,207.
+Development runs (a reach of the drive itself): patch 2 -- 125 steps, 73,728 words, 37,164 state bytes, 1,364
+performEdits; patches 2, 63, 0, 12 -- 155 steps, 95,232 words, 43,032 state bytes, 1,652 performEdits, 1,663
+worker jobs, end EXACT, in the CHECKED and the PRODUCT build; teeth T1 (one addss of the lift turned subss) T2 (a
+worker job skipped) T3 (one template byte) T4 (the setActive after a new rate dropped) T5 (every state value read one
+off) T6 (the UI timer never drains) each FAIL. The lifter learned pcmpeqb / pcmpeqw on the way (strnlen's SSE2 scan,
+reached by setState at 0x776499).
+
+SPEED (the product build, 48000 host, the 96 kHz engine, four keys held, this shared Xeon with three other jobs):
+950 ms per second of audio (init 176 ms, a patch load 4 ms) -- inside real time with no margin; the plugin's own
+code natively is about 2.3x faster (188 ms per second at 44.1 kHz, the full-chain measurement, scaled to 96 kHz).
+Where the time goes (callgrind, 30 blocks, four keys): 67 % in the eight voice-unit render functions (one copy per
+unit: f_395000, f_39ed80, f_3a8a40, f_3b2700, f_3bc3c0, f_3c6080, f_3cfd40, f_3d9a00, 8.4 % each) -- about 7,600 host
+instructions per voice per engine sample against the plugin's own 3,632; VOICE_WRAP 3.5 %, the CRT's math 6 %. The
+arithmetic is the hardware's (MXCSR set); the extra cost is the guest memory and stack traffic (every inlined call
+still writes its return address to the guest stack) and the flag bookkeeping -- the fast pass's next targets. The
+hottest function compiled (-O2): 52,813 host instructions, 15,522 of them (29 %) on the host's own stack frame --
+spills: the sixteen guest registers and the temporaries do not fit the host's sixteen. The biggest lever left is
+the plugin's own: it renders its eight voices on eight threads; the runtime runs those jobs one after another. A job
+never allocates (a counted drive, patch 2: 0 of 50,504 allocations inside a job), so the jobs are independent and
+could run in parallel; what stands in the way is the jobs' bookkeeping -- the done count and the lock words are
+read-modify-write instructions that would then have to be atomic, which ISO C99 cannot say (a platform layer can).
+
+Scope NOT covered yet (owed): the controller's parameter info (getParameterCount / getParameterInfo -- census
+only: jp8_controller_census.py -> jp8/gen/jp8_controller.json); other first setup rates
+(44100, 96000: jp8_reach_merge.py takes their reaches); the editor (and the drawn panel: the script file truth/
+lacks).
+
+## 6. Next
+
+1. Other first rates: JP8_HOST_RATES="48000 44100 96000" (one lift, the oracle and both builds at each).
+2. The controller's parameter info in the C API (from the census data or the lifted calls); the editor.
+3. The speed: the lifted path must gain margin before it is a product (the fast lifter's next steps, S3_STATUS).

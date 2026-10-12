@@ -61,7 +61,7 @@ PROFILE = dict(
     USER_DIR='C:\\Users\\u\\AppData\\Local\\Roland Cloud\\JUPITER-8',
     MODPATH='C:\\Program Files\\Common Files\\VST3\\JUPITER-8.vst3\\Contents\\x86_64-win\\JUPITER-8.vst3',
     INITIALIZE=None,                  # the component vtable's slot 3
-    PATCH_LOAD=0,                     # the patch browser's load: NOT YET LOCATED (load_patch unusable)
+    PATCH_LOAD=0x355F90,              # the patch browser's load (the JUNO 0x335850's first 20 instructions, normalized)
     ENGINE_RENDER=JOBS_DUE,           # where the render service stops (see the docstring)
     ZOOM_GET=0, WINDOW_FIT=0,         # the editor: not used by this oracle yet
 )
@@ -160,17 +160,53 @@ class JP8Host(H.HostProcess):
         finally:
             self._nested_top = None
 
-    def start(self, host_sr, max_block=H.MAXBLOCK, setting=None, state=None, log=lambda s: None):
-        """the JUNO oracle's start (boot as a host does, setupProcessing, setActive), then the JUPITER-8's HOST layout:
-        unit u's state / processor / assigner at HOST + 0xA0 / 0xB0 / 0xB8 + 64 u (READ, jp8_emu.JX.build) -- the
-        JUNO's +80 / +96 / +104 do not apply here"""
-        super().start(host_sr, max_block, setting=setting, state=state, log=log)
+    def setup(self, host_sr, max_block=H.MAXBLOCK, setting=None, state=None):
+        """the JUNO oracle's setup (start() after boot_host: setupProcessing, setActive, the host objects), then the
+        JUPITER-8's HOST layout: unit u's state / processor / assigner at HOST + 0xA0 / 0xB0 / 0xB8 + 64 u (READ,
+        jp8_emu.JX.build) -- the JUNO's +80 / +96 / +104 do not apply here"""
+        super().setup(host_sr, max_block, setting=setting, state=state)
         q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
         self.state = [q(self.HOST + 0xA0 + 64 * i) for i in range(9)]
         self.proc = [q(self.HOST + 0xB0 + 64 * i) for i in range(9)]
         self.assign = [q(self.HOST + 0xB8 + 64 * i) for i in range(9)]
         self.noteobj = None
         return self
+
+    # ------------------------------------------------------------ the UI timer and MIDI learn
+    # the core's CC records (core + 24 .. core + 32, 24 bytes each) and their functions -- the JUNO-60's, byte-equal
+    # (jx3p/tools/fw_map.py: JUNO 0x319C50 / 0x31AA40 / 0x3192E0 -> 0x325870 / 0x326660 / 0x324F00); the drain is
+    # the core's vtable slot 1 (EXECUTED: rva 0x33A290; the JUNO-60's 0x320120 has other bytes)
+    CC_INDEX, CC_LEARN, CC_FORGET = 0x325870, 0x326660, 0x324F00
+
+    def ui_drain(self):
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        return self.call(q(q(self.core) + 8), rcx=self.core, count=2_000_000_000)
+
+    def cc_index_table(self):
+        """{parameter id: record index}, from the plugin's own lookup over every record, in index order"""
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        n = (q(self.core + 32) - q(self.core + 24)) // 24
+        self.cc_index = {self.call(IB + self.CC_INDEX, rcx=self.core + 24, rdx=i) & 0xFFFFFFFF: i for i in range(n)}
+        return self.cc_index
+
+    def cc_learn(self, pid):
+        return self.call(IB + self.CC_LEARN, rcx=self.core + 24, rdx=self.cc_index.get(pid, 0xFFFFFFFF))
+
+    def cc_forget(self, pid):
+        if pid in self.cc_index:
+            self.call(IB + self.CC_FORGET, rcx=self.core + 24, rdx=self.cc_index[pid])
+
+    # ------------------------------------------------------------ the edit controller's own calls
+    # IEditController slots (VST3): 10 getParamStringByValue(id, value, String128), 11 getParamValueByString(id,
+    # TChar*, ParamValue&), 12 normalizedParamToPlain(id, value), 13 plainParamToNormalized(id, plain), 14
+    # getParamNormalized(id), 15 setParamNormalized(id, value); a ParamValue argument is the third: xmm2 (its upper
+    # half 0, both sides), a ParamValue result is xmm0
+    def ctl(self, slot, pid, value=0.0, r8=0, r9=0):
+        from unicorn.x86_const import UC_X86_REG_XMM0, UC_X86_REG_XMM2
+        q = lambda a: struct.unpack('<Q', self.uc.mem_read(a, 8))[0]
+        self.uc.reg_write(UC_X86_REG_XMM2, struct.unpack('<Q', struct.pack('<d', value))[0])
+        r = self.call(q(q(self.ctrl) + 8 * slot), rcx=self.ctrl, rdx=pid, r8=r8, r9=r9, count=2_000_000_000)
+        return r & 0xFFFFFFFF, self.uc.reg_read(UC_X86_REG_XMM0) & 0xFFFFFFFFFFFFFFFF
 
     def call(self, fn, rcx=0, rdx=0, r8=0, r9=0, count=0):
         uc = self.uc

@@ -97,6 +97,23 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    process() (the 96 kHz engine, the rate converter, the threaded engine render with the JX's worker transport): a note
    sounds and decays, no NaN. The framework is the JUNO's (fw_map: 13 of 24 functions byte-equal). OWED: the script
    file with 8 panel types truth/ lacks (stubbed: GUI only), the patch path, then the lift of the host layer.
+3c. 2026-10-12: THE HOST PATH, LIFTED (jp8/docs/HOST_LAYER.md sections 4-6): jp8/src/jp8_host.c + jp8h.h run the
+   plugin's own setupProcessing, setActive, process(), getState, setState, patch load, UI-timer drain, MIDI learn /
+   forget and engine workers, lifted (jp8_lift.py --hostcalls --hook --alloc-tailcall; the roots read from the
+   plugin's vtables by the reach; the lift from the 64-patch reach UNITED with the reach of the gate's own drive,
+   playbook 237), on the JP8H v2 template = the oracle's memory after boot_host, BEFORE the host knows its sample
+   rate (playbook 235): jp8h_init makes the setup calls at the rate it is given. Drive v4 (jp8_host_seq.py): 8 blocks
+   per patch with host automation, the MIDI controllers, the host-rate chain 44100 / 96000 / 88200 / 22050 / back,
+   setActive off-on, the drain and MIDI learn, sixteen setState inputs (crafted, the engine-rate setting 1..6, the
+   voice count 4 / 1), 150 edit-controller calls (v5). The VST3 surface census
+   and the controller census (226 parameters: 96 panel + CC 0..127, aftertouch, bend; IMidiMapping CC n ->
+   0x0FFFC100 + n) are the JUNO-60's answers (jp8_surface_census.py, jp8_controller_census.py -> jp8/gen/
+   jp8_controller.json). Speed: 950 ms per second of audio at 48000 (the 96 kHz engine), the plugin ~2.3x faster.
+   GATE GREEN (job jp8_host_gate5, logs/host_gate_48000.log): drive v5 (+150 edit-controller calls) on patches 2, 63,
+   0, 12 -- 305 steps, 97,280 words, 44,988 state bytes, 1,652 performEdits, 1,687 worker jobs, the memory after,
+   EXACTLY 0 in the CHECKED and the PRODUCT build; 6 teeth fail (T1 74,668 differences, T2 a trap, T3 CONTROL 1, T4
+   27,643, T5 a trap, T6 9,207). OWED: other first rates (JP8_HOST_RATES="48000 44100 96000"); the controller's
+   parameter info in the C API; the editor; the speed.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

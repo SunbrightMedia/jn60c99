@@ -513,6 +513,10 @@ class Lifter:
             n = op[1].imm
             if m == "psrldq": return "{ t0=c->x[%d]; memset(&c->x[%d],0,16); if(%d<16) memcpy(c->x[%d].b,t0.b+%d,16-%d); }" % (d, d, n, d, n, n)
             return "{ t0=c->x[%d]; memset(&c->x[%d],0,16); if(%d<16) memcpy(c->x[%d].b+%d,t0.b,16-%d); }" % (d, d, n, d, n, n)
+        if m in ("pcmpeqb", "pcmpeqw"):         # byte / word lanes all ones where equal (strnlen's SSE2 scan, 0x776499)
+            d = reg(ins, op[0].reg)[0]; s = xsrc(ins, op[1], "X")
+            if m == "pcmpeqb": return "t1=%s; " % s + " ".join("c->x[%d].b[%d]=(uint8_t)((c->x[%d].b[%d]==t1.b[%d])?0xFFu:0u);" % (d, l, d, l, l) for l in range(16))
+            return "t1=%s; " % s + " ".join("c->x[%d].w[%d]=(uint16_t)((c->x[%d].w[%d]==t1.w[%d])?0xFFFFu:0u);" % (d, l, d, l, l) for l in range(8))
         if m == "pmovmskb":
             s = reg(ins, op[1].reg)[0]; return wr_int(ins, op[0], "(" + "|".join("((XU(%d,%d)>>%d&1)<<%d)" % (s, b // 4, (b % 4) * 8 + 7, b) for b in range(16)) + ")", 32)
         # ---- MXCSR
