@@ -10,7 +10,9 @@ setActive, setState. The lifter (jp8_lift.py --dyn) takes the indirect map; "roo
 answer. Plumbing only (jp8_dynreach.py's method: a block hook, the translation cache flushed first, PORT_LESSONS 8).
 After every patch the reach so far is written to <out.json>.partial (playbook 142); JP8_REACH_RESUME=1 takes it and
 runs only the patches it does not hold (a fresh boot and its own setup first: the union of two drives, recorded in
-"resumed_at").
+"resumed_at"). JP8_REACH_STEPS=a-b records only the drive's steps a..b (1-based, the setup is step 1): the steps
+before run unhooked (the same state, fast), the ones after are not run -- a long drive's reach in pieces that run at
+once, united later (jp8_reach_merge.py); recorded in "steps".
 usage: jp8_host_dynreach.py <out.json> [patches e.g. 0-63] [rate=48000]"""
 import sys, os, json, collections, time, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,10 +68,11 @@ def roots_of():
                 ctl_count=slot(h.ctrl, 8), ctl_info=slot(h.ctrl, 9), midi_assign=slot(h.mm, 3), unit_count=slot(h.ui, 3),
                 unit_info=slot(h.ui, 4), unit_lists=slot(h.ui, 5), unit_selected=slot(h.ui, 11), unit_select=slot(h.ui, 12),
                 **{'ctl%d' % k: slot(h.ctrl, k) for k in range(10, 16)})
-done = []; resumed = []
+done = []; resumed = []; STEPS = None
 def dump(path):
     tmp = path + '.tmp'
     json.dump(dict(drive='host steps (jp8_host_seq)', rate=Q.RATE, rates=Q.RATES, patches=done, resumed_at=resumed, roots=roots,
+                   steps=STEPS, sweep=Q.SWEEP,
                    executed=sorted('%x' % a for a in executed),
                    indirect={'%x' % s: sorted('%x' % t for t in ts) for s, ts in indirect.items()},
                    stubs=dict(stubs)), open(tmp, 'w'))
@@ -84,17 +87,26 @@ if os.environ.get('JP8_REACH_RESUME') and os.path.exists(out + '.partial'):
     log('resumed: %d patches from %s.partial' % (len(done), out))
 todo = [p for p in patches if p not in done]
 if not todo: raise SystemExit('nothing to do: every patch is in %s.partial (rename it to %s)' % (out, out))
-uc.ctl_flush_tb(); hk = uc.hook_add(UC_HOOK_BLOCK, block)
 bank = B.bank_bytes(); states = {}; cstates = {}
 blob = lambda p: B.patch_blob(bank, p)
 ST = Q.steps(todo)
+RANGE = os.environ.get('JP8_REACH_STEPS')
+lo, hi = (int(x) for x in RANGE.split('-')) if RANGE else (1, len(ST))
+assert 1 <= lo <= hi <= len(ST), 'JP8_REACH_STEPS outside the drive (%d steps)' % len(ST)
+hk = None
+def hook_on():
+    global hk
+    uc.ctl_flush_tb(); hk = uc.hook_add(UC_HOOK_BLOCK, block)   # every block translated from here on is hooked
+if lo == 1: hook_on()
 h.host_setup(ST[0][1], Q.MAXBLOCK, Q.NPQ)          # jp8h_init's setup (the C side's), the controller's interfaces
 roots = roots_of()
 log('roots (the plugin\'s vtables): %s' % ', '.join('%s 0x%x' % kv for kv in roots.items()))
 if old is not None and old['roots'] != roots:
     raise SystemExit('the partial reach has other roots: another drive')
 n0 = len(executed); cur = None
-for st in ST[1:]:
+for i, st in enumerate(ST[1:hi], start=2):
+    if i == lo and hk is None:
+        hook_on(); log('the hook on from step %d (%s)' % (i, st[0]))
     k = st[0]
     if k == 'patch':
         cur = st[1]
@@ -106,6 +118,7 @@ for st in ST[1:]:
 log('the steps after the patches (controllers, rates, setActive, states): executed %d (+%d), %d indirect sites, %d stub names' % (
     len(executed), len(executed) - n0, len(indirect), len(stubs)))
 uc.hook_del(hk); uc.ctl_flush_tb()
+STEPS = [lo, hi]
 dump(out)
 if os.path.exists(out + '.partial'): os.remove(out + '.partial')
 log('stubs reached: %s' % ', '.join('%s x%d' % kv for kv in stubs.most_common()))

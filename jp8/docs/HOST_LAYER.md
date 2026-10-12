@@ -181,7 +181,10 @@ V6 (2026-10-12): WHAT A DAW ASKS THE CONTROLLER, AND A HOST THAT DOES NOT LEAK.
   (non-volatile + lanes); the voice render 5,010 host instructions per voice per engine sample (1.38x the
   plugin's 3,632). What remains: the calls (the caller stores every register the callee may read or write and
   reloads the ones it may write -- a math-library callee saves and restores xmm6-15, so they all move; ~15 % with
-  the function entries and returns) and the comiss / ucomiss flag work (~6 %).
+  the function entries and returns) and the comiss / ucomiss flag work (~6 %). MEASURED the same day, no gain
+  (callgrind, instructions executed): an inlining bound of 160 statements +4.4 %; a liveness pass that cuts the
+  entry loads and the reloads after a call to the live registers -0.07 % (GCC drops a dead load itself; the 41 %
+  fewer load statements were never executed). Reverted; what GCC cannot remove is a store to the CPU struct.
 
 SPEED (the product build, 48000 host, the 96 kHz engine, four keys held, this shared Xeon with three other jobs):
 950 ms per second of audio (init 176 ms, a patch load 4 ms) -- inside real time with no margin; the plugin's own

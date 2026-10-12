@@ -6,9 +6,10 @@
 # sample rate, against the host oracle itself (jp8_host_seq.py drive, jp8_host_ref.py oracle + template,
 # jp8_host_c.py C side; two processes).
 #   0. the host path's dynamic reach over the 64 factory patches and the drive's other steps
-#      (jp8/gen/jp8_hostreach_<rate>.json; jp8_host_dynreach.py regenerates it, ~45 min), united with the reach of
-#      THIS gate's drive (its patches, ~8 min; jp8_reach_merge.py); "roots" are the entries the drive called, read
-#      from the plugin's own vtables
+#      (jp8/gen/jp8_hostreach_<rate>.json; jp8_host_dynreach.py regenerates it, ~45 min), the reach of the sweep
+#      (jp8/gen/jp8_hostreach_sweep_48000.json, ~90 min), united with the reach of THIS gate's drive without the sweep
+#      (its patches, ~8 min; jp8_reach_merge.py); "roots" are the entries the drive called, read from the plugin's
+#      own vtables
 #   1. lift: those roots, every indirect call target of the reach; --alloc-tailcall (a jmp to operator new is a tail
 #      call, never a body to follow: playbook 234); --hostcalls (every stub call answered by jp8_host.c), --hook
 #      0x4460E7 (the jobs), 0x4456F0 (a worker's park) and 0x44580A (a job's render done); build CHECKED (the plain
@@ -39,19 +40,25 @@ export JP8_HOST_RATE="$RATE"
 # own drive, reached at each of its rates below, holds what does)
 REACH="${JP8_HOST_REACH:-$REPO/jp8/gen/jp8_hostreach_48000.json}"; REF="$OUT/ref_${RATE%.*}"; SRC="$REPO/jp8/src/jp8_host_lift.c"
 TOOTH=0x38633e
+SWEEP_PATCH=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); import jp8_host_seq as Q; print(Q.SWEEP_PATCH)")
 BASE="-std=c99 -pedantic-errors -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL -I$REPO/jp8/src"
 CHK="$BASE -O1 -DJP8_RELOC_CHECK=2"; PRD="$BASE -O2 -DJP8_RELOC_CHECK=0 -DJP8_MQ="
 echo "=== 0. the reach: the 64 patches, and this gate's own drive at each first rate ($RATES) ==="
-[ -f "$REACH" ] || python3 "$HERE/jp8_host_dynreach.py" "$REACH" 0-63 48000
+[ -f "$REACH" ] || JP8_HOST_SWEEP=0 python3 "$HERE/jp8_host_dynreach.py" "$REACH" 0-63 48000
+# the sweep's reach (v7: every panel parameter's positions, the effects, the arpeggiator, the assign modes; ~90 min)
+SREACH="${JP8_HOST_SREACH:-$REPO/jp8/gen/jp8_hostreach_sweep_48000.json}"
+[ -f "$SREACH" ] || python3 "$HERE/jp8_host_dynreach.py" "$SREACH" "$SWEEP_PATCH" 48000
 # the drive after 64 patches is not the drive after these four: a crafted state's next block can call what the long
 # drive never did (job jp8_host_gate3b: an indirect target at step 85) -- the lift holds both (jp8_reach_merge.py)
 GREACHES=""; LREACH="$OUT/hostreach_lift.json"
 for R in $RATES; do
     GREACH="$OUT/hostreach_gate_${R%.*}.json"; GREACHES="$GREACHES $GREACH"
-    python3 "$HERE/jp8_host_dynreach.py" "$GREACH" "${JP8_HOST_PATCHES:-2,63,0,12}" "$R" > "$OUT/hostreach_gate_${R%.*}.log" 2>&1   # set -e: a failure stops here
+    # the sweep (v7) is in the broad reach: it plays SWEEP_PATCH whatever the patches, and the engine it drives runs at
+    # its own rate whatever the first rate (code it misses is a trap on the C side: the gate goes red, never silent)
+    JP8_HOST_SWEEP=0 python3 "$HERE/jp8_host_dynreach.py" "$GREACH" "${JP8_HOST_PATCHES:-2,63,0,12}" "$R" > "$OUT/hostreach_gate_${R%.*}.log" 2>&1   # set -e: a failure stops here
     tail -1 "$OUT/hostreach_gate_${R%.*}.log"
 done
-python3 "$HERE/jp8_reach_merge.py" "$LREACH" "$REACH" $GREACHES
+python3 "$HERE/jp8_reach_merge.py" "$LREACH" "$REACH" "$SREACH" $GREACHES
 ROOTS=$(python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['roots']; print(','.join('0x%x' % v for v in sorted(set(r.values()))))" "$LREACH")
 echo "roots: $ROOTS"
 echo "=== 1. lift + build ==="

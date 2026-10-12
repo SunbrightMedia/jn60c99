@@ -41,9 +41,12 @@ then MIDI learn: a panel parameter learned from CC 3, the UI timer's drain, the 
 id with no record; then the states: the first patch's as written, a CC assigned to a panel parameter, a CC assigned to an id the plugin
 does not have, every parameter at the int32 maximum, every parameter at -5, a state cut after 20 entries, a count
 of 0, an empty stream, the engine-rate setting (0x0FFFC015, the DAW state's) at 1..5 and 6 (no converter:
-silence), the voice count (0x0FFFC00E) at 4 and 1 -- each followed by a note and the state the plugin then writes. Every output word, every
-state byte, every host call's answer, the edits the plugin hands its component handler and the memory after are
-graded."""
+silence), the voice count (0x0FFFC00E) at 4 and 1 -- each followed by a note and the state the plugin then writes. Then (v7,
+JP8_HOST_SWEEP=1, the default; 0 gives the v6 drive) THE SWEEP (sweep_steps): every panel parameter at every position
+the plugin's own display strings give (jp8_param_positions.py -> jp8/gen/jp8_param_positions.json), the effect units'
+types with their parameters, the arpeggiator's modes x ranges free and synced, the assign modes with legato and
+portamento, KEY HOLD, host blocks of 1 .. 512 samples. Every output word, every state byte, every host call's answer, the edits the plugin hands its
+component handler and the memory after are graded."""
 import os
 import json
 import struct
@@ -64,6 +67,12 @@ RATE_SETTING, VOICE_COUNT = 0x0FFFC015, 0x0FFFC00E   # the DAW state's engine-ra
 _CTL = json.load(open(os.path.join(HERE, '..', 'gen', 'jp8_controller.json')))
 PANEL = [p['id'] for p in _CTL['params'] if p['id'] < MIDI_BASE]   # the plugin's own parameters, in its order
 MASTER_TUNE = 0x2
+# every panel parameter's POSITIONS (jp8_param_positions.py: the plugin's own display strings at k / 256)
+_POS = json.load(open(os.path.join(HERE, '..', 'gen', 'jp8_param_positions.json')))
+POSITIONS = {p['id']: p['positions'] for p in _POS['params']}
+BYNAME = {p['title']: p['id'] for p in _CTL['params'] if p['id'] < MIDI_BASE}
+SWEEP = os.environ.get('JP8_HOST_SWEEP', '1') == '1'  # v7: the sweep of every panel parameter at the drive's end
+SWEEP_PATCH = 2
 
 
 def blocks(p):
@@ -167,6 +176,93 @@ def info_steps():
     return out
 
 
+def values(pid, cont=(0.0, 0.25, 0.5, 0.75, 1.0)):
+    """the values the sweep plays: a switch (16 positions or fewer) at the middle of each position, a continuous
+    parameter at cont"""
+    pos = POSITIONS[pid]
+    if len(pos) > 16:
+        return list(cont)
+    return [(lo + hi) / 2.0 / _POS['grid'] for lo, hi, _ in pos]
+
+
+FX = {'EFFECT TYPE': ('EFFECT CTRL', 'CHORUS PRE DELAY', 'CHORUS LOW CUT', 'CHORUS HIGH CUT', 'FLANGER MANUAL',
+                      'FLANGER RESONANCE', 'FLANGER LOW CUT'),
+      'DELAY TYPE': ('DELAY TIME', 'DELAY TAP TIME', 'DELAY FEEDBACK', 'DELAY HIGH CUT', 'DELAY HF DAMP',
+                     'DELAY HF DAMP FREQ', 'DELAY LF DAMP', 'DELAY LF DAMP FREQ', 'DELAY DIRECT LEVEL'),
+      'REVERB TYPE': ('REVERB TIME', 'REVERB PRE DELAY', 'REVERB LOW CUT', 'REVERB HIGH CUT', 'REVERB DENSITY',
+                      'REVERB DIRECT LEVEL')}
+ARP = ('ARPEGGIO SW', 'ARPEGGIO MODE', 'ARPEGGIO RANGE', 'TEMPO SYNC')
+ASSIGN = ('ASSIGN MODE', 'LEGATO', 'PORTAMENTO', 'PORTA TYPE')
+SWEEP_CHORD = ((48, 0.35), (55, 0.6), (60, 0.85), (64, 1.0))
+
+
+def sweep_steps():
+    """v7: EVERY panel parameter of the controller census at every position of a switch and five values of a continuous
+    one (jp8_param_positions.json), through process() as host automation, a chord sounding, the pitch bend and the mod
+    wheel moving in every block -- each parameter from a fresh load of SWEEP_PATCH; then the effects: each type of
+    each of the three units (EFFECT, DELAY, REVERB; the levels up) with that unit's parameters at every position /
+    three values under it; the arpeggiator: every mode x range, free and synced to a running host clock; the assign
+    modes x LEGATO x PORTA TYPE with overlapping keys and portamento; KEY HOLD across a release; host blocks of 17
+    sizes from 1 to 512 samples"""
+    out = []
+    on = [("on", i, 0, k, v) for i, (k, v) in enumerate(SWEEP_CHORD)]
+    off = [("off", 400 + i, 0, k, 0.5) for i, (k, _) in enumerate(SWEEP_CHORD)]
+    mods = [(BEND, 128, 0.3), (BEND, 384, 0.7), (BEND, 500, 0.5), (MIDI_BASE + 1, 0, 0.5), (MIDI_BASE + 1, 500, 0.0)]
+    special = set(FX) | {n for v in FX.values() for n in v} | set(ARP) | set(ASSIGN) | {'KEY HOLD'}
+    for pid in PANEL:
+        if any(BYNAME.get(n) == pid for n in special):
+            continue
+        out.append(('patch', SWEEP_PATCH))
+        vs = values(pid)
+        for j, v in enumerate(vs):
+            ev = (on if j == 0 else []) + (off if j == len(vs) - 1 else [])
+            out.append(('block', 512, ev, [(pid, 0, v)] + mods, None))
+    levels = [(BYNAME[n], 0, 1.0) for n in ('EFFECT LEVEL', 'REVERB LEVEL', 'DELAY LEVEL')]
+    for unit, prm in FX.items():
+        tid = BYNAME[unit]
+        out.append(('patch', SWEEP_PATCH))
+        for j, t in enumerate(values(tid)):
+            ev = [("off", 0, 0, k, 0.5) for k, _ in SWEEP_CHORD] + [("on", 256 + i, 0, k, v) for i, (k, v) in enumerate(SWEEP_CHORD)]
+            out.append(('block', 512, ev, [(tid, 0, t)] + (levels if j == 0 else []), None))
+            for n in prm:
+                for v in values(BYNAME[n], cont=(0.0, 0.5, 1.0)):
+                    out.append(('block', 512, [], [(BYNAME[n], 0, v)], None))
+        out += [('block', 512, [("off", 0, 0, k, 0.5) for k, _ in SWEEP_CHORD], [], None), ('block', 512, [], [], None)]
+    sw, mode, rng, sync = (BYNAME[n] for n in ARP)
+    out += [('patch', SWEEP_PATCH), ('block', 512, on, [(sw, 0, 1.0), (BYNAME['LFO RATE'], 0, 1.0)], None)]
+    ppq = 0.0
+    for sy in values(sync):
+        for m in values(mode):
+            for r in values(rng):
+                for k in range(2):
+                    out.append(('block', 512, [], [(sync, 0, sy), (mode, 0, m), (rng, 0, r)] if k == 0 else [],
+                                dict(TEMPO, ppq=ppq)))
+                    ppq += 512 / RATE * TEMPO['tempo'] / 60.0
+    out += [('block', 512, [], [(sw, 0, 0.0)], None), ('block', 512, off, [], None)]
+    am, leg, porta, pt = (BYNAME[n] for n in ASSIGN)
+    out.append(('patch', SWEEP_PATCH))
+    for a in values(am):
+        for lg in values(leg):
+            for t in values(pt):
+                out.append(('block', 512, [("on", 0, 0, 48, 0.8), ("on", 200, 0, 52, 0.7), ("off", 300, 0, 48, 0.5),
+                                           ("on", 400, 0, 55, 0.9)], [(am, 0, a), (leg, 0, lg), (pt, 0, t), (porta, 0, 0.6)], None))
+                out.append(('block', 512, [("off", 0, 0, 52, 0.5), ("on", 100, 0, 60, 0.6), ("off", 300, 0, 55, 0.5),
+                                           ("off", 450, 0, 60, 0.5)], [], None))
+    hold = BYNAME['KEY HOLD']
+    out += [('patch', SWEEP_PATCH), ('block', 512, on, [(hold, 0, 1.0)], None), ('block', 512, off, [], None),
+            ('block', 512, [("on", 0, 0, 72, 0.8)], [], None), ('block', 512, [], [(hold, 100, 0.0)], None),
+            ('block', 512, [("off", 0, 0, 72, 0.5)], [], None)]
+    # host block sizes: a key struck and released inside blocks of every size class up to the maximum, a parameter
+    # point at the block's last sample
+    cut = BYNAME['VCF CUTOFF']
+    out.append(('patch', SWEEP_PATCH))
+    for j, n in enumerate((1, 2, 3, 7, 16, 17, 31, 64, 100, 127, 255, 256, 257, 300, 333, 511, 512)):
+        ev = [("on", n // 3, 0, 60 + j % 12, 0.8), ("off", n - 1, 0, 60 + (j + 11) % 12, 0.5)]
+        out.append(('block', n, ev, [(cut, n - 1, (j + 1) / 18.0)], None))
+    out.append(('getstate', 'sweep'))
+    return out
+
+
 def steps(patches=None):
     """the whole drive, in order (the reach runs the same steps over its patch list)"""
     patches = PATCHES if patches is None else patches
@@ -193,4 +289,6 @@ def steps(patches=None):
     out += [('setstate', 'learned', 'as is'), ('compstate', 'learned', 'as is'), ('info', 'csetstate', 'c0'),
             ('ctl', 'get', PANEL[5], 0.0), ('block', 512, [("on", 0, 0, 60, 0.8)], [(MIDI_BASE + 3, 0, 0.4)], None),
             ('drain',), ('getstate', 'project'), ('info', 'cgetstate', 'c1')]
+    if SWEEP:
+        out += sweep_steps()
     return out
