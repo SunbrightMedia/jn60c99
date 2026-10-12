@@ -4311,3 +4311,32 @@ A survivor is first a question about the DRIVE: where does the slip run, for how
 gate looks. Answer it with counters and page diffs, then extend the drive where it holds the state longer -- and test
 the extension on the C side before paying for references. A graded memory step after a segment sees state that the
 next reset would hide.
+
+## 247. A GREEN GATE IS NOT A COMPLETE LIFT -- RANDOM HOST INPUT FINDS UNLIFTED CODE IN SECONDS
+Paid 2026-10-12 (JUPITER-8, the native oracle's fuzz). The lift holds only the code a drive made the oracle run, and
+every host gate was GREEN on its drive. The first random host input -- one point of CC 10 -- trapped the port: the
+plugin routes CC 10 to an empty engine method (`ret 0`, rva 0x36CD10) no drive had called. In 60 seconds a port-only
+scan of the COMMITTED lift found more: CC 70 (and EFFECT TYPE between its grid values on another patch: effect setup
+code, rva 0x380370 / 0x37FED0 by rate), CC 72 and a pair of panel parameters (rva 0x436F56), CC 119 (rva 0x37DFA0).
+Those four were held by the drive-v8 lift that job jp8_host_gate11 had graded -- but the committed lift was still the
+drive-v6 one (gates 10 and 11 left theirs in their snapshots), so the render CLI ran the oldest; CC 10's target was in
+no lift at all. Fix: jp8/tools/native/jp8_reach_scan.py replays random host input (any block size, notes, any of the
+226 controller ids, host clocks) through the PORT ALONE until its lift traps (a trap, never a silent difference), and
+keeps one minimized WITNESS per trap target; jp8_host_seq.witness_steps replays the witnesses (jp8/gen/
+jp8_reach_witness.json), so the oracle runs that code, the lift holds it and the gate grades it; scan again until clean.
+### The rule
+Reach is a claim about the INPUT SPACE, not about a drive: say "the lift holds the plugin" only after a large random
+scan of host input runs clean on the port. Commit a gate's lift with the gate's verdict, or the product runs an older
+one than the gates graded.
+
+## 248. "NO DRIVE MAKES A DENORMAL RESULT" WAS NEVER MEASURED -- A COUNTER FOUND A MILLION
+Paid 2026-10-12 (JUPITER-8 scope row 23). The row explained why the gates were exact although Unicorn never flushes a
+denormal result: "no graded drive makes one". A probe build (jp8/tools/native/ftz_probe_src.py: a counter in the
+software-float header) counted 1,069,551 denormal results under the plugin's FTZ in 6 s of one chord, the first in
+block 0. The conclusion still held, for another reason, now measured: every one is unobservable -- read as zero under
+the plugin's own DAZ or overwritten -- the PC's rules and the oracle's give the same output words and the same image +
+heap after the drive, and the host gate grades the PC's rules (JP8_SOFTFP=2) against the oracle, memory and stack
+included, EXACTLY 0. The native oracle (the plugin on a CPU, FTZ real) then equals the port on 192 renders.
+### The rule
+A "because" in a status row is a claim like any other: count it before writing it. A right conclusion on a wrong
+reason is a defect waiting for the drive that breaks the reason.

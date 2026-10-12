@@ -180,6 +180,18 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    model WS_VISIBLE); a second `_imp` in the oracle's class hid its heap reuse (playbook 244; tools/verify/
    dup_method_gate.py in make static). Template v4 ships (raw e618cfbd...). OWED: gate12 (v9 at three rates, 15
    teeth), the mutation gate on its references, 16 / 18 / 39, the render check on template v4.
+3j. 2026-10-12: THE NATIVE ORACLE; GATE11 GREEN; FTZ MEASURED; THE REACH SCAN (scope rows 1-5, 11, 23, 24).
+   Job jp8_host_gate11 (drive v8 at 48000 / 44100 / 96000, 14 teeth): EXIT 0 -- rows 1, 2, 3, 4 and 11 CLOSED at three
+   rates. THE NATIVE ORACLE (jp8/docs/NATIVE_ORACLE.md): the real plugin under wine, a VST3 host in C; it needs the
+   oracle's blank skin images natively too (initialize returns 0x8000FFFF without them). native_check.sh full: the 64
+   patches x 3 rates through the render CLI, 192 renders EXACTLY 0 against the plugin on a CPU, deterministic, N1 / N2
+   bite (row 5). FTZ (row 23): a counter found 1,069,551 denormal results in 6 s of one chord -- all unobservable (the
+   PC's rules and the oracle's give the same words and the same image + heap); the old "no drive makes one" was never
+   measured and false (playbook 248). THE REACH SCAN (row 24, playbook 247): random host input on the port alone, one
+   minimized witness per trap target; the committed lift (still v6) trapped on CC 10 / 70 / 72 / 119; gate11's v8 lift
+   holds all but CC 10's target (0x36CD10, an empty method). Drive v10 = v9 + witness_steps (jp8/gen/
+   jp8_reach_witness.json). OWED: gate13 (v9) EXIT and its lift COMMITTED (the product runs the v6 one); the witness loop
+   until the scan runs clean; gate14 (v10); jp8_native_fuzz.py graded natively (with its control and tooth).
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

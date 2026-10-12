@@ -75,6 +75,9 @@ POSITIONS = {p['id']: p['positions'] for p in _POS['params']}
 BYNAME = {p['title']: p['id'] for p in _CTL['params'] if p['id'] < MIDI_BASE}
 SWEEP = os.environ.get('JP8_HOST_SWEEP', '1') == '1'  # v7: the sweep of every panel parameter at the drive's end (0: without)
 MREACH = os.environ.get('JP8_HOST_MREACH', '1') == '1'   # v9: the mutation-reach segments (reach_steps)
+WITNESS = os.environ.get('JP8_HOST_WITNESS', '1') == '1'  # v10: the reach witnesses (witness_steps)
+DRIVE = os.environ.get('JP8_HOST_DRIVE', 'full')          # 'witness': the setup and the witnesses alone (a fast reach)
+WITNESS_FILE = os.path.join(HERE, '..', 'gen', 'jp8_reach_witness.json')
 SWEEP_PATCH = 2
 
 
@@ -376,8 +379,51 @@ def reach_steps():
     return out + [('setstate', 'mr_p63', 'as is'), ('compstate', 'mr_p63', 'as is')]
 
 
+def witness_steps():
+    """v10: THE REACH WITNESSES (jp8/gen/jp8_reach_witness.json, from jp8/tools/native/jp8_reach_scan.py): host input
+    a random scan found reaching plugin code the lift did not hold -- each minimized to the lines that still reach it
+    (one CC point, a parameter point on a patch, a pair of them). Each runs from its patch's load: its blocks as the
+    plan has them (a block above this drive's maximum split at it, the input after the cut moved into the next part),
+    the keys it left held released, two quiet blocks, then a graded memory step. Host input only, never plugin data."""
+    if not os.path.exists(WITNESS_FILE):
+        return []
+    ws = json.load(open(WITNESS_FILE))['witnesses']
+    out = []
+    for rva in sorted(ws, key=lambda r: int(r, 16)):
+        w = ws[rva]
+        out.append(('patch', w['patch']))
+        held = []
+        blks = []
+        for ln in w['lines']:
+            f = ln.split()
+            if f[0] == 'B': blks.append([int(f[1]), [], [], None])
+            elif f[0] == 'E':
+                on, off, ch, pitch = int(f[1]), int(f[2]), int(f[3]), int(f[4])
+                vel = struct.unpack('<f', struct.pack('<I', int(f[5], 16)))[0]
+                blks[-1][1].append(('on' if on else 'off', off, ch, pitch, vel))
+                if on: held.append((ch, pitch))
+                elif (ch, pitch) in held: held.remove((ch, pitch))
+            elif f[0] == 'P':
+                blks[-1][2].append((int(f[1], 16), int(f[2]), struct.unpack('<d', struct.pack('<Q', int(f[3], 16)))[0]))
+            elif f[0] == 'C':
+                d = lambda x: struct.unpack('<d', struct.pack('<Q', int(x, 16)))[0]
+                blks[-1][3] = dict(state=int(f[1], 16), ppq=d(f[2]), tempo=d(f[3]), cycle=(d(f[4]), d(f[5])))
+        for n, evs, pars, ctx in blks:
+            while n > MAXBLOCK:                      # split at the drive's maximum: what lies after moves on
+                out.append(('block', MAXBLOCK, [e for e in evs if e[1] < MAXBLOCK], [q for q in pars if q[1] < MAXBLOCK], ctx))
+                evs = [(e[0], e[1] - MAXBLOCK) + tuple(e[2:]) for e in evs if e[1] >= MAXBLOCK]
+                pars = [(q[0], q[1] - MAXBLOCK, q[2]) for q in pars if q[1] >= MAXBLOCK]
+                n -= MAXBLOCK
+            out.append(('block', n, evs, pars, ctx))
+        out.append(('block', 512, [('off', 0, ch, pitch, 0.0) for ch, pitch in held], [], None))
+        out += [('block', 512, [], [], None), ('block', 512, [], [], None), ('memhash', 'w_%s' % rva)]
+    return out
+
+
 def steps(patches=None):
     """the whole drive, in order (the reach runs the same steps over its patch list)"""
+    if DRIVE == 'witness':
+        return [('setup', RATE)] + witness_steps()
     patches = PATCHES if patches is None else patches
     out = [('setup', RATE)] + info_steps()
     for p in patches:
@@ -412,6 +458,8 @@ def steps(patches=None):
     out += editor_steps()
     if MREACH:
         out += reach_steps()
+    if WITNESS:
+        out += witness_steps()
     if SWEEP:
         out += sweep_steps()
     return out

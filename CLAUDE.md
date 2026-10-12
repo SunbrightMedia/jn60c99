@@ -307,10 +307,13 @@ mine is a hypothesis (playbook 80).
   EXACTLY 0 on patch 2. Drive v9 -- the editor's window messages + GUI timer (E2: ATL's run-time thunk run as its
   three instructions, WS_VISIBLE modeled; playbooks 244-245) and the mutation-reach segments with graded memory steps
   (playbook 246) -- EXACTLY 0 on patch 2 (template v4). jp8_verify_eeb0 (v7) EXIT 1: D RED, 8 survivors; v9's
-  segments show 5 of them on the C side (jp8_mutation_prescreen.py), 16 / 18 / 39 open (scope row 20). NEXT: gate12 (v9,
-  three rates, 15 teeth) and the mutation gate on it, jp8_host_gate11's EXIT (v8), the render check on template v4,
-  the JX verify (its lift includes jp8_cpu.h), the editor's meters / CC menu / patch window (the drawn panel needs the
-  user's JP8 script file and art), a live app. Speed ~670 ms per
+  segments show 5 of them on the C side (jp8_mutation_prescreen.py), 16 / 18 / 39 open (scope row 20). Gate11 (v8)
+  GREEN at three rates. THE NATIVE ORACLE (jp8/docs/NATIVE_ORACLE.md: the real plugin on a CPU under wine, a C VST3
+  host): 192 renders EXACTLY 0 (64 patches x 3 rates); FTZ measured unobservable (row 23). THE REACH SCAN (row 24,
+  playbook 247): random host input on the port alone finds code no drive ran; drive v10 replays its witnesses. The
+  committed lift is still v6: commit the newest GREEN gate's lift. NEXT: gate13 (v9) EXIT + its lift committed + the
+  mutation gate, the witness loop until the scan is clean, gate14 (v10), the native fuzz, the JX verify, the editor's
+  meters / CC menu / patch window (the drawn panel needs the user's JP8 script file and art), a live app. Speed ~670 ms per
   second of audio here (the plugin ~410). The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it

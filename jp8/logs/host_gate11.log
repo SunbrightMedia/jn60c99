@@ -1,0 +1,406 @@
+=== 0. the reach: the 64 patches, and this gate's own drive at each first rate (48000 44100 96000) ===
+[ 696.1s] wrote /home/user/snap_jp8g11/build/jp8_host/hostreach_gate_48000.json
+[ 664.7s] wrote /home/user/snap_jp8g11/build/jp8_host/hostreach_gate_44100.json
+[ 465.4s] wrote /home/user/snap_jp8g11/build/jp8_host/hostreach_gate_96000.json
+/home/user/snap_jp8g11/build/jp8_host/hostreach_lift.json: 119899 executed, 933 indirect sites, 54 stub names from 5 reaches
+roots: 0x2acc30,0x324f00,0x325870,0x326660,0x33a290,0x355f90,0x369040,0x369120,0x369150,0x3691a0,0x3691b0,0x3691d0,0x369754,0x369ad0,0x369ae0,0x36a2b0,0x36a300,0x36ba50,0x36bf30,0x36c600,0x36c650,0x445670,0x4479b0,0x448040,0x449ee0,0x450270,0x4502d0,0x450400,0x450420,0x450970,0x450bc0,0x450fd0,0x451180
+=== 1. lift + build ===
+lifted 1961 functions, 215335 instructions -> /home/user/snap_jp8g11/jp8/src/jp8_host_lift.c (261593 lines); unsupported (trap) 796: int3:475, vmovdqa:44, vmulsd:33, vmovd:31, vmovsd:17, vfmadd213sd:17, vaddsd:14, vsubsd:13, vmovq:12, vpand:8, lock cmpxchg:7, vmovapd:7, vpshufd:7, vpxor:6, vldmxcsr:6, vcvtdq2pd:5, vfmadd231sd:5, vdivsd:5, pmovsxdq:4, int:4, vcomisd:4, vpor:4, vandpd:4, vpsrlq:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, pshuflw:2, pcmpistri:2, vpsubq:2, vpsllq:2, vpaddq:2, vucomisd:2, vfnmadd231sd:2, vpmovmskb:2, vzeroupper:2
+jp8_fast: 1960 functions (1 allocator stubs), 526597 statements after 7490 calls inlined; flags LOCAL (no flag live where functions meet)
+jp8_xlane: 1960 functions; lane write 89909, load cg 55502, store cg 38593, movss load 16146, copy 15189, movss store 12052, ldx 5142, head read 3943, stx 3338, read 2323, other write 368, fallback 309, whole write 169
+=== 2. the oracle at 48000: template + references ===
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  15.5s] InitDll -> 1
+[  59.5s] IComponent::initialize -> 0x0
+[  59.6s] heap 0x31fb67b80 (263.6 MB used), 0 oracle regions outside the template: none
+[  61.6s] template (before setupProcessing): 8 regions, 69 facts, 840 stubs, 44.0 MB (sha256 51be86b0ddc1ed63)
+[  62.4s] setup 48000: the host objects end at 0x5a0012690, 0 edits, 0 jobs
+[  62.7s] patch 2: 0 blocks, 0 words so far, 96 edits, 0 jobs, heap 0x31fbfe870
+[  66.7s] patch 63: 8 blocks, 7168 words so far, 192 edits, 256 jobs, heap 0x31fc665d0
+[  71.0s] patch 0: 16 blocks, 14336 words so far, 288 edits, 520 jobs, heap 0x31fcc8c40
+[  75.8s] patch 12: 24 blocks, 21504 words so far, 384 edits, 784 jobs, heap 0x31fd07990
+[ 100.7s] rate 44100.0: 70 blocks, 67584 words so far, 384 edits, 1608 jobs, heap 0x31fd61950
+[ 102.5s] rate 96000.0: 73 blocks, 70656 words so far, 384 edits, 1648 jobs, heap 0x31fd681d0
+[ 103.3s] rate 88200.0: 76 blocks, 73728 words so far, 384 edits, 1680 jobs, heap 0x31fd6b1d0
+[ 104.2s] rate 22050.0: 79 blocks, 76800 words so far, 384 edits, 1712 jobs, heap 0x31fd6e610
+[ 104.2s] rate 48000.0: 82 blocks, 79872 words so far, 384 edits, 1712 jobs, heap 0x31fd6e610
+[ 110.8s] setstate p2: 93 blocks, 91136 words so far, 480 edits, 1840 jobs, heap 0x31fd882a0
+[ 112.2s] setstate p2: 95 blocks, 93184 words so far, 576 edits, 1864 jobs, heap 0x31fd8d470
+[ 113.3s] setstate p2: 97 blocks, 95232 words so far, 672 edits, 1888 jobs, heap 0x31fd92610
+[ 114.6s] setstate p2: 99 blocks, 97280 words so far, 768 edits, 1888 jobs, heap 0x31fd937e0
+[ 115.8s] setstate p2: 101 blocks, 99328 words so far, 788 edits, 1888 jobs, heap 0x31fd93810
+[ 115.8s] setstate p2: 103 blocks, 101376 words so far, 788 edits, 1888 jobs, heap 0x31fd93810
+[ 115.8s] setstate p2: 105 blocks, 103424 words so far, 788 edits, 1888 jobs, heap 0x31fd93810
+[ 116.0s] setstate p2: 107 blocks, 105472 words so far, 884 edits, 1888 jobs, heap 0x31fd94d60
+[ 118.3s] setstate p2: 109 blocks, 107520 words so far, 980 edits, 1912 jobs, heap 0x31fd99a10
+[ 120.1s] setstate p2: 111 blocks, 109568 words so far, 1076 edits, 1936 jobs, heap 0x31fd9cbe0
+[ 121.9s] setstate p2: 113 blocks, 111616 words so far, 1172 edits, 1960 jobs, heap 0x31fd9fb10
+[ 123.6s] setstate p2: 115 blocks, 113664 words so far, 1268 edits, 1984 jobs, heap 0x31fda2240
+[ 124.1s] setstate p2: 117 blocks, 115712 words so far, 1364 edits, 2008 jobs, heap 0x31fda4970
+[ 125.4s] setstate p2: 119 blocks, 117760 words so far, 1460 edits, 2008 jobs, heap 0x31fda5c40
+[ 127.3s] setstate p2: 121 blocks, 119808 words so far, 1556 edits, 2020 jobs, heap 0x31fdaae10
+[ 127.6s] setstate p2: 123 blocks, 121856 words so far, 1652 edits, 2023 jobs, heap 0x31fdaffe0
+[ 128.1s] setstate p2: 125 blocks, 123904 words so far, 1748 edits, 2029 jobs, heap 0x31fdb51b0
+[ 128.7s] setstate p2: 127 blocks, 125952 words so far, 1844 edits, 2038 jobs, heap 0x31fdba380
+[ 129.5s] setstate p2: 129 blocks, 128000 words so far, 1940 edits, 2053 jobs, heap 0x31fdbf550
+[ 130.5s] setstate p2: 131 blocks, 130048 words so far, 2036 edits, 2071 jobs, heap 0x31fdc4720
+[ 131.6s] setstate p2: 133 blocks, 132096 words so far, 2132 edits, 2092 jobs, heap 0x31fdc98f0
+[ 132.8s] setstate p2: 135 blocks, 134144 words so far, 2228 edits, 2116 jobs, heap 0x31fdceac0
+[ 134.0s] setstate learned: 137 blocks, 136192 words so far, 2324 edits, 2140 jobs, heap 0x31fdd3c90
+[ 134.9s] editor : 138 blocks, 137216 words so far, 2324 edits, 2148 jobs, heap 0x31fde7690
+[ 136.4s] patch 2: 140 blocks, 139264 words so far, 2420 edits, 2172 jobs, heap 0x31fe1c510
+[ 140.1s] patch 2: 146 blocks, 145408 words so far, 2516 edits, 2348 jobs, heap 0x31fe59270
+[ 143.0s] patch 2: 151 blocks, 150528 words so far, 2612 edits, 2500 jobs, heap 0x31fe93fc0
+[ 146.0s] patch 2: 156 blocks, 155648 words so far, 2708 edits, 2652 jobs, heap 0x31feced10
+[ 148.9s] patch 2: 161 blocks, 160768 words so far, 2804 edits, 2804 jobs, heap 0x31ff3f000
+[ 151.9s] patch 2: 166 blocks, 165888 words so far, 2900 edits, 2964 jobs, heap 0x31ff79d50
+[ 155.5s] patch 2: 171 blocks, 171008 words so far, 2996 edits, 3116 jobs, heap 0x320004cf0
+[ 156.9s] patch 2: 173 blocks, 173056 words so far, 3092 edits, 3212 jobs, heap 0x320039a40
+[ 160.7s] patch 2: 179 blocks, 179200 words so far, 3188 edits, 3388 jobs, heap 0x320076790
+[ 163.6s] patch 2: 184 blocks, 184320 words so far, 3284 edits, 3548 jobs, heap 0x320129540
+[ 167.2s] patch 2: 190 blocks, 190464 words so far, 3380 edits, 3724 jobs, heap 0x320166290
+[ 171.0s] patch 2: 196 blocks, 196608 words so far, 3476 edits, 3900 jobs, heap 0x3201a2fe0
+[ 174.0s] patch 2: 201 blocks, 201728 words so far, 3572 edits, 4060 jobs, heap 0x3201ddd30
+[ 177.3s] patch 2: 207 blocks, 207872 words so far, 3668 edits, 4228 jobs, heap 0x32021aa80
+[ 180.7s] patch 2: 213 blocks, 214016 words so far, 3764 edits, 4404 jobs, heap 0x32030b850
+[ 183.6s] patch 2: 218 blocks, 219136 words so far, 3860 edits, 4556 jobs, heap 0x3203465a0
+[ 185.0s] patch 2: 220 blocks, 221184 words so far, 3956 edits, 4652 jobs, heap 0x32037b2f0
+[ 186.4s] patch 2: 222 blocks, 223232 words so far, 4052 edits, 4748 jobs, heap 0x3203b0040
+[ 189.3s] patch 2: 227 blocks, 228352 words so far, 4148 edits, 4908 jobs, heap 0x3203ead90
+[ 192.2s] patch 2: 232 blocks, 233472 words so far, 4244 edits, 5060 jobs, heap 0x320425ae0
+[ 195.1s] patch 2: 237 blocks, 238592 words so far, 4340 edits, 5220 jobs, heap 0x320460830
+[ 198.0s] patch 2: 242 blocks, 243712 words so far, 4436 edits, 5380 jobs, heap 0x32049b580
+[ 201.1s] patch 2: 247 blocks, 248832 words so far, 4532 edits, 5532 jobs, heap 0x3205e14b0
+[ 203.9s] patch 2: 252 blocks, 253952 words so far, 4628 edits, 5692 jobs, heap 0x320612200
+[ 206.9s] patch 2: 257 blocks, 259072 words so far, 4724 edits, 5844 jobs, heap 0x320642f50
+[ 209.8s] patch 2: 262 blocks, 264192 words so far, 4820 edits, 6004 jobs, heap 0x320673ca0
+[ 212.7s] patch 2: 267 blocks, 269312 words so far, 4916 edits, 6156 jobs, heap 0x3206a49f0
+[ 215.7s] patch 2: 272 blocks, 274432 words so far, 5012 edits, 6316 jobs, heap 0x3206d5740
+[ 218.6s] patch 2: 277 blocks, 279552 words so far, 5108 edits, 6468 jobs, heap 0x320706490
+[ 221.5s] patch 2: 282 blocks, 284672 words so far, 5204 edits, 6628 jobs, heap 0x32073ba10
+[ 224.4s] patch 2: 287 blocks, 289792 words so far, 5300 edits, 6788 jobs, heap 0x32076c760
+[ 227.4s] patch 2: 292 blocks, 294912 words so far, 5396 edits, 6940 jobs, heap 0x32079d4b0
+[ 230.3s] patch 2: 297 blocks, 300032 words so far, 5492 edits, 7100 jobs, heap 0x3207ce200
+[ 233.2s] patch 2: 302 blocks, 305152 words so far, 5588 edits, 7252 jobs, heap 0x320994030
+[ 236.2s] patch 2: 307 blocks, 310272 words so far, 5684 edits, 7412 jobs, heap 0x3209c4d80
+[ 239.2s] patch 2: 312 blocks, 315392 words so far, 5780 edits, 7564 jobs, heap 0x3209f5ad0
+[ 242.1s] patch 2: 317 blocks, 320512 words so far, 5876 edits, 7724 jobs, heap 0x320a26820
+[ 245.1s] patch 2: 322 blocks, 325632 words so far, 5972 edits, 7876 jobs, heap 0x320a57570
+[ 247.9s] patch 2: 327 blocks, 330752 words so far, 6068 edits, 8036 jobs, heap 0x320a882c0
+[ 250.8s] patch 2: 332 blocks, 335872 words so far, 6164 edits, 8188 jobs, heap 0x320a882f0
+[ 253.7s] patch 2: 337 blocks, 340992 words so far, 6260 edits, 8340 jobs, heap 0x320a88320
+[ 255.0s] patch 2: 339 blocks, 343040 words so far, 6356 edits, 8436 jobs, heap 0x320a88350
+[ 256.4s] patch 2: 341 blocks, 345088 words so far, 6452 edits, 8532 jobs, heap 0x320a88380
+[ 260.9s] patch 2: 349 blocks, 353280 words so far, 6548 edits, 8748 jobs, heap 0x320ab90d0
+[ 262.3s] patch 2: 351 blocks, 355328 words so far, 6644 edits, 8844 jobs, heap 0x320af0a50
+[ 263.7s] patch 2: 353 blocks, 357376 words so far, 6740 edits, 8940 jobs, heap 0x320b217a0
+[ 266.9s] patch 2: 358 blocks, 362496 words so far, 6836 edits, 9100 jobs, heap 0x320b524f0
+[ 270.0s] patch 2: 363 blocks, 367616 words so far, 6932 edits, 9252 jobs, heap 0x320b83240
+[ 273.0s] patch 2: 368 blocks, 372736 words so far, 7028 edits, 9412 jobs, heap 0x320bb3f90
+[ 276.2s] patch 2: 373 blocks, 377856 words so far, 7124 edits, 9572 jobs, heap 0x320e44610
+[ 279.1s] patch 2: 378 blocks, 382976 words so far, 7220 edits, 9724 jobs, heap 0x320e75360
+[ 280.5s] patch 2: 380 blocks, 385024 words so far, 7316 edits, 9820 jobs, heap 0x320ea60b0
+[ 285.6s] patch 2: 389 blocks, 394240 words so far, 7412 edits, 10060 jobs, heap 0x320ed6e00
+[ 290.6s] patch 2: 398 blocks, 403456 words so far, 7508 edits, 10292 jobs, heap 0x320f07b50
+[ 295.6s] patch 2: 407 blocks, 412672 words so far, 7604 edits, 10532 jobs, heap 0x320f388a0
+[ 299.2s] patch 2: 413 blocks, 418816 words so far, 7700 edits, 10708 jobs, heap 0x320f695f0
+[ 301.7s] patch 2: 417 blocks, 422912 words so far, 7796 edits, 10844 jobs, heap 0x320f9a340
+[ 305.1s] patch 2: 422 blocks, 428032 words so far, 7892 edits, 11004 jobs, heap 0x320fcb090
+[ 308.2s] patch 2: 427 blocks, 433152 words so far, 7988 edits, 11156 jobs, heap 0x320ffbde0
+[ 311.3s] patch 2: 432 blocks, 438272 words so far, 8084 edits, 11316 jobs, heap 0x32102cb30
+[ 314.5s] patch 2: 437 blocks, 443392 words so far, 8180 edits, 11468 jobs, heap 0x32105d880
+[ 317.8s] patch 2: 442 blocks, 448512 words so far, 8276 edits, 11628 jobs, heap 0x32108e5d0
+[ 321.2s] patch 2: 447 blocks, 453632 words so far, 8372 edits, 11780 jobs, heap 0x3210bf320
+[ 457.3s] patch 2: 653 blocks, 664576 words so far, 8468 edits, 14468 jobs, heap 0x3210fa2a0
+[ 694.1s] patch 2: 1009 blocks, 1029120 words so far, 8564 edits, 18964 jobs, heap 0x3210fa2d0
+[ 817.6s] patch 2: 1245 blocks, 1270784 words so far, 8660 edits, 22012 jobs, heap 0x3210fa300
+[ 893.2s] patch 2: 1392 blocks, 1421312 words so far, 8756 edits, 23844 jobs, heap 0x3210fa330
+[ 910.2s] patch 2: 1424 blocks, 1454080 words so far, 8852 edits, 25012 jobs, heap 0x3210fa360
+[ 913.2s] patch 2: 1429 blocks, 1459200 words so far, 8948 edits, 25132 jobs, heap 0x3210fa390
+[ 916.5s] patch 2: 1446 blocks, 1464784 words so far, 9044 edits, 25540 jobs, heap 0x3210fa3c0
+[1125.0s] wrote /home/user/snap_jp8g11/build/jp8_host/ref_48000: 2636 steps, 1847 blocks, 1875408 words, 66504 state bytes, 9044 performEdits, 30444 worker jobs
+=== 2b. the shipped template (jp8/gen/jp8h_template.bin.gz, what jp8/apps/jp8_render boots) == the oracle's at 48000 ===
+shipped template 51be86b0ddc1ed63 (44013162 bytes), the oracle's 51be86b0ddc1ed63, its .sha256 file agrees: EQUAL
+=== 3. the C side at 48000: checked build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[ 152.1s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 30444 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 48000: product build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[  14.6s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 30444 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 48000: product build, the workers on threads (3 runs: a race would show) ===
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 48000: software floats (JP8_SOFTFP=2: DAZ / FTZ from the guest's MXCSR, in C) ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[  92.9s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 30444 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 2. the oracle at 44100: template + references ===
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  16.3s] InitDll -> 1
+[  59.8s] IComponent::initialize -> 0x0
+[  59.9s] heap 0x31fb67b80 (263.6 MB used), 0 oracle regions outside the template: none
+[  61.9s] template (before setupProcessing): 8 regions, 69 facts, 840 stubs, 44.0 MB (sha256 51be86b0ddc1ed63)
+[  62.7s] setup 44100: the host objects end at 0x5a0012690, 0 edits, 0 jobs
+[  63.0s] patch 2: 0 blocks, 0 words so far, 96 edits, 0 jobs, heap 0x31fbfe870
+[  67.4s] patch 63: 8 blocks, 7168 words so far, 192 edits, 256 jobs, heap 0x31fc679b0
+[  72.2s] patch 0: 16 blocks, 14336 words so far, 288 edits, 520 jobs, heap 0x31fccb3e0
+[  76.9s] patch 12: 24 blocks, 21504 words so far, 384 edits, 784 jobs, heap 0x31fd0b510
+[ 103.6s] rate 44100.0: 70 blocks, 67584 words so far, 384 edits, 1616 jobs, heap 0x31fd6d430
+[ 105.3s] rate 96000.0: 73 blocks, 70656 words so far, 384 edits, 1656 jobs, heap 0x31fd73cb0
+[ 106.1s] rate 88200.0: 76 blocks, 73728 words so far, 384 edits, 1688 jobs, heap 0x31fd76cb0
+[ 107.0s] rate 22050.0: 79 blocks, 76800 words so far, 384 edits, 1720 jobs, heap 0x31fd7a0f0
+[ 107.0s] rate 44100.0: 82 blocks, 79872 words so far, 384 edits, 1720 jobs, heap 0x31fd7a0f0
+[ 113.8s] setstate p2: 93 blocks, 91136 words so far, 480 edits, 1848 jobs, heap 0x31fd95ca0
+[ 115.4s] setstate p2: 95 blocks, 93184 words so far, 576 edits, 1872 jobs, heap 0x31fd9b410
+[ 116.7s] setstate p2: 97 blocks, 95232 words so far, 672 edits, 1896 jobs, heap 0x31fda0b70
+[ 117.9s] setstate p2: 99 blocks, 97280 words so far, 768 edits, 1896 jobs, heap 0x31fda1d40
+[ 119.1s] setstate p2: 101 blocks, 99328 words so far, 788 edits, 1896 jobs, heap 0x31fda1d70
+[ 119.2s] setstate p2: 103 blocks, 101376 words so far, 788 edits, 1896 jobs, heap 0x31fda1d70
+[ 119.2s] setstate p2: 105 blocks, 103424 words so far, 788 edits, 1896 jobs, heap 0x31fda1d70
+[ 119.3s] setstate p2: 107 blocks, 105472 words so far, 884 edits, 1896 jobs, heap 0x31fda32c0
+[ 121.7s] setstate p2: 109 blocks, 107520 words so far, 980 edits, 1920 jobs, heap 0x31fda8490
+[ 123.5s] setstate p2: 111 blocks, 109568 words so far, 1076 edits, 1944 jobs, heap 0x31fdab920
+[ 125.3s] setstate p2: 113 blocks, 111616 words so far, 1172 edits, 1968 jobs, heap 0x31fdaeaf0
+[ 127.0s] setstate p2: 115 blocks, 113664 words so far, 1268 edits, 1992 jobs, heap 0x31fdb1400
+[ 127.5s] setstate p2: 117 blocks, 115712 words so far, 1364 edits, 2016 jobs, heap 0x31fdb3d10
+[ 128.8s] setstate p2: 119 blocks, 117760 words so far, 1460 edits, 2016 jobs, heap 0x31fdb4fe0
+[ 130.6s] setstate p2: 121 blocks, 119808 words so far, 1556 edits, 2028 jobs, heap 0x31fdba770
+[ 131.0s] setstate p2: 123 blocks, 121856 words so far, 1652 edits, 2031 jobs, heap 0x31fdbfee0
+[ 131.6s] setstate p2: 125 blocks, 123904 words so far, 1748 edits, 2037 jobs, heap 0x31fdc5650
+[ 132.2s] setstate p2: 127 blocks, 125952 words so far, 1844 edits, 2046 jobs, heap 0x31fdcadc0
+[ 133.2s] setstate p2: 129 blocks, 128000 words so far, 1940 edits, 2061 jobs, heap 0x31fdd0550
+[ 134.2s] setstate p2: 131 blocks, 130048 words so far, 2036 edits, 2079 jobs, heap 0x31fdd5cc0
+[ 135.4s] setstate p2: 133 blocks, 132096 words so far, 2132 edits, 2100 jobs, heap 0x31fddb430
+[ 136.7s] setstate p2: 135 blocks, 134144 words so far, 2228 edits, 2124 jobs, heap 0x31fde0ba0
+[ 137.9s] setstate learned: 137 blocks, 136192 words so far, 2324 edits, 2148 jobs, heap 0x31fde6330
+[ 138.9s] editor : 138 blocks, 137216 words so far, 2324 edits, 2156 jobs, heap 0x31fdf9ff0
+[ 140.4s] patch 2: 140 blocks, 139264 words so far, 2420 edits, 2180 jobs, heap 0x31fe2f430
+[ 144.2s] patch 2: 146 blocks, 145408 words so far, 2516 edits, 2356 jobs, heap 0x31fe6d290
+[ 147.3s] patch 2: 151 blocks, 150528 words so far, 2612 edits, 2516 jobs, heap 0x31fea8e00
+[ 150.5s] patch 2: 156 blocks, 155648 words so far, 2708 edits, 2668 jobs, heap 0x31fee4970
+[ 153.6s] patch 2: 161 blocks, 160768 words so far, 2804 edits, 2820 jobs, heap 0x31ff55a80
+[ 156.7s] patch 2: 166 blocks, 165888 words so far, 2900 edits, 2972 jobs, heap 0x31ff915f0
+[ 160.1s] patch 2: 171 blocks, 171008 words so far, 2996 edits, 3132 jobs, heap 0x32001d3d0
+[ 161.7s] patch 2: 173 blocks, 173056 words so far, 3092 edits, 3228 jobs, heap 0x3200526c0
+[ 165.4s] patch 2: 179 blocks, 179200 words so far, 3188 edits, 3404 jobs, heap 0x320090510
+[ 168.6s] patch 2: 184 blocks, 184320 words so far, 3284 edits, 3564 jobs, heap 0x3201440e0
+[ 172.3s] patch 2: 190 blocks, 190464 words so far, 3380 edits, 3740 jobs, heap 0x320181f30
+[ 176.1s] patch 2: 196 blocks, 196608 words so far, 3476 edits, 3924 jobs, heap 0x3201bfd60
+[ 179.3s] patch 2: 201 blocks, 201728 words so far, 3572 edits, 4084 jobs, heap 0x3201fb8f0
+[ 183.0s] patch 2: 207 blocks, 207872 words so far, 3668 edits, 4260 jobs, heap 0x320239740
+[ 187.0s] patch 2: 213 blocks, 214016 words so far, 3764 edits, 4436 jobs, heap 0x32032b5f0
+[ 190.2s] patch 2: 218 blocks, 219136 words so far, 3860 edits, 4596 jobs, heap 0x320367180
+[ 191.7s] patch 2: 220 blocks, 221184 words so far, 3956 edits, 4692 jobs, heap 0x32039c470
+[ 193.2s] patch 2: 222 blocks, 223232 words so far, 4052 edits, 4788 jobs, heap 0x3203d1760
+[ 196.4s] patch 2: 227 blocks, 228352 words so far, 4148 edits, 4948 jobs, heap 0x32040d2d0
+[ 199.5s] patch 2: 232 blocks, 233472 words so far, 4244 edits, 5108 jobs, heap 0x320440c20
+[ 202.6s] patch 2: 237 blocks, 238592 words so far, 4340 edits, 5268 jobs, heap 0x320471970
+[ 205.8s] patch 2: 242 blocks, 243712 words so far, 4436 edits, 5420 jobs, heap 0x3204a26c0
+[ 208.9s] patch 2: 247 blocks, 248832 words so far, 4532 edits, 5580 jobs, heap 0x3205e14b0
+[ 212.0s] patch 2: 252 blocks, 253952 words so far, 4628 edits, 5740 jobs, heap 0x320612200
+[ 215.2s] patch 2: 257 blocks, 259072 words so far, 4724 edits, 5900 jobs, heap 0x320642f50
+[ 218.2s] patch 2: 262 blocks, 264192 words so far, 4820 edits, 6060 jobs, heap 0x320673ca0
+[ 221.4s] patch 2: 267 blocks, 269312 words so far, 4916 edits, 6212 jobs, heap 0x3206a49f0
+[ 224.5s] patch 2: 272 blocks, 274432 words so far, 5012 edits, 6372 jobs, heap 0x3206d5740
+[ 227.7s] patch 2: 277 blocks, 279552 words so far, 5108 edits, 6532 jobs, heap 0x320706490
+[ 231.0s] patch 2: 282 blocks, 284672 words so far, 5204 edits, 6692 jobs, heap 0x32073ba10
+[ 234.3s] patch 2: 287 blocks, 289792 words so far, 5300 edits, 6852 jobs, heap 0x32076c760
+[ 237.8s] patch 2: 292 blocks, 294912 words so far, 5396 edits, 7004 jobs, heap 0x32079d4b0
+[ 241.0s] patch 2: 297 blocks, 300032 words so far, 5492 edits, 7164 jobs, heap 0x3207ce200
+[ 244.3s] patch 2: 302 blocks, 305152 words so far, 5588 edits, 7324 jobs, heap 0x320994030
+[ 247.6s] patch 2: 307 blocks, 310272 words so far, 5684 edits, 7484 jobs, heap 0x3209c4d80
+[ 250.7s] patch 2: 312 blocks, 315392 words so far, 5780 edits, 7636 jobs, heap 0x3209f5ad0
+[ 253.9s] patch 2: 317 blocks, 320512 words so far, 5876 edits, 7796 jobs, heap 0x320a26820
+[ 257.0s] patch 2: 322 blocks, 325632 words so far, 5972 edits, 7956 jobs, heap 0x320a57570
+[ 260.1s] patch 2: 327 blocks, 330752 words so far, 6068 edits, 8116 jobs, heap 0x320a882c0
+[ 263.2s] patch 2: 332 blocks, 335872 words so far, 6164 edits, 8276 jobs, heap 0x320a882f0
+[ 266.4s] patch 2: 337 blocks, 340992 words so far, 6260 edits, 8428 jobs, heap 0x320a88320
+[ 267.8s] patch 2: 339 blocks, 343040 words so far, 6356 edits, 8524 jobs, heap 0x320a88350
+[ 269.3s] patch 2: 341 blocks, 345088 words so far, 6452 edits, 8628 jobs, heap 0x320a88380
+[ 274.0s] patch 2: 349 blocks, 353280 words so far, 6548 edits, 8844 jobs, heap 0x320ab90d0
+[ 275.6s] patch 2: 351 blocks, 355328 words so far, 6644 edits, 8940 jobs, heap 0x320af0a50
+[ 277.1s] patch 2: 353 blocks, 357376 words so far, 6740 edits, 9036 jobs, heap 0x320b217a0
+[ 280.5s] patch 2: 358 blocks, 362496 words so far, 6836 edits, 9196 jobs, heap 0x320b524f0
+[ 283.6s] patch 2: 363 blocks, 367616 words so far, 6932 edits, 9356 jobs, heap 0x320b83240
+[ 286.7s] patch 2: 368 blocks, 372736 words so far, 7028 edits, 9516 jobs, heap 0x320bb3f90
+[ 289.8s] patch 2: 373 blocks, 377856 words so far, 7124 edits, 9668 jobs, heap 0x320e44610
+[ 292.9s] patch 2: 378 blocks, 382976 words so far, 7220 edits, 9828 jobs, heap 0x320e75360
+[ 294.3s] patch 2: 380 blocks, 385024 words so far, 7316 edits, 9924 jobs, heap 0x320ea60b0
+[ 299.9s] patch 2: 389 blocks, 394240 words so far, 7412 edits, 10164 jobs, heap 0x320ed6e00
+[ 305.5s] patch 2: 398 blocks, 403456 words so far, 7508 edits, 10404 jobs, heap 0x320f07b50
+[ 311.0s] patch 2: 407 blocks, 412672 words so far, 7604 edits, 10644 jobs, heap 0x320f388a0
+[ 315.2s] patch 2: 413 blocks, 418816 words so far, 7700 edits, 10828 jobs, heap 0x320f695f0
+[ 317.9s] patch 2: 417 blocks, 422912 words so far, 7796 edits, 10964 jobs, heap 0x320f9a340
+[ 321.3s] patch 2: 422 blocks, 428032 words so far, 7892 edits, 11124 jobs, heap 0x320fcb090
+[ 324.5s] patch 2: 427 blocks, 433152 words so far, 7988 edits, 11284 jobs, heap 0x320ffbde0
+[ 327.6s] patch 2: 432 blocks, 438272 words so far, 8084 edits, 11436 jobs, heap 0x32102cb30
+[ 330.8s] patch 2: 437 blocks, 443392 words so far, 8180 edits, 11596 jobs, heap 0x32105d880
+[ 334.7s] patch 2: 442 blocks, 448512 words so far, 8276 edits, 11756 jobs, heap 0x32108e5d0
+[ 338.6s] patch 2: 447 blocks, 453632 words so far, 8372 edits, 11916 jobs, heap 0x3210bf320
+[ 453.4s] patch 2: 653 blocks, 664576 words so far, 8468 edits, 14668 jobs, heap 0x3210fa2a0
+[ 651.5s] patch 2: 1009 blocks, 1029120 words so far, 8564 edits, 19300 jobs, heap 0x3210fa2d0
+[ 783.6s] patch 2: 1245 blocks, 1270784 words so far, 8660 edits, 22420 jobs, heap 0x3210fa300
+[ 867.2s] patch 2: 1392 blocks, 1421312 words so far, 8756 edits, 24308 jobs, heap 0x3210fa330
+[ 885.6s] patch 2: 1424 blocks, 1454080 words so far, 8852 edits, 25484 jobs, heap 0x3210fa360
+[ 888.6s] patch 2: 1429 blocks, 1459200 words so far, 8948 edits, 25612 jobs, heap 0x3210fa390
+[ 892.2s] patch 2: 1446 blocks, 1464784 words so far, 9044 edits, 26020 jobs, heap 0x3210fa3c0
+[1124.0s] wrote /home/user/snap_jp8g11/build/jp8_host/ref_44100: 2636 steps, 1847 blocks, 1875408 words, 66504 state bytes, 9044 performEdits, 31068 worker jobs
+=== 2b. the shipped template (jp8/gen/jp8h_template.bin.gz, what jp8/apps/jp8_render boots) == the oracle's at 44100 ===
+shipped template 51be86b0ddc1ed63 (44013162 bytes), the oracle's 51be86b0ddc1ed63, its .sha256 file agrees: EQUAL
+=== 3. the C side at 44100: checked build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 44100) is the oracle's (image + heap + host objects)
+[ 168.6s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 31068 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 44100 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 44100: product build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 44100) is the oracle's (image + heap + host objects)
+[  15.8s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 31068 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 44100 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 44100: product build, the workers on threads (3 runs: a race would show) ===
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 44100 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 44100 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 44100 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 2. the oracle at 96000: template + references ===
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  15.3s] InitDll -> 1
+[  60.3s] IComponent::initialize -> 0x0
+[  60.4s] heap 0x31fb67b80 (263.6 MB used), 0 oracle regions outside the template: none
+[  62.5s] template (before setupProcessing): 8 regions, 69 facts, 840 stubs, 44.0 MB (sha256 51be86b0ddc1ed63)
+[  63.3s] setup 96000: the host objects end at 0x5a0012690, 0 edits, 0 jobs
+[  63.6s] patch 2: 0 blocks, 0 words so far, 96 edits, 0 jobs, heap 0x31fbfe870
+[  65.7s] patch 63: 8 blocks, 7168 words so far, 192 edits, 248 jobs, heap 0x31fc5f5d0
+[  68.2s] patch 0: 16 blocks, 14336 words so far, 288 edits, 496 jobs, heap 0x31fcbac40
+[  70.8s] patch 12: 24 blocks, 21504 words so far, 384 edits, 744 jobs, heap 0x31fcf2990
+[  83.1s] rate 44100.0: 70 blocks, 67584 words so far, 384 edits, 1472 jobs, heap 0x31fd1f950
+[  84.8s] rate 96000.0: 73 blocks, 70656 words so far, 384 edits, 1512 jobs, heap 0x31fd261d0
+[  85.6s] rate 88200.0: 76 blocks, 73728 words so far, 384 edits, 1544 jobs, heap 0x31fd291d0
+[  86.5s] rate 22050.0: 79 blocks, 76800 words so far, 384 edits, 1576 jobs, heap 0x31fd2c610
+[  86.5s] rate 96000.0: 82 blocks, 79872 words so far, 384 edits, 1576 jobs, heap 0x31fd2c610
+[  89.8s] setstate p2: 93 blocks, 91136 words so far, 480 edits, 1672 jobs, heap 0x31fd3b2a0
+[  90.7s] setstate p2: 95 blocks, 93184 words so far, 576 edits, 1688 jobs, heap 0x31fd3e470
+[  91.4s] setstate p2: 97 blocks, 95232 words so far, 672 edits, 1704 jobs, heap 0x31fd41610
+[  92.7s] setstate p2: 99 blocks, 97280 words so far, 768 edits, 1704 jobs, heap 0x31fd427e0
+[  93.8s] setstate p2: 101 blocks, 99328 words so far, 788 edits, 1704 jobs, heap 0x31fd42810
+[  93.9s] setstate p2: 103 blocks, 101376 words so far, 788 edits, 1704 jobs, heap 0x31fd42810
+[  93.9s] setstate p2: 105 blocks, 103424 words so far, 788 edits, 1704 jobs, heap 0x31fd42810
+[  94.0s] setstate p2: 107 blocks, 105472 words so far, 884 edits, 1704 jobs, heap 0x31fd43d60
+[  96.1s] setstate p2: 109 blocks, 107520 words so far, 980 edits, 1720 jobs, heap 0x31fd46cb0
+[  97.8s] setstate p2: 111 blocks, 109568 words so far, 1076 edits, 1736 jobs, heap 0x31fd48e80
+[  99.3s] setstate p2: 113 blocks, 111616 words so far, 1172 edits, 1752 jobs, heap 0x31fd4aef0
+[ 100.8s] setstate p2: 115 blocks, 113664 words so far, 1268 edits, 1768 jobs, heap 0x31fd4cb80
+[ 101.1s] setstate p2: 117 blocks, 115712 words so far, 1364 edits, 1784 jobs, heap 0x31fd4e7f0
+[ 102.3s] setstate p2: 119 blocks, 117760 words so far, 1460 edits, 1784 jobs, heap 0x31fd4fac0
+[ 103.9s] setstate p2: 121 blocks, 119808 words so far, 1556 edits, 1792 jobs, heap 0x31fd52c90
+[ 104.1s] setstate p2: 123 blocks, 121856 words so far, 1652 edits, 1794 jobs, heap 0x31fd55e60
+[ 104.4s] setstate p2: 125 blocks, 123904 words so far, 1748 edits, 1798 jobs, heap 0x31fd59030
+[ 104.8s] setstate p2: 127 blocks, 125952 words so far, 1844 edits, 1804 jobs, heap 0x31fd5c200
+[ 105.3s] setstate p2: 129 blocks, 128000 words so far, 1940 edits, 1814 jobs, heap 0x31fd5f3d0
+[ 105.8s] setstate p2: 131 blocks, 130048 words so far, 2036 edits, 1826 jobs, heap 0x31fd625a0
+[ 106.5s] setstate p2: 133 blocks, 132096 words so far, 2132 edits, 1840 jobs, heap 0x31fd65770
+[ 107.2s] setstate p2: 135 blocks, 134144 words so far, 2228 edits, 1856 jobs, heap 0x31fd68940
+[ 107.9s] setstate learned: 137 blocks, 136192 words so far, 2324 edits, 1872 jobs, heap 0x31fd6bb10
+[ 108.5s] editor : 138 blocks, 137216 words so far, 2324 edits, 1880 jobs, heap 0x31fd7e510
+[ 109.4s] patch 2: 140 blocks, 139264 words so far, 2420 edits, 1896 jobs, heap 0x31fdb1390
+[ 111.5s] patch 2: 146 blocks, 145408 words so far, 2516 edits, 2056 jobs, heap 0x31fde80f0
+[ 113.1s] patch 2: 151 blocks, 150528 words so far, 2612 edits, 2200 jobs, heap 0x31fe1de40
+[ 114.8s] patch 2: 156 blocks, 155648 words so far, 2708 edits, 2344 jobs, heap 0x31fe53b90
+[ 116.5s] patch 2: 161 blocks, 160768 words so far, 2804 edits, 2488 jobs, heap 0x31febee80
+[ 118.2s] patch 2: 166 blocks, 165888 words so far, 2900 edits, 2632 jobs, heap 0x31fef4bd0
+[ 119.9s] patch 2: 171 blocks, 171008 words so far, 2996 edits, 2776 jobs, heap 0x31ff7ab70
+[ 120.8s] patch 2: 173 blocks, 173056 words so far, 3092 edits, 2872 jobs, heap 0x31ffad8c0
+[ 122.7s] patch 2: 179 blocks, 179200 words so far, 3188 edits, 3032 jobs, heap 0x31ffe4610
+[ 124.4s] patch 2: 184 blocks, 184320 words so far, 3284 edits, 3184 jobs, heap 0x3200923c0
+[ 126.5s] patch 2: 190 blocks, 190464 words so far, 3380 edits, 3344 jobs, heap 0x3200c9110
+[ 128.5s] patch 2: 196 blocks, 196608 words so far, 3476 edits, 3512 jobs, heap 0x3200ffe60
+[ 130.1s] patch 2: 201 blocks, 201728 words so far, 3572 edits, 3656 jobs, heap 0x320135bb0
+[ 131.9s] patch 2: 207 blocks, 207872 words so far, 3668 edits, 3816 jobs, heap 0x32016c900
+[ 133.8s] patch 2: 213 blocks, 214016 words so far, 3764 edits, 3976 jobs, heap 0x3202576d0
+[ 135.4s] patch 2: 218 blocks, 219136 words so far, 3860 edits, 4120 jobs, heap 0x32028d420
+[ 136.3s] patch 2: 220 blocks, 221184 words so far, 3956 edits, 4216 jobs, heap 0x3202c0170
+[ 137.1s] patch 2: 222 blocks, 223232 words so far, 4052 edits, 4304 jobs, heap 0x3202f2ec0
+[ 138.7s] patch 2: 227 blocks, 228352 words so far, 4148 edits, 4456 jobs, heap 0x320328c10
+[ 140.4s] patch 2: 232 blocks, 233472 words so far, 4244 edits, 4600 jobs, heap 0x32035e960
+[ 142.0s] patch 2: 237 blocks, 238592 words so far, 4340 edits, 4744 jobs, heap 0x3203946b0
+[ 143.7s] patch 2: 242 blocks, 243712 words so far, 4436 edits, 4896 jobs, heap 0x3203ca400
+[ 145.3s] patch 2: 247 blocks, 248832 words so far, 4532 edits, 5040 jobs, heap 0x32050e1f0
+[ 147.1s] patch 2: 252 blocks, 253952 words so far, 4628 edits, 5184 jobs, heap 0x320543f40
+[ 148.7s] patch 2: 257 blocks, 259072 words so far, 4724 edits, 5328 jobs, heap 0x320579c90
+[ 150.3s] patch 2: 262 blocks, 264192 words so far, 4820 edits, 5480 jobs, heap 0x3205af9e0
+[ 152.0s] patch 2: 267 blocks, 269312 words so far, 4916 edits, 5624 jobs, heap 0x3205e5730
+[ 153.6s] patch 2: 272 blocks, 274432 words so far, 5012 edits, 5768 jobs, heap 0x32061b480
+[ 155.2s] patch 2: 277 blocks, 279552 words so far, 5108 edits, 5912 jobs, heap 0x3206511d0
+[ 156.8s] patch 2: 282 blocks, 284672 words so far, 5204 edits, 6064 jobs, heap 0x32068b750
+[ 158.4s] patch 2: 287 blocks, 289792 words so far, 5300 edits, 6208 jobs, heap 0x3206c14a0
+[ 160.1s] patch 2: 292 blocks, 294912 words so far, 5396 edits, 6352 jobs, heap 0x3206f71f0
+[ 161.7s] patch 2: 297 blocks, 300032 words so far, 5492 edits, 6504 jobs, heap 0x32072cf40
+[ 163.3s] patch 2: 302 blocks, 305152 words so far, 5588 edits, 6648 jobs, heap 0x3208f7d70
+[ 164.9s] patch 2: 307 blocks, 310272 words so far, 5684 edits, 6792 jobs, heap 0x32092dac0
+[ 166.5s] patch 2: 312 blocks, 315392 words so far, 5780 edits, 6936 jobs, heap 0x320963810
+[ 168.1s] patch 2: 317 blocks, 320512 words so far, 5876 edits, 7088 jobs, heap 0x320999560
+[ 169.7s] patch 2: 322 blocks, 325632 words so far, 5972 edits, 7232 jobs, heap 0x3209cf2b0
+[ 171.3s] patch 2: 327 blocks, 330752 words so far, 6068 edits, 7376 jobs, heap 0x320a05000
+[ 173.0s] patch 2: 332 blocks, 335872 words so far, 6164 edits, 7520 jobs, heap 0x320a0a030
+[ 174.7s] patch 2: 337 blocks, 340992 words so far, 6260 edits, 7664 jobs, heap 0x320a0f060
+[ 175.6s] patch 2: 339 blocks, 343040 words so far, 6356 edits, 7752 jobs, heap 0x320a11090
+[ 176.5s] patch 2: 341 blocks, 345088 words so far, 6452 edits, 7848 jobs, heap 0x320a130c0
+[ 178.9s] patch 2: 349 blocks, 353280 words so far, 6548 edits, 8048 jobs, heap 0x320a4be10
+[ 179.7s] patch 2: 351 blocks, 355328 words so far, 6644 edits, 8136 jobs, heap 0x320a85790
+[ 180.5s] patch 2: 353 blocks, 357376 words so far, 6740 edits, 8232 jobs, heap 0x320ab84e0
+[ 182.2s] patch 2: 358 blocks, 362496 words so far, 6836 edits, 8376 jobs, heap 0x320aee230
+[ 183.9s] patch 2: 363 blocks, 367616 words so far, 6932 edits, 8520 jobs, heap 0x320b23f80
+[ 185.6s] patch 2: 368 blocks, 372736 words so far, 7028 edits, 8672 jobs, heap 0x320b59cd0
+[ 187.4s] patch 2: 373 blocks, 377856 words so far, 7124 edits, 8816 jobs, heap 0x320def350
+[ 189.1s] patch 2: 378 blocks, 382976 words so far, 7220 edits, 8960 jobs, heap 0x320e250a0
+[ 190.0s] patch 2: 380 blocks, 385024 words so far, 7316 edits, 9056 jobs, heap 0x320e57df0
+[ 192.9s] patch 2: 389 blocks, 394240 words so far, 7412 edits, 9272 jobs, heap 0x320e91b40
+[ 195.9s] patch 2: 398 blocks, 403456 words so far, 7508 edits, 9488 jobs, heap 0x320ecb890
+[ 198.7s] patch 2: 407 blocks, 412672 words so far, 7604 edits, 9712 jobs, heap 0x320f055e0
+[ 200.7s] patch 2: 413 blocks, 418816 words so far, 7700 edits, 9872 jobs, heap 0x320f3c330
+[ 202.1s] patch 2: 417 blocks, 422912 words so far, 7796 edits, 10000 jobs, heap 0x320f71080
+[ 203.8s] patch 2: 422 blocks, 428032 words so far, 7892 edits, 10152 jobs, heap 0x320fa6dd0
+[ 205.5s] patch 2: 427 blocks, 433152 words so far, 7988 edits, 10296 jobs, heap 0x320fdcb20
+[ 207.1s] patch 2: 432 blocks, 438272 words so far, 8084 edits, 10440 jobs, heap 0x321012870
+[ 208.9s] patch 2: 437 blocks, 443392 words so far, 8180 edits, 10584 jobs, heap 0x3210485c0
+[ 210.6s] patch 2: 442 blocks, 448512 words so far, 8276 edits, 10736 jobs, heap 0x32107e310
+[ 212.4s] patch 2: 447 blocks, 453632 words so far, 8372 edits, 10880 jobs, heap 0x3210b4060
+[ 266.3s] patch 2: 653 blocks, 664576 words so far, 8468 edits, 13144 jobs, heap 0x3210fa2a0
+[ 358.4s] patch 2: 1009 blocks, 1029120 words so far, 8564 edits, 16912 jobs, heap 0x3210fa2d0
+[ 420.4s] patch 2: 1245 blocks, 1270784 words so far, 8660 edits, 19472 jobs, heap 0x3210fa300
+[ 459.1s] patch 2: 1392 blocks, 1421312 words so far, 8756 edits, 21008 jobs, heap 0x3210fa330
+[ 467.9s] patch 2: 1424 blocks, 1454080 words so far, 8852 edits, 22104 jobs, heap 0x3210fa360
+[ 469.5s] patch 2: 1429 blocks, 1459200 words so far, 8948 edits, 22216 jobs, heap 0x3210fa390
+[ 471.2s] patch 2: 1446 blocks, 1464784 words so far, 9044 edits, 22616 jobs, heap 0x3210fa3c0
+[ 573.5s] wrote /home/user/snap_jp8g11/build/jp8_host/ref_96000: 2636 steps, 1847 blocks, 1875408 words, 66504 state bytes, 9044 performEdits, 26696 worker jobs
+=== 2b. the shipped template (jp8/gen/jp8h_template.bin.gz, what jp8/apps/jp8_render boots) == the oracle's at 96000 ===
+shipped template 51be86b0ddc1ed63 (44013162 bytes), the oracle's 51be86b0ddc1ed63, its .sha256 file agrees: EQUAL
+=== 3. the C side at 96000: checked build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 96000) is the oracle's (image + heap + host objects)
+[  78.6s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 26696 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 96000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 96000: product build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 96000) is the oracle's (image + heap + host objects)
+[   8.5s] 2636 steps, 1875408 words (0 differ), 66504 state bytes, 9044 performEdits, 26696 worker jobs, heap 112449 live / 147 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 96000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 96000: product build, the workers on threads (3 runs: a race would show) ===
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 96000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 96000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 96000 Hz, patches [2, 63, 0, 12]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 4. the teeth ===
+tooth T1 bites (1842552 differences): [  46.9s] word 1026: step 418, block of 512, L sample 2: oracle 30946c48 C 30946cdc
+tooth T2 bites (9 differences): [   0.8s] TRAP: step 417 ('block', 512): rc -3 TRAP at rva 0x600000840: import DuplicateHandle not shimmed on the host path (called from rva 0x447256) (call rva 0x36bf30)
+tooth T4 bites (27643 differences): [  14.1s] word 67585: step 495, block of 512, L sample 1: oracle 33a0ce9a C 36634ac0
+tooth T5 bites (9 differences): [   1.4s] TRAP: step 686 ('block', 512): rc -3 TRAP at rva 0x37fea0: indirect target 0x37fea0 not lifted (call rva 0x36bf30)
+tooth T6 bites (1748413 differences): [  14.0s] step results differ from step 839: C ['ctl', 'get/60000a/0.0', 1, 4602696480615038976, ''] oracle ['ctl', 'get/60000a/0.0', 1, 4596232490410049536, '']
+tooth T7 bites (5 differences): [  13.6s] step results differ from step 845: C ['editor', '3940x2004', 1, 13423999440, '-196x-99', 1] oracle ['editor', '3940x2004', 1, 13416955024, '-196x-99', 1]
+tooth T8 bites (1 differences): [  13.9s] step results differ from step 2: C ['info', 'param/0', 0, '000060004c0046004f00200057004100560045000000000000000000000000000000000000000000000000000000000000000
+tooth T10 bites (1329989 differences): [  16.2s] word 453897: step 1228, block of 512, L sample 265: oracle 3d6c1972 C 3d6c199f
+tooth T13 bites (1840305 differences): [  14.4s] word 2072: step 419, block of 512, L sample 24: oracle 3d055043 C 3d055042
+tooth T14 bites (3 differences): [  13.9s] step results differ from step 849: C ['zoomconv', '3940x2004', 18] oracle ['zoomconv', '3940x2004', 24]
+tooth T3 bites (2 differences): [   0.7s] CONTROL 1 differs: init hash C 53dda57ac0d5fde9 oracle bed5e21731991471
+jp8_xlane: 1960 functions; lane write 89909, load cg 55502, store cg 38593, movss load 16146, copy 15189, movss store 12052, ldx 5142, head read 3943, stx 3338, read 2323, other write 368, fallback 309, whole write 169; TOOTH planted
+tooth T9 bites (9 differences): [   0.7s] TRAP: step 417 ('block', 512): rc -3 TRAP at rva 0x33ae1a: div0 (call rva 0x36bf30)
+tooth T12 bites (1 differences): [  98.9s] END hash differs: C 4b2883f0e8e56ce6 oracle b66a2bf7c9cdedaa
+tooth T11 bites (the shipped template, one byte flipped): shipped template c7e2c71d0973cb62 (44013162 bytes), the oracle's 51be86b0ddc1ed63, its .sha256 file agrees: DIFFERENT
+JP8 HOST GATE (setup, process(), patch load, MIDI controllers, the host transport, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, the editor's open and zoom, workers, the heap's reuse; first rates 48000 44100 96000, patches 2,63,0,12) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, software floats EXACTLY 0, 14 teeth bite
