@@ -24,9 +24,10 @@ slower than the plugin's own code (measured on the JX-3P's voice render against 
 per second of audio vs 159). jp8/tools/jp8_fast.py rewrites a lifted source with each function's registers and flags
 in C locals (stores at calls only where dirty and where the callee may read or write; flags proven dead where
 functions meet; small functions inlined in rounds): the JX voice render 371 ms, bit-exact (jx_master_bisect patch 5).
-Still owed before it carries a product: the JP8 layer gates on its output, a tooth (a planted pass defect must fail
-a gate), the per-function bounds check as one accumulator (CHECK=2 per access costs 4x in this form), the xmm
-registers off the stack, and the remaining calls. The JUNO-60's and JX-3P's row 24 closes with it (a lifted render).
+GRADED HERE (job jp8fast2): the three drive2 layer gates on the pass's output of jp8_lift.c are EXACTLY 0 (output,
+heap, stack); its tooth bites (JX bisect). Still owed before it carries a product: the bounds check as an expression
+(CHECK 2 as a function costs 4x: the compiler keeps it out of line in large functions), the xmm registers off the
+stack, the remaining calls, and the speed of the JP8's own render measured against the plugin run natively. The JUNO-60's and JX-3P's row 24 closes with it (a lifted render).
 **2026-10-11 (from the JX-3P track, JX-26a, playbook 213): `jp8_lift.py` now emits ISO C99** -- the 64-bit mul /
 imul / div through jp8_cpu.h's exact helpers (jp8_mulu64, jp8_muls64, jp8_divu128, jp8_divs128) and the bit scans
 through jp8_clz64 / jp8_ctz64 / jp8_popcount64, no __int128, no builtins (20 M operands equal to __int128's; the

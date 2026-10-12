@@ -4013,6 +4013,14 @@ the ramp sweep; 950 functions, 104,897 instructions) lifted by jp8_lift.py and r
   950 functions); small functions inlined into their callers in rounds. Measured: 2,320 -> 557 ms (band translation,
   no bounds check), 430 ms (identity guest mapping), 371 ms (rounds of inlining); 54,000 instructions per sample.
   Bit-exact (patch 5, jx_master_bisect). Still 2.3x the plugin: the calls that remain and the xmm unions.
+- GRADED ON A SECOND PLUGIN (job jp8fast2): the JUPITER-8's lifted source through the same pass (768 functions, 3,084
+  calls inlined, the flag proof holds on every function) -- its three drive2 layer gates EXACTLY 0: every output word,
+  the heap and the STACK equal to the plugin's. The pass's tooth (JP8_FAST_TOOTH=1: xmm0 not stored before a call)
+  bites: jx_master_bisect patch 5, all eight voices differ at chunk 3.
+- THE BOUNDS CHECK: jp8_cpu.h's JP8_RELOC_CHECK 2 (the bridge's default) cost 4x (2,350 vs 600 ms): in functions this
+  large the compiler stops inlining the checking translation -- 68,568 out-of-line calls, one per memory access
+  (objdump); the plain translation (CHECK 0) stays inlined. A per-access check must be an expression, never a
+  function the compiler may keep out of line.
 ### The rule
 Before a lifted path is planned as a product, time it against the plugin's own code run natively, and count
 instructions per sample on both; a lifted function's state lives in locals, not in a struct the guest memory may
