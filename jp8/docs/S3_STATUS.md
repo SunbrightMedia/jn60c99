@@ -33,9 +33,9 @@ stack, the remaining calls, and the speed of the JP8's own render measured again
 **2026-10-11 (from the JX-3P track, JX-26a, playbook 213): `jp8_lift.py` now emits ISO C99** -- the 64-bit mul /
 imul / div through jp8_cpu.h's exact helpers (jp8_mulu64, jp8_muls64, jp8_divu128, jp8_divs128) and the bit scans
 through jp8_clz64 / jp8_ctz64 / jp8_popcount64, no __int128, no builtins (20 M operands equal to __int128's; the
-JX's lifted source re-lifted: 14 lines changed, its lift gate EXACTLY 0). The committed jp8/src/jp8_lift.c is
-still the old output (this container has no build/jp8_lift/dynreach_*.json to lift from): the next
-jp8_lift_gate.sh run rewrites it -- then check it with tools/verify/c99_gate.py's scan.
+JX's lifted source re-lifted: 14 lines changed, its lift gate EXACTLY 0). 2026-10-12: jp8/src/jp8_lift.c re-lifted by
+jp8_lift_gates_all.sh (job jp8fast2: the three drive2 layers GREEN on it) and committed -- 94 lines changed, every
+one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; gcc -std=c99 -pedantic-errors clean.
 **Where it stands (each line has its log):**
 - ORACLE = DRIVE2 (`jp8_emu.JP8()` default; `legacy=True` only reproduces old logs): HOST from the FACTORY 0x444FE0
   (ALLOC 0x8D0 + ctor 0x444000), BUILD, FTZ, SETSR(float xmm1), host_init (host ids 0,1,2 through HOSTPARAM), recall through
