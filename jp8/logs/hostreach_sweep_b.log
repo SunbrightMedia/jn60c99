@@ -1,0 +1,9 @@
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  15.4s] InitDll -> 1
+[  60.1s] IComponent::initialize -> 0x0
+[  60.2s] roots (the plugin's vtables): process 0x36bf30, setupProcessing 0x449ee0, setActive 0x36c600, getState 0x36ba50, setState 0x36c650, patch_load 0x355f90, worker 0x445670, ui_drain 0x33a290, cc_index 0x325870, cc_learn 0x326660, cc_forget 0x324f00, ctl_qi 0x369754, ctl_compstate 0x369ae0, ctl_setstate 0x36a300, ctl_getstate 0x3691b0, ctl_count 0x450400, ctl_info 0x450420, midi_assign 0x369120, unit_count 0x3691d0, unit_info 0x450bc0, unit_lists 0x450970, unit_selected 0x3691a0, unit_select 0x369ad0, ctl10 0x450270, ctl11 0x4502d0, ctl12 0x450fd0, ctl13 0x451180, ctl14 0x369150, ctl15 0x36a2b0
+[  64.5s] patch 2 'BR JP PWM Brass ': executed 0 (+0), 0 indirect sites, 0 stub names
+[ 553.1s] the hook on from step 1464 (block)
+[3089.3s] the steps after the patches (controllers, rates, setActive, states): executed 48669 (+48669), 625 indirect sites, 13 stub names
+[3089.3s] stubs reached: HeapFree x12635, GetCurrentThreadId x4902, AcquireSRWLockExclusive x2451, ReleaseSRWLockExclusive x2451, COM:pchanges:4 x753, COM:pqueue:4 x753, COM:pqueue:5 x753, COM:pqueue:3 x753, COM:pchanges:3 x557, COM:handler:4 x480, COM:events:4 x260, COM:events:3 x66, COM:stream:4 x2
+[3089.3s] wrote /home/user/snap_jp8sweep/build/sreach_b.json
