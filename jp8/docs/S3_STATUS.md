@@ -25,7 +25,9 @@ per second of audio vs 159). jp8/tools/jp8_fast.py rewrites a lifted source with
 in C locals (stores at calls only where dirty and where the callee may read or write; flags proven dead where
 functions meet; small functions inlined in rounds): the JX voice render 371 ms, bit-exact (jx_master_bisect patch 5).
 GRADED HERE (job jp8fast2): the three drive2 layer gates on the pass's output of jp8_lift.c are EXACTLY 0 (output,
-heap, stack); its tooth bites (JX bisect). Still owed before it carries a product: the bounds check as an expression
+heap, stack); its tooth bites (JX bisect, and here: the state differs). TIMED (jp8/tools/jp8_speed.py, 22,050 samples
+of the render reference, one output checksum in every build): the plugin's own code natively 195 ms per second of
+audio at 44.1 kHz on this CPU, the plain lift 1,093 ms, the fast pass 449 ms (2.3x; compare + branch fused). Still owed before it carries a product: the bounds check as an expression
 (CHECK 2 as a function costs 4x: the compiler keeps it out of line in large functions), the xmm registers off the
 stack, the remaining calls, and the speed of the JP8's own render measured against the plugin run natively. The JUNO-60's and JX-3P's row 24 closes with it (a lifted render).
 **2026-10-11 (from the JX-3P track, JX-26a, playbook 213): `jp8_lift.py` now emits ISO C99** -- the 64-bit mul /

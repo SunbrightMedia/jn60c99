@@ -4020,7 +4020,15 @@ the ramp sweep; 950 functions, 104,897 instructions) lifted by jp8_lift.py and r
 - THE BOUNDS CHECK: jp8_cpu.h's JP8_RELOC_CHECK 2 (the bridge's default) cost 4x (2,350 vs 600 ms): in functions this
   large the compiler stops inlining the checking translation -- 68,568 out-of-line calls, one per memory access
   (objdump); the plain translation (CHECK 0) stays inlined. A per-access check must be an expression, never a
-  function the compiler may keep out of line.
+  function the compiler may keep out of line. As an expression on per-access slots (the pass numbers each access of a
+  statement) every call is gone but the check still costs 3.4x (2,000 vs 590 ms): a lifted render runs without it in
+  the product, as the hand port does (the gates keep a trapping check).
+- COMPARE + BRANCH as one C comparison (comiss / ucomiss and the jcc after it, where no flag is live after the
+  branch; 5,033 pairs in the JX voice code): 350 -> 324 ms, bit-exact.
+- THE JUPITER-8, timed (jp8/tools/jp8_speed.py, its drive2 render reference, 22,050 samples, one output checksum in
+  every build): the plugin's own code natively 195 ms per second of audio, the plain lift 1,093, the fast pass 449
+  (2.3x). Its three layer gates on that output EXACTLY 0; the pass's tooth bites there too. Left: the xmm unions
+  (GPR halves and lane merges: 2,170 movd, 953 or, 945 and in one voice copy), the calls that remain.
 ### The rule
 Before a lifted path is planned as a product, time it against the plugin's own code run natively, and count
 instructions per sample on both; a lifted function's state lives in locals, not in a struct the guest memory may

@@ -48,6 +48,7 @@ ASSIGN = r'(?:\+|-|\*|/|%|&|\||\^|<<|>>)?=(?!=)'
 ALLREG = frozenset(range(32))          # 0..15 the GPRs, 16..31 the xmm registers
 INLINE_MAX = int(os.environ.get("JP8_FAST_INLINE", "80"))
 INLINE_ROUNDS = 4
+FUSE_ON = os.environ.get('JP8_FAST_FUSE', '1') == '1'   # compare + branch fusion (0: off)
 TOOTH = os.environ.get('JP8_FAST_TOOTH') == '1'   # a planted pass defect: every gate on the output must fail   # statements: a leaf function this small is inlined at its direct calls
 
 STMT = re.compile(r'^  /\*([0-9a-f]+) (.*?)\*/ (.*)$')
@@ -457,9 +458,50 @@ def flags_ok(f):
                 li = fu[i] | (out - fk[i])
             if li != live_in[i]:
                 live_in[i] = li; changed = True
+    f.flive_in = live_in
     if n and live_in[f.start]:
         return False, 'flags %s live at the entry' % sorted(live_in[f.start])
     return True, ''
+
+
+# a float compare and the branch right after it, as ONE C comparison -- x86's comiss / ucomiss: unordered sets ZF, PF
+# and CF; OF = SF = 0 (jp8_cpu.h cmp_f). Only where no flag is live after the branch, on either path.
+FUSE = {'CC_A': '(%(a)s > %(b)s)', 'CC_AE': '(%(a)s >= %(b)s)', 'CC_B': '!(%(a)s >= %(b)s)', 'CC_BE': '!(%(a)s > %(b)s)',
+        'CC_E': '(!(%(a)s < %(b)s) && !(%(a)s > %(b)s))', 'CC_NE': '((%(a)s < %(b)s) || (%(a)s > %(b)s))',
+        'CC_P': '((%(a)s != %(a)s) || (%(b)s != %(b)s))', 'CC_NP': '((%(a)s == %(a)s) && (%(b)s == %(b)s))'}
+
+
+def find_fusions(f):
+    """{jcc statement index: (compare helper, operand A, operand B, condition)} for every compare + branch pair that
+    fuses: the branch follows the compare with no label between, its condition is one of FUSE, and no flag is live
+    after it"""
+    labeled, k, prev = set(), 0, False
+    for it in f.items:
+        if it[0] == 'label':
+            prev = True
+            continue
+        if prev:
+            labeled.add(k)
+        prev = False
+        k += 1
+    fz = {}
+    for j in range(1, len(f.st)):
+        if f.shape[j] != 'JCC' or j in labeled or f.shape[j - 1] != 'PLAIN':
+            continue
+        m = re.fullmatch(r'(cmp_[fd])\(c,(.*)\);', f.st[j - 1][3])
+        if not m:
+            continue
+        cc = SH_JCC.fullmatch(f.st[j][3]).group(1)
+        if cc not in FUSE:
+            continue
+        out = frozenset().union(*[f.flive_in[x] for x in f.succ[j]]) if f.succ[j] else frozenset()
+        if out:
+            continue
+        args = call_args('(' + m.group(2) + ')', 0)
+        if len(args) != 2:
+            continue
+        fz[j] = (m.group(1), args[0], args[1], cc)
+    return fz
 
 
 def dirty_in(f, use, dfn):
@@ -524,6 +566,24 @@ def rewrite_text(t):
     return t
 
 
+MEMTOK = re.compile(r'\b(FM(?:8|16|32|64|F|D|S8|S16|S32|X)|JF_LDX|JF_STX)\(')
+
+
+def number_mem(t):
+    """each guest access of one statement gets its own slot k (FMK..(k, ..)): the bad-access check is then an
+    expression on the slot's own temporaries, so two accesses in one expression never write one object"""
+    n = [0]
+    def sub(m):
+        k = n[0]; n[0] += 1
+        nm = m.group(1)
+        kk = {'JF_LDX': 'JF_LDXK', 'JF_STX': 'JF_STXK'}.get(nm, 'FMK' + nm[2:])
+        return '%s(%d, ' % (kk, k)
+    t = MEMTOK.sub(sub, t)
+    if 'JP8F_MOVSB(' in t:                  # rep movsb: slots 0 and 1 inside the macro, alone in its statement
+        n[0] = max(n[0], 2)
+    return t, n[0]
+
+
 def emit_fn(f, use, dfn, sync_flags, out):
     din = dirty_in(f, use, dfn)
     loc = sorted(f.local)
@@ -531,9 +591,10 @@ def emit_fn(f, use, dfn, sync_flags, out):
     xmms = [k for k in loc if k >= 16]
     # restrict: the lifted code reaches the CPU struct through cg alone (guest memory lies in the guest blocks), so the
     # compiler may keep a stored register in a machine register across guest stores
+    head = len(out)
     out.append('static void f_%s(CPU *restrict cg) {' % f.rva)
     decl = ('  int fz, fs, fc, fo, fp; uint64_t ha_, hb_, hr_, hh_, hcin_; int64_t hp_, hs_; unsigned hn_; float hf1_, hf2_;'
-            ' double hd1_, hd2_; uint32_t bad_ = 0; (void)bad_;')
+            ' double hd1_, hd2_;')
     if gprs:
         decl += ' uint64_t %s;' % ', '.join(rname(k) for k in gprs)
     if xmms:
@@ -547,6 +608,9 @@ def emit_fn(f, use, dfn, sync_flags, out):
     out.append(f.decl)
     out.append(f.entry)
     k = 0
+    slots = 0
+    fuse = find_fusions(f) if (FUSE_ON and not sync_flags) else {}
+    fused_cmp = {j - 1 for j in fuse}
     for it in f.items:
         if it[0] == 'label':
             out.append(it[1] + ':')
@@ -556,7 +620,7 @@ def emit_fn(f, use, dfn, sync_flags, out):
         if d is None:                       # unreachable from the entry: no dataflow value; store nothing extra
             d = frozenset(f.local)
         if sh == 'RET':
-            new = '{%s JP8F_FLUSH(); return;}' % stores(d, sync_flags)
+            new = '{%s @FLUSH@ return;}' % stores(d, sync_flags)
         elif sh == 'CALL':
             m = SH_CALL.fullmatch(t)
             cal = m.group(2)
@@ -564,27 +628,45 @@ def emit_fn(f, use, dfn, sync_flags, out):
             s = pre & (use[cal] | dfn[cal])
             if TOOTH and 16 in s:             # TOOTH: xmm0 (the first float argument) not stored before the call
                 s = s - {16}
-            new = 'r4-=8; M64(r4)=%s; {%s f_%s(cg); %s} r4+=8;' % (m.group(1), stores(s, sync_flags), cal,
+            new = 'r4-=8; FM64(r4)=%s; {%s f_%s(cg); %s} r4+=8;' % (m.group(1), stores(s, sync_flags), cal,
                                                                    loads(dfn[cal] & f.local, sync_flags))
         elif sh == 'ICALL':
             m = SH_ICALL.fullmatch(t)
-            new = 'a0=%s; r4-=8; M64(r4)=%s; {%s jp8_icall(cg, a0); %s} r4+=8;' % (
+            new = 'a0=%s; r4-=8; FM64(r4)=%s; {%s jp8_icall(cg, a0); %s} r4+=8;' % (
                 rewrite_text(m.group(1)), m.group(2), stores(d | {4}, sync_flags), loads(f.local, sync_flags))
         elif sh == 'TAIL':
             cal = SH_TAIL.fullmatch(t).group(1)
             s = d & (use[cal] | dfn[cal])
             rest = d - s - (dfn[cal] & f.local)
-            new = '{%s f_%s(cg); %s %s JP8F_FLUSH(); return;}' % (stores(s, sync_flags), cal,
+            new = '{%s f_%s(cg); %s %s @FLUSH@ return;}' % (stores(s, sync_flags), cal,
                                                                loads(dfn[cal] & f.local, sync_flags), stores(rest, False))
         elif sh == 'SWITCH':
             m = SH_SWITCH.fullmatch(t)
-            new = 'a0=%s; switch (a0) {%s default: {%s JP8F_FLUSH(); jp8_icall(cg, a0); return;} }' % (
+            new = 'a0=%s; switch (a0) {%s default: {%s @FLUSH@ jp8_icall(cg, a0); return;} }' % (
                 rewrite_text(m.group(1)), m.group(2), stores(d, sync_flags))
+        elif k in fused_cmp:                # the compare's flags are read by the next statement alone: it carries it
+            new = ';'
+        elif k in fuse:
+            hlp, a_, b_, cc = fuse[k]
+            v1, v2, daz = ('hf1_', 'hf2_', 'JP8_DAZF') if hlp == 'cmp_f' else ('hd1_', 'hd2_', 'JP8_DAZD')
+            cond = '(%s=%s(%s), %s=%s(%s), %s)' % (v1, daz, rewrite_text(a_), v2, daz, rewrite_text(b_),
+                                                   FUSE[cc] % {'a': v1, 'b': v2})
+            new = 'if %s goto %s;' % (cond, SH_JCC.fullmatch(t).group(2))
         else:
             new = rewrite_text(t)
+        new, nk = number_mem(new)
+        slots = max(slots, nk)
         out.append('  /*%s %s*/ %s' % (srva, mnem, new))
         k += 1
     out.append('}')
+    # the access slots (the bad-access check's temporaries) and the flush at every return
+    sl = ''.join(' uint64_t jta%d; uint32_t jtk%d, jto%d, jtn%d, jtb%d = 0; (void)jta%d; (void)jtk%d; (void)jto%d; (void)jtn%d;'
+                 ' (void)jtb%d;' % ((i,) * 10) for i in range(slots))
+    out[head + 1] += sl
+    flush = 'JP8F_FLUSHK(%s);' % ('|'.join('jtb%d' % i for i in range(slots)) or '0u')
+    for i in range(head, len(out)):
+        if '@FLUSH@' in out[i]:
+            out[i] = out[i].replace('@FLUSH@', flush)
 
 
 def main():
@@ -631,33 +713,30 @@ def main():
                 out.append('static inline uint64_t jf_rcl(int *cf, int sz, uint64_t a, unsigned n) { n %= (unsigned)(sz + 1); '
                            'a &= jp8_mask(sz); while (n--) { int c0 = (int)((a >> (sz - 1)) & 1); a = ((a << 1) | (uint64_t)*cf) '
                            '& jp8_mask(sz); *cf = c0; } return a; }')
-                out.append('/* jp8_fast.py: guest memory with the bad-access check summed in a local per function (bad_), added')
-                out.append(' * to jp8_badacc at every return -- jp8_cpu.h JP8_RELOC_CHECK 2 stores the global at every access */')
+                out.append('/* jp8_fast.py: guest memory through access slots -- with JP8_RELOC_CHECK 2 the bad-access check is an')
+                out.append(' * EXPRESSION on the slot\'s temporaries (jta/jtk/jto/jtn), summed per slot (jtb) and added to jp8_badacc at')
+                out.append(' * every return: as a function the compiler leaves it out of line in large functions (playbook 230) */')
                 out.append('#if defined(JP8_RELOC) && JP8_RELOC_CHECK == 2')
-                out.append('static inline void *jp8f_h(uint64_t a, unsigned n, uint32_t *bad) {')
-                out.append('    uint64_t i = a >> 28; uint32_t k = (uint32_t)(i & (JP8_NBANDS - 1)), off = (uint32_t)(a & 0x0FFFFFFFu);')
-                out.append('    uint32_t b = (uint32_t)(i >= JP8_NBANDS) | (uint32_t)(off < jp8_blo[k]) | (uint32_t)(off + n > jp8_bhi[k]);')
-                out.append('    *bad |= b; return b ? (void *)jp8_sink : (void *)((uintptr_t)a + jp8_bdelta[k]); }')
-                out.append('#define JP8F_H(a, n) jp8f_h((uint64_t)(a), (n), &bad_)')
-                out.append('#define JP8F_FLUSH() (jp8_badacc |= bad_)')
+                out.append('#define FMH(k, a, n) (jta##k = (uint64_t)(a), jtk##k = (uint32_t)((jta##k >> 28) & (JP8_NBANDS - 1u)), '
+                           'jto##k = (uint32_t)(jta##k & 0x0FFFFFFFu), jtn##k = (uint32_t)((jta##k >> 28) >= JP8_NBANDS) | '
+                           '(uint32_t)(jto##k < jp8_blo[jtk##k]) | (uint32_t)(jto##k + (n) > jp8_bhi[jtk##k]), jtb##k |= jtn##k, '
+                           'jtn##k ? (void *)jp8_sink : (void *)((uintptr_t)jta##k + jp8_bdelta[jtk##k]))')
+                out.append('#define JP8F_FLUSHK(x) (jp8_badacc |= (x))')
                 out.append('#else')
-                out.append('#define JP8F_H(a, n) JP8_H(a, n)')
-                out.append('#define JP8F_FLUSH() ((void)0)')
+                out.append('#define FMH(k, a, n) JP8_H(a, n)')
+                out.append('#define JP8F_FLUSHK(x) ((void)(x))')
                 out.append('#endif')
-                out.append('#define FM8(a)  (*(JP8_MQ uint8_t  *)JP8F_H(a, 1))')
-                out.append('#define FM16(a) (*(JP8_MQ uint16_t *)JP8F_H(a, 2))')
-                out.append('#define FM32(a) (*(JP8_MQ uint32_t *)JP8F_H(a, 4))')
-                out.append('#define FM64(a) (*(JP8_MQ uint64_t *)JP8F_H(a, 8))')
-                out.append('#define FMF(a)  (*(JP8_MQ float    *)JP8F_H(a, 4))')
-                out.append('#define FMD(a)  (*(JP8_MQ double   *)JP8F_H(a, 8))')
-                out.append('#define FMX(a)  (*(X *)JP8F_H(a, 16))')
-                out.append('#define FMS8(a)  ((int64_t)(int8_t)FM8(a))')
-                out.append('#define FMS16(a) ((int64_t)(int16_t)FM16(a))')
-                out.append('#define FMS32(a) ((int64_t)(int32_t)FM32(a))')
-                out.append('#define JF_LDX(d, a) memcpy((d), (const void *)JP8F_H(a, 16), 16)')
-                out.append('#define JF_STX(a, s) memcpy(JP8F_H(a, 16), (s), 16)')
+                for nm, ty, nb in (('8', 'uint8_t', 1), ('16', 'uint16_t', 2), ('32', 'uint32_t', 4), ('64', 'uint64_t', 8),
+                                   ('F', 'float', 4), ('D', 'double', 8)):
+                    out.append('#define FMK%s(k, a) (*(JP8_MQ %s *)FMH(k, a, %d))' % (nm, ty, nb))
+                out.append('#define FMKX(k, a) (*(X *)FMH(k, a, 16))')
+                out.append('#define FMKS8(k, a)  ((int64_t)(int8_t)FMK8(k, a))')
+                out.append('#define FMKS16(k, a) ((int64_t)(int16_t)FMK16(k, a))')
+                out.append('#define FMKS32(k, a) ((int64_t)(int32_t)FMK32(k, a))')
+                out.append('#define JF_LDXK(k, d, a) memcpy((d), (const void *)FMH(k, a, 16), 16)')
+                out.append('#define JF_STXK(k, a, s) memcpy(FMH(k, a, 16), (s), 16)')
                 out.append('#ifdef JP8_RELOC')
-                out.append('#define JP8F_MOVSB(c_,s_,d_) do { while (c_) { FM8(d_) = FM8(s_); d_++; s_++; c_--; } } while (0)')
+                out.append('#define JP8F_MOVSB(c_,s_,d_) do { while (c_) { FMK8(0, d_) = FMK8(1, s_); d_++; s_++; c_--; } } while (0)')
                 out.append('#else')
                 out.append('#define JP8F_MOVSB(c_,s_,d_) do { memcpy((void*)(uintptr_t)(d_),(const void*)(uintptr_t)(s_),'
                            '(size_t)(c_)); d_+=c_; s_+=c_; c_=0; } while (0)')
