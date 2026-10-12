@@ -125,8 +125,22 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    host-object area full after ~200 patch loads); both sides now reuse a freed block by its rounded size from the
    template's point, every host buffer is a slot of one scratch area (MEASURED: 160 loads grow the heap 31 MB, then
    stop). activateBus sets two bytes nothing reads (jp8_bus_census.py: no read in a patch load and 12 blocks, the output
-   word for word the same; logs/bus_census.log). OWED: drive v6's gate at three rates on the 64-patch
-   v6 reach (job jp8_reach64_v6, then the gate); the editor (the user's script file and art); the speed.
+   word for word the same; logs/bus_census.log). GATE GREEN (job jp8_host_gate8, logs/host_gate_v6_3rates.log; the
+   graded content tree f3f032ff = 83fb7007 + the v6 64-patch reach): drive v6 (776 steps: 98,304 words, 46,944 state
+   bytes, 1,748 performEdits, the reuse layer's live / free blocks, the memory after) at the first rates 48000, 44100
+   and 96000 -- the checked, the product (lanes + guest memory not volatile, playbook 239) and three threaded runs
+   EXACTLY 0 at each, 15 runs; 9 teeth bite (T1 75,684 differences, T2 a trap, T3 CONTROL 1, T4 27,644, T5 a trap, T6
+   10,222, T7 the end hash, T8 step 2, T9 a trap: the lanes swapped divide by zero). The lift: 1,258 functions,
+   167,736 instructions (jp8/src/jp8_host_lift.c, from the v6 64-patch reach united with the gate's drive).
+3e. 2026-10-12: THE SCOPE AUDIT AND THE SWEEP (jp8/docs/SCOPE_AUDIT.md: 22 rows, each measured). The v6 drive moved
+   ~10 of the 96 panel parameters; the census of their POSITIONS from the plugin's own display strings
+   (jp8_param_positions.py: 37 switches, 59 continuous) drives the v7 sweep (jp8_host_seq.sweep_steps): every
+   parameter at every position, the three effect units' types with their parameters, the arpeggiator's modes x
+   ranges free and synced, the assign modes, KEY HOLD, host blocks of 1..512 samples, the effects' long tail; and the
+   base drive gains the voice counts 2..8, MIDI channels 5 and 15, a note-on of velocity 0. The oracle runs the whole
+   sweep without a throw (patch 2: 1,365 blocks, 14 min). OWED: its reach (three pieces running), then the gate at
+   three rates with tooth T10 (EFFECT TYPE's automation dropped); jp8_mutation_gate.py (one-instruction slips in the
+   reached lift); the editor (the user's script file and art); the speed.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

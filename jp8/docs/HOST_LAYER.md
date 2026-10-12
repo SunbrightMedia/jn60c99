@@ -211,11 +211,11 @@ content tree 533e3470 = 8c4de38e + the threaded transport): at 48000, 44100 and 
 three threaded runs EXACTLY 0 -- 15 runs -- and the 6 teeth bite (T1 74,668 differences, T2 a trap, T3 CONTROL 1, T4
 27,643, T5 a trap, T6 9,207).
 
-Scope NOT covered yet (owed): drive v6 at the three first rates (its gate run); the editor (and the drawn panel:
+Drive v6 at the three first rates: GREEN (job jp8_host_gate8, S3_STATUS 3d). Scope NOT covered yet (owed): the v7 sweep's gate (jp8/docs/SCOPE_AUDIT.md rows 1-4); the editor (and the drawn panel:
 the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only).
 
 ## 6. Next
 
-1. Other first rates: DONE on drive v5 (job jp8_host_gate7); drive v6's gate runs them too.
-2. The controller's parameter info in the C API (from the census data or the lifted calls); the editor.
+1. Other first rates: DONE on drive v5 (job jp8_host_gate7) and v6 (job jp8_host_gate8).
+2. The controller's parameter info in the C API: DONE (v6, gate8). The editor: owed (the user's script file and art).
 3. The speed: the lifted path must gain margin before it is a product (the fast lifter's next steps, S3_STATUS).

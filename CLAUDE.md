@@ -289,15 +289,18 @@ mine is a hypothesis (playbook 80).
   96000, both builds, 4 teeth. THE HOST PATH (jp8/docs/HOST_LAYER.md):
   jp8/src/jp8_host.c + jp8h.h run the plugin's own setupProcessing,
   setActive, process(), getState / setState, patch load, UI-timer drain,
-  MIDI learn, edit-controller calls and engine workers, LIFTED, on a template
-  taken BEFORE the host knows its rate (playbook 235); jp8_host_gate.sh
-  GREEN (drive v5: MIDI controllers, the host-rate chain, 16 setState
-  inputs, 150 controller calls; 4 patches, both builds EXACTLY 0, 6 teeth;
-  the lift from the 64-patch reach united with the gate's own drive,
-  playbook 237; job jp8_host_gate5). NEXT: other first rates, the controller's
-  parameter info in the C API, the editor (needs the user's missing JP8
-  script), speed (950 ms per second of audio here; the plugin ~2.3x
-  faster). The bit-exact JP8 is ~5.3x one S3.
+  MIDI learn, edit-controller calls, what a DAW asks the controller at load
+  (parameter infos, MIDI mapping, units) and engine workers, LIFTED, on a
+  template taken BEFORE the host knows its rate (playbook 235); both sides'
+  heaps reuse freed blocks (playbook 238). jp8_host_gate.sh GREEN on drive v6
+  at the first rates 48000 / 44100 / 96000 (job jp8_host_gate8: checked,
+  product = lanes + non-volatile memory, threads; 4 patches; 9 teeth). SCOPE:
+  jp8/docs/SCOPE_AUDIT.md (22 rows, measured) -- rows 1-4 (every panel
+  parameter's positions, effects, arpeggiator, assign modes) close with the
+  v7 sweep's gate (owed; its reach runs in pieces). NEXT: that gate, the
+  mutation gate (jp8_mutation_gate.py), the editor (needs the user's JP8
+  script file and art), speed (~640 ms per second of audio here; the plugin
+  ~410). The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.
