@@ -234,6 +234,14 @@ from a fresh clone, with a tooth (one flipped bit). PROVEN on patch 2, 5.56 s, 2
 bites (jp8/logs/render_check_patch2.log). Builds: CC / JP8_RENDER_FLAGS / JP8_RENDER_LDFLAGS / JP8_RENDER_LIFT
 (build_render.sh) -- e.g. AArch64 with software FTZ / DAZ (-DJP8_SOFTFP=2).
 
+THE EDITOR'S FUNCTIONS, LOCATED (2026-10-12, READ; leads for scope row 21): fw_map.py finds 13 of its 24 framework
+functions EQUAL in this image (jp8/logs/fw_map_jp8.log); jp8/tools/jp8_fw_near.py ranks the nearest twin of each of the
+rest (fw_map's normalized streams, difflib) and is checked on the 16 known pairs -- each ranks first, its tooth bites
+(jp8/logs/fw_near_jp8.log). Nearest: setState 0x36C650 (0.992), core initialize 0x33A590 (0.993), render driver
+0x33AC90 (0.980), non-note MIDI path 0x3395D0 (0.869), ManagePatch handler 0x33CFE0 (0.787), patch manager 0x358A40
+(0.667), window zoom getter 0x2ACC30 (0.897), window fit 0x31B790 (0.857). The editor is lifted from these once the
+oracle runs them (its editor attached, as the JUNO's is: CLAIMS A40).
+
 ## 6. Next
 
 1. Other first rates: DONE on drive v5 (job jp8_host_gate7) and v6 (job jp8_host_gate8).

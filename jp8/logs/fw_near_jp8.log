@@ -1,0 +1,45 @@
+# python3 jp8/tools/jp8_fw_near.py (2026-10-12): each JUNO-60 wrapper function's nearest JUPITER-8 twin (READ, static; a lead, not a proof)
+## --check (the known pairs must rank first):
+  GetPluginFactory                 JUNO 0x348B40 (59 bytes) -> 0x36A700 1.000  known 0x36A700: FIRST
+  createInstance (processor)       JUNO 0x349CA0 (484 bytes) -> 0x36B860 0.976, 0x36B0A0 0.864  known 0x36B860: FIRST
+  IComponent::getState             JUNO 0x349EA0 (390 bytes) -> 0x36BA50 1.000, 0x308FC0 0.367, 0x308DC0 0.367  known 0x36BA50: FIRST
+  IComponent::setActive            JUNO 0x34AA50 (80 bytes) -> 0x36C600 1.000, 0x8D3CF0 0.684, 0x43AC10 0.684  known 0x36C600: FIRST
+  IAudioProcessor::process         JUNO 0x34A380 (89 bytes) -> 0x36BF30 1.000  known 0x36BF30: FIRST
+  IAudioProcessor::setupProcessing JUNO 0x3CB150 (83 bytes) -> 0x449EE0 1.000, 0x66A080 0.556, 0x620410 0.556  known 0x449EE0: FIRST
+  core setup                       JUNO 0x321AC0 (97 bytes) -> 0x33BC30 1.000, 0x33C030 0.807, 0x897A70 0.600  known 0x33BC30: FIRST
+  all sound off record             JUNO 0x3208E0 (335 bytes) -> 0x33AA50 1.000  known 0x33AA50: FIRST
+  UI-timer drain                   JUNO 0x320120 (761 bytes) -> 0x33A290 0.995  known 0x33A290: FIRST
+  render object lookup             JUNO 0x343A80 (86 bytes) -> 0x365310 1.000  known 0x365310: FIRST
+  rate converter                   JUNO 0x343E30 (1077 bytes) -> 0x3656C0 1.000  known 0x3656C0: FIRST
+  silence object                   JUNO 0x344280 (21 bytes) -> 0x365B10 1.000  known 0x365B10: FIRST
+  automatic engine rate            JUNO 0x34B260 (61 bytes) -> 0x36CDF0 1.000, 0x337B50 0.929, 0x337AB0 0.929  known 0x36CDF0: FIRST
+  engine setSampleRate             JUNO 0x3C7A20 (30 bytes) -> 0x4464F0 1.000, 0x59CA80 0.571, 0x548A70 0.571  known 0x4464F0: FIRST
+  arp init                         JUNO 0x3BE2F0 (181 bytes) -> 0x43C310 1.000  known 0x43C310: FIRST
+jp8_fw_near --check: every known pair ranks first
+## --check --tooth (GetPluginFactory expected one byte off: must fail):
+jp8_fw_near --check: 1 known pairs NOT first
+## the table:
+  GetPluginFactory                 JUNO 0x348B40 (59 bytes) -> 0x36A700 1.000  known 0x36A700: FIRST
+  createInstance (processor)       JUNO 0x349CA0 (484 bytes) -> 0x36B860 0.976, 0x36B0A0 0.864  known 0x36B860: FIRST
+  IComponent::getState             JUNO 0x349EA0 (390 bytes) -> 0x36BA50 1.000, 0x308FC0 0.367, 0x308DC0 0.367  known 0x36BA50: FIRST
+  IComponent::setState             JUNO 0x34AAA0 (460 bytes) -> 0x36C650 0.992
+  IComponent::setActive            JUNO 0x34AA50 (80 bytes) -> 0x36C600 1.000, 0x8D3CF0 0.684, 0x43AC10 0.684  known 0x36C600: FIRST
+  IAudioProcessor::process         JUNO 0x34A380 (89 bytes) -> 0x36BF30 1.000  known 0x36BF30: FIRST
+  IAudioProcessor::setupProcessing JUNO 0x3CB150 (83 bytes) -> 0x449EE0 1.000, 0x66A080 0.556, 0x620410 0.556  known 0x449EE0: FIRST
+  core initialize                  JUNO 0x320420 (1148 bytes) -> 0x33A590 0.993
+  core setup                       JUNO 0x321AC0 (97 bytes) -> 0x33BC30 1.000, 0x33C030 0.807, 0x897A70 0.600  known 0x33BC30: FIRST
+  render driver                    JUNO 0x320B20 (3997 bytes) -> 0x33AC90 0.980
+  all sound off record             JUNO 0x3208E0 (335 bytes) -> 0x33AA50 1.000  known 0x33AA50: FIRST
+  UI-timer drain                   JUNO 0x320120 (761 bytes) -> 0x33A290 0.995  known 0x33A290: FIRST
+  non-note MIDI path               JUNO 0x31F4E0 (715 bytes) -> 0x3395D0 0.869
+  ManagePatch handler              JUNO 0x322E60 (1409 bytes) -> 0x33CFE0 0.787
+  patch load                       JUNO 0x335850 (320 bytes) -> 0x355F90 0.989, 0x3538E0 0.556, 0x3562A0 0.516
+  patch manager                    JUNO 0x338090 (369 bytes) -> 0x358A40 0.667
+  render object lookup             JUNO 0x343A80 (86 bytes) -> 0x365310 1.000  known 0x365310: FIRST
+  rate converter                   JUNO 0x343E30 (1077 bytes) -> 0x3656C0 1.000  known 0x3656C0: FIRST
+  silence object                   JUNO 0x344280 (21 bytes) -> 0x365B10 1.000  known 0x365B10: FIRST
+  automatic engine rate            JUNO 0x34B260 (61 bytes) -> 0x36CDF0 1.000, 0x337B50 0.929, 0x337AB0 0.929  known 0x36CDF0: FIRST
+  engine setSampleRate             JUNO 0x3C7A20 (30 bytes) -> 0x4464F0 1.000, 0x59CA80 0.571, 0x548A70 0.571  known 0x4464F0: FIRST
+  arp init                         JUNO 0x3BE2F0 (181 bytes) -> 0x43C310 1.000  known 0x43C310: FIRST
+  window zoom getter               JUNO 0x2AA590 (99 bytes) -> 0x2ACC30 0.897
+  window fit                       JUNO 0x312750 (24 bytes) -> 0x31B790 0.857, 0x8922F0 0.615, 0x6C6CC0 0.571
