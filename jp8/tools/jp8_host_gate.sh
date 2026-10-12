@@ -27,7 +27,8 @@
 #      freed block (-DJP8H_TOOTH_NOREUSE: the oracle's does); T8 a parameter info's short title copied from its title
 #      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236); T9 the
 #      lane pass swaps lanes a and b in every store of a register to the CPU struct (JP8_XLANE_TOOTH=1); T10 host
-#      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded)
+#      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded); T11
+#      one byte of the shipped template flipped (jp8_template_check.py --tooth: stage 2b must see it)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -80,6 +81,8 @@ for R in $RATES; do
     RREF="$OUT/ref_${R%.*}"
     echo "=== 2. the oracle at $R: template + references ==="
     if [ -n "${JP8_HOST_SKIP_EMU:-}" ] && [ -f "$RREF/meta.json" ]; then echo "reusing $RREF"; else JP8_HOST_RATE=$R python3 "$HERE/jp8_host_ref.py" "$RREF"; fi
+    echo "=== 2b. the shipped template (jp8/gen/jp8h_template.bin.gz, what jp8/apps/jp8_render boots) == the oracle's at $R ==="
+    python3 "$HERE/jp8_template_check.py" "$REPO/jp8/gen/jp8h_template.bin.gz" "$RREF/meta.json"
     echo "=== 3. the C side at $R: checked build ==="
     JP8_HOST_RATE=$R python3 "$HERE/jp8_host_c.py" "$RREF" "$OUT/libjp8host_chk.so"
     echo "=== 3. the C side at $R: product build ==="
@@ -141,4 +144,6 @@ JP8_XLANE_TOOTH=1 python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT
 cc $PRD -w -c -o "$OUT/hlift_t9.o" "$OUT/jp8_host_lift_t9.c"
 cc -shared -o "$OUT/libjp8host_t9.so" "$OUT/hlift_t9.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T9 "$REF" "$OUT/libjp8host_t9.so"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 10 teeth bite"
+if python3 "$HERE/jp8_template_check.py" "$REPO/jp8/gen/jp8h_template.bin.gz" "$REF/meta.json" --tooth > "$OUT/tooth_T11.log" 2>&1; then echo "*** TOOTH T11 DID NOT BITE ***"; exit 1; fi
+echo "tooth T11 bites (the shipped template, one byte flipped): $(tail -1 "$OUT/tooth_T11.log" | cut -c1-150)"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, 11 teeth bite"

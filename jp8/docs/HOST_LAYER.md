@@ -214,6 +214,16 @@ three threaded runs EXACTLY 0 -- 15 runs -- and the 6 teeth bite (T1 74,668 diff
 Drive v6 at the three first rates: GREEN (job jp8_host_gate8, S3_STATUS 3d). Scope NOT covered yet (owed): the v7 sweep's gate (jp8/docs/SCOPE_AUDIT.md rows 1-4); the editor (and the drawn panel:
 the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only).
 
+THE RENDER CLI (2026-10-12): jp8/apps/jp8_render.c (ISO C99) runs this host path as a program -- jp8h_init on the
+shipped template (jp8/gen/jp8h_template.bin.gz, the oracle's memory before setupProcessing; the host gate's stage 2b
+checks it, tooth T11), the plugin's own patch load of a factory record, then a MIDI file (format 0 / 1, the tempo map;
+note on / off, CC n as 0x0FFFC100 + n, pressure + 128, bend + 129 at 14 bits) in blocks of 512 through process(), to
+a float WAV. Its plan file holds every block's events and points as process() got them; jp8_render_check.py replays
+the plan on the host oracle (two processes) and every output word must match. jp8/apps/render_check.sh does it all
+from a fresh clone, with a tooth (one flipped bit). PROVEN on patch 2, 5.56 s, 267,001 frames: EXACTLY 0, the tooth
+bites (jp8/logs/render_check_patch2.log). Builds: CC / JP8_RENDER_FLAGS / JP8_RENDER_LDFLAGS / JP8_RENDER_LIFT
+(build_render.sh) -- e.g. AArch64 with software FTZ / DAZ (-DJP8_SOFTFP=2).
+
 ## 6. Next
 
 1. Other first rates: DONE on drive v5 (job jp8_host_gate7) and v6 (job jp8_host_gate8).

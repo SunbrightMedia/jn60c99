@@ -141,6 +141,12 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    sweep without a throw (patch 2: 1,365 blocks, 14 min). OWED: its reach (three pieces running), then the gate at
    three rates with tooth T10 (EFFECT TYPE's automation dropped); jp8_mutation_gate.py (one-instruction slips in the
    reached lift); the editor (the user's script file and art); the speed.
+3f. 2026-10-12: THE RENDER CLI, GRADED (scope row 22 PARTIAL). jp8/apps/jp8_render.c: template + factory patch + MIDI
+   file -> WAV through the lifted process(); its plan replayed on the host oracle: patch 2, 5.56 s (chord, tempo
+   change, CC 1 / 7 / 11 / 64, bend, pressure, channel 3, velocity-0 note-on) EXACTLY 0, 267,001 frames; a flipped bit
+   is seen; 674 ms per second of audio (one core, three jobs running). The template ships (jp8/gen/jp8h_template.bin.gz,
+   8.1 MB; raw sha256 a30f59c6...) and the host gate checks it (stage 2b, tooth T11). One command:
+   jp8/apps/render_check.sh. NEXT: a live app (audio device, MIDI in) and the software-float builds (scope row 18).
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),
