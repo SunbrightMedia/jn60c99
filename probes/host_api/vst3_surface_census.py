@@ -10,9 +10,6 @@ import sys
 import zlib
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
-import host_process_emu as H          # noqa: E402
-import e2e_emu as E                   # noqa: E402
 
 # IComponent (IPluginBase 3..4): 5 getControllerClassId, 6 setIoMode, 7 getBusCount, 8 getBusInfo,
 # 9 getRoutingInfo, 10 activateBus, 11 setActive, 12 setState, 13 getState
@@ -21,9 +18,9 @@ import e2e_emu as E                   # noqa: E402
 K_SPEAKER_M = 1 << 19
 
 
-def main():
-    h = H.HostProcess()
-    h.start(48000.0, 4096)
+def census(h):
+    """the rows (call, answer) of a STARTED host oracle h: the JUNO's (tools/verify/host_process_emu.HostProcess) or
+    another plugin's on the same framework (jp8/tools/jp8_host_emu.JP8Host); h.state = the nine units' state blocks"""
     uc = h.uc
     q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
     u32 = lambda r: r & 0xFFFFFFFF
@@ -87,7 +84,15 @@ def main():
     ri = h.alloc_com(16)
     ro = h.alloc_com(16)
     rows.append(('getRoutingInfo()', '0x%x' % u32(h.vcall(h.comp, 9, ri, ro))))
-    for n, v in rows:
+    return rows
+
+
+def main():
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
+    import host_process_emu as H
+    h = H.HostProcess()
+    h.start(48000.0, 4096)
+    for n, v in census(h):
         print('%-44s %s' % (n, v))
 
 

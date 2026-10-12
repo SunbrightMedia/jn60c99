@@ -64,7 +64,9 @@ static inline void *jp8_h(uint64_t a, unsigned n) {
     return (void *)((uintptr_t)a + jp8_bdelta[k]);
 }
 #define JP8_H(a, n) jp8_h((uint64_t)(a), (n))
+#ifndef JP8_GS_BASE                /* a build may name another (the host layer: the wrapper oracle's TEB, 0x580000000) */
 #define JP8_GS_BASE 0x0ULL       /* the oracle's gs base is 0: gs:[x] = guest page 0 = band 0, exactly as under Unicorn */
+#endif
 #ifdef JP8_FLAT                                  /* every region at ONE host offset (jp8_rt.c jp8_map): host = guest + jp8_flat */
 #if UINTPTR_MAX < 0xFFFFFFFFFFFFFFFFu
 #error "JP8_FLAT needs a 64-bit host (one reservation spans the guest's 32 GB)"

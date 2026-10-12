@@ -68,7 +68,22 @@ First run (EXECUTED 2026-10-12): DllMain 4.5 s, InitDll 16 s, initialize -> S_OK
 block 9: 8 or 16 worker jobs per block (one or two engine renders behind the rate converter), peak 1.6e-13 idle,
 0.079-0.082 under the note, 0.049 in the release, back to 1.6e-13; no non-finite sample; 0.5 s per block.
 
-## 4. Next
+## 4. The VST3 surface (EXECUTED 2026-10-12, jp8/tools/jp8_surface_census.py)
+
+The JUNO-60's census probe (probes/host_api/vst3_surface_census.py, now a function of any started host oracle) run on
+the JUPITER-8 booted at 48000 / 4096: every answer is the JUNO-60's (docs/HOST_CALL_CENSUS.md) -- one framework.
+
+| Call | The JUPITER-8 |
+|---|---|
+| canProcessSampleSize | 32-bit kResultOk, 64-bit kResultFalse |
+| getLatencySamples / getTailSamples | 0 / 0 |
+| getBusCount / getBusInfo | 1 audio out "Stereo Out" (2 channels, flags 1), 1 event in "Event In"; no inputs |
+| getBusArrangement | out: stereo (3); in: 0x80070057 (no input bus) |
+| setBusArrangements | mono, stereo, 5.1 accepted (kResultOk), stored |
+| setIoMode, setProcessing, getRoutingInfo | kNotImplemented (0x80004001); setProcessing changes nothing |
+| activateBus(.., 1) | kResultOk; the core's first 1 KB or a unit's first 512 bytes change (on the JUNO: the bus flags, which its render never reads -- bus_audio_census.py; not yet asked here) |
+
+## 5. Next
 
 1. The patch path: the plugin's own patch load (the patch browser) or the DAW state (setState), located and driven.
 2. The C side: the lift rooted at the VST3 entries (process, setupProcessing, setActive, getState, setState) with

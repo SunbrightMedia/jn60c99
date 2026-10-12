@@ -4074,3 +4074,15 @@ an empty stub named for what it is, GUI scaffolding only). Then initialize retur
 ### The rule
 When the plugin refuses to start under the oracle, hook its own log writer first; it names the missing piece. Serve
 the plugin's own files; a stand-in for a missing one is named as a stub and listed as owed.
+
+## 234. A JMP INTO A RUNTIME FUNCTION IS A TAIL CALL -- A LIFTER THAT FOLLOWS IT INLINES THE CALLEE'S BODY
+Paid 2026-10-12: the JUPITER-8's host path (process(), the patch load, the engine workers) lifted from the plugin
+(jp8/tools/jp8_lift.py --hostcalls --hook) trapped in HeapAlloc on its first patch load: the lift had no allocator
+call at that site. A trace diff of oracle and lift showed `goto L_6f5b04` -- a function ended in `jmp 0x6F5B04`
+(operator new, the allocator the lift answers with jp8_alloc), and the lifter followed the jmp as a branch inside the
+caller, lifting operator new's own body, which calls the host heap the C side does not serve. --alloc-tailcall makes a
+jmp to the allocator a tail call (the allocator answered, then return), never a body to follow. Then EXACTLY 0 on
+both builds: 7168 output words, 96 performEdits, 256 worker jobs and the memory after.
+### The rule
+A lifter must treat a jmp to any function it answers itself (allocator, host call, hook) as call + return. Look for it
+first when a lift reaches code its oracle reaches only by a call.

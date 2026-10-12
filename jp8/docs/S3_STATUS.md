@@ -76,7 +76,9 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    NOTEON / NOTEOFF; render = per host sample VOICE_WRAP x8 + MASTER_WRAP in jp8_lift_seq.py's call layout. Every lifted
    call goes through jp8_call_x (the layer gates' call path); a trap kills the engine (JP8_E_TRAP, zeros out, nothing
    aborts); the host MXCSR is saved and restored. No snap, no latch clear, no replayed oracle call.
-3. DONE 2026-10-12 (4 patches; the 64-patch run and 96000 are the next job): THE FULL-CHAIN GATE, jp8_full_seq.py /
+3. DONE 2026-10-12 -- 44100 on 4 patches, then ALL 64 patches (job jp8full_64, logs/full_gate_44100_64.log) and 96000
+   on patches 2, 10, 52, 63 (job jp8full_96b, logs/full_gate_96000.log; the product build there on the multi-band
+   JP8_FLAT map), every run EXACTLY 0 in both builds with its 4 teeth biting: THE FULL-CHAIN GATE, jp8_full_seq.py /
    jp8_full_emu.py / jp8_full_c.py / jp8_full_gate.sh (job jp8full_gate1, EXIT 0, logs/full_gate_44100.log). CONTROL 0
    (the template == the oracle's post-static-init memory), CONTROL 1 (sha256 of the image + the heap after jp8_init ==
    the oracle's), RUN A (whole render events) and RUN B (re-init + random chunks of 1..300): every output word, the end

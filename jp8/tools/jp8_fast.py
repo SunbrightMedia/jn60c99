@@ -62,6 +62,7 @@ SH_SWITCH = re.compile(r'a0=(.*); switch \(a0\) \{(.*) default: jp8_icall\(c, a0
 SH_JMP = re.compile(r'goto ((?:L_[0-9a-f]+|Lr)(?:_i[0-9]+)*);')
 SH_JCC = re.compile(r'if \((CC_[A-Z]+)\) goto ((?:L_[0-9a-f]+|Lr)(?:_i[0-9]+)*);')
 SH_TRAP = re.compile(r'jp8_trap\(c, .*\);')
+SH_HOOK = re.compile(r'jp8_hook\(c, (0x[0-9a-f]+ULL)\);')   # jp8_lift.py --hook: the host's code, on every register
 
 
 def die(msg):
@@ -340,6 +341,8 @@ class Fn:
                 sh, cal, sc = 'JCC', None, [self.lab[SH_JCC.fullmatch(t).group(2)]] + nxt
             elif SH_TRAP.fullmatch(t):
                 sh, cal, sc = 'TRAP', None, []
+            elif SH_HOOK.fullmatch(t):
+                sh, cal, sc = 'HOOK', None, nxt
             elif re.search(r'\bgoto\b|\breturn\b|\bf_[0-9a-f]+\(|jp8_icall|jp8_import|jp8_alloc', t):   # a trap inside (div0) never returns: plain
                 die('f_%s %s: a statement that calls, jumps or returns in a shape not known: %s' % (rva, srva, t[:160]))
             else:
@@ -347,13 +350,15 @@ class Fn:
             self.shape.append(sh); self.callee.append(cal); self.succ.append(sc)
         self.start = self.lab['L_%s' % rva]
         self.ru, self.rd = [], []
-        for _, _, _, t in self.st:
+        for k_, (_, _, _, t) in enumerate(self.st):
             u, d = reg_effects(t)
+            if self.shape[k_] == 'HOOK':     # the host reads every register as it is (and changes none)
+                u = ALLREG
             self.ru.append(frozenset(u)); self.rd.append(frozenset(d))
         self.uses = frozenset().union(*self.ru) if self.ru else frozenset()
         self.defs = frozenset().union(*self.rd) if self.rd else frozenset()
         self.local = self.uses | self.defs
-        self.has_icall = any(s in ('ICALL', 'SWITCH') for s in self.shape)
+        self.has_icall = any(s in ('ICALL', 'SWITCH', 'HOOK') for s in self.shape)
 
 
 def inline_calls(f, fns, cand):
@@ -521,6 +526,8 @@ def dirty_in(f, use, dfn):
             out = (pre - s - (dfn[cal] & f.local)) | {4}
         elif sh == 'ICALL':
             out = frozenset({4})
+        elif sh == 'HOOK':                  # every dirty register stored before it: none dirty after
+            out = frozenset()
         else:
             out = d | f.rd[i]
         for s_ in f.succ[i]:
@@ -635,6 +642,8 @@ def emit_fn(f, use, dfn, sync_flags, out):
             m = SH_ICALL.fullmatch(t)
             new = 'a0=%s; r4-=8; FM64(r4)=%s; {%s jp8_icall(cg, a0); %s} r4+=8;' % (
                 rewrite_text(m.group(1)), m.group(2), stores(d | {4}, sync_flags), loads(f.local, sync_flags))
+        elif sh == 'HOOK':
+            new = '{%s jp8_hook(cg, %s); %s}' % (stores(d, sync_flags), SH_HOOK.fullmatch(t).group(1), loads(f.local, sync_flags))
         elif sh == 'TAIL':
             cal = SH_TAIL.fullmatch(t).group(1)
             s = d & (use[cal] | dfn[cal])

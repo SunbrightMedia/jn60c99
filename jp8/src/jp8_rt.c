@@ -40,9 +40,10 @@ uintptr_t jp8_bdelta[JP8_NBANDS]; uint32_t jp8_blo[JP8_NBANDS], jp8_bhi[JP8_NBAN
  * for every region and the lifted code adds one register instead of loading a band's delta (playbook 232). A region is
  * committed read-write in place; fresh pages read zero, as calloc's do. */
 uintptr_t jp8_flat; static unsigned char *jp8_flat_base;
-int jp8_map(uint64_t base, uint64_t size) {
-    uint64_t i = base >> 28, sz = (size + 4095) & ~4095ULL;
-    if (!size || (base & 4095) || i >= JP8_NBANDS || ((base + size - 1) >> 28) != i || jp8_bhi[i]) { fprintf(stderr, "jp8_map(0x%llx, 0x%llx): not one free band\n", (unsigned long long)base, (unsigned long long)size); return -1; }
+int jp8_map(uint64_t base, uint64_t size) {          /* FLAT: a region may span bands (one offset for all) */
+    uint64_t i = base >> 28, last = (base + size - 1) >> 28, sz = (size + 4095) & ~4095ULL, k;
+    if (!size || (base & 4095) || last >= JP8_NBANDS) { fprintf(stderr, "jp8_map(0x%llx, 0x%llx): outside the bands\n", (unsigned long long)base, (unsigned long long)size); return -1; }
+    for (k = i; k <= last; k++) if (jp8_bhi[k]) { fprintf(stderr, "jp8_map(0x%llx, 0x%llx): band 0x%llx in use\n", (unsigned long long)base, (unsigned long long)size, (unsigned long long)k); return -1; }
     if (!jp8_flat_base) {
         size_t span = (size_t)JP8_NBANDS << 28; void *p;
 #ifdef _WIN32
@@ -59,7 +60,11 @@ int jp8_map(uint64_t base, uint64_t size) {
 #else
     if (mprotect(jp8_flat_base + base, (size_t)sz, PROT_READ | PROT_WRITE)) return -1;
 #endif
-    jp8_bdelta[i] = jp8_flat; jp8_blo[i] = (uint32_t)(base & 0x0FFFFFFFu); jp8_bhi[i] = jp8_blo[i] + (uint32_t)size; return 0;
+    for (k = i; k <= last; k++) {                    /* each band: its slice of the region (lo..hi within the band) */
+        uint64_t b0 = k << 28, lo = base > b0 ? base - b0 : 0, hi = (base + size < b0 + 0x10000000ULL) ? base + size - b0 : 0x10000000ULL;
+        jp8_bdelta[k] = jp8_flat; jp8_blo[k] = (uint32_t)lo; jp8_bhi[k] = (uint32_t)hi;
+    }
+    return 0;
 }
 #else
 static void *jp8_braw[JP8_NBANDS];
