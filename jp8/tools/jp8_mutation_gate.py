@@ -8,9 +8,12 @@ a subtract an add, a multiply an add, or the value a guest store writes with its
 ONE build, each behind its own number (`if (JP8_MUT == k) { the slip } else { the instruction }`, JP8_MUT read once
 from the environment), so one compile serves them all; the product pipeline as the gate's (jp8_fast.py, jp8_xlane.py,
 -O2). Then the gate's own C side (jp8_host_c.py) runs once per mutation against the gate's references:
-  KILLED    it fails (a word, a state byte, an edit, the memory after, a trap) -- that slip is seen;
-  SURVIVED  it passes EXACTLY 0 -- a slip the gate cannot see: an equivalent one (named with its reason) or a gate to
-            write.
+  KILLED      it fails (a word, a state byte, an edit, the memory after, a trap) -- that slip is seen;
+  UNREACHED   it passes and the slip never ran (each slip counts its runs, reported at exit): the drive does not reach
+              that instruction (its rva came from the lift's reach, which holds more drives) -- a reach statement;
+  EQUIVALENT  it passes, the slip ran and never changed a value (both values are computed and compared at each run);
+  SURVIVED    it passes and the slip changed a value -- a slip the gate cannot see: a gate to write (or ACCEPTED,
+              named with its reason).
 CONTROL: JP8_MUT=0 must pass EXACTLY 0 (the guards change nothing) and the known slip -- the host gate's own tooth T1,
 the FINE TUNE setter's addss at 0x38633e -- must be KILLED, or the harness is broken.
 The sites are drawn with a fixed seed from the reached instructions of each kind, spread over the lift's functions.
@@ -102,23 +105,42 @@ for k, (kind, rva) in enumerate(sites, start=1):
     for i in by_kind[kind][rva]:
         plan[i] = (k, kind)
 out = list(lines)
+FOP = re.compile(r'^(XF\(\d+,0\))=(JP8_(?:ADDSS|SUBSS|MULSS))\((.*)\);$')
+def measured(k, kind, text):
+    """the statement with slip k MEASURED: both values computed, the slip's taken when JP8_MUT == k, and the run
+    counts how often it ran and how often the two values differed (jp8_mut_f / jp8_mut_u, reported at exit)"""
+    if kind == 'store^1':
+        s_ = STORE.match(text)
+        return '%s=jp8_mut_u(%d, %s, (%s)^1ULL);' % (s_.group(1), k, s_.group(2), s_.group(2))
+    f_ = FOP.match(text)
+    if not f_:
+        return None
+    _, pat, rep = KINDS[kind]
+    op = f_.group(2) + '('
+    assert op == pat
+    return '%s=jp8_mut_f(%d, %s(%s), %s(%s));' % (f_.group(1), k, f_.group(2), f_.group(3), rep[:-1], f_.group(3))
+for i, (k, kind) in list(plan.items()):
+    m = STMT.match(lines[i])
+    if measured(k, kind, m.group(4)) is None:          # a float op in another form: not a site
+        del plan[i]
 for i, (k, kind) in plan.items():
     m = STMT.match(lines[i])
     head, text = m.group(1), m.group(4)
-    if kind == 'store^1':
-        s = STORE.match(text)
-        mut = '%s=%s^1ULL;' % (s.group(1), s.group(2))
-    else:
-        _, pat, rep = KINDS[kind]
-        mut = text.replace(pat, rep, 1)
-    out[i] = '%sif (JP8_MUT == %d) { %s } else { %s }' % (head, k, mut, text)
+    out[i] = head + measured(k, kind, text)
 inc = next(i for i, ln in enumerate(out) if ln.startswith('#include "jp8_cpu.h"'))
 out[inc + 1:inc + 1] = ['#include <stdlib.h>',
-                        '/* jp8_mutation_gate.py: the mutation in force (JP8_MUT from the environment; 0: none) */',
-                        'static int jp8_mut_v = -1;',
+                        '#include <stdio.h>',
+                        '/* jp8_mutation_gate.py: the mutation in force (JP8_MUT from the environment; 0: none); at exit the',
+                        ' * run reports how often slip k ran and how often its value differed from the instruction\'s */',
+                        'static int jp8_mut_v = -1; static unsigned long jp8_mut_n, jp8_mut_d;',
+                        'static void jp8_mut_report(void) { fprintf(stderr, "JP8_MUT %d: ran %lu, changed %lu\\n", '
+                        'jp8_mut_v, jp8_mut_n, jp8_mut_d); }',
                         'static int jp8_mut_get(void) { if (jp8_mut_v < 0) { const char *e = getenv("JP8_MUT"); '
-                        'jp8_mut_v = e ? atoi(e) : 0; } return jp8_mut_v; }',
-                        '#define JP8_MUT jp8_mut_get()']
+                        'jp8_mut_v = e ? atoi(e) : 0; if (jp8_mut_v > 0) atexit(jp8_mut_report); } return jp8_mut_v; }',
+                        'static float jp8_mut_f(int k, float o, float m) { uint32_t a, b; if (jp8_mut_get() != k) return o; '
+                        'jp8_mut_n++; memcpy(&a, &o, 4); memcpy(&b, &m, 4); if (a != b) jp8_mut_d++; return m; }',
+                        'static uint64_t jp8_mut_u(int k, uint64_t o, uint64_t m) { if (jp8_mut_get() != k) return o; '
+                        'jp8_mut_n++; if ((uint32_t)o != (uint32_t)m) jp8_mut_d++; return m; }']
 mutsrc = os.path.join(a.out, 'jp8_host_lift_mut.c')
 open(mutsrc, 'w').write('\n'.join(out))
 log('%d mutations at %d lines -> %s' % (len(sites), len(plan), mutsrc))
@@ -139,31 +161,48 @@ run(['cc', '-shared', '-o', lib, obj, os.path.join(GATE, 'hrt_prd.o'), os.path.j
 log('built %s' % lib)
 
 def grade(k):
+    """(exit code, the first line that says why, (ran, changed) or None)"""
     env = dict(os.environ, JP8_MUT=str(k))
     try:
         r = subprocess.run([sys.executable, os.path.join(HERE, 'jp8_host_c.py'), a.refdir, lib], env=env,
                            capture_output=True, text=True, timeout=a.timeout)
         why = (r.stdout + r.stderr).strip().split('\n')
         first = next((x for x in why if 'differ' in x or 'TRAP' in x or 'Error' in x), why[-1] if why else '')
-        return r.returncode, first[:170]
+        cnt = re.search(r'JP8_MUT %d: ran (\d+), changed (\d+)' % k, r.stderr)
+        return r.returncode, first[:170], (int(cnt.group(1)), int(cnt.group(2))) if cnt else None
     except subprocess.TimeoutExpired:
-        return 'timeout', 'no end in %d s' % a.timeout
-rc, why = grade(0)
+        return 'timeout', 'no end in %d s' % a.timeout, None
+rc, why, _ = grade(0)
 log('CONTROL 0 (no mutation): rc %s %s' % (rc, why))
 if rc != 0:
     sys.exit('CONTROL 0 FAILED: the guarded build is not EXACTLY 0 without a mutation -- the harness is broken')
 res = []
+sited = {k for k, _ in plan.values()}
 for k, (kind, rva) in enumerate(sites, start=1):
-    rc, why = grade(k)
-    verdict = 'KILLED' if rc != 0 else ('ACCEPTED' if '%s/%s' % (rva, kind) in ACCEPTED else 'SURVIVED')
-    res.append(dict(k=k, kind=kind, rva=rva, fn=fn_of.get(rva), lines=len(by_kind[kind][rva]), verdict=verdict, why=why))
-    log('%2d %-8s 0x%-7s f_%-7s %-8s %s' % (k, kind, rva, fn_of.get(rva), verdict, why))
+    if k not in sited:
+        continue
+    rc, why, cnt = grade(k)
+    ran, changed = cnt if cnt else (None, None)
+    if rc != 0:
+        verdict = 'KILLED'
+    elif cnt is None:
+        verdict = 'NO COUNT'                # the run did not report (a broken harness): never a pass
+    elif ran == 0:
+        verdict = 'UNREACHED'               # this drive never runs it: a reach statement, not a graded slip
+    elif changed == 0:
+        verdict = 'EQUIVALENT'              # it ran and never changed a value on this drive
+    else:
+        verdict = 'ACCEPTED' if '%s/%s' % (rva, kind) in ACCEPTED else 'SURVIVED'
+    res.append(dict(k=k, kind=kind, rva=rva, fn=fn_of.get(rva), lines=len(by_kind[kind][rva]), verdict=verdict, why=why,
+                    ran=ran, changed=changed))
+    log('%2d %-8s 0x%-7s f_%-7s %-10s ran %s changed %s  %s' % (k, kind, rva, fn_of.get(rva), verdict, ran, changed,
+                                                              why if rc != 0 else ''))
     if k == 1 and verdict != 'KILLED':
         sys.exit('CONTROL 1 FAILED: the known slip (the host gate\'s T1 site) was not killed -- the harness is broken')
 json.dump(dict(refdir=a.refdir, seed=a.seed, results=res), open(os.path.join(a.out, 'mutations.json'), 'w'), indent=1)
 c = collections.Counter(r['verdict'] for r in res)
 log('MUTATION REACH: %d mutations -- %s' % (len(res), ', '.join('%s %d' % kv for kv in sorted(c.items()))))
-surv = [r for r in res if r['verdict'] == 'SURVIVED']
+surv = [r for r in res if r['verdict'] in ('SURVIVED', 'NO COUNT')]
 for r in surv:
     log('SURVIVOR: %s at 0x%s (f_%s)' % (r['kind'], r['rva'], r['fn']))
 sys.exit(1 if surv else 0)

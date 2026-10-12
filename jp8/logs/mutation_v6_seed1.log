@@ -1,0 +1,53 @@
+[   0.6s] reached candidates: store^1 15795, mul2add 9777, add2sub 7734, sub2add 2472
+[   0.6s] 41 mutations at 50 lines -> /home/user/snap_jp8gate8/build/jp8_mut/jp8_host_lift_mut.c
+[  27.3s] jp8_fast: 1257 functions (1 allocator stubs), 339063 statements after 4374 calls inlined; flags LOCAL (no flag live where functions meet)
+[  36.9s] jp8_xlane: 1257 functions; lane write 89439, load cg 47665, store cg 37189, movss load 16113, copy 15013, movss store 12022, ldx 4549, head read 3935, stx 2704, read 2306, other write 344, whole write
+[ 270.8s] built /home/user/snap_jp8gate8/build/jp8_mut/libjp8host_mut.so
+[ 273.5s] CONTROL 0 (no mutation): rc 0 [   2.5s] 776 steps, 98304 words (0 differ), 46944 state bytes, 1748 performEdits, 1695 worker jobs, heap 37752 live / 91 free blocks, end EXACT, stack EXACT (reported)
+[ 276.1s]  1 add2sub  0x38633e  f_386310  KILLED     ran 1440 changed 1440  [   2.5s] END hash differs: C 55191cdd6a39b3b2 oracle 8421bf1e5dc37e30
+[ 279.0s]  2 add2sub  0x3e1e9b  f_3d9a00  UNREACHED  ran 0 changed 0  
+[ 281.6s]  3 add2sub  0x3b9e83  f_3b2700  UNREACHED  ran 0 changed 0  
+[ 283.9s]  4 add2sub  0x3a205f  f_39ed80  KILLED     ran 38296 changed 38286  [   2.1s] END hash differs: C 62fa9ca1e3ccd1f6 oracle 8421bf1e5dc37e30
+[ 286.1s]  5 add2sub  0x3927c5  f_38dc60  KILLED     ran 59957 changed 53691  [   2.1s] END hash differs: C 1570d0144c5ce3ae oracle 8421bf1e5dc37e30
+[ 288.5s]  6 add2sub  0x3d6bd0  f_3cfd40  KILLED     ran 37035 changed 37011  [   2.3s] END hash differs: C b302e5a1979bcbbe oracle 8421bf1e5dc37e30
+[ 290.8s]  7 add2sub  0x3c1264  f_3bc3c0  EQUIVALENT ran 7168 changed 0  
+[ 293.5s]  8 add2sub  0x3b06f0  f_3a8a40  UNREACHED  ran 0 changed 0  
+[ 295.8s]  9 add2sub  0x3ca898  f_3c6080  UNREACHED  ran 0 changed 0  
+[ 298.3s] 10 add2sub  0x39c892  f_395000  UNREACHED  ran 0 changed 0  
+[ 300.8s] 11 add2sub  0x38177e  f_3816b0  EQUIVALENT ran 5616 changed 0  
+[ 303.6s] 12 sub2add  0x3a1092  f_39ed80  KILLED     ran 72245 changed 72239  [   2.6s] END hash differs: C 4b46a432f215cd1f oracle 8421bf1e5dc37e30
+[ 306.1s] 13 sub2add  0x3bf6cb  f_3bc3c0  KILLED     ran 38296 changed 38292  [   2.4s] END hash differs: C 2e16f20f60165ff5 oracle 8421bf1e5dc37e30
+[ 308.3s] 14 sub2add  0x3ceaa3  f_3c6080  UNREACHED  ran 0 changed 0  
+[ 310.8s] 15 sub2add  0x38dede  f_38dc60  KILLED     ran 74293 changed 41105  [   2.3s] END hash differs: C 3f940be6d51f48ac oracle 8421bf1e5dc37e30
+[ 313.2s] 16 sub2add  0x3a9886  f_3a8a40  KILLED     ran 72245 changed 72245  [   2.3s] END hash differs: C a659d89be1bc41c6 oracle 8421bf1e5dc37e30
+[ 315.9s] 17 sub2add  0x3952bb  f_395000  EQUIVALENT ran 74293 changed 0  
+[ 318.4s] 18 sub2add  0x3d4a3b  f_3cfd40  EQUIVALENT ran 7168 changed 0  
+[ 321.1s] 19 sub2add  0x3da89c  f_3d9a00  KILLED     ran 70197 changed 70197  [   2.5s] END hash differs: C 93aff556bc332809 oracle 8421bf1e5dc37e30
+[ 323.5s] 20 sub2add  0x3b95ac  f_3b2700  KILLED     ran 39083 changed 39065  [   2.3s] END hash differs: C fa3eb1d7475ed0a5 oracle 8421bf1e5dc37e30
+[ 326.0s] 21 sub2add  0x3817c9  f_3816b0  KILLED     ran 2376 changed 2232  [   2.4s] END hash differs: C 674f34e40420dd4b oracle 8421bf1e5dc37e30
+[ 328.4s] 22 mul2add  0x3db3da  f_3d9a00  KILLED     ran 70197 changed 70197  [   2.2s] END hash differs: C cf04e34798612ba0 oracle 8421bf1e5dc37e30
+[ 330.8s] 23 mul2add  0x3a8bfa  f_3a8a40  KILLED     ran 72245 changed 3221  [   2.3s] END hash differs: C 46e0b0739fa82386 oracle 8421bf1e5dc37e30
+[ 333.2s] 24 mul2add  0x39e6e7  f_395000  KILLED     ran 33162 changed 33162  [   2.3s] END hash differs: C df57f8b15fa1067b oracle 8421bf1e5dc37e30
+[ 335.5s] 25 mul2add  0x3d6b68  f_3cfd40  KILLED     ran 37035 changed 37035  [   2.2s] END hash differs: C 34ea31194f32c2c9 oracle 8421bf1e5dc37e30
+[ 338.2s] 26 mul2add  0x3cdcef  f_3c6080  UNREACHED  ran 0 changed 0  
+[ 340.8s] 27 mul2add  0x3c38c2  f_3bc3c0  UNREACHED  ran 0 changed 0  
+[ 343.1s] 28 mul2add  0x381992  f_3818e0  KILLED     ran 1157 changed 1157  [   1.6s] TRAP: step 681 ('block', 512): rc -3 TRAP at rva 0x600000790: import GetLastError not shimmed on the host path (called from rva 0x7908e1) (call rva 0x36bf30)
+[ 345.4s] 29 mul2add  0x3a76ec  f_39ed80  UNREACHED  ran 0 changed 0  
+[ 348.2s] 30 mul2add  0x3bc0e7  f_3b2700  SURVIVED   ran 33162 changed 33162  
+[ 350.8s] 31 mul2add  0x38e6e6  f_38dc60  SURVIVED   ran 7168 changed 7168  
+[ 353.3s] 32 store^1  0x39e182  f_395000  SURVIVED   ran 33162 changed 33162  
+[ 355.7s] 33 store^1  0x40ae64  f_3f8240  KILLED     ran 72 changed 72  [   2.2s] END hash differs: C ce4c918242bd6fbf oracle 8421bf1e5dc37e30
+[ 358.0s] 34 store^1  0x438455  f_37df60  KILLED     ran 171 changed 171  [   2.2s] END hash differs: C 370de487ced76739 oracle 8421bf1e5dc37e30
+[ 360.5s] 35 store^1  0x413964  f_440450  KILLED     ran 72 changed 72  [   2.4s] END hash differs: C 071a0c0dd18bc031 oracle 8421bf1e5dc37e30
+[ 362.8s] 36 store^1  0x3cb757  f_3c6080  KILLED     ran 24733 changed 24733  [   2.2s] END hash differs: C 5597f006960728e2 oracle 8421bf1e5dc37e30
+[ 365.1s] 37 store^1  0x382de7  f_382db0  SURVIVED   ran 144 changed 144  
+[ 367.6s] 38 store^1  0x3a3877  f_39ed80  KILLED     ran 7168 changed 7168  [   2.3s] END hash differs: C c978d1b85472f17f oracle 8421bf1e5dc37e30
+[ 370.2s] 39 store^1  0x3dc27a  f_3d9a00  KILLED     ran 38296 changed 38296  [   2.5s] END hash differs: C 4a81a9926ee8e156 oracle 8421bf1e5dc37e30
+[ 372.8s] 40 store^1  0x3afbfa  f_3a8a40  UNREACHED  ran 0 changed 0  
+[ 375.5s] 41 store^1  0x3906b1  f_38dc60  SURVIVED   ran 7168 changed 7168  
+[ 375.5s] MUTATION REACH: 41 mutations -- EQUIVALENT 4, KILLED 22, SURVIVED 5, UNREACHED 10
+[ 375.5s] SURVIVOR: mul2add at 0x3bc0e7 (f_3b2700)
+[ 375.5s] SURVIVOR: mul2add at 0x38e6e6 (f_38dc60)
+[ 375.5s] SURVIVOR: store^1 at 0x39e182 (f_395000)
+[ 375.5s] SURVIVOR: store^1 at 0x382de7 (f_382db0)
+[ 375.5s] SURVIVOR: store^1 at 0x3906b1 (f_38dc60)
