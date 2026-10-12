@@ -26,7 +26,7 @@ HDR     := $(wildcard src/*.h) $(wildcard gui/*.h)
 OBJ     := $(SRC:.c=.o)
 $(OBJ): $(HDR)
 
-.PHONY: all test clean gui provenance verify verify-seq verify-recipe static completeness engineb engineb-quick verify-jx3p webapp native reproduce
+.PHONY: all test clean gui provenance verify verify-seq verify-recipe static completeness engineb engineb-quick verify-jx3p verify-jp8 webapp native reproduce
 all: $(OBJ)
 
 # JX-3P port finish line: recall (C==oracle) + integration render (voice+master
@@ -34,6 +34,11 @@ all: $(OBJ)
 # JX3P.vst3. Override coverage with JX_VERIFY_RATES / JX_VERIFY_N / JX_VERIFY_PATCHES.
 verify-jx3p:
 	sh jx3p/tools/jx_verify.sh
+
+# JUPITER-8 finish line: the lift on drive2, the self-booting engine (44100, 96000), the host path at three first
+# rates, mutation reach; prints the scope table's OPEN rows (jp8/docs/SCOPE_AUDIT.md). Hours: run it as a job.
+verify-jp8:
+	sh jp8/tools/jp8_verify.sh
 
 # The honest finish-line gate: functional tests must pass AND the LIVE plugin
 # comparisons must pass AND the provenance ledger must have zero CAPTURED /
