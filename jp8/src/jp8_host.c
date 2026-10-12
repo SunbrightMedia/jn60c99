@@ -803,6 +803,9 @@ int jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, in
     H.npq = 0;
     for (i = 0; i < npar; i++) {
         int q;
+#ifdef JP8H_TOOTH_SWEEP                                  /* the gate's tooth: host automation of EFFECT TYPE never arrives */
+        if (par[i].id == 0x600258u) continue;
+#endif
         for (q = 0; q < H.npq; q++) if (H.pq_id[q] == par[i].id) break;
         if (q == H.npq) {
             if (H.npq == NPQ) return err(JP8H_E_ARG, "more parameter ids in one block than the template's queues");

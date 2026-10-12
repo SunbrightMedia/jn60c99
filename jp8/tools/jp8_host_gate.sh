@@ -26,7 +26,8 @@
 #      (-DJP8H_TOOTH_NODRAIN: the learned CC map and the store stay as they were); T7 the C side's heap never reuses a
 #      freed block (-DJP8H_TOOTH_NOREUSE: the oracle's does); T8 a parameter info's short title copied from its title
 #      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236); T9 the
-#      lane pass swaps lanes a and b in every store of a register to the CPU struct (JP8_XLANE_TOOTH=1)
+#      lane pass swaps lanes a and b in every store of a register to the CPU struct (JP8_XLANE_TOOTH=1); T10 host
+#      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -112,7 +113,7 @@ EOF
 cc $BASE -O1 -DJP8_RELOC_CHECK=0 -w -c -o "$OUT/hlift_t1.o" "$OUT/jp8_host_lift_t1.c"
 cc -shared -o "$OUT/libjp8host_t1.so" "$OUT/hlift_t1.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T1 "$REF" "$OUT/libjp8host_t1.so"
-for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN 7:NOREUSE 8:INFO; do
+for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN 7:NOREUSE 8:INFO 10:SWEEP; do
     cc $PRD -DJP8H_TOOTH_${t#*:} -c -o "$OUT/hhost_t${t%%:*}.o" "$REPO/jp8/src/jp8_host.c"
     cc -shared -o "$OUT/libjp8host_t${t%%:*}.so" "$OUT/hlift_prd.o" "$OUT/hrt_prd.o" "$OUT/hhost_t${t%%:*}.o" -lm
     bite "T${t%%:*}" "$REF" "$OUT/libjp8host_t${t%%:*}.so"
@@ -140,4 +141,4 @@ JP8_XLANE_TOOTH=1 python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT
 cc $PRD -w -c -o "$OUT/hlift_t9.o" "$OUT/jp8_host_lift_t9.c"
 cc -shared -o "$OUT/libjp8host_t9.so" "$OUT/hlift_t9.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T9 "$REF" "$OUT/libjp8host_t9.so"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 9 teeth bite"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 10 teeth bite"

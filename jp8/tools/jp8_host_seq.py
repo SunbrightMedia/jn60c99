@@ -41,11 +41,12 @@ then MIDI learn: a panel parameter learned from CC 3, the UI timer's drain, the 
 id with no record; then the states: the first patch's as written, a CC assigned to a panel parameter, a CC assigned to an id the plugin
 does not have, every parameter at the int32 maximum, every parameter at -5, a state cut after 20 entries, a count
 of 0, an empty stream, the engine-rate setting (0x0FFFC015, the DAW state's) at 1..5 and 6 (no converter:
-silence), the voice count (0x0FFFC00E) at 4 and 1 -- each followed by a note and the state the plugin then writes. Then (v7,
-JP8_HOST_SWEEP=1, the default; 0 gives the v6 drive) THE SWEEP (sweep_steps): every panel parameter at every position
+silence), the voice count (0x0FFFC00E) at 4 and 1 (v7: and 2, 3, 5, 6, 7, 8) -- each followed by a note and the state the
+plugin then writes (v7 also plays keys on MIDI channels 5 and 15 and a note-on of velocity 0). Then (v7,
+JP8_HOST_SWEEP=1, the default; 0 leaves it out -- the gate's per-rate reach) THE SWEEP (sweep_steps): every panel parameter at every position
 the plugin's own display strings give (jp8_param_positions.py -> jp8/gen/jp8_param_positions.json), the effect units'
 types with their parameters, the arpeggiator's modes x ranges free and synced, the assign modes with legato and
-portamento, KEY HOLD, host blocks of 1 .. 512 samples. Every output word, every state byte, every host call's answer, the edits the plugin hands its
+portamento, KEY HOLD, host blocks of 1 .. 512 samples, the effects' long tail. Every output word, every state byte, every host call's answer, the edits the plugin hands its
 component handler and the memory after are graded."""
 import os
 import json
@@ -71,7 +72,7 @@ MASTER_TUNE = 0x2
 _POS = json.load(open(os.path.join(HERE, '..', 'gen', 'jp8_param_positions.json')))
 POSITIONS = {p['id']: p['positions'] for p in _POS['params']}
 BYNAME = {p['title']: p['id'] for p in _CTL['params'] if p['id'] < MIDI_BASE}
-SWEEP = os.environ.get('JP8_HOST_SWEEP', '1') == '1'  # v7: the sweep of every panel parameter at the drive's end
+SWEEP = os.environ.get('JP8_HOST_SWEEP', '1') == '1'  # v7: the sweep of every panel parameter at the drive's end (0: without)
 SWEEP_PATCH = 2
 
 
@@ -108,6 +109,9 @@ def controllers():
         (512, on(48, 52, 55), [(PANEL[2], 0, 0.0), (PANEL[2], 128, 0.33), (PANEL[2], 384, 1.0)], None),
         (512, [], [(cc(123), 200, 0.0)], None),                             # all notes off under three held keys
         (512, off(48, 52, 55), [(cc(7), 0, 0.5)], None),
+        (512, [("on", 0, 5, 60, 0.8), ("on", 100, 0, 64, 0.0)], [], None),  # v7: another MIDI channel, velocity 0
+        (512, [("off", 0, 5, 60, 0.0), ("off", 50, 0, 64, 0.0), ("on", 300, 15, 67, 0.5)], [], None),
+        (512, [("off", 0, 15, 67, 0.5)], [], None),
     ]
 
 
@@ -134,7 +138,8 @@ def state_variant(s, how):
 
 
 VARIANTS = ['cc_assign', 'cc_invalid', 'values_max', 'values_neg', 'short20', 'count0', 'empty',
-            'rate1', 'rate2', 'rate3', 'rate4', 'rate5', 'rate6', 'voices4', 'voices1', 'as is']
+            'rate1', 'rate2', 'rate3', 'rate4', 'rate5', 'rate6', 'voices4', 'voices1',
+            'voices2', 'voices3', 'voices5', 'voices6', 'voices7', 'voices8', 'as is']
 
 
 def ctl_steps():
@@ -203,7 +208,7 @@ def sweep_steps():
     each of the three units (EFFECT, DELAY, REVERB; the levels up) with that unit's parameters at every position /
     three values under it; the arpeggiator: every mode x range, free and synced to a running host clock; the assign
     modes x LEGATO x PORTA TYPE with overlapping keys and portamento; KEY HOLD across a release; host blocks of 17
-    sizes from 1 to 512 samples"""
+    sizes from 1 to 512 samples; the delay's and the reverb's long tail (400 blocks)"""
     out = []
     on = [("on", i, 0, k, v) for i, (k, v) in enumerate(SWEEP_CHORD)]
     off = [("off", 400 + i, 0, k, 0.5) for i, (k, _) in enumerate(SWEEP_CHORD)]
@@ -259,6 +264,12 @@ def sweep_steps():
     for j, n in enumerate((1, 2, 3, 7, 16, 17, 31, 64, 100, 127, 255, 256, 257, 300, 333, 511, 512)):
         ev = [("on", n // 3, 0, 60 + j % 12, 0.8), ("off", n - 1, 0, 60 + (j + 11) % 12, 0.5)]
         out.append(('block', n, ev, [(cut, n - 1, (j + 1) / 18.0)], None))
+    # the effects' long tail: delay at its longest with feedback, reverb at its longest, one chord, then 400 blocks
+    # (4.3 s at 48000: the 300,000-sample rings of the 96 kHz engine, 3.1 s, wrap)
+    tail = [(BYNAME[n], 0, v) for n, v in (('DELAY LEVEL', 1.0), ('DELAY TIME', 1.0), ('DELAY FEEDBACK', 0.8),
+                                           ('REVERB LEVEL', 1.0), ('REVERB TIME', 1.0), ('EFFECT LEVEL', 1.0))]
+    out += [('patch', SWEEP_PATCH), ('block', 512, on + off, tail, None)]
+    out += [('block', 512, [], [], None)] * 400
     out.append(('getstate', 'sweep'))
     return out
 
