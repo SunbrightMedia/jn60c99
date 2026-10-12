@@ -4170,3 +4170,34 @@ an old "no gain" (volatile) when the code around it has changed.
 ### The rule (2)
 Grade a code-generator optimization by the instructions EXECUTED (callgrind on the product build), never by the
 statements it removes from the source: the C compiler may already do it.
+
+## 240. A GREEN GATE ON A DRIVE THAT MOVES 10 OF 96 PARAMETERS -- CENSUS THE POSITIONS, SWEEP THEM, AND LET EACH SLIP COUNT ITSELF
+Paid 2026-10-12 (JUPITER-8): the host gate was GREEN at three first rates on drive v6, and the scope audit's first
+question -- which of the plugin's parameters does the drive ever move? -- had the answer "about 10 of 96". The four
+patches' recalls set the rest, so code behind an effect type, an arpeggiator mode or an assign mode was lifted only
+if one of the 64 factory patches happened to use it, and graded only if one of the gate's 4 did. Three tools closed
+the method gap:
+- THE CENSUS from the plugin's own answers: getParamStringByValue at k / 256 for every panel parameter
+  (jp8_param_positions.py) -- equal neighbouring strings are one position: 37 switches (2..24 positions), 59
+  continuous. The drive is built from it (every position of a switch, five values of a continuous parameter), never
+  from a hand list of "interesting" values.
+- THE SWEEP in context: a parameter whose effect needs another one (an effect unit's parameters need its level up and
+  its type set; the arpeggiator's modes need it on, a chord held and a running clock) is swept under every position of
+  its switch. The whole sweep ran on the oracle first, without a throw (1,365 blocks, 14 min), before any reach or
+  gate was spent on it; its reach runs in pieces (JP8_REACH_STEPS: the steps before a piece run unhooked).
+- A MUTATION GATE THAT MEASURES ITS OWN VERDICTS: one build holds all slips (each behind `JP8_MUT == k`); each slip
+  computes BOTH values at every run and the run reports how often it ran and how often they differed. So a slip that
+  passes is classified by measurement, not by argument: UNREACHED (never ran: the drive does not reach it), EQUIVALENT
+  (ran, never changed a value), SURVIVED (changed values the gate did not see). First run on drive v6: 41 slips --
+  22 KILLED, 10 UNREACHED (the lift holds 64 patches' code, the gate drives 4), 4 EQUIVALENT (one ran 74,293 times
+  without a change), 5 SURVIVED, all masked by the drive's settings (a filter-history store, effect index work, a
+  voice temporary, a stack argument the callee ignores). Without the counts, 19 "survivors" would have been reported
+  and argued about; with them, 5 are named and the gate to write is known.
+### The rule
+A differential gate's claim is as wide as its drive. Census the parameter space from the plugin's own answers and
+drive every position, in the context that makes it matter; then measure the gate's reach with slips that count their
+own runs and changes -- a survivor that never ran is a reach statement, one that never changed a value is equivalent,
+and only the rest is a blind spot.
+(Near miss the same day: a new tool written under the name of an existing one -- jp8_param_census.py, the D4 cell
+census cited by S3_STATUS and PORT_LESSONS -- caught by `git status` before the commit and restored. Check
+`git ls-files` before naming a new file.)
