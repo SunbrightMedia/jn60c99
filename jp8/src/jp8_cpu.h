@@ -244,6 +244,11 @@ static inline unsigned jp8_ctz64(uint64_t x) {     /* x != 0 */
     if (!(x & 0x1ULL)) { n += 1; }
     return n;
 }
+static inline uint64_t jp8_bswap64(uint64_t x) {   /* bswap: byte 0 <-> 7, 1 <-> 6, 2 <-> 5, 3 <-> 4 */
+    x = (x & 0x00000000FFFFFFFFULL) << 32 | x >> 32;
+    x = (x & 0x0000FFFF0000FFFFULL) << 16 | (x >> 16 & 0x0000FFFF0000FFFFULL);
+    return (x & 0x00FF00FF00FF00FFULL) << 8 | (x >> 8 & 0x00FF00FF00FF00FFULL);
+}
 static inline unsigned jp8_popcount64(uint64_t x) {
     x = x - ((x >> 1) & 0x5555555555555555ULL);
     x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);

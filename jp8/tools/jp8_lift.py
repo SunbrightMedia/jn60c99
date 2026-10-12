@@ -359,6 +359,10 @@ class Lifter:
             sz = op[0].size * 8; src = rd_int(ins, op[1], sz)
             body = "(63-jp8_clz64(a0))" if m == "bsr" else "jp8_ctz64(a0)"
             return "a0=%s; c->zf=(a0==0); if (a0) { %s }" % (src, wr_int(ins, op[0], body))
+        if m == "bswap":                         # the bytes reversed (a 32-bit form zero-extends, as every 32-bit write)
+            sz = op[0].size * 8; src = rd_int(ins, op[0])
+            if sz not in (32, 64): return None       # the 16-bit form is undefined on x86
+            return wr_int(ins, op[0], "jp8_bswap64(%s)" % src if sz == 64 else "(jp8_bswap64(%s)>>32)" % src)
         if m in ("tzcnt", "lzcnt", "popcnt"):
             sz = op[0].size * 8; src = rd_int(ins, op[1], sz)
             body = {"tzcnt": "(a0?jp8_ctz64(a0):%d)" % sz, "lzcnt": "(a0?jp8_clz64(a0)-(64-%d):%d)" % (sz, sz), "popcnt": "jp8_popcount64(a0)"}[m]
