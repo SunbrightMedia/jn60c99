@@ -178,14 +178,18 @@ runs on its own thread with the render's registers and its own stack; all render
 hook: the job's render loop has ended) each waits for its turn, and the bookkeeping runs one job at a time in unit
 order -- the sequential transport's order, so no atomics are needed and the result is the same. Patch 2's v5 drive:
 EXACTLY 0 in 10 of 10 runs; 711 ms per second of audio against the sequential 1,058, on this 4-core machine with
-two other jobs running (an idle machine with 8 cores gains more). The gate grades it as a third build.
+two other jobs running (an idle machine with 8 cores gains more). The gate grades it as a third build: GREEN at
+three first rates (job jp8_host_gate7, jp8/logs/host_gate_3rates_v5.log; drive v5, patches 2, 63, 0, 12; the graded
+content tree 533e3470 = 8c4de38e + the threaded transport): at 48000, 44100 and 96000 the checked, the product and
+three threaded runs EXACTLY 0 -- 15 runs -- and the 6 teeth bite (T1 74,668 differences, T2 a trap, T3 CONTROL 1, T4
+27,643, T5 a trap, T6 9,207).
 
-Scope NOT covered yet (owed): other first setup rates (44100, 96000: jp8_reach_merge.py takes their reaches;
-job jp8_host_gate7 runs them on the v5 drive); the editor (and the drawn panel: the script file truth/ lacks);
-IEditController2 (knob mode, help, about: GUI only).
+Scope NOT covered yet (owed): drive v6 at the three first rates (its gate run); the editor (and the drawn panel:
+the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only); activateBus
+(jp8_bus_census.py).
 
 ## 6. Next
 
-1. Other first rates: JP8_HOST_RATES="48000 44100 96000" (one lift, the oracle and both builds at each).
+1. Other first rates: DONE on drive v5 (job jp8_host_gate7); drive v6's gate runs them too.
 2. The controller's parameter info in the C API (from the census data or the lifted calls); the editor.
 3. The speed: the lifted path must gain margin before it is a product (the fast lifter's next steps, S3_STATUS).
