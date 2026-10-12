@@ -53,6 +53,13 @@ int  jp8h_select_unit(int32_t id, uint32_t *result);
 int  jp8h_ctl_get_state(void *buf, size_t cap, size_t *n, uint32_t *result);
 int  jp8h_ctl_set_state(const void *data, size_t n, uint32_t *result);
 int  jp8h_component_state(const void *data, size_t n, uint32_t *result);
+/* v8 (E1): THE EDITOR -- the virtual screen a host's machine has (GetSystemMetrics 78 / 79), the editor opened
+ * (IEditController::createView("editor") + IPlugView::attached), a panel window's zoom getter (the window found by its
+ * fit's call; w x h its Script.xml size, e.g. the main panel 3940 x 2004), the windows laid out so far */
+int  jp8h_screen(int32_t cx, int32_t cy);
+int  jp8h_attach_editor(uint64_t *view, uint32_t *result);
+int  jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom);
+int  jp8h_windows(int32_t *wh, int cap);
 const char *jp8h_error(void);
 /* gates */
 void    *jp8h_guest(uint64_t gaddr, size_t len);

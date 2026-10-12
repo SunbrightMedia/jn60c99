@@ -1,7 +1,7 @@
 #!/bin/sh
 # jp8_host_gate.sh -- the JUPITER-8 HOST gate: the plugin's own VST3 entries a host calls -- setupProcessing,
 # setActive, process(), getState, setState -- its own patch load, its UI timer's drain and MIDI learn (the CC menu's
-# Learn / Forget) and its own engine workers, LIFTED, run by
+# Learn / Forget), its own engine workers and (v8) its editor's open and window zoom, LIFTED, run by
 # jp8/src/jp8_host.c on the memory the host oracle had after booting the plugin up to the point a host learns its
 # sample rate, against the host oracle itself (jp8_host_seq.py drive, jp8_host_ref.py oracle + template,
 # jp8_host_c.py C side; two processes).
@@ -12,7 +12,8 @@
 #      own vtables
 #   1. lift: those roots, every indirect call target of the reach; --alloc-tailcall (a jmp to operator new is a tail
 #      call, never a body to follow: playbook 234); --hostcalls (every stub call answered by jp8_host.c), --hook
-#      0x4460E7 (the jobs), 0x4456F0 (a worker's park) and 0x44580A (a job's render done); build CHECKED (the plain
+#      0x4460E7 (the jobs), 0x4456F0 (a worker's park), 0x44580A (a job's render done) and 0x31B790 (a window's fit to
+#      the screen: the editor's windows found by their call); build CHECKED (the plain
 #      lift, every access bounds-checked, -O1), PRODUCT (the fast pass, then jp8_xlane.py: every xmm register in three
 #      scalars; guest memory not volatile, -DJP8_MQ=; -O2) and THREADS (the product with the workers on POSIX threads,
 #      JP8H_THREADS: a platform layer), all on the one-offset map (JP8_FLAT), the oracle's TEB as gs base
@@ -30,7 +31,9 @@
 #      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded); T11
 #      one byte of the shipped template flipped (jp8_template_check.py --tooth: stage 2b must see it); T12 the
 #      software-float build with no software DAZ / FTZ at all (-DJP8_SOFTFP_TOOTH_NOFLUSH: denormals reach the
-#      engine's state on this drive -- the memory after must see it)
+#      engine's state on this drive -- the memory after must see it); T13 the host transport always playing, never
+#      looping (-DJP8H_TOOTH_TRANSPORT: v8's stopped and looped blocks under a synced arpeggio must be graded); T14 the
+#      screen's width and height swapped in GetSystemMetrics (-DJP8H_TOOTH_EDITOR: the editor window's zoom must see it)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -66,7 +69,7 @@ python3 "$HERE/jp8_reach_merge.py" "$LREACH" "$REACH" "$SREACH" $GREACHES
 ROOTS=$(python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['roots']; print(','.join('0x%x' % v for v in sorted(set(r.values()))))" "$LREACH")
 echo "roots: $ROOTS"
 echo "=== 1. lift + build ==="
-python3 "$HERE/jp8_lift.py" "$SRC" "$ROOTS" --dyn "$LREACH" --alloc 0x6F5B04 --alloc-tailcall --name host --hostcalls --hook 0x4460E7,0x4456F0,0x44580A
+python3 "$HERE/jp8_lift.py" "$SRC" "$ROOTS" --dyn "$LREACH" --alloc 0x6F5B04 --alloc-tailcall --name host --hostcalls --hook 0x4460E7,0x4456F0,0x44580A,0x31B790
 python3 "$HERE/jp8_fast.py" "$SRC" "$OUT/jp8_host_lift_fast.c"
 python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT/jp8_host_lift_xl.c"
 cc $CHK -w -c -o "$OUT/hlift_chk.o" "$SRC"
@@ -126,7 +129,7 @@ EOF
 cc $BASE -O1 -DJP8_RELOC_CHECK=0 -w -c -o "$OUT/hlift_t1.o" "$OUT/jp8_host_lift_t1.c"
 cc -shared -o "$OUT/libjp8host_t1.so" "$OUT/hlift_t1.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 bite T1 "$REF" "$OUT/libjp8host_t1.so"
-for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN 7:NOREUSE 8:INFO 10:SWEEP; do
+for t in 2:SKIPJOB 4:RATE 5:STREAM 6:NODRAIN 7:NOREUSE 8:INFO 10:SWEEP 13:TRANSPORT 14:EDITOR; do
     cc $PRD -DJP8H_TOOTH_${t#*:} -c -o "$OUT/hhost_t${t%%:*}.o" "$REPO/jp8/src/jp8_host.c"
     cc -shared -o "$OUT/libjp8host_t${t%%:*}.so" "$OUT/hlift_prd.o" "$OUT/hrt_prd.o" "$OUT/hhost_t${t%%:*}.o" -lm
     bite "T${t%%:*}" "$REF" "$OUT/libjp8host_t${t%%:*}.so"
@@ -161,4 +164,4 @@ cc -shared -o "$OUT/libjp8host_t12.so" "$OUT/hlift_t12.o" "$OUT/hrt_t12.o" "$OUT
 bite T12 "$REF" "$OUT/libjp8host_t12.so"
 if python3 "$HERE/jp8_template_check.py" "$REPO/jp8/gen/jp8h_template.bin.gz" "$REF/meta.json" --tooth > "$OUT/tooth_T11.log" 2>&1; then echo "*** TOOTH T11 DID NOT BITE ***"; exit 1; fi
 echo "tooth T11 bites (the shipped template, one byte flipped): $(tail -1 "$OUT/tooth_T11.log" | cut -c1-150)"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, software floats EXACTLY 0, 12 teeth bite"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, the host transport, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, the editor's open and zoom, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, the shipped template the oracle's, software floats EXACTLY 0, 14 teeth bite"

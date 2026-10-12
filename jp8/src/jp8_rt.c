@@ -218,6 +218,8 @@ static uint64_t jp8_bump(uint64_t sz) {
     if (jp8_reuse) jp8_live_put(p, (uint32_t)sz);
     return p;
 }
+uint64_t jp8_heap_alloc(uint64_t sz) { return jp8_bump(sz); }   /* the host's HeapAlloc / the oracle's bump (the GUI's imports) */
+uint64_t jp8_hc_next(void) { jp8_hc += 16; return jp8_hc; }       /* jp8_emu's Create* / Open*: the next fake handle */
 void jp8_alloc(CPU *c) {
     if (jp8_heap_closed) { jp8_trap(c, 0x6F5B04, "a worker job allocates (the threaded transport assumes none does)"); return; }
     c->r[0] = jp8_bump(c->r[1] & 0xFFFFFFFFULL ? c->r[1] & 0xFFFFFFFFULL : 16);

@@ -131,6 +131,8 @@ extern void jp8_trap(CPU *c, uint64_t rva, const char *what);
 extern void jp8_tr(CPU *c, uint64_t rva);        /* per-instruction trace record (lift --trace builds only) */
 extern void jp8_icall(CPU *c, uint64_t target);   /* indirect call/jump through the lifted-function table */
 extern void jp8_alloc(CPU *c);                   /* the CRT allocator hook point: ecx = size -> rax = bump pointer (zeroed) */
+extern uint64_t jp8_heap_alloc(uint64_t sz);     /* the same allocator for a host's HeapAlloc (the editor's imports) */
+extern uint64_t jp8_hc_next(void);               /* the oracle's next fake handle (CreateWindowExA ...) */
 extern void jp8_import(CPU *c, int idx);         /* an import stub reached: shimmed exactly as jp8_emu._imp does */
 
 static inline uint64_t jp8_mask(int sz) { return sz == 64 ? ~0ULL : ((1ULL << sz) - 1); }

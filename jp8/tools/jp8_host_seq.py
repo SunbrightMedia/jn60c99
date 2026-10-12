@@ -275,6 +275,62 @@ def sweep_steps():
     return out
 
 
+K_PLAYING, K_CYCLE_ACTIVE, K_PPQ, K_TEMPO, K_CYCLE = 0x2, 0x4, 0x200, 0x400, 0x1000   # VST3 ProcessContext flags
+
+
+def transport():
+    """v8: THE HOST TRANSPORT under a synced arpeggio (scope row 3: the states v7 left out) -- a running clock at three
+    tempos, the transport stopped (the position frozen), a restart from 0, a loop (kCycleActive: the position jumps
+    back at the cycle's end), a locate backwards, a block with no ProcessContext and one whose context has no tempo"""
+    sw, mode, rng, sync = (BYNAME[n] for n in ARP)
+    keys = (48, 55, 60, 64)
+    out = []
+    pos = [0.0]
+
+    def run(n, tempo=120.0, playing=True, cyc=None, pars=(), ev=()):
+        for j in range(n):
+            c = dict(tempo=tempo, playing=playing, ppq=pos[0])
+            if cyc:
+                c = dict(state=K_PLAYING | K_TEMPO | K_PPQ | K_CYCLE | K_CYCLE_ACTIVE, tempo=tempo, ppq=pos[0], cycle=cyc)
+            out.append((512, list(ev) if j == 0 else [], list(pars) if j == 0 else [], c))
+            if playing:
+                pos[0] += 512 / RATE * tempo / 60.0
+                if cyc and pos[0] >= cyc[1]:
+                    pos[0] -= cyc[1] - cyc[0]
+    run(1, pars=[(sw, 0, 1.0), (sync, 0, 1.0), (mode, 0, 0.5), (rng, 0, 0.5)],
+        ev=[("on", 10 * i, 0, k, 0.7) for i, k in enumerate(keys)])      # the arpeggio on, synced, a chord held
+    run(3)                                                              # a running clock at 120
+    run(2, tempo=90.0)                                                  # tempo changes
+    run(2, tempo=172.5)
+    run(3, tempo=172.5, playing=False)                                  # stopped: the position frozen
+    pos[0] = 0.0
+    run(2)                                                              # a restart from 0
+    pos[0] = 0.05
+    run(6, cyc=(0.0, 0.0625))                                           # a loop of 1/16 beat: the position jumps back
+    pos[0] = 0.25
+    run(1)                                                              # a locate backwards (no cycle)
+    out.append((512, [], [], None))                                     # no ProcessContext
+    out.append((512, [], [], dict(state=K_PLAYING | K_PPQ, ppq=pos[0]))) # a context without a tempo
+    out.append((512, [("off", 0, 0, k, 0.5) for k in keys], [(sw, 0, 0.0)], dict(TEMPO, ppq=pos[0])))
+    return out
+
+
+MAIN_PANEL = (3940, 2004)        # the main panel's window (truth/Script.xml: its size)
+
+
+def editor_steps():
+    """v8 (E1): THE EDITOR OPENED -- on a machine with no screen first (GetSystemMetrics 0: the fit is negative, so the
+    window computes it again at its next conversion), then the main window's zoom getter on screens that change under
+    it: the first positive fit is kept for the window's life (the JUNO's rule 4), the zoom value clamped to it (rule
+    1) -- and the state after, which holds the zoom"""
+    w, h = MAIN_PANEL
+    return [('screen', 0, 0), ('editor',), ('zoomconv', w, h), ('getstate', 'editor0'),
+            ('screen', 1024, 768), ('zoomconv', w, h), ('getstate', 'editor1'),
+            ('screen', 3840, 2160), ('zoomconv', w, h), ('screen', 640, 480), ('zoomconv', w, h),
+            ('block', 512, [("on", 0, 0, 60, 0.8)], [], None), ('block', 512, [("off", 0, 0, 60, 0.0)], [], None),
+            ('getstate', 'editor2')]
+
+
 def steps(patches=None):
     """the whole drive, in order (the reach runs the same steps over its patch list)"""
     patches = PATCHES if patches is None else patches
@@ -284,6 +340,7 @@ def steps(patches=None):
         out += [('block',) + b for b in blocks(p)]
         out.append(('getstate', 'p%d' % p))
     out += [('block',) + b for b in controllers()]
+    out += [('block',) + b for b in transport()]
     if MAXBLOCK > 512:                       # blocks of the host's maximum and one below: the render driver splits them
         cut = PANEL[(len(PANEL) // 3)]
         out += [('block', MAXBLOCK, [("on", i * 7, 0, k, 0.7) for i, k in enumerate(CHORD[:6])], [(cut, MAXBLOCK // 3, 0.4)], dict(TEMPO)),
@@ -307,6 +364,7 @@ def steps(patches=None):
     out += [('setstate', 'learned', 'as is'), ('compstate', 'learned', 'as is'), ('info', 'csetstate', 'c0'),
             ('ctl', 'get', PANEL[5], 0.0), ('block', 512, [("on", 0, 0, 60, 0.8)], [(MIDI_BASE + 3, 0, 0.4)], None),
             ('drain',), ('getstate', 'project'), ('info', 'cgetstate', 'c1')]
+    out += editor_steps()
     if SWEEP:
         out += sweep_steps()
     return out

@@ -118,8 +118,9 @@ ih = memhash(); com_init = lib.jp8h_com_next()
 if ih != meta['init_hash']: bad += 1; log('CONTROL 1 differs: init hash C %s oracle %s' % (ih[:16], meta['init_hash'][:16]))
 else: log('CONTROL 1: the memory after jp8h_init (the setup at %g) is the oracle\'s (image + heap + host objects)' % ST[0][1])
 bank = B.bank_bytes(); got = bytearray(); got_states = bytearray(); states = {}; cstates = {}; results = []; trap = None
+com_grew = []                                   # steps that made host objects: only the editor's open may
 for i, st in enumerate(ST[1:]):
-    k = st[0]
+    k = st[0]; c0 = lib.jp8h_com_next()
     if k == 'patch':
         blob = B.patch_blob(bank, st[1]); r = lib.jp8h_load_patch(blob, len(blob)); res = [k, st[1], 0]
     elif k == 'block':
@@ -166,9 +167,19 @@ for i, st in enumerate(ST[1:]):
         r = lib.jp8h_component_state(s, len(s), ctypes.byref(out_r)); res = [k, '%s/%s' % (st[1], st[2]), out_r.value]
     elif k == 'info':
         r, res = info_step(st[1:], cstates)
+    elif k == 'screen':                           # v8 (E1): the machine's virtual screen
+        r = lib.jp8h_screen(st[1], st[2]); res = [k, '%dx%d' % (st[1], st[2]), 0]
+    elif k == 'editor':                           # v8 (E1): the editor opened
+        view = ctypes.c_uint64(0); out_r = ctypes.c_uint32(0)
+        r = lib.jp8h_attach_editor(ctypes.byref(view), ctypes.byref(out_r))
+        wh = (ctypes.c_int32 * 32)(); nwin = lib.jp8h_windows(wh, 16)
+        res = [k, ' '.join('%dx%d' % p_ for p_ in sorted((wh[2 * j], wh[2 * j + 1]) for j in range(min(nwin, 16)))), out_r.value, view.value]
+    elif k == 'zoomconv':                         # v8 (E1): a panel window's zoom getter
+        z = ctypes.c_int32(0); r = lib.jp8h_window_zoom(st[1], st[2], ctypes.byref(z)); res = [k, '%dx%d' % (st[1], st[2]), z.value]
     else:
         raise SystemExit('unknown step %r' % (st,))
     if r: trap = 'step %d %r: rc %d %s' % (i + 1, st[:2], r, lib.jp8h_error().decode()); break
+    if lib.jp8h_com_next() != c0 and k != 'editor': com_grew.append((i + 1, st[:2]))
     results.append(res)
 if trap: bad += 1; log('TRAP: %s' % trap)
 if results != meta['results'][:len(results)] or len(results) != len(meta['results']):
@@ -202,7 +213,7 @@ if mine != meta['edits']:
 if lib.jp8h_jobs() != meta['jobs']: bad += 1; log('worker jobs C %d oracle %d' % (lib.jp8h_jobs(), meta['jobs']))
 if lib.jp8h_heap_top() != meta['heap_end']: bad += 1; log('bump pointer C 0x%x oracle 0x%x' % (lib.jp8h_heap_top(), meta['heap_end']))
 if lib.jp8h_com_next() != meta['com_next_end']: bad += 1; log('host-object allocator C 0x%x oracle 0x%x' % (lib.jp8h_com_next(), meta['com_next_end']))
-if lib.jp8h_com_next() != com_init: bad += 1; log('the host-object area grew after jp8h_init: 0x%x -> 0x%x' % (com_init, lib.jp8h_com_next()))
+if com_grew: bad += 1; log('the host-object area grew in %d steps other than the editor\'s open, first %r' % (len(com_grew), com_grew[0]))
 hl, hf = ctypes.c_uint64(0), ctypes.c_uint64(0); lib.jp8h_heap_stats(ctypes.byref(hl), ctypes.byref(hf))
 if (hl.value, hf.value) != (meta['heap_live'], meta['heap_free']):
     bad += 1; log('the heap\'s reuse layer: C %d live / %d free blocks, oracle %d / %d' % (hl.value, hf.value, meta['heap_live'], meta['heap_free']))

@@ -65,7 +65,16 @@ extern void jp8_heap_close_thread(void);
 #define SCR_VEC     0x6A0
 #define SCR_PATCH   0x6C0
 #define SCR_PATCH_N 0x10000
-#define SCR_SIZE    0x106C0
+#define SCR_EDNAME  0x106C0          /* v8: the editor's createView name and attached's platform type (jp8_host_emu SCR) */
+#define SCR_EDTYPE  0x106D0
+#define SCR_SIZE    0x106E0
+#define WINDOW_FIT  0x31B790ULL      /* a window's fit to the screen (a lifter hook: the window is found by its call) */
+#define ZOOM_GET    0x2ACC30ULL      /* a window's zoom getter (jp8_host_emu PROFILE; EXECUTED 2026-10-12) */
+#define NDIB_MAX    256
+#define NSL_MAX     64
+#define NGD_MAX     4096
+#define NSKIN_MAX   1024
+#define NWIN_MAX    16
 static const uint8_t IID_IMIDIMAPPING[16] = { 0xF7, 0xF9, 0x0F, 0xDF, 0xB7, 0x49, 0x69, 0x46, 0xB6, 0x3A, 0xB7, 0x32, 0x7A, 0xDB, 0xF5, 0xE5 };
 static const uint8_t IID_IUNITINFO[16] = { 0xB5, 0xD6, 0x4B, 0x3D, 0x3A, 0x91, 0xD2, 0x4F, 0xA8, 0x86, 0xE7, 0x68, 0xA5, 0xEB, 0x92, 0xC1 };
 
@@ -96,6 +105,14 @@ static struct {
     /* v6: the scratch area, the controller's IMidiMapping and IUnitInfo, the end of the host-object region */
     uint64_t scr, mm, ui, com_end; int32_t nparam, nunit;
     uint64_t reg[16], xreg[16][2], eflags;   /* the oracle's registers at template time */
+    /* v8 (E1): the editor -- the state the oracle's answers to the GUI's imports keep (template v3, jp8_host_emu.gui_state) */
+    int32_t scr_cx, scr_cy;                 /* the machine's virtual screen: GetSystemMetrics 78 / 79 (others 0) */
+    uint64_t lasterr, fake_heap, view;
+    int ndib; struct { uint64_t hb, bits; int32_t w, h; uint32_t bpp, stride; } dib[NDIB_MAX];
+    int nsl; struct { uint64_t head; int n, cap; uint64_t *e; } sl[NSL_MAX];
+    int ngd; struct { uint64_t hd; uint32_t w, h, fmt; } gd[NGD_MAX];
+    int nskin; struct { char name[96]; uint32_t w, h; } skin[NSKIN_MAX];
+    int nwin; struct { int32_t w, h; uint64_t win; } win[NWIN_MAX];
 } H;
 
 static int err(int code, const char *m) { snprintf(H.msg, sizeof H.msg, "%s", m); return code; }
@@ -141,6 +158,153 @@ static void record_edit(uint32_t id, double v) {
 static int w_self_free_check(void);              /* a worker thread? (the threaded transport, below) */
 #endif
 static int pq_index(uint64_t this_) { int i; for (i = 0; i < NPQ; i++) if (H.pq[i] == this_) return i; return -1; }
+/* ---------------------------------------------------------------- v8 (E1): the GUI's imports, as the oracle answers them
+ * (probes/b6/wrapper_emu.py: _imp, _gdip; jp8_emu.py: _imp) -- the editor's open makes 335 calls of 36 imports
+ * (jp8/logs/editor_imports.log). Plumbing: each answer is the oracle's, state and all. */
+static uint64_t alloc_com(uint64_t n);
+static uint64_t stack_arg(CPU *c, int k) { return gq(c->r[4] + 8 + 8 * (uint64_t)k); }    /* wrapper_emu.stack_arg */
+static uint8_t gb(uint64_t a) { uint8_t v = 0; void *p = jp8h_guest(a, 1); if (p) memcpy(&v, p, 1); return v; }
+static int gd_find(uint64_t hd) { int i; for (i = 0; i < H.ngd; i++) if (H.gd[i].hd == hd) return i; return -1; }
+static void gd_of(uint64_t hd, uint32_t *w, uint32_t *h, uint32_t *fmt) {     /* imgs.get(h, dict(w=64, h=64, fmt=0x26200A)) */
+    int i = gd_find(hd);
+    *w = i < 0 ? 64 : H.gd[i].w; *h = i < 0 ? 64 : H.gd[i].h; *fmt = i < 0 ? 0x26200Au : H.gd[i].fmt;
+}
+static uint64_t new_img(CPU *c, uint32_t w, uint32_t h, uint32_t fmt) {        /* _gdip's new_img: alloc_com(32) */
+    uint64_t hd = alloc_com(32); int i = gd_find(hd);
+    if (i < 0) { if (H.ngd >= NGD_MAX) { jp8_trap(c, 0, "too many GDI+ images"); return 0; } i = H.ngd++; }
+    H.gd[i].hd = hd; H.gd[i].w = w; H.gd[i].h = h; H.gd[i].fmt = fmt;
+    return hd;
+}
+static int sl_of(CPU *c, uint64_t head) {                                      /* slists.setdefault(head, []) */
+    int i; for (i = 0; i < H.nsl; i++) if (H.sl[i].head == head) return i;
+    if (H.nsl >= NSL_MAX) { jp8_trap(c, 0, "too many singly linked lists"); return -1; }
+    i = H.nsl++; H.sl[i].head = head; H.sl[i].n = 0; H.sl[i].cap = 16;
+    if (!(H.sl[i].e = (uint64_t *)malloc(16 * sizeof(uint64_t)))) { jp8_trap(c, 0, "no memory"); return -1; }
+    return i;
+}
+static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0: not a GUI import */
+    uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
+    if (!strcmp(n, "GetSystemMetrics")) {                             /* the screen dict holds 78 and 79 only */
+        uint32_t i = (uint32_t)rcx;
+#ifdef JP8H_TOOTH_EDITOR    /* the gate's tooth: the screen's width and height swapped (the zoom's fit must see it) */
+        i = i == 0x4E ? 0x4F : i == 0x4F ? 0x4E : i;
+#endif
+        c->r[0] = (uint64_t)(int64_t)(i == 0x4E ? H.scr_cx : i == 0x4F ? H.scr_cy : 0); return 1;
+    }
+    if (!strcmp(n, "LoadCursorA") || !strcmp(n, "LoadCursorW") || !strcmp(n, "FlushInstructionCache") ||
+        !strcmp(n, "AllocateAndInitializeSid") || !strcmp(n, "WakeAllConditionVariable") || !strcmp(n, "WakeConditionVariable") ||
+        !strcmp(n, "DeleteObject") || !strcmp(n, "DeleteDC") || !strcmp(n, "ReleaseDC")) { c->r[0] = 1; return 1; }
+    if (!strcmp(n, "RegisterClassExA") || !strcmp(n, "RegisterClassExW") || !strcmp(n, "RegisterClassA") ||
+        !strcmp(n, "RegisterClassW")) { c->r[0] = 0xC001; return 1; }
+    if (!strcmp(n, "SelectObject")) { c->r[0] = 0x77770; return 1; }
+    if (!strcmp(n, "GetLastError")) { c->r[0] = H.lasterr & 0xFFFFFFFFu; return 1; }
+    if (!strcmp(n, "SetLastError")) { H.lasterr = rcx & 0xFFFFFFFFu; c->r[0] = 0; return 1; }
+    if (!strcmp(n, "GetProcessHeap")) { c->r[0] = H.fake_heap; return 1; }
+    if (!strcmp(n, "HeapAlloc")) { c->r[0] = jp8_heap_alloc(r8 ? r8 : rdx ? rdx : 16); return 1; }   /* r8 or rdx or 16 */
+    if (!strcmp(n, "HeapReAlloc")) { c->r[0] = jp8_heap_alloc(r9); return 1; }   /* a new block, nothing copied: the oracle's */
+    if (!strcmp(n, "GetCurrentProcess")) { c->r[0] = 0; return 1; }
+    if (!strncmp(n, "Create", 6) && strcmp(n, "CreateDIBSection") && strncmp(n, "CreateFile", 10)) { c->r[0] = jp8_hc_next(); return 1; }
+    /* the imports the oracle does not model: its default answer, 0 (e2e_emu / jp8_emu: counted, unhandled) */
+    if (!strcmp(n, "GetClassInfoExA") || !strcmp(n, "HeapSize") || !strcmp(n, "SetTimer") || !strcmp(n, "InvalidateRect") ||
+        !strcmp(n, "SetWindowPos") || !strcmp(n, "EnumThreadWindows") || !strcmp(n, "GetDesktopWindow") || !strcmp(n, "IsWindow") ||
+        !strcmp(n, "DestroyWindow") || !strcmp(n, "LoadLibraryExA") || !strcmp(n, "KillTimer")) { c->r[0] = 0; return 1; }
+    if (!strcmp(n, "MultiByteToWideChar")) {
+        uint64_t outp = stack_arg(c, 4); uint32_t outn = (uint32_t)stack_arg(c, 5), cnt = (uint32_t)r9, len, k;
+        if (cnt == 0xFFFFFFFFu) { for (len = 0; len < 1200 && gb(r8 + len); len++) {} len++; }   /* rstr + '\0' */
+        else len = cnt;
+        if (outn == 0) { c->r[0] = len; return 1; }
+        for (k = 0; k < len && k < outn; k++) { uint16_t w = k < len - (cnt == 0xFFFFFFFFu) ? gb(r8 + k) : 0; wmem(outp + 2 * (uint64_t)k, &w, 2); }
+        c->r[0] = len < outn ? len : outn; return 1;
+    }
+    if (!strcmp(n, "CreateDIBSection")) {
+        int32_t w_ = gi(rdx + 4), h_ = gi(rdx + 8); uint32_t bpp = ((uint32_t)gi(rdx + 12) >> 16) & 0xFFFFu, stride, size, ah;
+        uint64_t bits;
+        ah = (uint32_t)(h_ < 0 ? -h_ : h_); stride = ((uint32_t)(w_ < 0 ? -w_ : w_) * bpp + 31) / 32 * 4;
+        size = stride * ah; if (size < 16) size = 16;
+        if (H.ndib >= NDIB_MAX) { jp8_trap(c, 0, "too many DIB sections"); return 1; }
+        bits = jp8_heap_alloc(size);                                    /* self.bump(size_), zeroed */
+        H.dib[H.ndib].hb = 0xB0000 + 0x10 * (uint64_t)H.ndib; H.dib[H.ndib].bits = bits; H.dib[H.ndib].w = w_; H.dib[H.ndib].h = h_;
+        H.dib[H.ndib].bpp = bpp; H.dib[H.ndib].stride = stride;
+        if (r9) wq(r9, bits);
+        c->r[0] = H.dib[H.ndib++].hb; return 1;
+    }
+    if (!strcmp(n, "GetObjectA") || !strcmp(n, "GetObjectW")) {
+        int i; uint8_t bm[104]; int32_t v; uint32_t u; uint16_t hw;
+        for (i = 0; i < H.ndib && H.dib[i].hb != rcx; i++) {}
+        if (i == H.ndib) { c->r[0] = 0; return 1; }
+        memset(bm, 0, sizeof bm);                                       /* '<iiiiHHIQ' then (104) '<IiiHHIIiiII' + 12 + '<QI' */
+        v = H.dib[i].w; memcpy(bm + 4, &v, 4); v = H.dib[i].h < 0 ? -H.dib[i].h : H.dib[i].h; memcpy(bm + 8, &v, 4);
+        v = (int32_t)H.dib[i].stride; memcpy(bm + 12, &v, 4); hw = 1; memcpy(bm + 16, &hw, 2); hw = (uint16_t)H.dib[i].bpp; memcpy(bm + 18, &hw, 2);
+        memcpy(bm + 24, &H.dib[i].bits, 8);
+        if ((uint32_t)rdx >= 104) {
+            u = 40; memcpy(bm + 32, &u, 4); v = H.dib[i].w; memcpy(bm + 36, &v, 4); v = H.dib[i].h; memcpy(bm + 40, &v, 4);
+            hw = 1; memcpy(bm + 44, &hw, 2); hw = (uint16_t)H.dib[i].bpp; memcpy(bm + 46, &hw, 2);
+            u = H.dib[i].stride * (uint32_t)(H.dib[i].h < 0 ? -H.dib[i].h : H.dib[i].h); memcpy(bm + 52, &u, 4);
+            wmem(r8, bm, 96); c->r[0] = 104; return 1;                  /* bm[:104] of a 96-byte struct: 96 written */
+        }
+        wmem(r8, bm, 32); c->r[0] = 32; return 1;
+    }
+    if (!strcmp(n, "InterlockedPushEntrySList")) {
+        int i = sl_of(c, rcx); uint64_t old;
+        if (i < 0) return 1;
+        old = H.sl[i].n ? H.sl[i].e[H.sl[i].n - 1] : 0; wq(rdx, old);
+        if (H.sl[i].n == H.sl[i].cap) {
+            uint64_t *q = (uint64_t *)realloc(H.sl[i].e, sizeof(uint64_t) * 2 * (size_t)H.sl[i].cap);
+            if (!q) { jp8_trap(c, 0, "no memory"); return 1; }
+            H.sl[i].e = q; H.sl[i].cap *= 2;
+        }
+        H.sl[i].e[H.sl[i].n++] = rdx; c->r[0] = old; return 1;
+    }
+    if (!strcmp(n, "InterlockedPopEntrySList")) { int i = sl_of(c, rcx); if (i >= 0) c->r[0] = H.sl[i].n ? H.sl[i].e[--H.sl[i].n] : 0; return 1; }
+    if (!strcmp(n, "InterlockedFlushSList")) {
+        int i = sl_of(c, rcx); if (i >= 0) { c->r[0] = H.sl[i].n ? H.sl[i].e[H.sl[i].n - 1] : 0; H.sl[i].n = 0; } return 1;
+    }
+    if (!strncmp(n, "Gdip", 4)) {                                      /* _gdip (GdiplusStartup and every Gdip*) */
+        uint32_t w, h, fmt;
+        if (!strcmp(n, "GdiplusStartup")) { wq(rcx, 1); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipAlloc")) { c->r[0] = alloc_com(rcx > 16 ? rcx : 16); return 1; }
+        if (!strcmp(n, "GdipCreateBitmapFromFile") || !strcmp(n, "GdipCreateBitmapFromFileICM")) {
+            char nm[96]; size_t k = 0, last = 0, i; int j;
+            uint16_t ch;
+            for (i = 0; i < 600; i++) {                                 /* rstr(rcx, True) -> basename, lower case */
+                ch = (uint16_t)(gb(rcx + 2 * i) | gb(rcx + 2 * i + 1) << 8);
+                if (!ch) break;
+                if (ch == '\\' || ch == '/') { k = 0; last = i + 1; continue; }
+                if (k + 1 < sizeof nm) nm[k++] = (char)(ch >= 'A' && ch <= 'Z' ? ch + 32 : ch);
+            }
+            (void)last; nm[k] = 0; w = 16; h = 16;
+            for (j = 0; j < H.nskin; j++) if (!strcmp(H.skin[j].name, nm)) { w = H.skin[j].w; h = H.skin[j].h; break; }
+            wq(rdx, new_img(c, w, h, 0x26200Au)); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipCreateBitmapFromHBITMAP")) { wq(r8, new_img(c, 64, 64, 0x26200Au)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipCreateBitmapFromScan0")) {
+            wq(stack_arg(c, 5), new_img(c, (uint32_t)rcx, (uint32_t)rdx, (uint32_t)r9)); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipCloneImage")) { gd_of(rcx, &w, &h, &fmt); wq(rdx, new_img(c, w, h, fmt)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImageWidth") || !strcmp(n, "GdipGetImageHeight") || !strcmp(n, "GdipGetImagePixelFormat")) {
+            uint32_t v; gd_of(rcx, &w, &h, &fmt); v = strstr(n, "Width") ? w : strstr(n, "Height") ? h : fmt;
+            wmem(rdx, &v, 4); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipGetImagePaletteSize")) { int32_t v = 8; wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImagePalette")) { uint64_t z = 0; wmem(rdx, &z, 8); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipBitmapLockBits")) {
+            uint8_t d[32]; uint64_t buf, data = stack_arg(c, 4); int32_t st_;
+            gd_of(rcx, &w, &h, &fmt);
+            buf = jp8_heap_alloc((uint64_t)w * h * 4 + 16);             /* bump(w h 4 + 16), the first w h 4 bytes zeroed */
+            memset(d, 0, sizeof d); memcpy(d, &w, 4); memcpy(d + 4, &h, 4); st_ = (int32_t)(w * 4); memcpy(d + 8, &st_, 4);
+            memcpy(d + 12, &fmt, 4); memcpy(d + 16, &buf, 8);
+            wmem(data, d, 32); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipGetImageGraphicsContext") || !strcmp(n, "GdipCreateFromHDC") || !strcmp(n, "GdipCreatePath") ||
+            !strcmp(n, "GdipCreateSolidFill") || !strcmp(n, "GdipCloneBrush")) { wq(rdx, alloc_com(32)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipCreatePen1")) { wq(stack_arg(c, 3), alloc_com(32)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipCreateLineBrushI")) { wq(stack_arg(c, 5), alloc_com(32)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetSmoothingMode")) { int32_t v = 0; wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImageEncodersSize")) { uint32_t v = 0; wmem(rcx, &v, 4); wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        c->r[0] = 0; return 1;                                          /* every other Gdip*: Ok, nothing written */
+    }
+    return 0;
+}
 void jp8_hostcall(CPU *c, uint64_t target) {
     const char *n = stub_name(target); uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
     char msg[96];
@@ -243,6 +407,7 @@ void jp8_hostcall(CPU *c, uint64_t target) {
         if ((uint32_t)rcx == 0xE06D7363u) { jp8_trap(c, target, "the plugin threw a C++ exception (RaiseException 0xE06D7363)"); return; }
         c->r[0] = 0; return;
     }
+    if (gui_import(c, n)) return;                       /* v8 (E1): the editor's imports */
     snprintf(msg, sizeof msg, "import %s not shimmed on the host path (called from rva 0x%llx)", n,
              (unsigned long long)(gq(c->r[4]) - IB));
     if (getenv("JP8H_DEBUG")) {                         /* the image addresses on the stack above: the call chain */
@@ -333,6 +498,16 @@ void jp8_hook(CPU *c, uint64_t rva) {
         return;
     }
 #endif
+    if (rva == WINDOW_FIT) {                     /* v8 (E1): a window lays itself out -- found by its fit's call, as the
+                                                    oracle's editor_attach finds it: windows[(w, h)] = this */
+        int32_t rc_[4]; int i; void *p = jp8h_guest(c->r[1] + 0x18, 16);
+        if (!p) { jp8_trap(c, rva, "a window's rectangle is not mapped"); return; }
+        memcpy(rc_, p, 16);
+        for (i = 0; i < H.nwin && !(H.win[i].w == rc_[2] - rc_[0] && H.win[i].h == rc_[3] - rc_[1]); i++) {}
+        if (i == H.nwin) { if (H.nwin >= NWIN_MAX) { jp8_trap(c, rva, "too many windows"); return; } H.nwin++; }
+        H.win[i].w = rc_[2] - rc_[0]; H.win[i].h = rc_[3] - rc_[1]; H.win[i].win = c->r[1];
+        return;
+    }
     if (rva == RENDER_DONE) return;              /* the sequential transport: the bookkeeping follows at once */
     if (rva == JOBS_DUE) {
         uint64_t host = c->r[1] - DONE_LOCK, top = (c->r[4] - 0x100000ULL) & ~0xFULL; int u;
@@ -389,10 +564,10 @@ static int call(uint64_t fn, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r
     return 0;
 }
 
-/* ---------------------------------------------------------------- the template (JP8H v2, jp8_host_ref.py) */
+/* ---------------------------------------------------------------- the template (JP8H v2 / v3, jp8_host_ref.py) */
 static int load(const unsigned char *b, size_t len) {
-    size_t p = 12; uint32_t nreg, r, k, nkv, ns;
-    if (len < 16 || memcmp(b, "JP8H", 4) || le32(b + 4) != 2) return err(JP8H_E_TEMPLATE, "template: not JP8H version 2");
+    size_t p = 12; uint32_t nreg, r, k, nkv, ns, ver;
+    if (len < 16 || memcmp(b, "JP8H", 4) || ((ver = le32(b + 4)) != 2 && ver != 3)) return err(JP8H_E_TEMPLATE, "template: not JP8H version 2 or 3");
     if (crc32_of(b, len - 4) != le32(b + len - 4)) return err(JP8H_E_TEMPLATE, "template: crc32 mismatch");
     nreg = le32(b + 8);
     if (nreg > NREG_MAX || (H.nreg && (uint32_t)H.nreg != nreg)) return err(JP8H_E_TEMPLATE, "template: regions");
@@ -438,7 +613,7 @@ static int load(const unsigned char *b, size_t len) {
                 int r_ = atoi(key + 1); const char *t = strchr(key, 'l') ? "lo" : "hi";
                 if (r_ >= 0 && r_ < 16) H.xreg[r_][t[0] == 'h'] = v;
             }
-            KV("eflags", H.eflags);
+            KV("eflags", H.eflags); KV("lasterr", H.lasterr); KV("fake_heap", H.fake_heap);
 #undef KV
         }
         if (!H.audio || !H.comp || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream)
@@ -457,6 +632,50 @@ static int load(const unsigned char *b, size_t len) {
         if (k && H.stub[k].addr <= H.stub[k - 1].addr) return err(JP8H_E_TEMPLATE, "template: stubs not sorted");
     }
     H.nstub = (int)ns;
+    for (k = 0; k < (uint32_t)H.nsl; k++) free(H.sl[k].e);
+    H.ndib = H.nsl = H.ngd = H.nskin = H.nwin = 0; H.view = 0; H.scr_cx = H.scr_cy = 0;
+    if (!H.fake_heap) H.fake_heap = 0x4242000000ULL;               /* jp8_emu.FAKE_HEAP (a v2 template names none) */
+    if (ver == 3) {                                                   /* the GUI's import state */
+        uint32_t nd, nl, ng, nk, j;
+        if (p + 4 > len - 4 || (nd = le32(b + p)) > NDIB_MAX) return err(JP8H_E_TEMPLATE, "template: DIB sections");
+        p += 4;
+        for (k = 0; k < nd; k++, p += 32) {
+            if (p + 32 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated DIB");
+            H.dib[k].hb = le64(b + p); H.dib[k].w = (int32_t)le32(b + p + 8); H.dib[k].h = (int32_t)le32(b + p + 12);
+            H.dib[k].bpp = le32(b + p + 16); H.dib[k].stride = le32(b + p + 20); H.dib[k].bits = le64(b + p + 24);
+        }
+        H.ndib = (int)nd;
+        if (p + 4 > len - 4 || (nl = le32(b + p)) > NSL_MAX) return err(JP8H_E_TEMPLATE, "template: lists");
+        p += 4;
+        for (k = 0; k < nl; k++) {
+            uint32_t n_;
+            if (p + 12 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated list");
+            H.sl[k].head = le64(b + p); n_ = le32(b + p + 8); p += 12;
+            if (p + 8 * (size_t)n_ > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated list entries");
+            H.sl[k].cap = n_ > 16 ? (int)n_ : 16; H.sl[k].n = (int)n_;
+            if (!(H.sl[k].e = (uint64_t *)malloc(sizeof(uint64_t) * (size_t)H.sl[k].cap))) return err(JP8H_E_TEMPLATE, "no memory");
+            for (j = 0; j < n_; j++, p += 8) H.sl[k].e[j] = le64(b + p);
+            H.nsl = (int)k + 1;
+        }
+        if (p + 4 > len - 4 || (ng = le32(b + p)) > NGD_MAX) return err(JP8H_E_TEMPLATE, "template: images");
+        p += 4;
+        for (k = 0; k < ng; k++, p += 20) {
+            if (p + 20 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated image");
+            H.gd[k].hd = le64(b + p); H.gd[k].w = le32(b + p + 8); H.gd[k].h = le32(b + p + 12); H.gd[k].fmt = le32(b + p + 16);
+        }
+        H.ngd = (int)ng;
+        if (p + 4 > len - 4 || (nk = le32(b + p)) > NSKIN_MAX) return err(JP8H_E_TEMPLATE, "template: skin");
+        p += 4;
+        for (k = 0; k < nk; k++) {
+            uint32_t nl_;
+            if (p + 4 > len - 4) return err(JP8H_E_TEMPLATE, "template: truncated skin");
+            nl_ = le32(b + p); p += 4;
+            if (nl_ >= sizeof H.skin[k].name || p + nl_ + 8 > len - 4) return err(JP8H_E_TEMPLATE, "template: skin name");
+            memcpy(H.skin[k].name, b + p, nl_); H.skin[k].name[nl_] = 0; p += nl_;
+            H.skin[k].w = le32(b + p); H.skin[k].h = le32(b + p + 4); p += 8;
+        }
+        H.nskin = (int)nk;
+    }
     if (p != len - 4) return err(JP8H_E_TEMPLATE, "template: trailing bytes");
     return JP8H_OK;
 }
@@ -816,6 +1035,9 @@ int jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, in
     if (ctx) {      /* host_process_emu.process's ProcessContext: state, the host rate, ppq, the cycle, the tempo */
         uint8_t c[160];
         memset(c, 0, sizeof c); memcpy(c, &ctx->state, 4); memcpy(c + 8, &H.rate, 8); memcpy(c + 40, &ctx->ppq, 8);
+#ifdef JP8H_TOOTH_TRANSPORT     /* the gate's tooth: the transport always playing, never looping (v8's stops / loop) */
+        { uint32_t st = (ctx->state | 0x2u) & ~0x4u; memcpy(c, &st, 4); }
+#endif
         memcpy(c + 56, &ctx->cycle_start, 8); memcpy(c + 64, &ctx->cycle_end, 8); memcpy(c + 72, &ctx->tempo, 8);
         wmem(H.ctx, c, sizeof c); cptr = H.ctx;
     }
@@ -838,6 +1060,36 @@ int jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, in
 uint64_t jp8h_heap_top(void) { return jp8_heap_get(); }
 uint64_t jp8h_jobs(void) { return H.njobs; }
 uint64_t jp8h_com_next(void) { return H.com_next; }
+/* ---------------------------------------------------------------- v8 (E1): the editor (jp8_host_emu.editor_attach) */
+int jp8h_screen(int32_t cx, int32_t cy) {           /* the machine's virtual screen: GetSystemMetrics 78 / 79 */
+    int rc = live(); if (rc) return rc;
+    H.scr_cx = cx; H.scr_cy = cy; return JP8H_OK;
+}
+int jp8h_attach_editor(uint64_t *view, uint32_t *result) {   /* createView("editor"), attached(parent, "HWND") */
+    uint64_t name, t; int rc = live(); if (rc) return rc;
+    name = scratch(SCR_EDNAME, 16); wmem(name, "editor", 7);
+    t = scratch(SCR_EDTYPE, 16); wmem(t, "HWND", 5);
+    if (call(gq(gq(H.ctrl) + 8 * 17), H.ctrl, name, 0, 0)) return JP8H_E_TRAP;              /* IEditController::createView */
+    H.view = H.cpu.r[0];
+    if (!H.view) return err(JP8H_E_STATE, "createView(\"editor\") gave no view");
+    if (call(gq(gq(H.view) + 8 * 4), H.view, 0x10010, t, 0)) return JP8H_E_TRAP;           /* IPlugView::attached */
+    if (view) *view = H.view;
+    if (result) *result = (uint32_t)H.cpu.r[0];
+    return JP8H_OK;
+}
+int jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom) {  /* host_process_emu.window_conv: the window's zoom getter */
+    int i, rc = live(); if (rc) return rc;
+    for (i = 0; i < H.nwin && !(H.win[i].w == w && H.win[i].h == h); i++) {}
+    if (i == H.nwin) return err(JP8H_E_ARG, "no window of that size has laid itself out");
+    if (call(IB + ZOOM_GET, H.win[i].win, 0, 0, 0)) return JP8H_E_TRAP;
+    if (zoom) *zoom = (int32_t)(uint32_t)H.cpu.r[0];
+    return JP8H_OK;
+}
+int jp8h_windows(int32_t *wh, int cap) {            /* the windows laid out so far: w, h pairs; the count returned */
+    int i;
+    for (i = 0; i < H.nwin && i < cap; i++) { wh[2 * i] = H.win[i].w; wh[2 * i + 1] = H.win[i].h; }
+    return H.nwin;
+}
 int jp8h_threaded(void) {                  /* 1: the workers run on threads (their stacks are their own) */
 #ifdef JP8H_THREADS
     return 1;

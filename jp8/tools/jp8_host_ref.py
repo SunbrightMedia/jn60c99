@@ -11,9 +11,12 @@ component and the controller initialized and connected, the handler, setComponen
     result (and the bytes a controller call wrote), every output word of every block, every state byte, then the
     performEdit calls the plugin made, the worker jobs, and the memory hashes. From the template on the host's heap
     reuses freed blocks (JP8Host.heap_reuse_on) and the host-object area must not grow after the setup (a stop).
-Plumbing only. FORMAT JP8H v2 (little endian): "JP8H" u32 2 u32 nregions; per region u64 base u64 size u32 nruns,
+Plumbing only. FORMAT JP8H v3 (little endian): "JP8H" u32 3 u32 nregions; per region u64 base u64 size u32 nruns,
 per run u32 off u32 len bytes; u32 nfacts, per fact char key[24] u64 value; u32 nstubs, per stub u64 addr u32 len
-name; u32 crc32 of every byte before it.
+name; THE GUI's IMPORT STATE (v3, the oracle's own answers kept between calls: jp8_host_emu.gui_state) -- u32 ndibs,
+per DIB u64 handle i32 w i32 h u32 bpp u32 stride u64 bits; u32 nlists, per singly linked list u64 head u32 n, n x u64
+entry; u32 nimages, per GDI+ image u64 handle u32 w u32 h u32 format; u32 nskin, per skin image u32 len name (lower
+case) u32 w u32 h; u32 crc32 of every byte before it.
 usage: jp8_host_ref.py <outdir>"""
 import sys, os, json, struct, time, hashlib, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -61,7 +64,9 @@ for k in range(16):
     v = uc.reg_read(getattr(XC, 'UC_X86_REG_XMM%d' % k)); facts['x%dlo' % k] = v & (2**64 - 1); facts['x%dhi' % k] = v >> 64
 facts['eflags'] = uc.reg_read(XC.UC_X86_REG_EFLAGS)
 stubs = sorted((a, nm[1]) for a, nm in h.stub2name.items())
-body = bytearray(b'JP8H' + struct.pack('<II', 2, len(REGIONS)))
+gs = h.gui_state()
+facts['lasterr'] = gs['lasterr']; facts['fake_heap'] = J.FAKE_HEAP
+body = bytearray(b'JP8H' + struct.pack('<II', 3, len(REGIONS)))
 for base, size in REGIONS:
     rr = runs_of(region_bytes(base, size))
     body += struct.pack('<QQI', base, size, len(rr))
@@ -70,6 +75,14 @@ body += struct.pack('<I', len(facts))
 for k, v in facts.items(): body += k.encode().ljust(24, b'\0')[:24] + struct.pack('<Q', v & 0xFFFFFFFFFFFFFFFF)
 body += struct.pack('<I', len(stubs))
 for a, nm in stubs: body += struct.pack('<QI', a, len(nm)) + nm.encode()
+body += struct.pack('<I', len(gs['dibs']))
+for hb, (w_, h_, bpp, stride, bits) in gs['dibs']: body += struct.pack('<QiiIIQ', hb, w_, h_, bpp, stride, bits)
+body += struct.pack('<I', len(gs['slists']))
+for head, ents in gs['slists']: body += struct.pack('<QI', head, len(ents)) + b''.join(struct.pack('<Q', e) for e in ents)
+body += struct.pack('<I', len(gs['gdip']))
+for hd, (w_, h_, fmt) in gs['gdip']: body += struct.pack('<QIII', hd, w_, h_, fmt)
+body += struct.pack('<I', len(gs['skin']))
+for nm, (w_, h_) in gs['skin']: body += struct.pack('<I', len(nm)) + nm.encode('latin1') + struct.pack('<II', w_, h_)
 body += struct.pack('<I', zlib.crc32(bytes(body)) & 0xFFFFFFFF)
 open(os.path.join(out, 'jp8_host_template.bin'), 'wb').write(body)
 log('template (before setupProcessing): %d regions, %d facts, %d stubs, %.1f MB (sha256 %s)' % (len(REGIONS), len(facts), len(stubs),
@@ -90,14 +103,14 @@ log('setup %g: the host objects end at 0x%x, %d edits, %d jobs' % (ST[0][1], h.c
 bank = B.bank_bytes(); words = bytearray(); results = []; states = {}; cstates = {}; state_bytes = bytearray(); nblock = 0
 blob = lambda p: B.patch_blob(bank, p)
 for st in ST[1:]:
-    k = st[0]
+    k = st[0]; c0 = h.com_next
     row, w, sb = h.run_step(st, blob, Q.state_variant, states, cstates)
     results.append(row); words += w; state_bytes += sb; nblock += k == 'block'
-    if k in ('patch', 'rate', 'setstate'):
-        log('%s %s: %d blocks, %d words so far, %d edits, %d jobs, heap 0x%x' % (k, st[1], nblock, len(words) // 4, len(h.edits) - e0,
-            len(h.jobs) - j0, h.heap))
-if h.com_next != com_init:
-    raise SystemExit('the host-object area grew during the drive: 0x%x -> 0x%x' % (com_init, h.com_next))
+    if h.com_next != c0 and k != 'editor':    # only the editor's open makes host objects (its GDI+ images: wrapper_emu)
+        raise SystemExit('the host-object area grew in step %r: 0x%x -> 0x%x' % (st[:2], c0, h.com_next))
+    if k in ('patch', 'rate', 'setstate', 'editor'):
+        log('%s %s: %d blocks, %d words so far, %d edits, %d jobs, heap 0x%x' % (k, st[1] if len(st) > 1 else '', nblock, len(words) // 4,
+            len(h.edits) - e0, len(h.jobs) - j0, h.heap))
 edits = [[e[1], struct.unpack('<Q', struct.pack('<d', e[2]))[0]] for e in h.edits[e0:] if e[0] == 'performEdit']
 open(os.path.join(out, 'words.bin'), 'wb').write(bytes(words))
 stack = bytes(uc.mem_read(Q.STACK_BASE, Q.STACK_SIZE))    # the guest stack after the drive (graded by hash; kept so a

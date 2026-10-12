@@ -67,7 +67,8 @@ def roots_of():
                 ctl_qi=slot(h.ctrl, 0), ctl_compstate=slot(h.ctrl, 5), ctl_setstate=slot(h.ctrl, 6), ctl_getstate=slot(h.ctrl, 7),
                 ctl_count=slot(h.ctrl, 8), ctl_info=slot(h.ctrl, 9), midi_assign=slot(h.mm, 3), unit_count=slot(h.ui, 3),
                 unit_info=slot(h.ui, 4), unit_lists=slot(h.ui, 5), unit_selected=slot(h.ui, 11), unit_select=slot(h.ui, 12),
-                **{'ctl%d' % k: slot(h.ctrl, k) for k in range(10, 16)})
+                ctl_createview=slot(h.ctrl, 17), zoom_get=H.ZOOM_GET - IB,    # v8 (E1): the editor's entries the C side
+                **{'ctl%d' % k: slot(h.ctrl, k) for k in range(10, 16)})     # calls (the view's own after it exists)
 done = []; resumed = []; STEPS = None
 def dump(path):
     tmp = path + '.tmp'
@@ -111,6 +112,8 @@ for i, st in enumerate(ST[1:hi], start=2):
     if k == 'patch':
         cur = st[1]
     h.run_step(st, blob, Q.state_variant, states, cstates)
+    if k == 'editor':                                # v8 (E1): IPlugView::attached, a method of the view just made
+        roots['view_attached'] = slot(h.view, 4)
     if k == 'getstate' and cur is not None and st[1] == 'p%d' % cur:     # a patch's steps end with its state
         log('patch %d %r: executed %d (+%d), %d indirect sites, %d stub names' % (
             cur, B.patch_name(bank, cur), len(executed), len(executed) - n0, len(indirect), len(stubs)))

@@ -86,8 +86,8 @@ IID_IUNITINFO = W.vst_iid(0x3D4BD6B5, 0x913A4FD2, 0xA886E768, 0xA5EB92C1)
 # THE HOST'S SCRATCH AREA (host_setup; jp8_host.c the same): one block of the host-object area for every buffer a host
 # call hands the plugin, at fixed offsets, cleared before each use -- (offset, size)
 SCR = dict(setup=(0x0, 24), qi=(0x20, 0x40), str=(0x60, 256), text=(0x160, 256), val=(0x260, 8), info=(0x270, 792),
-           unit=(0x590, 268), vec=(0x6A0, 24), patch=(0x6C0, 0x10000))
-SCR_SIZE = 0x106C0
+           unit=(0x590, 268), vec=(0x6A0, 24), patch=(0x6C0, 0x10000), edname=(0x106C0, 16), edtype=(0x106D0, 16))
+SCR_SIZE = 0x106E0
 
 
 class JP8Host(H.HostProcess):
@@ -289,6 +289,39 @@ class JP8Host(H.HostProcess):
             raise RuntimeError('setupProcessing -> 0x%x' % r)
         self.host_sr = float(host_sr)
 
+    # ------------------------------------------------------------ the editor (v8, E1)
+    def editor_attach(self):
+        """the host opens the plugin's editor: IEditController::createView("editor"), IPlugView::attached on a parent
+        window -- host_process_emu.attach_editor's calls, the two strings in the scratch (the host-object area grows only
+        by what the plugin itself asks for). Each window the plugin lays out is found by its fit's call (WINDOW_FIT):
+        self.windows[(w, h)] = the window (w x h: its panel's Script.xml size). The screen is self.screen."""
+        uc = self.uc
+        if not hasattr(self, 'windows'):
+            self.windows = {}
+
+            def on_fit(uc_, addr, size, ud):
+                this = uc_.reg_read(UC_X86_REG_RCX)
+                r = struct.unpack('<4i', uc_.mem_read(this + 0x18, 16))
+                self.windows[(r[2] - r[0], r[3] - r[1])] = this
+            uc.hook_add(H.UC_HOOK_CODE, on_fit, begin=H.WINDOW_FIT, end=H.WINDOW_FIT)
+        name = self.scratch('edname'); uc.mem_write(name, b'editor\0')
+        t = self.scratch('edtype'); uc.mem_write(t, b'HWND\0')
+        view = self.vcall(self.ctrl, 17, name, count=4_000_000_000)          # IEditController::createView
+        if not view:
+            raise RuntimeError('createView("editor") gave no view')
+        r = self.vcall(view, 4, 0x10010, t, count=4_000_000_000) & 0xFFFFFFFF   # IPlugView::attached
+        self.view = view
+        return view, r
+
+    def gui_state(self):
+        """the oracle's own answers the GUI's imports keep between calls (wrapper_emu / jp8_emu), for the template:
+        the DIB sections (CreateDIBSection / GetObjectA), the interlocked singly linked lists, the GDI+ images, the
+        skin images' sizes by file name (GdipCreateBitmapFromFile), the last error"""
+        return dict(dibs=sorted(self.__dict__.get('dibs', {}).items()),
+                    slists=sorted((k, list(v)) for k, v in self.__dict__.get('slists', {}).items()),
+                    gdip=sorted((k, (v['w'], v['h'], v['fmt'])) for k, v in self.__dict__.get('gdip_imgs', {}).items()),
+                    skin=sorted(self.skin.items()), lasterr=getattr(self, 'lasterr', 0))
+
     # ------------------------------------------------------------ one step of the host gate's drive (jp8_host_seq)
     def run_step(self, st, blob, variant, states, cstates):
         """one step as the host makes it (jp8_host_seq.steps; jp8_host_c.py makes the same through the C API): blob(p)
@@ -336,6 +369,13 @@ class JP8Host(H.HostProcess):
             row = [k, '%s/%s' % (st[1], st[2]), r]
         elif k == 'info':
             row = self.info_step(st[1:], cstates)
+        elif k == 'screen':                       # v8: the machine's virtual screen (GetSystemMetrics 78 / 79)
+            self.screen = {0x4E: st[1], 0x4F: st[2]}; row = [k, '%dx%d' % (st[1], st[2]), 0]
+        elif k == 'editor':                       # v8: the editor opened (E1)
+            view, r = self.editor_attach()
+            row = [k, ' '.join('%dx%d' % wh for wh in sorted(self.windows)), r, view]
+        elif k == 'zoomconv':                     # v8: a coordinate conversion of a panel window: its zoom getter
+            row = [k, '%dx%d' % (st[1], st[2]), self.window_conv((st[1], st[2]))]
         else:
             raise SystemExit('unknown step %r' % (st,))
         return row, words, sbytes
