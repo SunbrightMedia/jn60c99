@@ -63,7 +63,9 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
   ORACLE's own recorded HOSTPARAM calls: host_init {0:1, 1:10, 2:100} and 64 pools x 64 patches in call order.
 
 **Next, in order (tasks carried over from the retired chat):**
-1. Add the HOST tooth to the boot layer (seen to fail). Then the 64-patch reach on drive2:
+1. DONE 2026-10-12: the HOST tooth (jp8_lift_c.py JP8_HOST_TOOTH=1 flips one bit of the constructed [HOST+8] after
+   the FACTORY call; jp8_lift_gate.sh runs it on the boot layer): it bites -- the output differs from sample 961 --
+   while the same run without it is EXACTLY 0. Then the 64-patch reach on drive2:
    `sh tools/run_job.sh jp8_reach64 sh jp8/tools/jp8_lift_reach.sh` -> logs/lift_reach64_drive2.log (~80 min).
 2. The self-booting engine: jp8/src/jp8.h + jp8_engine.c (SHIPPING_DESIGN.md report C section 2, CORRECTED for drive2:
    no snap; build = replay FACTORY then BUILD at MXCSR 0x1F80, then 0x9FC0; host_init + recall from jp8_recall_tab.h;

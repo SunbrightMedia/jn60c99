@@ -5,7 +5,9 @@ then replays the judged drive of jp8_lift_seq: every control-plane event is the 
 RECORDED from the oracle (entry, rcx, rdx, r8, r9, MXCSR, xmm1 float for SETSR), replayed verbatim through the LIFTED
 code -- nothing is re-derived here (plumbing only); renders call the lifted VOICE_WRAP x8 + MASTER_WRAP. Compares
 every output word, every recorded return value, the bump pointer, the whole post-run heap (and reports the stack).
-exit 0 = EXACTLY 0. No unicorn here (two-process rule). usage: jp8_lift_c.py <refdir> <libjp8lift.so>"""
+exit 0 = EXACTLY 0. No unicorn here (two-process rule). usage: jp8_lift_c.py <refdir> <libjp8lift.so>
+JP8_HOST_TOOTH=1: the HOST tooth -- one bit of the constructed [HOST+8] flipped after the FACTORY call (the boot layer
+must then fail)."""
 import sys, os, json, struct, ctypes, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import jp8_lift_seq as Q
@@ -80,6 +82,8 @@ for patch in Q.PATCHES:
                 rc=call(c["fn"],c["rcx"],c["rdx"],c["r8"],c["r9"],c["mx"])
             if rc: trap="%s (event %s, call rva 0x%x)"%(lib.jp8_last_trap().decode(),ev,c["fn"]); break
             rax=struct.unpack("<Q",ctypes.string_at(cp+RAX_OFF,8))[0]
+            if c["fn"]==Q.FACTORY and os.environ.get("JP8_HOST_TOOTH")=="1":    # THE HOST TOOTH: the constructed
+                b=bytearray(rd(rax+8,8)); b[2]^=0x10; wr(rax+8,bytes(b))          # [HOST+8] (the rate) corrupted, C side
             if rax!=c["rax"]:
                 log("patch %d: event %s call rva 0x%x returned 0x%x, oracle 0x%x"%(patch,ev,c["fn"],rax,c["rax"])); bad+=1
         if ev=="build" and not trap:

@@ -29,4 +29,11 @@ if python3 "$HERE/jp8_lift_c.py" "$REF" "$OUT/libjp8lift_tooth.so" > "$OUT/tooth
 fi
 echo "tooth bites: $(grep -m1 'oracle .* C ' "$OUT/tooth.log")"
 grep "A/B" "$OUT/tooth.log"
+if [ "$LAYER" = boot ]; then          # the HOST tooth: one bit of the constructed [HOST+8] flipped on the C side
+    echo "=== 5. the HOST tooth (boot layer) ==="
+    if JP8_HOST_TOOTH=1 python3 "$HERE/jp8_lift_c.py" "$REF" "$OUT/libjp8lift.so" > "$OUT/host_tooth.log" 2>&1; then
+        echo "*** THE HOST TOOTH DID NOT BITE ***"; exit 1
+    fi
+    echo "HOST tooth bites: $(grep -m1 'differ\|oracle' "$OUT/host_tooth.log")"
+fi
 echo "JP8 LIFT GATE ($LAYER, drive2) GREEN"
