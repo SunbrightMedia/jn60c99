@@ -7,7 +7,8 @@ a DAW asks the controller at load (parameter and unit infos, the MIDI mapping, i
   CONTROL 1  after jp8h_init: the image + heap + host-object hash == the oracle's after its setup().
   RUN        every step's result, every output word, every state byte, the performEdit calls (ids and value bits),
              the worker jobs, the bump pointer, the heap's reuse layer (live and free blocks), the host-object
-             allocator (which must not move after jp8h_init) and the end hash: EXACTLY the oracle's.
+             allocator (which must not move after jp8h_init), the end hash and -- in a sequential build -- the guest
+             stack: EXACTLY the oracle's (with JP8H_THREADS each worker has its own stack: the main one is reported).
 No unicorn here (two-process rule), no plugin logic (plumbing only). exit 0 = EXACTLY 0.
 usage: jp8_host_c.py <refdir> <lib.so>"""
 import sys, os, json, struct, ctypes, hashlib, time
@@ -53,6 +54,7 @@ lib.jp8h_set_state.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(
 lib.jp8h_error.restype = ctypes.c_char_p
 lib.jp8h_guest.argtypes = [ctypes.c_uint64, ctypes.c_size_t]; lib.jp8h_guest.restype = ctypes.c_void_p
 for f in ('jp8h_heap_top', 'jp8h_jobs', 'jp8h_com_next'): getattr(lib, f).restype = ctypes.c_uint64
+lib.jp8h_threaded.restype = ctypes.c_int
 lib.jp8h_edits.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
 I32, U32 = ctypes.c_int32, ctypes.c_uint32
 lib.jp8h_param_info.argtypes = [I32, ctypes.POINTER(PINFO), ctypes.POINTER(U32)]
@@ -207,9 +209,11 @@ if (hl.value, hf.value) != (meta['heap_live'], meta['heap_free']):
 eh = memhash()
 if not trap and eh != meta['end_hash']: bad += 1; log('END hash differs: C %s oracle %s' % (eh[:16], meta['end_hash'][:16]))
 sh = hashlib.sha256(region(Q.STACK_BASE, Q.STACK_SIZE)).hexdigest()
-log('%d steps, %d words (%d differ), %d state bytes, %d performEdits, %d worker jobs, heap %d live / %d free blocks, end %s, stack %s (reported)' % (
+threaded = bool(lib.jp8h_threaded())       # the workers on threads: their stacks are their own, the main stack differs
+if not trap and not threaded and sh != meta['stack_hash']: bad += 1; log('STACK hash differs: C %s oracle %s' % (sh[:16], meta['stack_hash'][:16]))
+log('%d steps, %d words (%d differ), %d state bytes, %d performEdits, %d worker jobs, heap %d live / %d free blocks, end %s, stack %s (%s)' % (
     len(results) + 1, nw, len(diffs), len(got_states), len(mine), lib.jp8h_jobs(), hl.value, hf.value, 'EXACT' if eh == meta['end_hash'] else 'DIFFERS',
-    'EXACT' if sh == meta['stack_hash'] else 'differs'))
+    'EXACT' if sh == meta['stack_hash'] else 'differs', 'reported: threads' if threaded else 'graded'))
 print('JP8 HOST PATH (process(), patch load, setup, rate changes, state; %g Hz, patches %s): %s' % (Q.RATE, Q.PATCHES,
       'EXACTLY 0 -- every step, word, state byte, edit, job and the memory after' if not bad else '%d differences -- NOT bit-exact' % bad))
 sys.exit(0 if not bad else 1)

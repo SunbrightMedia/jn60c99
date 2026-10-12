@@ -841,6 +841,13 @@ int jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, in
 uint64_t jp8h_heap_top(void) { return jp8_heap_get(); }
 uint64_t jp8h_jobs(void) { return H.njobs; }
 uint64_t jp8h_com_next(void) { return H.com_next; }
+int jp8h_threaded(void) {                  /* 1: the workers run on threads (their stacks are their own) */
+#ifdef JP8H_THREADS
+    return 1;
+#else
+    return 0;
+#endif
+}
 int jp8h_edits(uint32_t *id, double *val, int cap) {
     int i, n = H.nedit < cap ? H.nedit : cap;
     for (i = 0; i < n; i++) { id[i] = H.edit_id[i]; val[i] = H.edit_val[i]; }

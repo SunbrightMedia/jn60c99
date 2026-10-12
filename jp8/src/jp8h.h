@@ -59,6 +59,7 @@ void    *jp8h_guest(uint64_t gaddr, size_t len);
 uint64_t jp8h_heap_top(void);
 uint64_t jp8h_jobs(void);
 uint64_t jp8h_com_next(void);
+int      jp8h_threaded(void);                                       /* 1: JP8H_THREADS (the workers' stacks are their own) */
 int      jp8h_edits(uint32_t *id, double *val, int cap);           /* the performEdit calls so far (all, count returned) */
 void     jp8h_heap_stats(uint64_t *live_blocks, uint64_t *free_blocks); /* the heap's reuse layer (jp8_rt.c) */
 #endif
