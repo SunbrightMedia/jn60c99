@@ -2,7 +2,8 @@
 """jp8_host_seq.py -- the SHARED drive of the JUPITER-8 host gate and its reach (all three processes import it; no
 unicorn, no ctypes). One instance, booted as a DAW boots it up to the point it learns its sample rate (the host
 oracle's boot_host: the template is taken there), then STEPS, each side making the same host calls:
-  ('setup', rate)         the host's first setupProcessing(rate, MAXBLOCK) + setActive(1) (the oracle's setup())
+  ('setup', rate)         the host's first setupProcessing(rate, MAXBLOCK) + setActive(1) (the oracle's setup());
+                          MAXBLOCK is 512, or JP8_HOST_MAXBLOCK (above 512 the drive adds blocks of that size)
   ('patch', p)            the plugin's own patch load (a factory record's bytes after its name)
   ('block', n, ev, par, ctx)  one process() block: note events, parameter queue points, the process context
   ('getstate', key)       IComponent::getState -- the bytes are graded; kept under key on each side
@@ -53,7 +54,7 @@ import json
 import struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 RATE = float(os.environ.get("JP8_HOST_RATE", "48000"))
-MAXBLOCK = 512
+MAXBLOCK = int(os.environ.get('JP8_HOST_MAXBLOCK', '512'))   # the host's maximum block (setupProcessing); above 512 the drive adds full blocks
 PATCHES = [int(x) for x in os.environ.get("JP8_HOST_PATCHES", "2,63,0,12").split(",")]
 RATES = [44100.0, 96000.0, 88200.0, 22050.0, RATE]   # the host-rate changes after the patches
 NPQ = 8                     # parameter queues the C side creates after setup (jp8_host.c NPQ)
@@ -283,6 +284,12 @@ def steps(patches=None):
         out += [('block',) + b for b in blocks(p)]
         out.append(('getstate', 'p%d' % p))
     out += [('block',) + b for b in controllers()]
+    if MAXBLOCK > 512:                       # blocks of the host's maximum and one below: the render driver splits them
+        cut = PANEL[(len(PANEL) // 3)]
+        out += [('block', MAXBLOCK, [("on", i * 7, 0, k, 0.7) for i, k in enumerate(CHORD[:6])], [(cut, MAXBLOCK // 3, 0.4)], dict(TEMPO)),
+                ('block', MAXBLOCK - 1, [], [(cut, 0, 0.6), (cut, MAXBLOCK - 2, 0.2)], dict(TEMPO, ppq=1.0)),
+                ('block', MAXBLOCK, [("off", MAXBLOCK - 1 - i, 0, k, 0.5) for i, k in enumerate(CHORD[:6])], [], None),
+                ('block', MAXBLOCK, [], [], None)]
     for r in RATES:
         out += [('block', 512, [("on", 100, 0, 64, 0.7)], [], None), ('rate', r),
                 ('block', 512, [], [], None), ('block', 512, [("off", 0, 0, 64, 0.0)], [], None)]
