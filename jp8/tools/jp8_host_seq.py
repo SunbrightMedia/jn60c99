@@ -340,7 +340,8 @@ def reach_steps():
     23, 34 of jp8_verify_eeb0). Each segment HOLDS its configuration (a chord, its parameters modulated) and ends with
     the memory ('memhash': image + heap + host objects, graded at that step on both sides). Measured on the C side
     first (the mutation build with and without each slip): A shows 34 in the words and 19 / 23 in the memory, B shows 9,
-    C shows 12."""
+    C shows 12. D (the engine-rate settings on patch 63) is for 39, 16 and 18: the v7 lift holds no code for it, so the
+    gate's own reach finds it."""
     keys = ((36, 0.9), (55, 0.5), (67, 0.7), (79, 0.3))
     on = [("on", i, 0, k, v) for i, (k, v) in enumerate(keys)]
     off = [("off", i, 0, k, 0.0) for i, (k, _) in enumerate(keys)]
@@ -362,7 +363,17 @@ def reach_steps():
     out += [('block', 512, [], [(BYNAME['VCO2 MOD'], 0, (i % 10) / 10.0), (BYNAME['VCO2 FINE TUNE'], 0, ((i * 3) % 10) / 10.0),
                                 (BYNAME['VCO2 SYNC'], 0, (i % 2) * 1.0), (BYNAME['VCO ENV MOD'], 0, ((i * 9) % 10) / 10.0)], None)
             for i in range(40)]
-    return out + tail + [('memhash', 'mr_vco2')]
+    out += tail + [('memhash', 'mr_vco2')]
+    # D: the engine-rate settings 1-6 on patch 63 (VCO1 WAVE's third position: survivor 39's filter, whose oldest
+    # coefficient is -0.689 only when the engine runs at 44100 -- the init branches on the rate at rva 0x3F82AA, 0.0
+    # otherwise), then VCO1 WAVE's sixth position (survivors 16, 18) -- each setting held, its memory graded
+    out += [('patch', 63), ('block', 512, [], [], None), ('getstate', 'mr_p63')]
+    for r in range(1, 7):
+        out += [('setstate', 'mr_p63', 'rate%d' % r), ('compstate', 'mr_p63', 'rate%d' % r), ('block', 512, on, [], None)]
+        out += [('block', 512, [], mod(i), None) for i in range(12)]
+        out += [('block', 512, [], [(BYNAME['VCO1 WAVE'], 0, 0.9512)], None)] + [('block', 512, [], mod(i + 1), None) for i in range(12)]
+        out += tail + [('memhash', 'mr_p63_rate%d' % r)]
+    return out + [('setstate', 'mr_p63', 'as is'), ('compstate', 'mr_p63', 'as is')]
 
 
 def steps(patches=None):
