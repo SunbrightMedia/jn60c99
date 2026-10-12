@@ -1,0 +1,4 @@
+# 2026-10-12: drive v8 (patch 2, 48000, no sweep), the host's IPlugFrame set before attached: the C side (lift of reach_e4: 1,882 functions) against the oracle's references (refe4)
+[   0.8s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   2.2s] 828 steps, 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end EXACT, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after

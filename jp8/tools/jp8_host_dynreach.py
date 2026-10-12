@@ -113,7 +113,7 @@ for i, st in enumerate(ST[1:hi], start=2):
         cur = st[1]
     h.run_step(st, blob, Q.state_variant, states, cstates)
     if k == 'editor':                                # v8 (E1): IPlugView::attached, a method of the view just made
-        roots['view_attached'] = slot(h.view, 4)
+        roots['view_attached'] = slot(h.view, 4); roots['view_setframe'] = slot(h.view, 12)
     if k == 'getstate' and cur is not None and st[1] == 'p%d' % cur:     # a patch's steps end with its state
         log('patch %d %r: executed %d (+%d), %d indirect sites, %d stub names' % (
             cur, B.patch_name(bank, cur), len(executed), len(executed) - n0, len(indirect), len(stubs)))

@@ -90,9 +90,34 @@ SCR = dict(setup=(0x0, 24), qi=(0x20, 0x40), str=(0x60, 256), text=(0x160, 256),
 SCR_SIZE = 0x106E0
 
 
+class PluginNullCall(RuntimeError):
+    """the plugin jumped into the zero page (a call through a null pointer): on a PC an access violation; .rva: the
+    return address of the call that went there"""
+    def __init__(self, rva):
+        super().__init__('the plugin called into the zero page (a null pointer; from rva 0x%x)' % rva)
+        self.rva = rva
+
+
 class JP8Host(H.HostProcess):
     def __init__(self):
         super().__init__()
+        # THE ZERO PAGE IS NEVER CODE (playbook 242): the oracle maps the low 1 MB (jp8_emu: data the plugin reads near
+        # null), so a call through a null pointer would run its zeros as `add [rax], al` up to a RET -- a stop by name
+        # instead (PluginNullCall), as a PC faults
+        self.null_exec = None
+
+        def _null_exec(uc_, addr, size, ud):
+            if self.null_exec is None:
+                self.null_exec = struct.unpack('<Q', bytes(uc_.mem_read(uc_.reg_read(UC_X86_REG_RSP), 8)))[0] - IB
+            uc_.emu_stop()
+        self.uc.hook_add(H.UC_HOOK_CODE, _null_exec, begin=0, end=0xFFFFF)
+        # v8 (E1): THE HOST'S IPlugFrame. A host sets one on every view before attached (VST3: createView, setFrame,
+        # attached); the JUPITER-8's view calls frame->resizeView with no null check (rva 0x448106; without a frame the
+        # oracle ran the zero page at address 0 as code, 524,293 instructions, where a PC faults), then its own onSize.
+        # Made with the host's other objects, so the template holds the vtable and the one frame (fact 'frame').
+        self.vt['frame'] = self._vtable('frame', 4)
+        self.frame = self.new_obj('frame')
+        self.frame_sizes = []                     # every resizeView's new size: (left, top, right, bottom)
         # THE JUPITER-8's SCRIPT FOLDER: its Script.xml draws on eight more script files the plugin ships (truth/:
         # ScriptResourceCmn.xml defines 43 of its bitmaps, the others the About / Auth / Browse / Header / Manage / Setup
         # / Tweak panels) and on its TextCodeTable.dat. Without them its view manager refuses the root panel ("Unable to
@@ -309,6 +334,8 @@ class JP8Host(H.HostProcess):
         view = self.vcall(self.ctrl, 17, name, count=4_000_000_000)          # IEditController::createView
         if not view:
             raise RuntimeError('createView("editor") gave no view')
+        if self.vcall(view, 12, self.frame, count=4_000_000_000) & 0xFFFFFFFF:  # IPlugView::setFrame (the host's frame)
+            raise RuntimeError('setFrame refused')
         r = self.vcall(view, 4, 0x10010, t, count=4_000_000_000) & 0xFFFFFFFF   # IPlugView::attached
         self.view = view
         return view, r
@@ -321,6 +348,16 @@ class JP8Host(H.HostProcess):
                     slists=sorted((k, list(v)) for k, v in self.__dict__.get('slists', {}).items()),
                     gdip=sorted((k, (v['w'], v['h'], v['fmt'])) for k, v in self.__dict__.get('gdip_imgs', {}).items()),
                     skin=sorted(self.skin.items()), lasterr=getattr(self, 'lasterr', 0))
+
+    def _com(self, uc, name, this, a1, a2, a3):
+        """v8 (E1): the host's IPlugFrame -- resizeView(view, newSize) is taken (the size recorded, kResultTrue); the
+        plugin then calls its own onSize. QueryInterface, addRef, release: the wrapper's (E_NOINTERFACE, 1, 1)."""
+        if name.startswith('COM:frame:') and int(name.rsplit(':', 1)[1]) >= 3:
+            if int(name.rsplit(':', 1)[1]) == 3:
+                self.frame_sizes.append(struct.unpack('<4i', uc.mem_read(a2, 16)))
+                return self._ret(uc, 0)
+            return self._ret(uc, 0x80004001)      # E_NOTIMPL (IPlugFrame has three methods past IUnknown's)
+        return super()._com(uc, name, this, a1, a2, a3)
 
     # ------------------------------------------------------------ one step of the host gate's drive (jp8_host_seq)
     def run_step(self, st, blob, variant, states, cstates):
@@ -373,7 +410,9 @@ class JP8Host(H.HostProcess):
             self.screen = {0x4E: st[1], 0x4F: st[2]}; row = [k, '%dx%d' % (st[1], st[2]), 0]
         elif k == 'editor':                       # v8: the editor opened (E1)
             view, r = self.editor_attach()
-            row = [k, ' '.join('%dx%d' % wh for wh in sorted(self.windows)), r, view]
+            fs = self.frame_sizes[-1] if self.frame_sizes else (0, 0, 0, 0)
+            row = [k, ' '.join('%dx%d' % wh for wh in sorted(self.windows)), r, view, '%dx%d' % (fs[2] - fs[0], fs[3] - fs[1]),
+                   len(self.frame_sizes)]
         elif k == 'zoomconv':                     # v8: a coordinate conversion of a panel window: its zoom getter
             row = [k, '%dx%d' % (st[1], st[2]), self.window_conv((st[1], st[2]))]
         else:
@@ -465,6 +504,9 @@ class JP8Host(H.HostProcess):
             if getattr(self, 'cxx_throw', None) is not None:     # the plugin threw: no unwinder, a named stop
                 t, self.cxx_throw = self.cxx_throw, None
                 raise W.PluginThrow(t)
+            if self.null_exec is not None:                        # a call through a null pointer: a named stop
+                t, self.null_exec = self.null_exec, None
+                raise PluginNullCall(t)
             req = self._req
             if req is None:
                 rip = uc.reg_read(UC_X86_REG_RIP)

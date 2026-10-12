@@ -107,7 +107,8 @@ static struct {
     uint64_t reg[16], xreg[16][2], eflags;   /* the oracle's registers at template time */
     /* v8 (E1): the editor -- the state the oracle's answers to the GUI's imports keep (template v3, jp8_host_emu.gui_state) */
     int32_t scr_cx, scr_cy;                 /* the machine's virtual screen: GetSystemMetrics 78 / 79 (others 0) */
-    uint64_t lasterr, fake_heap, view;
+    uint64_t lasterr, fake_heap, view, frame;   /* frame: the host's IPlugFrame (template fact) */
+    int32_t fr_w, fr_h, fr_n;               /* the last resizeView's new size, the number of them */
     int ndib; struct { uint64_t hb, bits; int32_t w, h; uint32_t bpp, stride; } dib[NDIB_MAX];
     int nsl; struct { uint64_t head; int n, cap; uint64_t *e; } sl[NSL_MAX];
     int ngd; struct { uint64_t hd; uint32_t w, h, fmt; } gd[NGD_MAX];
@@ -305,7 +306,21 @@ static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0:
     }
     return 0;
 }
+#ifdef JP8H_TRACE_IMPORTS               /* a debugging build: the editor open's import calls, as jp8_editor_imports.py --seq prints them */
+static int trace_on;
+static void hostcall_body(CPU *c, uint64_t target);
 void jp8_hostcall(CPU *c, uint64_t target) {
+    const char *n = stub_name(target); uint64_t a[4], from = gq(c->r[4]) - IB;
+    a[0] = c->r[1]; a[1] = c->r[2]; a[2] = c->r[8]; a[3] = c->r[9];
+    hostcall_body(c, target);
+    if (trace_on)
+        fprintf(stderr, "IMP %s 0x%llx %llx %llx %llx %llx -> %llx\n", n ? n : "?", (unsigned long long)from, (unsigned long long)a[0],
+                (unsigned long long)a[1], (unsigned long long)a[2], (unsigned long long)a[3], (unsigned long long)c->r[0]);
+}
+static void hostcall_body(CPU *c, uint64_t target) {
+#else
+void jp8_hostcall(CPU *c, uint64_t target) {
+#endif
     const char *n = stub_name(target); uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
     char msg[96];
     if (!n) { snprintf(msg, sizeof msg, "stub 0x%llx not in the template", (unsigned long long)target); jp8_trap(c, target, msg); return; }
@@ -379,6 +394,15 @@ void jp8_hostcall(CPU *c, uint64_t target) {
             }
             if (slot == 6) { wmem(rdx, &H.s_pos, 8); c->r[0] = S_OK_; return; }      /* tell(pos*) */
             c->r[0] = E_FAIL_; return;
+        }
+        if (kl == 5 && !strncmp(kind, "frame", 5)) {        /* v8 (E1): the host's IPlugFrame (jp8_host_emu.JP8Host._com) */
+            if (slot == 0) { uint64_t z = 0; wmem(r8, &z, 8); c->r[0] = 0x80004002u; return; }   /* queryInterface: E_NOINTERFACE */
+            if (slot == 3) {                                   /* resizeView(view, newSize): the size taken, kResultTrue */
+                int32_t rc_[4]; void *p = jp8h_guest(r8, 16);
+                if (!p) { jp8_trap(c, target, "resizeView's rectangle is not mapped"); return; }
+                memcpy(rc_, p, 16); H.fr_w = rc_[2] - rc_[0]; H.fr_h = rc_[3] - rc_[1]; H.fr_n++; c->r[0] = 0; return;
+            }
+            c->r[0] = 0x80004001u; return;                      /* E_NOTIMPL */
         }
         if (kl == 7 && !strncmp(kind, "handler", 7)) {                                          /* IComponentHandler: record, accept */
             if (slot == 4) record_edit((uint32_t)rdx, c->x[2].d[0]);
@@ -551,6 +575,11 @@ static int call(uint64_t fn, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r
     c->r[1] = rcx; c->r[2] = rdx; c->r[8] = r8; c->r[9] = r9;
     if (jp8_call_x(c, fn - IB)) {
         snprintf(H.msg, sizeof H.msg, "%s (call rva 0x%llx)", jp8_last_trap(), (unsigned long long)(fn - IB));
+        if (getenv("JP8H_DEBUG")) {                     /* the image addresses on the stack at the trap: the call chain */
+            int k; fprintf(stderr, "jp8h: %s; stack image addresses:", H.msg);
+            for (k = 0; k < 160; k++) { uint64_t v = gq(c->r[4] + 8 * (uint64_t)k); if (v >= IB && v < IB + 0xDE7000) fprintf(stderr, " +%x:0x%llx", 8 * k, (unsigned long long)(v - IB)); }
+            fprintf(stderr, "\n");
+        }
         H.st = 2; H.in_job = 0;
 #ifndef JP8_SOFTFP
         _mm_setcsr(hmx);
@@ -613,7 +642,7 @@ static int load(const unsigned char *b, size_t len) {
                 int r_ = atoi(key + 1); const char *t = strchr(key, 'l') ? "lo" : "hi";
                 if (r_ >= 0 && r_ < 16) H.xreg[r_][t[0] == 'h'] = v;
             }
-            KV("eflags", H.eflags); KV("lasterr", H.lasterr); KV("fake_heap", H.fake_heap);
+            KV("eflags", H.eflags); KV("lasterr", H.lasterr); KV("fake_heap", H.fake_heap); KV("frame", H.frame);
 #undef KV
         }
         if (!H.audio || !H.comp || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream)
@@ -633,7 +662,7 @@ static int load(const unsigned char *b, size_t len) {
     }
     H.nstub = (int)ns;
     for (k = 0; k < (uint32_t)H.nsl; k++) free(H.sl[k].e);
-    H.ndib = H.nsl = H.ngd = H.nskin = H.nwin = 0; H.view = 0; H.scr_cx = H.scr_cy = 0;
+    H.ndib = H.nsl = H.ngd = H.nskin = H.nwin = 0; H.view = 0; H.scr_cx = H.scr_cy = 0; H.fr_w = H.fr_h = H.fr_n = 0;
     if (!H.fake_heap) H.fake_heap = 0x4242000000ULL;               /* jp8_emu.FAKE_HEAP (a v2 template names none) */
     if (ver == 3) {                                                   /* the GUI's import state */
         uint32_t nd, nl, ng, nk, j;
@@ -1035,10 +1064,11 @@ int jp8h_process(int n, const jp8h_event *ev, int nev, const jp8h_param *par, in
     if (ctx) {      /* host_process_emu.process's ProcessContext: state, the host rate, ppq, the cycle, the tempo */
         uint8_t c[160];
         memset(c, 0, sizeof c); memcpy(c, &ctx->state, 4); memcpy(c + 8, &H.rate, 8); memcpy(c + 40, &ctx->ppq, 8);
-#ifdef JP8H_TOOTH_TRANSPORT     /* the gate's tooth: the transport always playing, never looping (v8's stops / loop) */
-        { uint32_t st = (ctx->state | 0x2u) & ~0x4u; memcpy(c, &st, 4); }
-#endif
         memcpy(c + 56, &ctx->cycle_start, 8); memcpy(c + 64, &ctx->cycle_end, 8); memcpy(c + 72, &ctx->tempo, 8);
+#ifdef JP8H_TOOTH_TRANSPORT     /* the gate's tooth: the host tempo off by half -- of the context the plugin reads the tempo
+                                   (perturbed on the drive: the position, the playing flag, the loop change no word) */
+        { double tp = ctx->tempo * 1.5; memcpy(c + 72, &tp, 8); }
+#endif
         wmem(H.ctx, c, sizeof c); cptr = H.ctx;
     }
     memset(pd, 0, sizeof pd);
@@ -1069,9 +1099,15 @@ int jp8h_attach_editor(uint64_t *view, uint32_t *result) {   /* createView("edit
     uint64_t name, t; int rc = live(); if (rc) return rc;
     name = scratch(SCR_EDNAME, 16); wmem(name, "editor", 7);
     t = scratch(SCR_EDTYPE, 16); wmem(t, "HWND", 5);
+#ifdef JP8H_TRACE_IMPORTS
+    trace_on = 1;
+#endif
     if (call(gq(gq(H.ctrl) + 8 * 17), H.ctrl, name, 0, 0)) return JP8H_E_TRAP;              /* IEditController::createView */
     H.view = H.cpu.r[0];
     if (!H.view) return err(JP8H_E_STATE, "createView(\"editor\") gave no view");
+    if (!H.frame) return err(JP8H_E_TEMPLATE, "the template names no host frame (fact 'frame')");
+    if (call(gq(gq(H.view) + 8 * 12), H.view, H.frame, 0, 0)) return JP8H_E_TRAP;            /* IPlugView::setFrame */
+    if ((uint32_t)H.cpu.r[0]) return err(JP8H_E_STATE, "setFrame refused");
     if (call(gq(gq(H.view) + 8 * 4), H.view, 0x10010, t, 0)) return JP8H_E_TRAP;           /* IPlugView::attached */
     if (view) *view = H.view;
     if (result) *result = (uint32_t)H.cpu.r[0];
@@ -1083,6 +1119,12 @@ int jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom) {  /* host_process_emu
     if (i == H.nwin) return err(JP8H_E_ARG, "no window of that size has laid itself out");
     if (call(IB + ZOOM_GET, H.win[i].win, 0, 0, 0)) return JP8H_E_TRAP;
     if (zoom) *zoom = (int32_t)(uint32_t)H.cpu.r[0];
+    return JP8H_OK;
+}
+int jp8h_frame_size(int32_t *w, int32_t *h, int32_t *n) {   /* the last size the view asked the host's frame for */
+    if (w) *w = H.fr_w;
+    if (h) *h = H.fr_h;
+    if (n) *n = H.fr_n;
     return JP8H_OK;
 }
 int jp8h_windows(int32_t *wh, int cap) {            /* the windows laid out so far: w, h pairs; the count returned */

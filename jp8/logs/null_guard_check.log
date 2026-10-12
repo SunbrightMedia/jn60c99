@@ -1,0 +1,6 @@
+# 2026-10-12: jp8_null_guard_check.py -- the editor opened without the host's frame must stop by name
+[   0.9s] DllMain(PROCESS_ATTACH) -> 1
+[  21.6s] InitDll -> 1
+[  78.1s] IComponent::initialize -> 0x0
+[  78.4s] createView("editor") -> 0x31fb67b90; attached with no setFrame
+jp8_null_guard_check: the plugin called into the zero page (a null pointer; from rva 0x448109) -- the guard stops it, named

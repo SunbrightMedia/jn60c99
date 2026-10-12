@@ -4230,3 +4230,38 @@ the memory after (denormals reach the engine's state in the long tail) -- the en
 Grade the state the output does not show (the stack, the memory after): a divergence in a path whose result is
 discarded is still a divergence. When a fix lands in one copy of shared harness code, find every copy before
 calling it fixed. A runtime models the guest's machine state exactly -- no defaults, no host state showing through.
+
+## 242. THE HOST THAT NEVER SET A FRAME -- THE ORACLE RAN THE ZERO PAGE AS CODE WHERE A PC FAULTS
+Paid 2026-10-12 (JUPITER-8 editor, E1). The C side opened the editor through the lifted createView / attached and
+trapped at an indirect call to address 0 (rva 0x448106). The C side was right: 342 of 342 import calls (name, caller,
+arguments, answer) equal the oracle's, and the oracle called address 0 too. Its host model (host_process_emu
+attach_editor, from the JUNO) never calls IPlugView::setFrame, which every VST3 host calls before attached; the
+JUPITER-8's view calls frame->resizeView with no null check, then its own onSize. The oracle maps the low 1 MB, all
+zeros, so the call ran 524,288 `add [rax], al` (rax 0, al 0: no write), fell into a RET past 1 MB and returned 0 -- the
+editor "worked", its references were written, and a PC would have crashed on the first read through the null frame.
+Fix: the host model is a host -- JP8Host makes an IPlugFrame with its other objects (template fact 'frame'), calls
+setFrame before attached, and its resizeView takes the size (kResultTrue) and records it (graded: the 'editor' step
+names the size asked, -196 x -99 on a machine with no screen). And the zero page is never code: a code hook on it stops
+the oracle by name (PluginNullCall, with the call's return address); jp8_null_guard_check.py opens the editor without
+the frame and must see that stop at rva 0x448109.
+### The rule
+A host model makes every call the host contract requires before the entry it drives (VST3: createView, setFrame,
+attached). A reference is only as good as the oracle's model of the machine: memory a PC never maps (the zero page)
+must stop the oracle by name when executed, never run. When the port and the oracle agree on something a PC cannot
+do, the harness is wrong.
+
+## 243. A PROBE THAT SHOWS "NO EFFECT" PROVES NOTHING UNTIL IT IS SEEN TO ACT -- AND A TOOTH MUST BITE ON WHAT THE PLUGIN READS
+Paid 2026-10-12 (JUPITER-8 drive v8, the host transport). Tooth T13 forced the context's playing flag on and its loop
+flag off: no output word changed, so it did not bite. The plugin does READ them -- process() copies the playing flag,
+the position, the loop and the tempo into a transport record for its render driver (rva 0x36C28B-0x36C2E0; the read
+census jp8_ctx_census.py) -- but perturbation probes on the C side (whose lift equals the plugin on the drive) measured
+which of them change the output in the transport blocks: the position (ppq + 0.37), the playing flag, the loop flag
+and the context's sample rate change no word; the tempo x 1.5 changes 62,231 words from the section's first block. On the way, two probes "showed" that the ARPEGGIO SW point had no effect either -- they had
+been pasted inside an `#ifdef` of another tooth and compiled out. Moved out, the same probes changed 59,262 words: the
+arpeggio runs in the section. T13 now scales the tempo (the input the plugin reads) and bites.
+### The rule
+Before a tooth is written on an input, perturb that input and measure that it changes what the gate grades; a tooth
+on an input that changes nothing never bites, and the gate's claim about that input is then "read, no effect on this
+drive", stated as such (a read census says what is read; only a perturbation says what matters). A probe
+whose answer is "no effect" is evidence only next to a control that shows the same probe acting (a second input it
+does change) -- otherwise the probe itself may be the thing that did nothing.

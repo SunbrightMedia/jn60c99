@@ -65,7 +65,7 @@ for k in range(16):
 facts['eflags'] = uc.reg_read(XC.UC_X86_REG_EFLAGS)
 stubs = sorted((a, nm[1]) for a, nm in h.stub2name.items())
 gs = h.gui_state()
-facts['lasterr'] = gs['lasterr']; facts['fake_heap'] = J.FAKE_HEAP
+facts['lasterr'] = gs['lasterr']; facts['fake_heap'] = J.FAKE_HEAP; facts['frame'] = h.frame   # v8: the host's IPlugFrame
 body = bytearray(b'JP8H' + struct.pack('<II', 3, len(REGIONS)))
 for base, size in REGIONS:
     rr = runs_of(region_bytes(base, size))

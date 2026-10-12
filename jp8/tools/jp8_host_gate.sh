@@ -31,8 +31,9 @@
 #      automation of EFFECT TYPE never arrives (-DJP8H_TOOTH_SWEEP: the sweep's effect types must be graded); T11
 #      one byte of the shipped template flipped (jp8_template_check.py --tooth: stage 2b must see it); T12 the
 #      software-float build with no software DAZ / FTZ at all (-DJP8_SOFTFP_TOOTH_NOFLUSH: denormals reach the
-#      engine's state on this drive -- the memory after must see it); T13 the host transport always playing, never
-#      looping (-DJP8H_TOOTH_TRANSPORT: v8's stopped and looped blocks under a synced arpeggio must be graded); T14 the
+#      engine's state on this drive -- the memory after must see it); T13 the host tempo off by half
+#      (-DJP8H_TOOTH_TRANSPORT: the tempo is what the plugin reads of the context; v8's tempos under a synced arpeggio
+#      must be graded); T14 the
 #      screen's width and height swapped in GetSystemMetrics (-DJP8H_TOOTH_EDITOR: the editor window's zoom must see it)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),

@@ -1,0 +1,33 @@
+# 2026-10-12: teeth T13 (-DJP8H_TOOTH_TRANSPORT: the host tempo x 1.5) and T14 (-DJP8H_TOOTH_EDITOR: GetSystemMetrics 78 / 79 swapped) on the same lift and references
+## T13
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   1.6s] word 2072: step 419, block of 512, L sample 24: oracle 3d055043 C 3d055042
+[   1.6s] word 2075: step 419, block of 512, L sample 27: oracle 3d3c62cf C 3d3c62ce
+[   1.6s] word 2076: step 419, block of 512, L sample 28: oracle 3d50b3de C 3d50b3df
+[   1.6s] word 2077: step 419, block of 512, L sample 29: oracle 3d64e1b9 C 3d64e1bc
+[   1.6s] word 2078: step 419, block of 512, L sample 30: oracle 3d78b2cc C 3d78b2ce
+[   1.6s] word 2079: step 419, block of 512, L sample 31: oracle 3d85f9d9 C 3d85f9dd
+[   1.6s] worker jobs C 1436 oracle 1380
+[   2.0s] END hash differs: C edc61ee6537fd9d4 oracle 763bdf13cdf6e1f3
+[   2.1s] STACK hash differs: C af7b0808cc179b0d oracle 6c4f3eb0239194d6
+[   2.9s]   11 stack words differ, 0x201eef7b0 .. 0x201fefa90
+[   2.9s]   0x201eef7b0: C 000000003d99fec8 oracle 000000003e118afb
+[   2.9s]   0x201eef7c0: C 00000000bd8066ca oracle 000000003b703f78
+[   2.9s]   0x201eef830: C 000000003ac8fc9f oracle 000000003ac900a8
+[   2.9s]   0x201eef8c0: C 000000003f800000 oracle 00000000bf800000
+[   2.9s]   0x201eef8d0: C 000000003e785738 oracle 000000003ea6fa6c
+[   2.9s]   0x201eef9f0: C 000000003f800000 oracle 00000000bf800000
+[   2.9s]   0x201eefa00: C 000000003e785738 oracle 000000003ea6fa6c
+[   2.9s]   0x201eefaa0: C 000000003f59518e oracle 000000003f6e779a
+[   2.9s]   0x201fef900: C 0000000035ec42ef oracle 000000003659d0a2
+[   2.9s]   0x201fef910: C 000000002609951c oracle 00000000264ee09b
+[   2.9s]   0x201fefa90: C 3dd0c5b73e00363e oracle 3ddf904e3e145faf
+[   2.9s] 828 steps, 117760 words (83840 differ), 58680 state bytes, 2036 performEdits, 1436 worker jobs, heap 47501 live / 88 free blocks, end DIFFERS, stack differs (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): 83843 differences -- NOT bit-exact
+## T14
+[   0.6s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   1.5s] step results differ from step 819: C ['zoomconv', '3940x2004', 18] oracle ['zoomconv', '3940x2004', 24]
+[   1.6s] state bytes differ: C 58680 bytes, oracle 58680, first at byte 55635
+[   2.0s] END hash differs: C 13c2b22a4d4ae643 oracle 763bdf13cdf6e1f3
+[   2.0s] 828 steps, 117760 words (0 differ), 58680 state bytes, 2036 performEdits, 1380 worker jobs, heap 47501 live / 88 free blocks, end DIFFERS, stack EXACT (graded)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): 3 differences -- NOT bit-exact

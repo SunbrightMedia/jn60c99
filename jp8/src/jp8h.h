@@ -60,6 +60,7 @@ int  jp8h_screen(int32_t cx, int32_t cy);
 int  jp8h_attach_editor(uint64_t *view, uint32_t *result);
 int  jp8h_window_zoom(int32_t w, int32_t h, int32_t *zoom);
 int  jp8h_windows(int32_t *wh, int cap);
+int  jp8h_frame_size(int32_t *w, int32_t *h, int32_t *n);   /* the last size the view asked the host's frame for; n asks */
 const char *jp8h_error(void);
 /* gates */
 void    *jp8h_guest(uint64_t gaddr, size_t len);
