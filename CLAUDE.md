@@ -276,15 +276,21 @@ mine is a hypothesis (playbook 80).
   (tools/verify/c99_gate.py, both ports); every JX file's role and proof in
   jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Row 23 (NaN parity, the JUNO's
   A41 classes: 53 + 37 equalities, 3 helpers, 12 sign folds, the page's
-  conversions) fixed 2026-10-11, S3_STATUS (16); full verify-jx3p owed on the
-  newest commit.
+  conversions) fixed 2026-10-11, S3_STATUS (16); its full verify (jxverify_c0c8)
+  went RED on an illegal voice-count edit the oracle cannot follow (playbook 231,
+  fixed; S3_STATUS (18)): full verify-jx3p owed on the newest commit. Row 24
+  (two different NaNs meeting) ACCEPTED by the user 2026-10-12 until the lifter
+  is fast (then a lifted render closes it by construction).
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
   Steps 0-4 PROVEN at 44100. DRIVE2 is the oracle (the plugin's factory
   builds the HOST, recall through HOSTPARAM, no snap). The machine-code
   lifter's three layer gates are EXACTLY 0 on drive2 with teeth; the PSI
   template + the oracle-recorded recall table are exported (jp8/gen/).
-  NEXT: jp8.h + jp8_engine.c (self-booting engine) + the full-chain gate
-  64/64. The bit-exact JP8 is ~5.3x one S3.
+  NEXT (the user's order, 2026-10-12): STEP 1 the FAST LIFTER --
+  jp8/tools/jp8_fast.py (registers and flags in C locals; playbook 230): the
+  JX voice lift 2,320 -> 371 ms per second of audio, the plugin's own code
+  159 ms; then jp8.h + jp8_engine.c (self-booting engine) + the full-chain
+  gate 64/64. The bit-exact JP8 is ~5.3x one S3.
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.

@@ -19,6 +19,14 @@ Labels: PROVEN = executed under Unicorn on the plugin's own code; READ = static 
 | 5 | Transcribe (layer 3: the hosted boot) | GREEN 2026-09-22 (logs/lift_gate_layer3_boot.log, job jp8_L3gate3): from the POST-STATIC-INIT image the C twin runs the lifted BUILD 0x445020 -> SETSR 0x4464F0 (float xmm1, 44100) -> host_init through HOSTPARAM 0x4465B0 -> recall of patch 5 through DISPATCH (flag 0) + ASG_NOTIFY -> 2200 samples (no snap: the plugin's own walker settles) -> NOTEON 60 / 64 / NOTEOFF / 64, on boot patches 2 and 63: 167,616 output words and the whole heap EXACTLY 0. Lift: 762 functions, 156,488 instructions, 280 trap sites (none reached). TOOTH (FINE TUNE setter + 0.0003 at 0x38633e): FAILS with 432 differences, first at state[0]+0x1480. Two harness defects paid on the way (PORT_LESSONS 12): the stack is state (BUILD copies static-init stack residue into 8 voice records) and the C side entered every call 8 bytes below the oracle's rsp. | PROVEN (EXACTLY 0) |
 
 ## ⚑ RESUME HERE (written 2026-09-28 when the chat was retired; everything below this block is the dated record)
+**2026-10-12 -- THE USER'S ORDER: STEP 1 IS THE FAST LIFTER (playbook 230).** The lifter's output is exact and 5-13x
+slower than the plugin's own code (measured on the JX-3P's voice render against the plugin run natively: 2,320 ms
+per second of audio vs 159). jp8/tools/jp8_fast.py rewrites a lifted source with each function's registers and flags
+in C locals (stores at calls only where dirty and where the callee may read or write; flags proven dead where
+functions meet; small functions inlined in rounds): the JX voice render 371 ms, bit-exact (jx_master_bisect patch 5).
+Still owed before it carries a product: the JP8 layer gates on its output, a tooth (a planted pass defect must fail
+a gate), the per-function bounds check as one accumulator (CHECK=2 per access costs 4x in this form), the xmm
+registers off the stack, and the remaining calls. The JUNO-60's and JX-3P's row 24 closes with it (a lifted render).
 **2026-10-11 (from the JX-3P track, JX-26a, playbook 213): `jp8_lift.py` now emits ISO C99** -- the 64-bit mul /
 imul / div through jp8_cpu.h's exact helpers (jp8_mulu64, jp8_muls64, jp8_divu128, jp8_divs128) and the bit scans
 through jp8_clz64 / jp8_ctz64 / jp8_popcount64, no __int128, no builtins (20 M operands equal to __int128's; the

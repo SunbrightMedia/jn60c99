@@ -3989,3 +3989,47 @@ run. resync_shims.py now runs `ledger.py check` after every merge or --record an
 `ledger.py emit` that re-earns it.
 ### The rule
 A tool that moves a proof's source runs that proof's staleness check itself, in the same step.
+
+## 230. A LIFT IS EXACT BY CONSTRUCTION -- AND SLOW UNTIL ITS STATE LEAVES MEMORY; MEASURE IT AGAINST THE PLUGIN'S OWN CODE
+Paid 2026-10-12 (the lift experiment, JX row 24). The JX voice wrapper 0x377080 and its reach (the eight voice copies,
+the ramp sweep; 950 functions, 104,897 instructions) lifted by jp8_lift.py and run in place of the hand transcription
+(jx_bridge.c JX_LIFT_VOICE, off by default): bit-exact against the plugin (jx_master_bisect: patch 5 and the 64-patch
+--gate, job lift_gate1). Lessons:
+- THE GUEST IMAGE: a lifted switch reads its jump table from .text, which the JX guest image did not carry (it ships
+  .rdata, .data and the tables of the committed jx_lift.c) -- the first run crashed on the table read (the guard
+  pages made it loud). jx_guest_export.py's JX_LIFT_SRC takes another lifted source's tables; jx_guest.py's
+  JX_GUEST_DIR loads such an image.
+- SPEED, against the PLUGIN'S OWN CODE run natively (native_replay.c; 5 s of audio, patch 5, this CPU): the plugin
+  159 ms per second of audio, 30,163 instructions per sample; the hand transcription 162 ms, 32,440; the lift as the
+  lifter writes it 2,320 ms (volatile guest memory, a bounds check per access, registers and flags in the CPU struct:
+  every instruction loads and stores memory, every flag op computes five flags). Two quick fixes did NOT help
+  (measured): each function's state in a local CPU copy synced at every call (the syncs at the hot helpers' calls
+  ate the gain) and `restrict` alone.
+- jp8/tools/jp8_fast.py (the fast pass, the lifter's statements unchanged): registers in C locals, stored before a
+  call only when dirty (a forward dataflow) and only where the callee may read or write them (transitive use / def
+  sets), reloaded after it only where the callee may write; flags as locals, written as plain C (no helper the
+  compiler may keep out of line: one that is takes the flags' address and puts them in memory for the whole
+  function), proven dead where functions meet (a backward liveness: no flag live at an entry or after a call, all
+  950 functions); small functions inlined into their callers in rounds. Measured: 2,320 -> 557 ms (band translation,
+  no bounds check), 430 ms (identity guest mapping), 371 ms (rounds of inlining); 54,000 instructions per sample.
+  Bit-exact (patch 5, jx_master_bisect). Still 2.3x the plugin: the calls that remain and the xmm unions.
+### The rule
+Before a lifted path is planned as a product, time it against the plugin's own code run natively, and count
+instructions per sample on both; a lifted function's state lives in locals, not in a struct the guest memory may
+alias.
+
+## 231. THE ORACLE HAS NO C++ UNWINDER -- AN ILLEGAL HOST VALUE SENT THE PLUGIN INTO A THROW IT NEVER MAKES ON A PC
+Paid 2026-10-12: the full JX verify on c0c8eb67 (job jxverify_c0c8) went RED in its 26th product gate: host edits seed
+3, patch 34, 48000 Hz -- the oracle stopped with UC_ERR_EXCEPTION. An interrupt hook named it: int3 after the import
+stub RaiseException with code 0xE06D7363 (an MSVC C++ throw), from rva 0x3FA238. The point that does it (each alone,
+EXECUTED): voiceCount 0x0FFFC00E at the normalized value 1.25 -- the plugin does not clamp it, 2 + 1.25 x 6 = 9.5
+voices of 8, so its render waits for a ninth worker (0x3F7010) and creates the wait's semaphore lazily (0x3FA010:
+CreateSemaphore(0, 0, 0x7FFFFFFF, 0), a NULL return throws); the oracle's import stub returned NULL. On a PC that
+wait would never end (INFERRED). A VST3 host sends normalized values in [0, 1] only; 1.0 and -0.25 on the same id
+do not throw. The gate's edits keep their illegal values on every other id (the plugin clamps them; seeds 1 and 2
+passed), the voice count takes [0, 1] (the random stream is unchanged): 225 blocks EQUAL. The oracle's wrapper now
+stops a C++ throw by name (wrapper_emu.PluginThrow, never an int3 after the stub), and jx_product_gate reports an
+oracle throw or a port trap as RED, named.
+### The rule
+A gate's illegal inputs must stay inside what the plugin defines; where the oracle cannot follow the plugin (a C++
+throw, a wait on a thread), it stops by name, and the input is checked against the host contract before it is kept.

@@ -91,6 +91,7 @@ exit 0 = every block of every (rate, patch) equal, bit for bit.
 import atexit
 import ctypes
 import json
+import re
 import os
 import shutil
 import struct
@@ -204,6 +205,9 @@ def edit_ids():
     return ids, lack
 
 
+VOICE_COUNT = 0x0FFFC00E                      # the host setting voiceCount, 2..8 (HOST_LAYER.md 3)
+
+
 def edit_schedule(nblk, blk, start, seed):
     """the --edits sequence: per block its host parameter points (id, offset, value) in sample order, from host
     sample `start` to the last block"""
@@ -218,7 +222,9 @@ def edit_schedule(nblk, blk, start, seed):
             break
         pid = r.choice(ids) if r.random() < 0.92 else r.choice(lack)
         v = r.choice((0.0, 1.0, 0.5, r.random(), r.random(), r.random(), r.random(), -0.25, 1.25, 1e-9))
-        out[s // blk].append((pid, s % blk, v))
+        if pid == VOICE_COUNT:                # the voice count takes [0, 1] only (playbook 231): the plugin does
+            v = min(max(v, 0.0), 1.0)         # not clamp it -- 1.25 is 9.5 voices of 8, its render then waits on a
+        out[s // blk].append((pid, s % blk, v))   # ninth worker; a VST3 host sends [0, 1] (the stream is unchanged)
     return out
 
 
@@ -405,7 +411,11 @@ def oracle(rate, patch, nblk, blk, on, off, recalls='', edits='-1'):
                 continue
             h.load_patch(bank[B.BANK_HEADER + p * B.BANK_STRIDE + B.BANK_BLOB_OFF:B.BANK_HEADER + (p + 1) * B.BANK_STRIDE])
         valid, bpm = tmp[b]                   # the ProcessContext: a valid tempo, or none (JX-8)
-        L, R = h.process(blk, events=ev, params=par[b], ctx={'tempo': bpm} if valid else None)
+        try:
+            L, R = h.process(blk, events=ev, params=par[b], ctx={'tempo': bpm} if valid else None)
+        except X.W.PluginThrow as e:          # the plugin's own C++ throw (playbook 231): the run ends at it
+            out.append(['throw', b, e.rva])
+            break
         out.append([list(L), list(R)])
     return out
 
@@ -484,8 +494,11 @@ def port(so, rate, patch, nblk, blk, on, off, tooth, img96, recalls='', edits='-
             if os.environ.get('JX_TEMPO_TOOTH') != '1':        # TOOTH: the port never hears the host tempo
                 lib.jx3p_product_tempo(*tmp[b])
             lib.jx3p_product_block(Lb, Rb, blk, arr, nev)
+            if lib.jx3p_lift_error():         # the lifted code stopped in this block's records: the run ends here
+                out.append(['trap', b, lib.jx3p_lift_error().decode()])     # (main() checks the oracle threw too)
+                break
         out.append([list(struct.unpack('<%dI' % blk, bytes(Lb))), list(struct.unpack('<%dI' % blk, bytes(Rb)))])
-    if lib.jx3p_lift_error():                 # a trap in a mid-run record list: never a silent pass
+    if lib.jx3p_lift_error() and not (out and out[-1][0] == 'trap'):   # a trap elsewhere: never a silent pass
         raise SystemExit('the lifted parameter system trapped during the run: %s' % lib.jx3p_lift_error().decode())
     return out
 
@@ -572,9 +585,20 @@ def main():
             if p.returncode:
                 raise SystemExit('port failed: ' + p.stderr[-1500:])
             ro, rp = json.loads(o.stdout), json.loads(p.stdout)
-            first = next(((b, s) for b in range(nblk) for s in range(blk)
+            # A C++ THROW (playbook 231): the oracle stops, named, at a block whose run makes the plugin throw
+            # (it has no unwinder); the port stops at a lifted trap -- either is RED, never a crash or a pass
+            thr = ro[-1] if ro and ro[-1][0] == 'throw' else None
+            trp = rp[-1] if rp and rp[-1][0] == 'trap' else None
+            if thr or trp:                    # a C++ throw the oracle cannot follow, or a lifted trap: RED, named
+                bad += 1
+                print('  host %d patch %d %s: the plugin %s; the port %s -- RED' % (
+                    rate, patch, es, 'throws a C++ exception in block %d (RaiseException from rva 0x%x)' % (thr[1], thr[2])
+                    if thr else 'runs on', 'stops in block %d (%s)' % (trp[1], trp[2]) if trp else 'runs on'), flush=True)
+                continue
+            nblk_c = nblk
+            first = next(((b, s) for b in range(nblk_c) for s in range(blk)
                           if ro[b][0][s] != rp[b][0][s] or ro[b][1][s] != rp[b][1][s]), None)
-            loud = sum(1 for b in range(nblk) for x in ro[b][0] if x & 0x7FFFFFFF)
+            loud = sum(1 for b in range(nblk_c) for x in ro[b][0] if x & 0x7FFFFFFF)
             what = 'patch %d' % patch + (' velocity plan' if on == VEL_ON else ' poly seed %d' % (-on - 1) if on < 0 else '')
             if on < 0:
                 nev = sum(len(e) for e in schedule(nblk, blk, on, off))

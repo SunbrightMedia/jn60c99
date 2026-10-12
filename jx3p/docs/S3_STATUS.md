@@ -3,6 +3,23 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-12 (18) — ROW 24 ACCEPTED BY THE USER; THE LIFT EXPERIMENT; THE FULL VERIFY RED, FIXED (playbooks 230, 231)
+
+- ROW 24 (two different NaNs meeting): the user's decision, in writing (2026-10-12): accepted for now; it closes when
+  the lifter is fast -- the JUPITER-8's first step (jp8/docs/S3_STATUS.md). SCOPE_AUDIT row 24 ACCEPTED.
+- THE LIFT EXPERIMENT (playbook 230): the plugin's voice wrapper 0x377080 and its reach, lifted (jx_bridge.c
+  JX_LIFT_VOICE, off by default; the guest image with the lifted switches' tables: jx_guest_export.py JX_LIFT_SRC,
+  jx_guest.py JX_GUEST_DIR): bit-exact (jx_master_bisect: 64 patches, job lift_gate1), but 2,320 ms per second of
+  audio against the plugin's own 159 ms run natively (the hand port: 162 ms). jp8/tools/jp8_fast.py (registers and
+  flags in C locals, dirty-only stores at calls, flags proven dead where functions meet, inlining in rounds): 371 ms,
+  bit-exact on patch 5 -- not yet a product; the hand transcription stays the product.
+- THE FULL VERIFY of c0c8eb67 (job jxverify_c0c8, EXIT 2): RED in jx_product_gate --edits 3 (patch 34, 48000) -- the
+  oracle stopped at an int3 after RaiseException 0xE06D7363 (a C++ throw). Cause (playbook 231, EXECUTED): voiceCount
+  0x0FFFC00E at the illegal normalized value 1.25 (9.5 voices of 8; the render waits for a ninth worker, its lazy
+  semaphore create fails in the oracle and throws). VST3 hosts send [0, 1]; the edits keep their illegal values on
+  every other id, the voice count takes [0, 1]: 225 blocks EQUAL. The oracle names a C++ throw (PluginThrow); the gate
+  reports a throw or a lifted trap as RED. Row 23 closes with the re-run full verify.
+
 ## 2026-10-11 (17) — THE ORACLE GRADED BY THE REAL CPU; THE CRT'S FMA3 CODE; EVERY CPU QUESTION; ROW 24 FOR THE USER
 
 Unicorn is a model of a CPU (playbooks 226, 227). Two places where it is not the user's:

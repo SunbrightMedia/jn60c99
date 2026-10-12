@@ -166,6 +166,34 @@ static int jxg_call(uint64_t rva, uint64_t rcx, uint64_t rdx, uint64_t r8, uint6
     return 0;
 }
 
+#ifdef JX_LIFT_VOICE
+/* THE VOICE WRAPPER, LIFTED (2026-10-12, the lift experiment): the plugin's own per-unit wrapper 0x377080 -- the
+ * unit's flag, its start-up latch, the outputs zeroed, voice v's own copy of the render (eight copies, one per
+ * voice: 0x3A22C0, 0x3A99B0 .. 0x3D6110, through the jump table at 0x3771B4), then the ramp sweep 0x3F40E0 --
+ * run on the unit's guest state, one C statement per instruction (jx_lift.py, the wrapper among its roots). Its
+ * two output cells and their pointer pair sit at the stack block's lowest bytes (the call's stack grows down from
+ * G.rsp and never reaches them); the cells carry the last value in, as the wrapper leaves a unit whose flag is 0
+ * untouched. Off by default: the transcription stays the product until the lift is graded. */
+static void jxg_voice(int v)
+{
+    uint64_t cells = G.slo + 0x100 + 8 * (uint64_t)v, pair = G.slo + 0x200 + 16 * (uint64_t)v;
+    uint8_t *pc = jxg_any(cells, 8), *pp = jxg_any(pair, 16);
+    uint32_t mx = G.mx;
+    if (!pc || !pp) { G.lift_err = 1; return; }
+    memcpy(pc, &G.vcells[2 * v], 8);
+    sq64(pp, cells);
+    sq64(pp + 8, cells + 4);
+    /* the plugin's MXCSR, but FTZ as the caller runs: the gates' oracle mode has it off (Unicorn never flushes a
+     * result, playbook 120), the product has it on (jx_enable_hw_ftz) */
+#ifndef JP8_SOFTFP
+    G.mx = (G.mx & ~0x8000u) | (_mm_getcsr() & 0x8000u);
+#endif
+    jxg_call(0x377080, G.stg[v], (uint64_t)v, pair, 0, NULL);
+    G.mx = mx;
+    memcpy(&G.vcells[2 * v], pc, 8);
+}
+#endif
+
 /* one call whose float argument is in xmm1 (setSampleRate: engine vt+0x18), the rest as jxg_call */
 static int jxg_call_f1(uint64_t rva, uint64_t rcx, float f)
 {
@@ -640,12 +668,17 @@ void jx3p_render(float *L, float *R, int n)
                 G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
                 continue;
             }
+#ifdef JX_LIFT_VOICE
+            (void)st; (void)latch;
+            jxg_voice(v);                                 /* the plugin's wrapper, lifted: all of the below */
+#else
             if (!st[0x14]) continue;
             latch = gi(st + 0xAAC308);
             G.vcells[2 * v] = G.vcells[2 * v + 1] = 0.0f;
             if (latch > 0) si32(st + 0xAAC308, latch - 1);
             else jx_voice_render(st, v, pairs[v]);
             jxg_ramp_sweep(st);
+#endif
         }
         {   uint8_t *st = G.mstate;
             outL = outR = 0;

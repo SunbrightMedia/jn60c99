@@ -103,6 +103,13 @@ def _norm(p):
     return p
 
 
+class PluginThrow(RuntimeError):
+    """the plugin threw a C++ exception (RaiseException 0xE06D7363); .rva: the return address into the CRT"""
+    def __init__(self, rva):
+        super().__init__('the plugin threw a C++ exception (RaiseException 0xE06D7363, from rva 0x%x)' % rva)
+        self.rva = rva
+
+
 class Wrapper(BASE):
     def __init__(self):
         super().__init__()
@@ -213,6 +220,14 @@ class Wrapper(BASE):
         rcx, rdx = uc.reg_read(UC_X86_REG_RCX), uc.reg_read(UC_X86_REG_RDX)
         r8, r9 = uc.reg_read(UC_X86_REG_R8), uc.reg_read(UC_X86_REG_R9)
         ret = lambda v: self._ret(uc, v)
+        if name == 'RaiseException' and (rcx & 0xFFFFFFFF) == 0xE06D7363:
+            # A C++ THROW (MSVC's _CxxThrowException: code 'msc' | 0xE0000000). The oracle has no unwinder, so the
+            # run stops HERE, named (PluginThrow), instead of running on into the int3 after the stub (2026-10-12:
+            # the JX-3P's host entry throws from process() for the illegal normalized value 1.25 on id 0x0FFFC00E;
+            # playbook 231). The return address names the throw site's caller frame.
+            self.cxx_throw = struct.unpack('<Q', bytes(uc.mem_read(uc.reg_read(UC_X86_REG_RSP), 8)))[0] - IB
+            uc.emu_stop()
+            return
         if name.startswith('COM:'):
             return self._com(uc, name, rcx, rdx, r8, r9)
         if name in ('EncodePointer', 'DecodePointer', 'EncodeSystemPointer', 'DecodeSystemPointer'):

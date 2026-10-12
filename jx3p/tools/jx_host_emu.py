@@ -144,6 +144,9 @@ class JXHost(H.HostProcess):
         while True:
             self._req = None
             uc.emu_start(start, RET, count=count)
+            if getattr(self, 'cxx_throw', None) is not None:     # the plugin threw: no unwinder, a named stop
+                t, self.cxx_throw = self.cxx_throw, None
+                raise W.PluginThrow(t)
             req = self._req
             if req is None:
                 rip = uc.reg_read(UC_X86_REG_RIP)

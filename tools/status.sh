@@ -30,7 +30,7 @@ echo "    3. every row of the scope audit is CLOSED or accepted in writing"
 echo
 echo "  OPEN scope rows (JX-3P) -- these are what 'not done' means today:"
 grep -E '^\| *[0-9]+ \|' jx3p/docs/SCOPE_AUDIT.md 2>/dev/null \
-  | grep -viE 'CLOSED|\| OK \|' \
+  | grep -viE 'CLOSED|ACCEPTED|\| OK \|' \
   | sed -E 's/\|([^|]*)\|([^|]*)\|([^|]*)\|.*/  row\1-\2:\3/' \
   | cut -c1-110
 echo

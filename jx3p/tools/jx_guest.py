@@ -22,7 +22,8 @@ def path(rate_k, tmp=None):
     """the committed guest image for engine rate rate_k kHz (44 or 96), inflated; tmp: the folder to use"""
     if rate_k in _cache and os.path.exists(_cache[rate_k]):
         return _cache[rate_k]
-    gz = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_%dk.bin.gz' % rate_k)
+    gz = os.path.join(os.environ.get('JX_GUEST_DIR') or os.path.join(REPO, 'jx3p', 'gen'),  # JX_GUEST_DIR: an experiment's
+                      'jx_guest_%dk.bin.gz' % rate_k)
     if tmp is None:                    # a folder of this process's own, deleted at its exit (44 MB per image: 724
         tmp = tempfile.mkdtemp(prefix='jx_guest_')    # left-behind folders filled the disk, 2026-10-10)
         atexit.register(shutil.rmtree, tmp, True)

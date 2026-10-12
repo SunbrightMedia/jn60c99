@@ -73,7 +73,8 @@ def image_pages():
     import capstone
     from capstone import x86
     img = bytes(J.IMG)
-    src = open(os.path.join(REPO, 'jx3p', 'src', 'jx_lift.c')).read()
+    # JX_LIFT_SRC: another lifted source's tables (a lift experiment's; the committed image uses jx_lift.c)
+    src = open(os.environ.get('JX_LIFT_SRC') or os.path.join(REPO, 'jx3p', 'src', 'jx_lift.c')).read()
     pages = set(json.load(open(os.path.join(REPO, 'jx3p', 'gen', 'jx_lift_pages.json')))['image'])
     for m in re.findall(r'\b0x(18[0-9a-f]{7})ULL\b', src):
         r = int(m, 16) - J.IB
