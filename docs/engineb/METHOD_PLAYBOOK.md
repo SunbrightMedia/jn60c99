@@ -4158,3 +4158,15 @@ second of audio from ~1,015 ms to ~720 ms on the loaded machine, EXACTLY 0 on th
 Before optimizing generated code, profile it per source construct (here: per guest instruction) and read the machine
 code of the costliest lines. Never hand a hot scalar to the compiler inside a union with integer views; and re-measure
 an old "no gain" (volatile) when the code around it has changed.
+### Two levers measured the same day that do NOT pay (callgrind, the same 0.99 s of audio, patch 2, EXACTLY 0 both)
+- A larger inlining bound (JP8_FAST_INLINE=160 against 80): 5,662 calls inlined against 4,374, the source 84 MB
+  against 39 MB, the compile ~5 GB of memory -- and 6.13 G instructions executed against 5.88 G (+4.4 %). The
+  callers grow: more registers dirty at each call and indirect call that stays, more spills.
+- A liveness pass in the fast pass (load at the entry only the registers live there; after a call reload only the
+  live ones): the load statements fell from 154,839 to 92,028 (-41 %) and the executed instructions from 5.8760 G to
+  5.8716 G (-0.07 %). GCC -O2 already drops a load whose local is overwritten before it is read; the pass only
+  duplicated it. Reverted. What the compiler cannot remove is a STORE to the CPU struct (a callee may read it) --
+  the next lever, if any, is interprocedural (which stores a callee and its callers really read).
+### The rule (2)
+Grade a code-generator optimization by the instructions EXECUTED (callgrind on the product build), never by the
+statements it removes from the source: the C compiler may already do it.
