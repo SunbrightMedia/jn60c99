@@ -114,6 +114,19 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    EXACTLY 0 in the CHECKED and the PRODUCT build; 6 teeth fail (T1 74,668 differences, T2 a trap, T3 CONTROL 1, T4
    27,643, T5 a trap, T6 9,207). OWED: other first rates (JP8_HOST_RATES="48000 44100 96000"); the controller's
    parameter info in the C API; the editor; the speed.
+3d. 2026-10-12: THE WORKERS ON THREADS, THREE FIRST RATES, THE CONTROLLER'S LOAD-TIME CALLS, NO LEAK (HOST_LAYER.md
+   section 5, playbook 238). JP8H_THREADS (POSIX threads, a platform layer): the eight engine jobs render at once,
+   their bookkeeping one at a time in unit order at rva 0x44580A -- GREEN at 48000, 44100 and 96000 (job
+   jp8_host_gate7: checked, product and three threaded runs EXACTLY 0 at each rate, 6 teeth bite;
+   logs/host_gate_3rates_v5.log). Drive v6: what a DAW asks the controller at load (226 parameter infos, the MIDI
+   mapping, the units, the controller's own state) and setComponentState after every setState, in the C API
+   (jp8h_param_info, jp8h_midi_assignment, jp8h_unit_*, jp8h_component_state ...). THE LEAK: the oracle answered
+   HeapFree with a no-op and the C runtime mirrored it -- equal, and both leaking (a patch load 1.32 MB; the
+   host-object area full after ~200 patch loads); both sides now reuse a freed block by its rounded size from the
+   template's point, every host buffer is a slot of one scratch area (MEASURED: 160 loads grow the heap 31 MB, then
+   stop). activateBus sets two bytes nothing reads (jp8_bus_census.py: no read in a patch load and 12 blocks, the output
+   word for word the same; logs/bus_census.log). OWED: drive v6's gate at three rates on the 64-patch
+   v6 reach (job jp8_reach64_v6, then the gate); the editor (the user's script file and art); the speed.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

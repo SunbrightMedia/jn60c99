@@ -81,7 +81,7 @@ the JUPITER-8 booted at 48000 / 4096: every answer is the JUNO-60's (docs/HOST_C
 | getBusArrangement | out: stereo (3); in: 0x80070057 (no input bus) |
 | setBusArrangements | mono, stereo, 5.1 accepted (kResultOk), stored |
 | setIoMode, setProcessing, getRoutingInfo | kNotImplemented (0x80004001); setProcessing changes nothing |
-| activateBus(.., 1) | kResultOk; the core's first 1 KB or a unit's first 512 bytes change (on the JUNO: the bus flags, which its render never reads -- bus_audio_census.py; not yet asked here) |
+| activateBus(.., 1) | kResultOk; two bytes change (core +760, core +872: the bus flags) and NO instruction reads them in a patch load and 12 process() blocks after it; the output is the same word for word (EXECUTED: jp8_bus_census.py, logs/bus_census.log -- the JUNO-60's answer, bus_audio_census.py). The C API does not call it. |
 
 ## 5. The C side (EXECUTED 2026-10-12): the host path, lifted
 
@@ -185,8 +185,7 @@ three threaded runs EXACTLY 0 -- 15 runs -- and the 6 teeth bite (T1 74,668 diff
 27,643, T5 a trap, T6 9,207).
 
 Scope NOT covered yet (owed): drive v6 at the three first rates (its gate run); the editor (and the drawn panel:
-the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only); activateBus
-(jp8_bus_census.py).
+the script file truth/ lacks); IEditController2 (knob mode, help, about: GUI only).
 
 ## 6. Next
 

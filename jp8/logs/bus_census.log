@@ -1,0 +1,6 @@
+activateBus answers: 0x0, 0x0
+bytes activateBus changed in the heap: 2 (0x3104e65f0 (core +760), 0x3104e6660 (core +872))
+output: 11264 words, 0 differ (sha256 747c667b88ac / 747c667b88ac)
+reads of those bytes after activateBus (the patch load and every block): 0 (none)
+VERDICT: activateBus does not change what process() renders (patch 2, 12 blocks); no instruction read the bytes it set
+rc=0
