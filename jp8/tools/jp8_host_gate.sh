@@ -11,9 +11,10 @@
 #      from the plugin's own vtables
 #   1. lift: those roots, every indirect call target of the reach; --alloc-tailcall (a jmp to operator new is a tail
 #      call, never a body to follow: playbook 234); --hostcalls (every stub call answered by jp8_host.c), --hook
-#      0x4460E7 (the jobs), 0x4456F0 (a worker's park) and 0x44580A (a job's render done); build CHECKED (every
-#      access bounds-checked, -O1), PRODUCT (the fast pass, -O2) and THREADS (the product with the workers on POSIX
-#      threads, JP8H_THREADS: a platform layer), all on the one-offset map (JP8_FLAT), the oracle's TEB as gs base
+#      0x4460E7 (the jobs), 0x4456F0 (a worker's park) and 0x44580A (a job's render done); build CHECKED (the plain
+#      lift, every access bounds-checked, -O1), PRODUCT (the fast pass, then jp8_xlane.py: every xmm register in three
+#      scalars; guest memory not volatile, -DJP8_MQ=; -O2) and THREADS (the product with the workers on POSIX threads,
+#      JP8H_THREADS: a platform layer), all on the one-offset map (JP8_FLAT), the oracle's TEB as gs base
 #   2. the oracle: the template and the references
 #   3. the three builds (THREADS three times): CONTROL 1 (after the setup calls), then every step's result, every
 #      output word, every state byte, every performEdit, the worker jobs and the memory after
@@ -23,7 +24,8 @@
 #      T5 every state value the IBStream hands setState one off (-DJP8H_TOOTH_STREAM); T6 the UI timer never drains
 #      (-DJP8H_TOOTH_NODRAIN: the learned CC map and the store stay as they were); T7 the C side's heap never reuses a
 #      freed block (-DJP8H_TOOTH_NOREUSE: the oracle's does); T8 a parameter info's short title copied from its title
-#      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236)
+#      (-DJP8H_TOOTH_INFO: every title is set, every short title empty -- keyed to the content, playbook 236); T9 the
+#      lane pass swaps lanes a and b in every store of a register to the CPU struct (JP8_XLANE_TOOTH=1)
 # env: JP8_HOST_PATCHES (default 2,63,0,12), JP8_HOST_RATES (default 48000; e.g. "48000 44100 96000": one lift for
 #      all, the oracle and both builds at each, the teeth at the first), JP8_HOST_SKIP_EMU=1 (reuse references),
 #      JP8_HOST_REACH (another reach file, e.g. a short one while developing)
@@ -38,7 +40,7 @@ export JP8_HOST_RATE="$RATE"
 REACH="${JP8_HOST_REACH:-$REPO/jp8/gen/jp8_hostreach_48000.json}"; REF="$OUT/ref_${RATE%.*}"; SRC="$REPO/jp8/src/jp8_host_lift.c"
 TOOTH=0x38633e
 BASE="-std=c99 -pedantic-errors -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL -I$REPO/jp8/src"
-CHK="$BASE -O1 -DJP8_RELOC_CHECK=2"; PRD="$BASE -O2 -DJP8_RELOC_CHECK=0"
+CHK="$BASE -O1 -DJP8_RELOC_CHECK=2"; PRD="$BASE -O2 -DJP8_RELOC_CHECK=0 -DJP8_MQ="
 echo "=== 0. the reach: the 64 patches, and this gate's own drive at each first rate ($RATES) ==="
 [ -f "$REACH" ] || python3 "$HERE/jp8_host_dynreach.py" "$REACH" 0-63 48000
 # the drive after 64 patches is not the drive after these four: a crafted state's next block can call what the long
@@ -55,14 +57,15 @@ echo "roots: $ROOTS"
 echo "=== 1. lift + build ==="
 python3 "$HERE/jp8_lift.py" "$SRC" "$ROOTS" --dyn "$LREACH" --alloc 0x6F5B04 --alloc-tailcall --name host --hostcalls --hook 0x4460E7,0x4456F0,0x44580A
 python3 "$HERE/jp8_fast.py" "$SRC" "$OUT/jp8_host_lift_fast.c"
+python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT/jp8_host_lift_xl.c"
 cc $CHK -w -c -o "$OUT/hlift_chk.o" "$SRC"
 cc $CHK -c -o "$OUT/hrt_chk.o" "$REPO/jp8/src/jp8_rt.c"; cc $CHK -c -o "$OUT/hhost_chk.o" "$REPO/jp8/src/jp8_host.c"
 cc -shared -o "$OUT/libjp8host_chk.so" "$OUT/hlift_chk.o" "$OUT/hrt_chk.o" "$OUT/hhost_chk.o" -lm
-cc $PRD -w -c -o "$OUT/hlift_prd.o" "$OUT/jp8_host_lift_fast.c"
+cc $PRD -w -c -o "$OUT/hlift_prd.o" "$OUT/jp8_host_lift_xl.c"
 cc $PRD -c -o "$OUT/hrt_prd.o" "$REPO/jp8/src/jp8_rt.c"; cc $PRD -c -o "$OUT/hhost_prd.o" "$REPO/jp8/src/jp8_host.c"
 cc -shared -o "$OUT/libjp8host_prd.so" "$OUT/hlift_prd.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
 THR="$PRD -D_POSIX_C_SOURCE=200809L -DJP8H_THREADS"      # the platform layer: the workers on POSIX threads
-cc $THR -w -c -o "$OUT/hlift_thr.o" "$OUT/jp8_host_lift_fast.c"
+cc $THR -w -c -o "$OUT/hlift_thr.o" "$OUT/jp8_host_lift_xl.c"
 cc $THR -c -o "$OUT/hrt_thr.o" "$REPO/jp8/src/jp8_rt.c"; cc $THR -c -o "$OUT/hhost_thr.o" "$REPO/jp8/src/jp8_host.c"
 cc -shared -o "$OUT/libjp8host_thr.so" "$OUT/hlift_thr.o" "$OUT/hrt_thr.o" "$OUT/hhost_thr.o" -lm -lpthread
 for R in $RATES; do
@@ -126,4 +129,8 @@ m = json.load(open(src + "/meta.json")); m["template_sha256"] = hashlib.sha256(b
 json.dump(m, open(dst + "/meta.json", "w"))
 EOF
 bite T3 "$OUT/ref_t3" "$OUT/libjp8host_prd.so"
-echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 8 teeth bite"
+JP8_XLANE_TOOTH=1 python3 "$HERE/jp8_xlane.py" "$OUT/jp8_host_lift_fast.c" "$OUT/jp8_host_lift_t9.c"
+cc $PRD -w -c -o "$OUT/hlift_t9.o" "$OUT/jp8_host_lift_t9.c"
+cc -shared -o "$OUT/libjp8host_t9.so" "$OUT/hlift_t9.o" "$OUT/hrt_prd.o" "$OUT/hhost_prd.o" -lm
+bite T9 "$REF" "$OUT/libjp8host_t9.so"
+echo "JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller and what a DAW asks it, workers, the heap's reuse; first rates $RATES, patches ${JP8_HOST_PATCHES:-2,63,0,12}) GREEN: checked + product + threads builds EXACTLY 0, 9 teeth bite"
