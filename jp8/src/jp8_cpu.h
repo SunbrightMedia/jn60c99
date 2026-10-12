@@ -65,6 +65,16 @@ static inline void *jp8_h(uint64_t a, unsigned n) {
 }
 #define JP8_H(a, n) jp8_h((uint64_t)(a), (n))
 #define JP8_GS_BASE 0x0ULL       /* the oracle's gs base is 0: gs:[x] = guest page 0 = band 0, exactly as under Unicorn */
+#ifdef JP8_FLAT                                  /* every region at ONE host offset (jp8_rt.c jp8_map): host = guest + jp8_flat */
+#if UINTPTR_MAX < 0xFFFFFFFFFFFFFFFFu
+#error "JP8_FLAT needs a 64-bit host (one reservation spans the guest's 32 GB)"
+#endif
+extern uintptr_t jp8_flat;                       /* the fast pass copies it into a function local: no reload after a store */
+#if JP8_RELOC_CHECK == 0
+#undef JP8_H
+#define JP8_H(a, n) ((void *)((uintptr_t)(a) + jp8_flat))
+#endif
+#endif
 #else
 #define JP8_H(a, n) ((void *)(uintptr_t)(a))
 #define JP8_GS_BASE 0x700020000ULL   /* the oracle's page 0 (gs base 0) mirrored here: BUF_BASE + 0x20000 */

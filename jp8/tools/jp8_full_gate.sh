@@ -3,7 +3,7 @@
 # against the drive2 oracle, two processes (jp8_full_seq.py drive, jp8_full_emu.py oracle, jp8_full_c.py engine).
 # Neither side replays the other's calls: the engine boots from the template with its own tables.
 #   1. build: CHECKED = the lift (jp8_lift.c) with every access bounds-checked (JP8_RELOC_CHECK=2), -O1;
-#             PRODUCT = the fast pass of the lift (jp8_fast.py), no bounds check, -O2
+#             PRODUCT = the fast pass of the lift (jp8_fast.py), no bounds check, one host offset (JP8_FLAT), -O2
 #   2. the oracle references (CONTROL 0 inside: the template == the oracle's post-static-init memory)
 #   3. both builds: CONTROL 1 (init hash), RUN A (whole render events), RUN B (re-init + random chunks): EXACTLY 0
 #   4. the teeth, each must FAIL (first patch only): T1 a note-on one key up (-DJP8_FULL_TOOTH); T2 ONE addss of the lift
@@ -18,7 +18,7 @@ RATE="${JP8_FULL_RATE:-44100}"; REF="$OUT/ref_${RATE%.*}"; export JP8_EMU_QUIET=
 TOOTH=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); import jp8_full_seq as Q; print(Q.TOOTH_RVA)")
 FIRST=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); import jp8_full_seq as Q; print(Q.PATCHES[0])")
 BASE="-std=c99 -pedantic-errors -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC -I$REPO/jp8/src"
-CHK="$BASE -O1 -DJP8_RELOC_CHECK=2"; PRD="$BASE -O2 -DJP8_RELOC_CHECK=0"
+CHK="$BASE -O1 -DJP8_RELOC_CHECK=2"; PRD="$BASE -O2 -DJP8_RELOC_CHECK=0 -DJP8_FLAT"
 echo "=== 1. build (checked + product) ==="
 python3 "$HERE/jp8_fast.py" "$REPO/jp8/src/jp8_lift.c" "$OUT/jp8_lift_fast.c"
 cc $CHK -w -c -o "$OUT/lift_chk.o" "$REPO/jp8/src/jp8_lift.c"
@@ -57,7 +57,7 @@ for line in open(src):
 assert n == 1, "tooth site 0x%x found %d times" % (rva, n)
 open(dst, "w").write("".join(out))
 EOF
-cc $BASE -O1 -DJP8_RELOC_CHECK=0 -w -c -o "$OUT/lift_t2.o" "$OUT/jp8_lift_t2.c"
+cc $BASE -O1 -DJP8_RELOC_CHECK=0 -DJP8_FLAT -w -c -o "$OUT/lift_t2.o" "$OUT/jp8_lift_t2.c"
 cc -shared -o "$OUT/libjp8_t2.so" "$OUT/lift_t2.o" "$OUT/rt_prd.o" "$OUT/eng_prd.o" -lm
 bite T2 "$OUT/libjp8_t2.so"
 cc $PRD -DJP8_HOST_TOOTH -c -o "$OUT/eng_t3.o" "$REPO/jp8/src/jp8_engine.c"

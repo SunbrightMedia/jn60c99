@@ -1,0 +1,16 @@
+[   0.4s] DllMain(PROCESS_ATTACH) -> 1
+[  16.2s] InitDll -> 1
+[  59.3s] IComponent::initialize -> 0x0
+[  59.4s] started: HOST 0x3192ef970 vtable rva 0xa704b0 rate 96000.0 voices 8
+[  59.8s] block 0: jobs 8, peak 1.64e-13, nonfinite 0  (0.5s)
+[  60.4s] block 1: jobs 24, peak 1.569e-13, nonfinite 0  (0.6s)
+[  61.0s] block 2: jobs 32, peak 0.07859, nonfinite 0  (0.6s)
+[  61.5s] block 3: jobs 48, peak 0.08049, nonfinite 0  (0.5s)
+[  62.1s] block 4: jobs 56, peak 0.08028, nonfinite 0  (0.6s)
+[  62.6s] block 5: jobs 72, peak 0.0814, nonfinite 0  (0.5s)
+[  63.1s] block 6: jobs 80, peak 0.08154, nonfinite 0  (0.5s)
+[  63.7s] block 7: jobs 96, peak 0.08204, nonfinite 0  (0.5s)
+[  64.2s] block 8: jobs 104, peak 0.08195, nonfinite 0  (0.6s)
+[  64.8s] block 9: jobs 120, peak 0.04876, nonfinite 0  (0.6s)
+[  65.3s] block 10: jobs 128, peak 1.569e-13, nonfinite 0  (0.5s)
+[  65.9s] block 11: jobs 144, peak 1.569e-13, nonfinite 0  (0.5s)

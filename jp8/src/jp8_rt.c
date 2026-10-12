@@ -1,11 +1,14 @@
 /* jp8_rt.c -- runtime for the lifted code: the trap, the address-space loader (the oracle's regions mapped at the
  * SAME virtual addresses, MAP_FIXED_NOREPLACE, then the dumps loaded), FTZ/DAZ, and the entry the gate calls. */
-#ifndef JP8_RELOC
+#if !defined(JP8_RELOC) || defined(JP8_FLAT)
 #define _GNU_SOURCE
 #endif
 #include "jp8_cpu.h"
-#ifndef JP8_RELOC
+#if !defined(JP8_RELOC) || (defined(JP8_FLAT) && !defined(_WIN32))
 #include <sys/mman.h>
+#endif
+#if defined(JP8_FLAT) && defined(_WIN32)
+#include <windows.h>
 #endif
 #include <setjmp.h>
 #include <errno.h>
@@ -32,6 +35,33 @@ void jp8_tr(CPU *c, uint64_t rva) {
  * heap 0x31, BUF 0x70; import stubs 0x60 are call targets only). Guest pointer VALUES never change, so every dump,
  * template and heap compare stays byte-identical to the oracle's. */
 uintptr_t jp8_bdelta[JP8_NBANDS]; uint32_t jp8_blo[JP8_NBANDS], jp8_bhi[JP8_NBANDS];
+#ifdef JP8_FLAT
+/* FLAT: ONE host reservation spans every band (32 GB of address space, nothing committed), so host = guest + jp8_flat
+ * for every region and the lifted code adds one register instead of loading a band's delta (playbook 232). A region is
+ * committed read-write in place; fresh pages read zero, as calloc's do. */
+uintptr_t jp8_flat; static unsigned char *jp8_flat_base;
+int jp8_map(uint64_t base, uint64_t size) {
+    uint64_t i = base >> 28, sz = (size + 4095) & ~4095ULL;
+    if (!size || (base & 4095) || i >= JP8_NBANDS || ((base + size - 1) >> 28) != i || jp8_bhi[i]) { fprintf(stderr, "jp8_map(0x%llx, 0x%llx): not one free band\n", (unsigned long long)base, (unsigned long long)size); return -1; }
+    if (!jp8_flat_base) {
+        size_t span = (size_t)JP8_NBANDS << 28; void *p;
+#ifdef _WIN32
+        p = VirtualAlloc(NULL, span, MEM_RESERVE, PAGE_NOACCESS);
+#else
+        p = mmap(NULL, span, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+        if (p == MAP_FAILED) p = NULL;
+#endif
+        if (!p) { fprintf(stderr, "jp8_map: cannot reserve the flat span\n"); return -1; }
+        jp8_flat_base = (unsigned char *)p; jp8_flat = (uintptr_t)p;
+    }
+#ifdef _WIN32
+    if (!VirtualAlloc(jp8_flat_base + base, (size_t)sz, MEM_COMMIT, PAGE_READWRITE)) return -1;
+#else
+    if (mprotect(jp8_flat_base + base, (size_t)sz, PROT_READ | PROT_WRITE)) return -1;
+#endif
+    jp8_bdelta[i] = jp8_flat; jp8_blo[i] = (uint32_t)(base & 0x0FFFFFFFu); jp8_bhi[i] = jp8_blo[i] + (uint32_t)size; return 0;
+}
+#else
 static void *jp8_braw[JP8_NBANDS];
 int jp8_map(uint64_t base, uint64_t size) {
     uint64_t i = base >> 28; unsigned char *raw, *h;
@@ -41,6 +71,7 @@ int jp8_map(uint64_t base, uint64_t size) {
     jp8_braw[i] = raw; jp8_bdelta[i] = (uintptr_t)h - (uintptr_t)base;
     jp8_blo[i] = (uint32_t)(base & 0x0FFFFFFFu); jp8_bhi[i] = jp8_blo[i] + (uint32_t)size; return 0;
 }
+#endif
 void *jp8_host(uint64_t a) { return JP8_H(a, 1); }      /* for harnesses: guest -> host */
 static CPU *jp8_cur; uint32_t jp8_badacc; unsigned char jp8_sink[64];
 void jp8_fault(uint64_t a, unsigned n) {

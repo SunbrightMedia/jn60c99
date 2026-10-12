@@ -601,6 +601,7 @@ def emit_fn(f, use, dfn, sync_flags, out):
         decl += ' X %s;' % ', '.join(rname(k) for k in xmms)
     out.append(decl + ' (void)ha_; (void)hb_; (void)hr_; (void)hh_; (void)hcin_; (void)hp_; (void)hs_; (void)hn_;'
                ' (void)hf1_; (void)hf2_; (void)hd1_; (void)hd2_;')
+    out.append('  JP8F_FLATD')              # JP8_FLAT: the one host offset in a local (empty otherwise)
     init = loads(f.local, sync_flags)
     if not sync_flags:
         init += 'fz=fs=fc=fo=fp=0;'
@@ -722,9 +723,19 @@ def main():
                            '(uint32_t)(jto##k < jp8_blo[jtk##k]) | (uint32_t)(jto##k + (n) > jp8_bhi[jtk##k]), jtb##k |= jtn##k, '
                            'jtn##k ? (void *)jp8_sink : (void *)((uintptr_t)jta##k + jp8_bdelta[jtk##k]))')
                 out.append('#define JP8F_FLUSHK(x) (jp8_badacc |= (x))')
+                out.append('#elif defined(JP8_RELOC) && defined(JP8_FLAT)')
+                out.append('/* JP8_FLAT: every region at one host offset, read once per function into jfd_ (a local the guest\'s')
+                out.append(' * stores cannot alias): an access is one add, not a load of the band\'s delta (playbook 232) */')
+                out.append('#define FMH(k, a, n) ((void *)((uintptr_t)(a) + jfd_))')
+                out.append('#define JP8F_FLUSHK(x) ((void)(x))')
                 out.append('#else')
                 out.append('#define FMH(k, a, n) JP8_H(a, n)')
                 out.append('#define JP8F_FLUSHK(x) ((void)(x))')
+                out.append('#endif')
+                out.append('#if defined(JP8_RELOC) && defined(JP8_FLAT)')
+                out.append('#define JP8F_FLATD const uintptr_t jfd_ = jp8_flat; (void)jfd_;')
+                out.append('#else')
+                out.append('#define JP8F_FLATD')
                 out.append('#endif')
                 for nm, ty, nb in (('8', 'uint8_t', 1), ('16', 'uint16_t', 2), ('32', 'uint32_t', 4), ('64', 'uint64_t', 8),
                                    ('F', 'float', 4), ('D', 'double', 8)):

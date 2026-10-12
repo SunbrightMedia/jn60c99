@@ -1,0 +1,30 @@
+=== 1. build (checked + product) ===
+jp8_fast: 768 functions (1 allocator stubs), 241293 statements after 3084 calls inlined; flags LOCAL (no flag live where functions meet)
+=== 2. oracle references (drive2, 44100 Hz) ===
+reusing /home/user/snap_jp8flat/build/jp8_full/ref_44100
+=== 3. the engine: checked build ===
+[   2.6s] patch 2 run A: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [2.5s]
+[   5.2s] patch 2 run B: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [2.6s]
+[   8.2s] patch 63 run A: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [2.9s]
+[  10.6s] patch 63 run B: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [2.4s]
+[  14.1s] patch 0 run A: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [3.5s]
+[  17.1s] patch 0 run B: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [3.1s]
+[  20.1s] patch 12 run A: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [2.9s]
+[  23.1s] patch 12 run B: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [3.1s]
+JP8 FULL CHAIN (drive2, 44100 Hz, runs AB): EXACTLY 0 -- every word, init and end hash on patches [2, 63, 0, 12]
+=== 3. the engine: product build ===
+[   1.0s] patch 2 run A: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.9s]
+[   1.8s] patch 2 run B: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.8s]
+[   2.6s] patch 63 run A: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.8s]
+[   3.3s] patch 63 run B: 307728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.8s]
+[   4.2s] patch 0 run A: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.9s]
+[   5.1s] patch 0 run B: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.9s]
+[   6.0s] patch 12 run A: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.8s]
+[   6.8s] patch 12 run B: 397728 words (0 differ), init EXACT, end EXACT, stack EXACT (reported) -> PASS  [0.9s]
+JP8 FULL CHAIN (drive2, 44100 Hz, runs AB): EXACTLY 0 -- every word, init and end hash on patches [2, 63, 0, 12]
+=== 4. the teeth (patch 2) ===
+tooth T1 bites: [   0.7s] patch 2 run A: word 73742 (sample 4096, voice 7 main) oracle 381ec03e C 381ec07a
+tooth T2 bites: [   0.7s] patch 2 run A: CONTROL 1 differs: init hash C 8b7f5cc7193fa174 oracle f6389e9e84d711ab, bump pointer C 0x316857970 oracle 0x316857970
+tooth T3 bites: [   0.5s] patch 2 run A: CONTROL 1 differs: init hash C 286fdb05080bc2e6 oracle f6389e9e84d711ab, bump pointer C 0x316857970 oracle 0x316857970
+tooth T4 bites: [   0.5s] patch 2 run A: CONTROL 1 differs: init hash C 068a005ff187b029 oracle f6389e9e84d711ab, bump pointer C 0x316857970 oracle 0x316857970
+JP8 FULL-CHAIN GATE (drive2, 44100 Hz, patches 2,63,0,12) GREEN: checked + product builds EXACTLY 0, 4 teeth bite

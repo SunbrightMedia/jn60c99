@@ -86,8 +86,15 @@ one a 64-bit mul / imul through the exact helpers; no __int128 or builtin left; 
    FINE TUNE addss turned subss (CONTROL 1), T3 one bit of [HOST+8] (CONTROL 1), T4 the template without its stack
    (CONTROL 1). SPEED (44.1 kHz, a note held, this shared Xeon): the product build 939 ms per second of audio (init
    205 ms, a recall 0.9 ms); the same fast pass on the identity map 472-520 ms; the plugin's own code natively 188 ms.
-   The band table costs ~1.9x: every guest access reloads jp8_bdelta (any store may alias it). Next lever: ONE delta for
-   every region (one reservation), held in a local per function.
+   The band table costs ~1.9x: every guest access reloads jp8_bdelta (any store may alias it). DONE the same day
+   (playbook 232): JP8_FLAT -- every region in one host reservation, one offset, read once per function into a local --
+   516 ms per second of audio (the identity path's speed); the gate's PRODUCT build is now the flat one: EXACTLY 0 on
+   the same 4 patches, 4 teeth bite (job jp8flat_gate1, logs/full_gate_44100_flat.log).
+3b. 2026-10-12: THE HOST LAYER'S ORACLE (jp8/docs/HOST_LAYER.md): jp8/tools/jp8_host_emu.py boots the plugin as a DAW
+   does -- DllMain, InitDll, createInstance, initialize, setupProcessing, setActive -- and plays it through its OWN
+   process() (the 96 kHz engine, the rate converter, the threaded engine render with the JX's worker transport): a note
+   sounds and decays, no NaN. The framework is the JUNO's (fw_map: 13 of 24 functions byte-equal). OWED: the script
+   file with 8 panel types truth/ lacks (stubbed: GUI only), the patch path, then the lift of the host layer.
 4. C-twin listen (jp8_listen_c.py, the sweep law on the C engine) + agreement table vs SWEEP_44100_DRIVE2.
 5. Skeptic items still open (SHIPPING_DESIGN.md): 3 (host RENDER does three things the stubs do not), 5 (carry all tables —
    done by carrying the whole image), 6 (the three skipped ctors), 8 (FP semantics / graded artifact), 9 (runtime gaps),

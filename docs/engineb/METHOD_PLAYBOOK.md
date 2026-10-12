@@ -4049,3 +4049,28 @@ oracle throw or a port trap as RED, named.
 ### The rule
 A gate's illegal inputs must stay inside what the plugin defines; where the oracle cannot follow the plugin (a C++
 throw, a wait on a thread), it stops by name, and the input is checked against the host contract before it is kept.
+
+## 232. ONE TRANSLATION TABLE ENTRY PER ACCESS IS A LOAD THE COMPILER MAY NEVER HOIST -- GIVE EVERY REGION ONE OFFSET
+Paid 2026-10-12: the JUPITER-8's self-booting engine (jp8/src/jp8_engine.c) is bit-exact against the plugin
+(jp8_full_gate.sh), but its product build -- the fast pass, the guest regions in host arenas found through the 256 MB
+band table (JP8_RELOC) -- took 849-939 ms per second of audio where the same pass on the identity map took 472-520 and
+the plugin's own code 188. Every guest access is `a + jp8_bdelta[a >> 28]`: a load from a global the compiler must
+re-read after every guest store (with -fno-strict-aliasing any store may alias it). JP8_FLAT puts every region in ONE
+host reservation (32 GB of address space, nothing committed; each region committed in place), so host = guest + one
+offset, and the fast pass reads that offset once per function into a local no store can alias: 516 ms, the identity
+path's speed, and the gate EXACTLY 0 on the same oracle references with its 4 teeth biting (job jp8flat_gate1).
+### The rule
+In lifted code the address translation must be arithmetic on a value the compiler can keep in a register (a local,
+restrict, or a constant), never a table read on every access; a table stays for the bounds-checked gate builds.
+
+## 233. A MISSING DATA FILE FAILS FAR FROM ITS CAUSE -- HOOK THE PLUGIN'S OWN LOG BEFORE GUESSING
+Paid 2026-10-12: the JUPITER-8 under the JUNO's host oracle (jp8/tools/jp8_host_emu.py) passed DllMain, InitDll and
+createInstance, then IComponent::initialize returned E_UNEXPECTED. A block trace narrowed it to the view manager's
+registration; the plugin's own logger (write function rva 0x466AA0, hooked) then named it at once: "Unable to find
+child panel type definition edit" -> "Unable to convert root panel definition main" -> "Unable to create view
+manager". Two causes, both data: Script.xml draws on eight more script files of the plugin's folder (served from
+truth/ now), and eight panel types it uses are defined in NO file of truth/ (a script the truth copy lacks; served as
+an empty stub named for what it is, GUI scaffolding only). Then initialize returned S_OK and process() played.
+### The rule
+When the plugin refuses to start under the oracle, hook its own log writer first; it names the missing piece. Serve
+the plugin's own files; a stand-in for a missing one is named as a stub and listed as owed.
