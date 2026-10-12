@@ -158,6 +158,16 @@ V6 (2026-10-12): WHAT A DAW ASKS THE CONTROLLER, AND A HOST THAT DOES NOT LEAK.
   cleared before use; one stream object serves every state call. MEASURED: 160 patch loads cycling the 64 factory
   patches grow the heap 31 MB and then stop (259 blocks kept by the plugin). The gate grades the reuse layer's live
   and free block counts, and the oracle stops if the host-object area moves after the setup.
+- DEV RUN (job jp8_host_dev6, logs/host_gate_v6_dev_p2.log; drive v6 on patch 2 at 48000, the lift from the v5
+  64-patch reach united with this drive's: 1,258 functions, 167,736 instructions): 746 steps, 76,800 words, 41,076
+  state bytes, 1,460 performEdits, 903 worker jobs, the reuse layer's 26,990 live / 89 free blocks and the memory
+  after EXACTLY 0 in the checked, the product and three threaded runs; teeth T1-T6 bite, and the two new ones, run
+  against the same references, bite too -- T7 (no reuse on the C side: the counts 0 / 0, the end hash; the output
+  words EQUAL -- block addresses do not reach the sound) and T8 (a short title from the title: step 2 differs).
+  Speed (jp8_host_speed.py, patch 2, four keys, 48000; this 4-core machine fully loaded): 1,027 ms per second of
+  audio, threads 992 ms, the same checksum; the heap grows 1.75 MB over the first ~220 blocks (the deques' map) and
+  then not at all. Callgrind (one second): the eight voice-unit renders are 78 % of the instructions, ~7,470 host
+  instructions per voice per engine sample (the plugin's own: 3,632).
 
 SPEED (the product build, 48000 host, the 96 kHz engine, four keys held, this shared Xeon with three other jobs):
 950 ms per second of audio (init 176 ms, a patch load 4 ms) -- inside real time with no margin; the plugin's own

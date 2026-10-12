@@ -1,0 +1,58 @@
+=== 0. the reach: the 64 patches, and this gate's own drive at each first rate (48000) ===
+[ 425.6s] wrote /home/user/snap_jp8dev/build/jp8_host/hostreach_gate_48000.json
+/home/user/snap_jp8dev/build/jp8_host/hostreach_lift.json: 111913 executed, 800 indirect sites, 20 stub names from 2 reaches
+roots: 0x324f00,0x325870,0x326660,0x33a290,0x355f90,0x369120,0x369150,0x3691a0,0x3691b0,0x3691d0,0x369754,0x369ad0,0x369ae0,0x36a2b0,0x36a300,0x36ba50,0x36bf30,0x36c600,0x36c650,0x445670,0x449ee0,0x450270,0x4502d0,0x450400,0x450420,0x450970,0x450bc0,0x450fd0,0x451180
+=== 1. lift + build ===
+lifted 1258 functions, 167736 instructions -> /home/user/snap_jp8dev/jp8/src/jp8_host_lift.c (200200 lines); unsupported (trap) 543: int3:225, vmovdqa:44, vmulsd:33, vmovd:31, vmovsd:17, vfmadd213sd:17, vaddsd:14, vsubsd:13, vmovq:12, vpand:8, vmovapd:7, vpshufd:7, vpxor:6, vldmxcsr:6, lock cmpxchg:5, vcvtdq2pd:5, vfmadd231sd:5, vdivsd:5, pmovsxdq:4, vcomisd:4, vpor:4, vandpd:4, int:3, vpsrlq:3, vmulpd:3, vcvtsd2ss:3, vorps:3, vstmxcsr:3, vcvtss2si:3, vcvtsi2ss:3, vucomiss:3, bswap:2, pcmpistri:2, vpsubq:2, vpsllq:2, vpaddq:2, vucomisd:2, vfnmadd231sd:2, vpmovmskb:2, vzeroupper:2
+jp8_fast: 1257 functions (1 allocator stubs), 339063 statements after 4374 calls inlined; flags LOCAL (no flag live where functions meet)
+=== 2. the oracle at 48000: template + references ===
+[   0.5s] DllMain(PROCESS_ATTACH) -> 1
+[  16.9s] InitDll -> 1
+[  61.2s] IComponent::initialize -> 0x0
+[  61.3s] heap 0x31fb67b80 (263.6 MB used), 0 oracle regions outside the template: none
+[  63.3s] template (before setupProcessing): 8 regions, 66 facts, 836 stubs, 44.0 MB (sha256 a30f59c6bf8095a5)
+[  64.2s] setup 48000: the host objects end at 0x5a0012640, 0 edits, 0 jobs
+[  64.5s] patch 2: 0 blocks, 0 words so far, 96 edits, 0 jobs, heap 0x31fbfe870
+[  75.6s] rate 44100.0: 20 blocks, 19456 words so far, 96 edits, 456 jobs, heap 0x31fc25fb0
+[  77.4s] rate 96000.0: 23 blocks, 22528 words so far, 96 edits, 496 jobs, heap 0x31fc2c830
+[  78.3s] rate 88200.0: 26 blocks, 25600 words so far, 96 edits, 528 jobs, heap 0x31fc2f830
+[  79.2s] rate 22050.0: 29 blocks, 28672 words so far, 96 edits, 560 jobs, heap 0x31fc32c70
+[  79.2s] rate 48000.0: 32 blocks, 31744 words so far, 96 edits, 560 jobs, heap 0x31fc32c70
+[  86.0s] setstate p2: 43 blocks, 43008 words so far, 192 edits, 688 jobs, heap 0x31fc4c900
+[  87.3s] setstate p2: 45 blocks, 45056 words so far, 288 edits, 712 jobs, heap 0x31fc51ad0
+[  88.6s] setstate p2: 47 blocks, 47104 words so far, 384 edits, 736 jobs, heap 0x31fc56c70
+[  90.0s] setstate p2: 49 blocks, 49152 words so far, 480 edits, 736 jobs, heap 0x31fc57e40
+[  91.5s] setstate p2: 51 blocks, 51200 words so far, 500 edits, 736 jobs, heap 0x31fc57e70
+[  91.5s] setstate p2: 53 blocks, 53248 words so far, 500 edits, 736 jobs, heap 0x31fc57e70
+[  91.6s] setstate p2: 55 blocks, 55296 words so far, 500 edits, 736 jobs, heap 0x31fc57e70
+[  91.7s] setstate p2: 57 blocks, 57344 words so far, 596 edits, 736 jobs, heap 0x31fc593c0
+[  94.3s] setstate p2: 59 blocks, 59392 words so far, 692 edits, 760 jobs, heap 0x31fc5e070
+[  96.2s] setstate p2: 61 blocks, 61440 words so far, 788 edits, 784 jobs, heap 0x31fc61240
+[  98.1s] setstate p2: 63 blocks, 63488 words so far, 884 edits, 808 jobs, heap 0x31fc64170
+[  99.8s] setstate p2: 65 blocks, 65536 words so far, 980 edits, 832 jobs, heap 0x31fc668a0
+[ 100.5s] setstate p2: 67 blocks, 67584 words so far, 1076 edits, 856 jobs, heap 0x31fc68fd0
+[ 101.9s] setstate p2: 69 blocks, 69632 words so far, 1172 edits, 856 jobs, heap 0x31fc6a1a0
+[ 104.1s] setstate p2: 71 blocks, 71680 words so far, 1268 edits, 868 jobs, heap 0x31fc6f370
+[ 104.4s] setstate p2: 73 blocks, 73728 words so far, 1364 edits, 871 jobs, heap 0x31fc74540
+[ 105.8s] setstate learned: 75 blocks, 75776 words so far, 1460 edits, 895 jobs, heap 0x31fc79810
+[ 107.6s] wrote /home/user/snap_jp8dev/build/jp8_host/ref_48000: 746 steps, 76 blocks, 76800 words, 41076 state bytes, 1460 performEdits, 903 worker jobs
+=== 3. the C side at 48000: checked build ===
+[   0.8s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   7.1s] 746 steps, 76800 words (0 differ), 41076 state bytes, 1460 performEdits, 903 worker jobs, heap 26990 live / 89 free blocks, end EXACT, stack EXACT (reported)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 48000: product build ===
+[   0.7s] CONTROL 1: the memory after jp8h_init (the setup at 48000) is the oracle's (image + heap + host objects)
+[   1.9s] 746 steps, 76800 words (0 differ), 41076 state bytes, 1460 performEdits, 903 worker jobs, heap 26990 live / 89 free blocks, end EXACT, stack EXACT (reported)
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 3. the C side at 48000: product build, the workers on threads (3 runs: a race would show) ===
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+JP8 HOST PATH (process(), patch load, setup, rate changes, state; 48000 Hz, patches [2]): EXACTLY 0 -- every step, word, state byte, edit, job and the memory after
+=== 4. the teeth ===
+tooth T1 bites (54181 differences): [   2.5s] word 1026: step 418, block of 512, L sample 2: oracle 30946c48 C 30946cdc
+tooth T2 bites (8 differences): [   0.7s] TRAP: step 417 ('block', 512): rc -3 TRAP at rva 0x600000880: import CreateSemaphoreA not shimmed on the host path (called from rva 0x447151) (call rva 0x36bf30
+tooth T4 bites (27644 differences): [   1.6s] word 19457: step 439, block of 512, L sample 1: oracle b5c1eafe C b5fa8b97
+tooth T5 bites (8 differences): [   1.3s] TRAP: step 630 ('block', 512): rc -3 TRAP at rva 0x37fed0: indirect target 0x37fed0 not lifted (call rva 0x36bf30)
+tooth T6 bites (10222 differences): [   1.4s] step results differ from step 741: C ['ctl', 'get/60000a/0.0', 1, 4602696480615038976, ''] oracle ['ctl', 'get/60000a/0.0', 1, 4596232490410049536, '']
+tooth T3 bites (2 differences): [   0.6s] CONTROL 1 differs: init hash C 744e988d07004881 oracle b5966d4447faaeea
+JP8 HOST GATE (setup, process(), patch load, MIDI controllers, rate changes, the UI timer, MIDI learn, state, the edit controller, workers; first rates 48000, patches 2) GREEN: checked + product + threads builds EXACTLY 0, 6 teeth bite
