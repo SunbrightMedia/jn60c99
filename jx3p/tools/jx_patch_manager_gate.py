@@ -9,8 +9,9 @@ PORT    gui/juno_pm.c built with the JX bridge (jx3p/gui/jx_pm_glue.c, -DJPM_PRO
         the same files and answers
 Compared after every command, as the JUNO's: every bank's every history state, the cursors, the selection, the
 clipboard, the number format, the autosave counter, the view's record image and values, the window's values, the
-dialogs asked, the file operations, every file, the model calls. The bank name control's mouse is left out: its
-button's frame is the art's (SCOPE_AUDIT row 20); its rename and menu are reached by Ctrl+W / Ctrl+B.
+dialogs asked, the file operations, every file, the model calls. The bank name control's clicks and double clicks too
+(2026-10-13, SCOPE_AUDIT rows 19-20): its button is a frame of the art (jx3p/truth/Script/buttonArrowR.png), the
+plugin booted with the art's sheet sizes (jx_pm_emu.py), half its presses on the button's and the control's edges.
 
 usage: jx_patch_manager_gate.py [--seed N] [--steps N] [--tooth N]
 """
@@ -33,10 +34,12 @@ G.SCRIPT = MOD + '\\Script'
 G.WATCH = [G.DATA, G.PATCH, G.OLD, G.DESK]
 G.LIST = (331, 35, 1615, 515)                  # jx3p/truth/Script.xml panel patch: control patch 331,35 size 1284,480
 G.BANKNAME = (54, 33, 303, 63)                 # patchBankName 54,33 size 249,30
-G.BANKBTN = None                               # its button: a frame of buttonArrowR.png -- the art's
+G.BANKBTN = (54, 33, 74, 65)                   # its button: buttonPosition 0,0, a frame of buttonArrowR.png (80 x 32,
+                                               # 4 states along x: 20 x 32) -- the art's; graded at its edges below
+G.BANK_EDGES = [(x, y) for x in (53, 54, 73, 74, 75, 302, 303) for y in (32, 33, 62, 63, 64, 65)]
 G.BAD_HDR = b'KoaBankFile00003PG-JX3P'
 G.FACTORY_PATH = os.path.join(REPO, 'jx3p', 'truth', 'preset_bank_1.bin')
-G.REF_TAG = 'jx_'
+G.REF_TAG = 'jx_art_'                          # the plugin's references with the art's sizes
 G.GATE_SCRIPT = os.path.abspath(__file__)
 LIBDIR = os.path.join(REPO, 'scratchpad', 'jx_pm')
 SRCS = ['jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c', 'jx3p/gui/jx_bridge.c',

@@ -71,6 +71,7 @@ void jx3p_model_commit(void);
 int jx3p_value_set(uint32_t id, int32_t v);
 int jx3p_host_edits(uint32_t *ids, double *vals, int *kinds, int cap);
 int jx3p_state_save(unsigned char *out, int cap);
+int jx3p_product_pending(int *out, int cap);
 void jx3p_ui_tick(void);
 int jx3p_keybed_state(int key);
 int jx3p_keybed_write(int key, int value);
@@ -567,12 +568,13 @@ typedef struct Ctl {
     const char *expr;                      /* exprLatchButton: its state's expression */
     const char *onref[8], *offref[8];      /* exprLatchButton: its onValueRef / onValue pairs, its off pairs */
     int onv[8], offv[8], non, noff;
-    int dir, dragged;                      /* jx3pSlider: a click's direction (+0xCC), a drag moved it */
+    int dir, dragged;                      /* jx3pSlider: a click's direction (+0xCC), a drag moved it (+0xBC) */
+    int gx, gy, lx, ly, fine;              /* jx3pSlider: the grab (+0xB4), the last point (+0xAC), Shift (+0xBD) */
     int horiz, decay, ch, fade, state, rect[4], blits[7 * BAR_BLITS], nblits;   /* barGraphX (rva 0x31C450) */
 } Ctl;
 typedef struct Panel Panel;
 typedef struct { Panel *p; Ctl *c; } Item;
-struct Panel { char *type; int x, y, w, h, has_size; const char *cond; Bmp *bmp; Item *items; int n, cap; };
+struct Panel { char *type; int x, y, w, h, has_size, modal; const char *cond; Bmp *bmp; Item *items; int n, cap; };
 
 static XN *paneltype(const char *type)
 {
@@ -692,6 +694,8 @@ static Ctl *control(XN *el, int ox, int oy)
     if ((s = xtext(el, "role")) && *s) { c->role = atoi(s); c->role_set = 1; }
     if ((s = xtext(el, "bitmapStateRange")) && ints(s, v, 2) == 2) { c->sr0 = v[0]; c->sr1 = v[1]; c->has_sr = 1; }
     c->clickable = (s = xtext(el, "clickable")) && !strcmp(s, "1");
+    c->gx = c->gy = c->lx = c->ly = -2147483647;   /* jx3pSlider: no grab, no last point (0x80000001) */
+    c->dir = 1;
     c->fn = xtext(el, "function");
     c->args = xtext(el, "arguments");
     c->unit = xtext(el, "unit");
@@ -755,7 +759,9 @@ static Panel *build(const char *type, int ox, int oy)
     n->x = ox; n->y = oy;
     if (s && ints(s, v, 2) == 2 && strcmp(type, "main")) { n->x = ox + v[0]; n->y = oy + v[1]; }
     s = xtext(p, "size");
+    if (!s) s = xtext(p, "size-win-pi");   /* the Windows plug-in's size (the plugin's: setupA 800 x 260, EXECUTED) */
     if (s && ints(s, v, 2) == 2) { n->w = v[0]; n->h = v[1]; n->has_size = 1; }
+    n->modal = (s = xtext(p, "modal")) && !strcmp(s, "1");
     n->cond = xtext(p, "openCondition");
     n->bmp = bmp_get(xtext(p, "bitmapRef"));
     for (i = 0; i < p->n; ++i) {
@@ -769,7 +775,10 @@ static Panel *build(const char *type, int ox, int oy)
 /* ----------------------------------------------------------------- the model */
 #ifndef EXE_TOOTH
 #define EXE_TOOTH 0                         /* a check's tooth (make_native_jx.py --define EXE_TOOTH=n): 2 no zoom
-                                             * conversion at the patch window's open, 3 a DCO switch flips the other bit */
+                                             * conversion at the patch window's open, 3 a DCO switch flips the other bit,
+                                             * 4 a jx3pSlider's click does nothing, 5 exprLatchButton's on and off pairs
+                                             * swapped, 6 patchSelectButton's lanes swapped, 7 patchBlock loads the next
+                                             * patch, 8 the latch family presses at the down (jx_panel_gate.py) */
 #endif
 static void *g_eng;
 static CRITICAL_SECTION g_lock;            /* every engine call */
@@ -791,8 +800,11 @@ static void collect_edits(void)
 {
     uint32_t ids[512];
     double vals[512];
-    int n = jx3p_host_edits(ids, vals, NULL, 512), i, k;
+    int kinds[512];
+    int n = jx3p_host_edits(ids, vals, kinds, 512), i, k;
     for (i = 0; i < n; ++i) {
+        if (g_log)                         /* each performEdit as the host sees it (jx3p/tools/jx_panel_gate.py) */
+            fprintf(g_log, "# hostedit %u %d %016llx\n", (unsigned)ids[i], kinds[i], dbits(vals[i]));
         for (k = 0; k < g_nrt && g_rt[k].id != ids[i]; ++k) ;
         if (k == g_nrt) { if (g_nrt == 512) continue; ++g_nrt; }
         g_rt[k].id = ids[i];
@@ -1199,21 +1211,54 @@ static void jxlatch_press(const Ctl *c) { Leaf *L = cleaf(c); if (L) val_set_raw
  * position is bit role of the value (rva 0x350F30); position p sets (value & (2 >> role)) | (p << role) -- nothing
  * when that equals the value -- as a position through the value's number table (rva 0x351010 -> 0x283A60) */
 static int jxslider_pos(const Ctl *c) { return (cval(c) >> c->role) & 1; }
-static void jxslider_set(const Ctl *c, int p)
+/* the set (rva 0x351010): with flag 0 (a drag's) nothing when the value stays, with flag 1 (a press's, a release's)
+ * the set in any case */
+static void jxslider_set(const Ctl *c, int p, int flag)
 {
     Leaf *L = cleaf(c);
     int v = cval(c), n;
     if (!L) return;
-    n = (v & (2 >> c->role)) | ((p & 1) << c->role);
-    if (n == v) return;
+    n = (v & (2 >> c->role)) | (p << c->role);
+    if (n == v && !flag) return;
     val_set_raw(L, value_of(L, n));
+}
+/* the cap's place at a position (rva 0x2E7C00, vertical; positions 2, its step offset +0xA4 0): centred across,
+ * from the bottom (position 0) to the top (position 1), C division */
+static void jxslider_cap(const Ctl *c, int pos, int *cx, int *cy)
+{
+    int fw, fh, lo, hi, v;
+    frame_size(c->bmp, &fw, &fh);
+    *cx = (c->x + c->x + c->w) / 2 - fw / 2;
+    lo = c->y + c->h - fh;
+    hi = c->y;
+    v = ((hi - lo) * pos * 2 / 1 + lo * 2 + 1) / 2;
+    if (lo <= hi) v = v < lo ? lo : v > hi ? hi : v;
+    else v = v < hi ? hi : v > lo ? lo : v;
+    *cy = v;
+}
+/* a point's position (rva 0x2E7D80, vertical): the point less the grab along the travel -- the cap's bottom place
+ * to its top place, widened by the point's distance past the slider's width across (the slack) -- rounded in C
+ * division; Shift (+0xBD) moves one position at most; clamped to 0 .. 1 */
+static int jxslider_point(const Ctl *c, int x, int y)
+{
+    int fw, fh, xc = (c->x + c->x + c->w) / 2, w = c->w, sl, lo, num, den, p, cur = jxslider_pos(c), d;
+    frame_size(c->bmp, &fw, &fh);
+    sl = abs(x - xc) - w;
+    if (sl < 0) sl = 0;
+    lo = c->y + c->h - fh + sl;
+    num = (y - c->gy) - lo;
+    den = (c->y - sl) - lo;
+    p = den ? (num * 1 * 2 / den + 1) / 2 : 0;
+    d = p - cur;
+    if (c->fine && (unsigned)(d + 1) > 2u) p = cur + (c->ly - y < 0 ? -1 : c->ly - y > 0 ? 1 : 0);
+    return p < 0 ? 0 : p > 1 ? 1 : p;
 }
 /* exprLatchButton (vt 0x9A0048): on while its state's expression holds (rva 0x350980); the press (rva 0x350770): on,
  * its off pairs -- else its on pairs -- set in order (one multi-set, rva 0x283B30), then the panel's commit */
 static int expr_on(const Ctl *c) { return c->expr && eval_cond(c->expr); }
 static void expr_press(const Ctl *c)
 {
-    int on = expr_on(c), i, n = on ? c->noff : c->non;
+    int on = EXE_TOOTH == 5 ? !expr_on(c) : expr_on(c), i, n = on ? c->noff : c->non;
     for (i = 0; i < n; ++i) {
         const Leaf *L = resolve(on ? c->offref[i] : c->onref[i]);
         if (L) val_set_raw(L, on ? c->offv[i] : c->onv[i]);
@@ -1226,7 +1271,7 @@ static void expr_press(const Ctl *c)
 static int psel_target(const Ctl *c)
 {
     int cur = get("vm.vs.patchId");
-    return c->lane ? c->index * 16 + cur % 16 : cur / 16 * 16 + c->index;
+    return (EXE_TOOTH == 6 ? !c->lane : c->lane) ? c->index * 16 + cur % 16 : cur / 16 * 16 + c->index;
 }
 static int psel_on(const Ctl *c)
 {
@@ -1340,8 +1385,11 @@ static void draw_control(Ctl *c)
         return;
     case C_JXSLIDER:                                             /* the slider's draw at its position of two */
         if (!c->bmp || !c->bmp->px) return;
-        frame_size(c->bmp, &w, &h);
-        draw_frame(c->bmp, 0, c->x + (c->w - w) / 2, c->y + (c->h - h) * (1 - jxslider_pos(c)));
+        {
+            int cx, cy;
+            jxslider_cap(c, jxslider_pos(c), &cx, &cy);
+            draw_frame(c->bmp, 0, cx, cy);
+        }
         return;
     case C_PATCHBLOCK:                                           /* rva 0x3515F0: the text, inset 2 / 1 */
         if (c->nwr && c->wr[0]) {
@@ -2463,7 +2511,8 @@ static void cc_tree(Panel *p, FILE *f)
 {
     int i, nc = 0, np = 0, b[4];
     for (i = 0; i < p->n; ++i) p->items[i].p ? ++np : ++nc;
-    fprintf(f, "# cctree P %d %d %d\n", panel_open(p), nc, np);
+    fprintf(f, "# cctree P %d %d %d %d %d %d %d %d %d\n", panel_open(p), nc, np, p->x, p->y, p->w, p->h, p->has_size,
+            p->modal);                    /* the panel's rectangle (jx_panel_gate.py: the plugin's +0x18) */
     for (i = 0; i < p->n; ++i) {
         Ctl *c = p->items[i].c;
         Leaf *L;
@@ -2485,17 +2534,41 @@ static int cc_press(int x, int y, int mods, int choice)
     if ((mods && CC_TOOTH != 4) || get("vm.vs.panelPatch") == 1) return 0;   /* tooth 4: modifiers ignored */
     return cc_menu(x, y, choice);
 }
-static Ctl *hit(int x, int y)
+/* THE PLUGIN'S MOUSE DISPATCH (a panel's, rva 0x2AA9D0; EXECUTED, jx3p/tools/jx_panel_gate.py): an open panel that
+ * holds the point offers it to its controls from the last, then to its open panels from the last; a modal panel
+ * (Script.xml <modal>1</modal>, +0xDC) takes whatever none of them took (*modal: that panel) */
+static Ctl *hit_in(Panel *p, int x, int y, Panel **modal)
 {
-    Ctl *list[512];
-    int n = visible_list(g_tree, list, 0, 512), i, b[4];
-    for (i = n - 1; i >= 0; --i) {
-        Ctl *c = list[i];
-        if (c->type == C_DISPLAY) continue;
-        if (c->fn && !strcmp(c->fn, "PlugOut")) continue;
+    int i, b[4];
+    Ctl *c;
+    if (!panel_open(p)) return NULL;
+    if (p->has_size && (x < p->x || y < p->y || x >= p->x + p->w || y >= p->y + p->h)) return NULL;
+    for (i = p->n - 1; i >= 0; --i) {
+        c = p->items[i].c;
+        if (!c || c->type == C_DISPLAY || (c->fn && !strcmp(c->fn, "PlugOut"))) continue;
         if (bounds(c, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3]) return c;
     }
+    for (i = p->n - 1; i >= 0; --i)
+        if (p->items[i].p && ((c = hit_in(p->items[i].p, x, y, modal)) || *modal)) return c;
+    if (p->modal) *modal = p;
     return NULL;
+}
+static Ctl *hit_m(int x, int y, Panel **modal) { *modal = NULL; return hit_in(g_tree, x, y, modal); }
+static Ctl *hit(int x, int y) { Panel *m; return hit_m(x, y, &m); }
+/* a down a modal panel took, outside every one of its panels, closes it (rva 0x2A77A0): its open condition's value
+ * set to 0, flag 1, the commit (EXECUTED: the setup page, vm.vs.setup 0) */
+static void modal_down(Panel *p, int x, int y)
+{
+    char ref[96];
+    const char *k;
+    int i;
+    for (i = 0; i < p->n; ++i) {
+        Panel *q = p->items[i].p;
+        if (q && q->has_size && x >= q->x && y >= q->y && x < q->x + q->w && y < q->y + q->h) return;
+    }
+    if (!p->cond || !(k = strchr(p->cond, ','))) return;
+    snprintf(ref, sizeof ref, "%.*s", (int)(k - p->cond), p->cond);
+    set(ref, 0);
 }
 static void show_tip(const Ctl *c)
 {
@@ -2586,12 +2659,29 @@ static void action(const char *fn, const char *args);
 static int patch_down(int x, int y, int dbl);
 static void pm_after(void);
 
-static void mouse_down(int x, int y, int shift, int dbl)
+/* the press of a JX latch-family control (vt+0x120): jx3pLatchButton rva 0x350F80, exprLatchButton 0x350770,
+ * patchSelectButton 0x355040 (the patch, loaded through the manager) */
+static void latch_press(Ctl *c)
+{
+    if (c->type == C_JXLATCH) jxlatch_press(c);
+    else if (c->type == C_EXPRLATCH) expr_press(c);
+    else if (c->type == C_PATCHSEL) { juno_pm_pick(g_pm, psel_target(c)); pm_after(); }
+}
+
+static int g_mx, g_my;                     /* the last point of a down or a move: an up without one goes there */
+static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's message flags (1 Shift, 2 Ctrl, 8 Alt;
+                                                          * 4 a right-button press the CC menu did not take) */
 {
     Ctl *c;
     Leaf *L;
+    Panel *modal;
+    int shift = mods & 1;
+    g_mx = x; g_my = y;
     if (get("vm.vs.panelPatch") == 1 && patch_down(x, y, dbl)) return;
-    if (!(c = hit(x, y))) return;
+    if (!(c = hit_m(x, y, &modal))) {
+        if (modal && !dbl) modal_down(modal, x, y);
+        return;
+    }
     L = cleaf(c);
     g_drag = c;
     g_dy = y;
@@ -2643,27 +2733,43 @@ static void mouse_down(int x, int y, int shift, int dbl)
         g_dirty = 1;
         midi_menu();
         break;
-    case C_JXLATCH:
-        press(c);
-        jxlatch_press(c);
-        break;
+    case C_JXLATCH:                     /* the latchButton's down (its mouse handler rva 0x2CD350, a down or a double
+                                         * click): pressed and captured; the press itself (vt+0x120) comes with the up,
+                                         * wherever the up is (EXECUTED, jx_panel_gate.py) */
     case C_EXPRLATCH:
+    case C_PATCHSEL:
         press(c);
-        expr_press(c);
-        break;
-    case C_PATCHSEL:                    /* the press (rva 0x355040): the patch, loaded through the manager */
-        press(c);
-        juno_pm_pick(g_pm, psel_target(c));
-        pm_after();
+#if EXE_TOOTH == 8                      /* TOOTH 8: the press at the down */
+        latch_press(c);
+        g_drag = NULL;
+#endif
         break;
     case C_PATCHBLOCK:                  /* a down or a double click (rva 0x351C90) */
-        juno_pm_pick(g_pm, c->patchid);
+        juno_pm_pick(g_pm, EXE_TOOTH == 7 ? (c->patchid + 1) % 64 : c->patchid);
         pm_after();
         g_drag = NULL;
         break;
-    case C_JXSLIDER: {                  /* the slider's press (rva 0x2E6B20): off its cap it waits for the
-                                         * release (clickable); on it, a drag */
+    case C_JXSLIDER: {                  /* the slider's press (rva 0x2E6B20, a down or a double click): Ctrl alone
+                                         * sets the default and lets go; on the cap, its grab; off it, clickable,
+                                         * it waits for the release (else the cap's middle grabbed and set there) */
+        int cx, cy, fw, fh;
         c->dragged = 0;
+        c->gx = c->gy = -2147483647;
+        if (mods == 2) {
+            Leaf *D = cleaf(c);
+            jxslider_set(c, D ? (D->def >> c->role) & 1 : 0, 1);
+            g_drag = NULL;
+            break;
+        }
+        c->lx = x; c->ly = y;
+        jxslider_cap(c, jxslider_pos(c), &cx, &cy);
+        frame_size(c->bmp, &fw, &fh);
+        if (x >= cx && x < cx + fw && y >= cy && y < cy + fh) { c->gx = x - cx; c->gy = y - cy; }
+        else if (!c->clickable) {
+            c->gx = x - cx; c->gy = fh / 2;
+            jxslider_set(c, jxslider_point(c, x, y), 0);
+            c->dragged = 1;
+        }
         show_tip(c);
         break;
     }
@@ -2682,11 +2788,13 @@ static void mouse_down(int x, int y, int shift, int dbl)
     g_dirty = 1;
 }
 
-static void mouse_move(int x, int y, int shift)
+static void mouse_move(int x, int y, int mods)
 {
     Ctl *c = g_drag;
     Leaf *L;
+    int shift = mods & 1;
     double fine = shift ? 0.1 : 1.0;
+    g_mx = x; g_my = y;
     if (!c) return;
     L = cleaf(c);
     if (c->type == C_SLIDER && L) {
@@ -2706,12 +2814,20 @@ static void mouse_move(int x, int y, int shift)
             val_set(L, (int)floor(g_dv + g_dacc + 0.5));
         }
         show_tip(c);
-    } else if (c->type == C_JXSLIDER && abs(y - g_dy) >= 2) {
-        int w, h, p;
-        frame_size(c->bmp, &w, &h);       /* the cap's centre: position 1 at the top, 0 at the bottom */
-        p = y < c->y + c->h / 2 ? 1 : 0;
+    } else if (c->type == C_JXSLIDER) {  /* the drag (rva 0x2E7940): Shift alone, 2 pixels at least; a grab from an
+                                         * off-cap press, the cap's middle; the point's position, set (flag 0) */
+        int cx, cy, fw, fh;
+        if (x == c->lx && y == c->ly) return;
+        c->fine = mods == 1;
+        if (c->fine && abs(y - c->ly) < 2) return;
+        if (c->clickable && c->gx == -2147483647 && c->gy == -2147483647) {
+            jxslider_cap(c, jxslider_pos(c), &cx, &cy);
+            frame_size(c->bmp, &fw, &fh);
+            c->gx = x - cx; c->gy = fh / 2;
+        }
+        jxslider_set(c, jxslider_point(c, x, y), 0);
+        c->lx = x; c->ly = y;
         c->dragged = 1;
-        jxslider_set(c, p);
         show_tip(c);
     } else if (c->type == C_KEYBOARD && g_kb_drag) {      /* a move while it drags */
         int vel, n = key_hit(c, x, y, &vel);
@@ -2723,21 +2839,36 @@ static void mouse_move(int x, int y, int shift)
 /* the button up: on the keyboard (rva 0x2D41F0) the drag ends and the held key is
  * released (at -offVel: the velocity of the up position, which the hit test gives,
  * is replaced, offVel being 1..127) */
-static void mouse_up(void)
+static void mouse_up_at(int x, int y)
 {
     if (g_drag && g_drag->type == C_KEYBOARD && g_kb_drag) { g_kb_drag = 0; kb_release(1); }
-    if (g_drag && g_drag->type == C_JXSLIDER && !g_drag->dragged && g_drag->clickable) {
-        Ctl *c = g_drag;                  /* a click (rva 0x2E7AD0): one position on, turning at the ends */
-        int p = jxslider_pos(c);
-        if (p <= 0) c->dir = 1;
-        else if (p >= 1) c->dir = -1;
-        jxslider_set(c, p + c->dir);
+    if (g_drag && (g_drag->type == C_JXLATCH || g_drag->type == C_EXPRLATCH || g_drag->type == C_PATCHSEL)) {
+        int b[4], in = bounds(g_drag, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
+        /* the latchButton's up (rva 0x2CD350): the press, vt+0x120 -- jx3pLatchButton's (0x350F80) wherever the up
+         * is, exprLatchButton's (0x350770) and patchSelectButton's (0x355040) only with the up on the control (its
+         * hit +0x104 at the up; EXECUTED) */
+        if (g_drag->type == C_JXLATCH || in) latch_press(g_drag);
+    }
+    if (g_drag && g_drag->type == C_JXSLIDER) {   /* the release (rva 0x2E7AD0) */
+        Ctl *c = g_drag;
+        if (c->dragged) {                 /* a drag: the point's position (Shift: the last point within 2 pixels) */
+            if (!(c->fine && abs(y - c->ly) < 2)) { c->lx = x; c->ly = y; }
+            jxslider_set(c, jxslider_point(c, c->lx, c->ly), 1);
+        } else if (c->clickable && EXE_TOOTH != 4) {   /* a click: one position on, turning at the ends */
+            int p = jxslider_pos(c);
+            if (p <= 0) c->dir = 1;
+            else if (p >= 1) c->dir = -1;
+            jxslider_set(c, p + c->dir, 1);
+        }
+        c->lx = c->ly = c->gx = c->gy = -2147483647;
+        c->dragged = c->fine = 0;
     }
     g_drag = NULL;
     g_npressed = 0;
     g_has_tip = 0;
     g_dirty = 1;
 }
+static void mouse_up(void) { mouse_up_at(g_mx, g_my); }
 
 static void mouse_wheel(int x, int y, int up)
 {
@@ -3084,20 +3215,22 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
     case WM_LBUTTONDOWN:
     case WM_LBUTTONDBLCLK:
         SetCapture(h);
-        mouse_down(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom, (wp & MK_SHIFT) != 0, m == WM_LBUTTONDBLCLK);
+        mouse_down(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom,
+                   ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0), m == WM_LBUTTONDBLCLK);
         if (m == WM_LBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL))   /* not through the patch window */
             mouse_dbl(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
         InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_MOUSEMOVE:
-        if (g_drag) { mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom, (wp & MK_SHIFT) != 0); InvalidateRect(h, NULL, FALSE); }
+        if (g_drag) { mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom,
+                                 ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0)); InvalidateRect(h, NULL, FALSE); }
         else if (pm_mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom)) InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
         ReleaseCapture();
         pm_mouse_up(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
-        mouse_up();
+        mouse_up_at(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
         InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_KEYDOWN:                     /* the patch window's list takes the keys while it is open */
@@ -3115,7 +3248,8 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         }
         /* any other right press goes on to the controls, which do not test the button */
         SetCapture(h);
-        mouse_down(x, y, (wp & MK_SHIFT) != 0, m == WM_RBUTTONDBLCLK);
+        mouse_down(x, y, 4 | ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0),
+                   m == WM_RBUTTONDBLCLK);
         if (m == WM_RBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(x, y);
         InvalidateRect(h, NULL, FALSE);
         return 0;
@@ -3313,6 +3447,28 @@ static void log_state(void)
     fprintf(g_log, "state ");
     for (k = 0; k < n; ++k) fprintf(g_log, "%02x", sb[k]);
     fprintf(g_log, "\n");
+}
+/* the engine records queued for the next block (kind, offset, id or status, value or note, velocity) and each
+ * panel's open flag in cc_tree's order -- jx3p/tools/jx_panel_gate.py */
+static void log_pending(void)
+{
+    static int p[5 * 4096];
+    int n, k;
+    EnterCriticalSection(&g_lock);
+    n = jx3p_product_pending(p, 5 * 4096);
+    LeaveCriticalSection(&g_lock);
+    if (!g_log) return;
+    fprintf(g_log, "# pending %d", n);
+    for (k = 0; k < n && k < 4096; ++k)
+        fprintf(g_log, " %d,%d,%d,%d,%d", p[5 * k], p[5 * k + 1], p[5 * k + 2], p[5 * k + 3], p[5 * k + 4]);
+    fprintf(g_log, "\n");
+}
+static void log_opens(Panel *p, FILE *f)
+{
+    int i;
+    fputc(panel_open(p) ? '1' : '0', f);
+    for (i = 0; i < p->n; ++i)
+        if (p->items[i].p) log_opens(p->items[i].p, f);
 }
 static Ctl *find_ref(Panel *p, const char *ref)
 {
@@ -3684,7 +3840,11 @@ static int play_test(const char *path, int change_patch)
  *   ccpick X Y | cctree | state                             the CC assign search at a point (no press) |
  *                                                           the panel tree it searches | the state as
  *                                                           getState writes it (cc_menu_gate.py)
- * every engine call to FILE.log (the calls a GUI makes, in order). */
+ *   dbl X Y SHIFT | up X Y                                  a double click (as WM_LBUTTONDBLCLK) | the up at
+ *                                                           a point (jx_panel_gate.py: the plugin's message)
+ *   pending | opens                                         the engine records queued for the next block |
+ *                                                           each panel's open flag, in cctree's order
+ * every engine call to FILE.log (the calls a GUI makes, in order); each mouse event first as "# kb ..." */
 static int kb_script(const char *path)
 {
     FILE *in = fopen(path, "r");
@@ -3696,7 +3856,7 @@ static int kb_script(const char *path)
     while (fgets(line, sizeof line, in)) {
         if (sscanf(line, "rdown %d %d %d %d", &a, &b, &c, &d) == 4) {
             fprintf(g_log, "# rdown %d %d %d %d\n", a, b, c, d);
-            if (!cc_press(a, b, c, d)) mouse_down(a, b, c & 1, 0);
+            if (!cc_press(a, b, c, d)) mouse_down(a, b, 4 | c, 0);
         }
         else if ((k = sscanf(line, "ccmsg %d %d %d %d", &a, &b, &c, &d)) >= 3) {   /* the press alone: */
             if (k == 3) d = 2;                                   /* the menu's item (none by default), */
@@ -3711,10 +3871,27 @@ static int kb_script(const char *path)
         }
         else if (!strncmp(line, "cctree", 6)) cc_tree(g_tree, g_log);
         else if (!strncmp(line, "state", 5)) log_state();
+        else if (!strncmp(line, "pending", 7)) log_pending();
+        else if (!strncmp(line, "opens", 5)) { fprintf(g_log, "# opens "); log_opens(g_tree, g_log); fprintf(g_log, "\n"); }
         else if (sscanf(line, "cc %d %d", &a, &b) == 2) midi_in(0xB0u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
-        else if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) mouse_down(a, b, c, 0);
-        else if (sscanf(line, "move %d %d %d", &a, &b, &c) == 3) mouse_move(a, b, c);
-        else if (!strncmp(line, "up", 2)) mouse_up();
+        else if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) {
+            fprintf(g_log, "# kb down %d %d %d\n", a, b, c);
+            mouse_down(a, b, c, 0);
+        }
+        else if (sscanf(line, "dbl %d %d %d", &a, &b, &c) == 3) {      /* WM_LBUTTONDBLCLK's path */
+            fprintf(g_log, "# kb dbl %d %d %d\n", a, b, c);
+            mouse_down(a, b, c, 1);
+            if (!juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(a, b);
+        }
+        else if (sscanf(line, "move %d %d %d", &a, &b, &c) == 3) {
+            fprintf(g_log, "# kb move %d %d %d\n", a, b, c);
+            mouse_move(a, b, c);
+        }
+        else if (!strncmp(line, "up", 2)) {
+            if (sscanf(line, "up %d %d", &a, &b) != 2) { a = g_mx; b = g_my; }
+            fprintf(g_log, "# kb up %d %d\n", a, b);
+            mouse_up_at(a, b);
+        }
         else if (sscanf(line, "wheel %d %d %d", &a, &b, &c) == 3) mouse_wheel(a, b, c);
         else if (sscanf(line, "set %d %127[^\r\n]", &a, ref) == 2) set(ref, a);
         else if (sscanf(line, "patch %d %d", &a, &b) == 2) pm_scripted_patch(a, b);

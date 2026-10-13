@@ -303,16 +303,23 @@ python3 "$HERE/jx_record_gate.py"
 python3 "$HERE/jx_record_gate.py" --tooth
 # the patch window (JX-24): the JUNO-60's patch manager gate on the JX plugin's own manager (jx_pm_emu.py) and the
 # port (gui/juno_pm.c on the JX bridge); its teeth are the JUNO's PM_TOOTH set
-rm -f "$REPO"/scratchpad/jx_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
+rm -f "$REPO"/scratchpad/jx_art_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
+# (each gate's own exit status decides: sh has no pipefail, a pipe after the gate would hide it -- playbook 251)
 for sp in 9:40 1:200 5:200 100:150; do
-  python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:} | grep -v '^REACH'
+  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:}); then
+    echo "$out" | grep -v '^REACH'; echo "[jx verify] FAIL -- the patch manager gate, seed ${sp%%:*}"; exit 1
+  fi
+  echo "$out" | grep -v '^REACH'
 done
-# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
-# presses (its button is the art's: SCOPE_AUDIT row 20) and cannot bite here
+# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19, the bank name control's
+# presses, wait for the art's runs (SCOPE_AUDIT row 20, in progress)
 for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
           14:9:40 15:9:40 16:1:200 17:9:40; do
   t=${ts%%:*}; r=${ts#*:}
-  python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t | tail -1
+  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t); then
+    echo "$out" | tail -3; echo "[jx verify] FAIL -- patch manager tooth $t did not bite"; exit 1
+  fi
+  echo "$out" | tail -1
 done
 echo "=== JX GATE 3i: SEEDS, NaN, RAMPS, TABLES (the JUNO-60's gate classes the JX lacked: docs/GATE_PARITY.tsv, JX-26e) ==="
 # the seeded fuzz of the render (patch x rate x warm x notes), its tooth a slip in a voice helper every voice runs

@@ -48,6 +48,8 @@ FUNCS = [('ManagePatch', 'load'), ('ManagePatch', 'save'), ('ManagePatch', 'save
 LIST = (338, 57, 1628, 603)                    # the list control's rectangle (Script.xml patch)
 BANKNAME = (61, 57, 332, 94)                   # the bank name control's (patchBankName: 61,57 size 271,37)
 BANKBTN = (64, 60, 78, 94)                     # its button: buttonPosition 3,3, a 14x34 frame (EXECUTED)
+BANK_EDGES = None                              # points on the button's and the control's edges, half the bank
+                                               # presses there (another plugin's; None: random points only)
 FULL_EVERY = 10                                # every history state's records: every 10th command and the last
 REF_FORMAT = 2                                 # the reference pickle's form (2: model calls and window values)
 WIN_IDS = (0x0FFFC002, 0x0FFFC004, 0x0FFFC005, 0x0FFFC006)   # panelPatch, patchManager, patchListMain, -Sub
@@ -129,6 +131,8 @@ def script(seed, steps):
                                                       # button's frame comes from the art: None, no art)
             x0, y0, x1, y1 = BANKNAME
             a = (rnd.randrange(x0 - 10, x1 + 10), rnd.randrange(y0 - 5, y1 + 5))
+            if BANK_EDGES and rnd.random() < 0.5:
+                a = rnd.choice(BANK_EDGES)
             kind = rnd.choice(['click', 'click', 'dbl'])
             ev = {'click': [(0, a), (1, a)], 'dbl': [(0, a), (1, a), (2, a), (1, a)]}[kind]
             ops.append(('bank', kind, ev, ans))

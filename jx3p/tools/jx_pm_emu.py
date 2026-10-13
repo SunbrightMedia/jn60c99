@@ -8,8 +8,8 @@ handlers, the buttons' functions, the manager, the save, the tick, the model's s
 load and the serializer, the controls' registrations, the record index, the view's values, the bank name refresh,
 the text edit and message services -- equal in their normalized code (70 of 77 at -0x120; the rest found by their
 code); the two vtables by the mouse handlers in their slot 9; the data (the number format, the menu service's
-override pointer) by the same instruction of the twin function. Without the JX art the controls' images are blank
-ones of the Script.xml geometry (no PNG sizes).
+override pointer) by the same instruction of the twin function. The controls' images have the art's sizes (the PNG
+headers of jx3p/truth/Script/, 2026-10-13; before the art, blank ones of the Script.xml geometry).
 
 USE (Unicorn only)    import jx_pm_emu; P = jx_pm_emu.M.PlugPM(files=[...])
 """
@@ -37,8 +37,25 @@ PM_PROFILE = dict(
     CODE=tuple((a + D, b + D) for a, b in ((0x322E60, 0x324900), (0x3262C0, 0x326330), (0x3278C0, 0x328550),
                                            (0x32C000, 0x335850), (0x335990, 0x33F600))),
     OLD_DIR='C:\\ProgramData\\Roland\\JX-3P',
-    PNG=None,                                                  # no JX art: the wrapper's blank geometry
+    PNG=None,                                                  # set below: the art's sheet sizes
 )
+
+
+def png_sizes():
+    """each JX sprite sheet's size from its own PNG header (jx3p/truth/Script/: the user's Script folder, pinned)"""
+    import struct
+    d = os.path.join(REPO, 'jx3p', 'truth', 'Script')
+    out = {}
+    for f in sorted(os.listdir(d)):
+        if f.lower().endswith('.png'):
+            b = open(os.path.join(d, f), 'rb').read(24)
+            if b[:8] != b'\x89PNG\r\n\x1a\n' or b[12:16] != b'IHDR':
+                raise SystemExit('not a PNG: %s' % f)
+            out[f.lower()] = struct.unpack('>II', b[16:24])
+    return out
+
+
+PM_PROFILE['PNG'] = png_sizes()                                # the controls' rectangles from the art (2026-10-13)
 
 
 def _load(name, path, **inject):
