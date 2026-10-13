@@ -2678,7 +2678,13 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
     int shift = mods & 1;
     g_mx = x; g_my = y;
     if (get("vm.vs.panelPatch") == 1 && patch_down(x, y, dbl)) return;
-    if (!(c = hit_m(x, y, &modal))) {
+    c = hit_m(x, y, &modal);
+    if (g_log) {                          /* the control the dispatch found (jx_panel_gate.py compares the plugin's) */
+        int hb[4];
+        if (c && bounds(c, hb)) fprintf(g_log, "# hit %s %d %d %d %d\n", c->typestr, hb[0], hb[1], hb[0] + hb[2], hb[1] + hb[3]);
+        else fprintf(g_log, "# hit %s\n", modal ? "modal" : "-");
+    }
+    if (!c) {
         if (modal && !dbl) modal_down(modal, x, y);
         return;
     }

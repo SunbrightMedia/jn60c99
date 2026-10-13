@@ -68,6 +68,7 @@ DATA = 'C:\\ProgramData\\Roland Cloud\\JX-3P'
 # the JX twins of the JUNO's addresses (jx3p/tools/fw_map.py --pair: the code equal, JX = JUNO - 0x120 here; the
 # data by the twin instruction; the CC assign class by its attach in vt+0xB0)
 DISPATCH = 0x2AA9D0                            # a panel's message dispatch (JUNO 0x2AAAF0)
+OFFER, OFFER_RET = 0x2AAC35, 0x2AAC38          # its offer of the message to a control (vt+0x48) and the answer
 HANDLER, SEARCH_RET = 0x31D300, 0x31D379       # the CC assign control's handler (0x31D420) and its search's return
 LEARN, FORGET = 0x31A920, 0x3191C0             # (0x31AA40, 0x3192E0)
 MAP_RECORD, MAP_ID = 0x3199F0, 0x319B30        # (0x319B10, 0x319C50)
@@ -130,8 +131,8 @@ class Plugin:
         import numpy as np
         import jx_pm_emu
         from unicorn import UC_HOOK_CODE
-        from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RDX
-        self.RAX, self.RDX = UC_X86_REG_RAX, UC_X86_REG_RDX
+        from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX
+        self.RAX, self.RCX, self.RDX = UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX
         self.P = P = jx_pm_emu.M.PlugPM(files=[(DATA + '\\1 Preset.bin', open(os.path.join(TRUTH, 'preset_bank_1.bin'),
                                                                                  'rb').read())], rate=rate)
         h = self.h = P.h
@@ -148,7 +149,7 @@ class Plugin:
         if self.q(self.cca + 0x80) != h.core:
             raise SystemExit('the plugin\'s attach (rva 0x%X) left +0x80 = %x, not the core %x'
                              % (CCA_ATTACH, self.q(self.cca + 0x80), h.core))
-        self.names, self.panels, self.tree, self.jx = {}, [], [], []
+        self.names, self.panels, self.tree, self.jx, self.info = {}, [], [], [], {}
         self._walk(self.root)
         mp_ = h.core + 24
         vb, ve = self.q(mp_), self.q(mp_ + 8)
@@ -167,6 +168,9 @@ class Plugin:
         uc.hook_add(UC_HOOK_CODE, self._call, begin=IB + LEARN, end=IB + LEARN)
         uc.hook_add(UC_HOOK_CODE, self._call, begin=IB + FORGET, end=IB + FORGET)
         uc.hook_add(UC_HOOK_CODE, self._pick, begin=IB + SEARCH_RET, end=IB + SEARCH_RET)
+        self.offered = self.taker = None           # the control a mouse message went to, the one that took it
+        uc.hook_add(UC_HOOK_CODE, self._offer, begin=IB + OFFER, end=IB + OFFER)
+        uc.hook_add(UC_HOOK_CODE, self._answer, begin=IB + OFFER_RET, end=IB + OFFER_RET)
         self.msg = h.alloc_com(0x20)
         self.opens = [0] * len(self.panels)
 
@@ -203,6 +207,7 @@ class Plugin:
                     pid = self.h.call(self.IB + MAP_ID, rcx=self.h.core + 24, rdx=rec) & 0xFFFFFFFF
             tn = self.tname(c)
             ctl.append((tn, l, t, r, b, nrefs, rec, pid))
+            self.info[c] = (tn, l, t, r, b)
             if q(c) - self.IB in JX_VT:
                 if JX_VT[q(c) - self.IB] != tn:
                     raise SystemExit('class at vtable 0x%X names itself %r' % (q(c) - self.IB, tn))
@@ -226,6 +231,13 @@ class Plugin:
         self.st.setdefault('calls', []).append(('cc_learn' if addr == self.IB + LEARN else 'cc_forget',
                                                 self.rec_id[k] if k < len(self.rec_id) else -1))
 
+    def _offer(self, uc, addr, size, ud):
+        self.offered = uc.reg_read(self.RCX)
+
+    def _answer(self, uc, addr, size, ud):
+        if self.taker is None and uc.reg_read(self.RAX) & 0xFF:
+            self.taker = self.offered
+
     def _pick(self, uc, addr, size, ud):
         r = uc.reg_read(self.RAX) & 0xFFFFFFFF
         self.st['pick'] = r - (1 << 32) if r >= 1 << 31 else r
@@ -248,6 +260,7 @@ class Plugin:
         """the root panel's own dispatch on a mouse message: taken or not"""
         self.write_opens()
         self.st = dict(choice=-1, items=None, calls=[], pick=None)
+        self.taker = None
         self.uc.mem_write(self.msg, struct.pack('<iiii', typ, x, y, flags))
         return self.h.call(self.IB + DISPATCH, rcx=self.root, rdx=self.msg, count=4_000_000_000) & 0xFF
 
@@ -347,8 +360,14 @@ def oracle(log):
         t = ln.split()
         if not t:
             continue
-        if in_event and (t[0] in calls or ln.startswith('# hostedit') or ln.startswith('# pm ')):
-            if ln.startswith('# hostedit'):
+        if in_event and (t[0] in calls or ln.startswith('# hostedit') or ln.startswith('# pm ') or ln.startswith('# hit')):
+            if ln.startswith('# hit'):          # the program's dispatch: the control its press went to
+                want = tuple([t[2]] + [int(v) for v in t[3:7]]) if len(t) >= 7 else None
+                got = g.info.get(g.taker) if g.taker is not None else None
+                if want != got:
+                    fail('%s: the press went to -- the plugin\'s dispatch %s, the program\'s %s' % (where(), got, want or t[2]))
+                res['n']['hits'] += 1
+            elif ln.startswith('# hostedit'):
                 exe_edits += edits_of_exe(t)
             elif t[0] in calls:
                 res['n']['exe_calls'] += 1
@@ -651,7 +670,9 @@ def script(tree, parents, jx, opens_by_cfg, configs, seed, quick=False):
                     s = 2                                        # Ctrl: the slider's default
                 kind = rnd.random()
                 after = ['opens', 'state', 'pending']           # after every event: the comparisons
-                ev = ['down %d %d %d' % (p[0], p[1], s)] + after
+                # a real mouse moves to a point before it presses there or lets go there: the move first (the panels'
+                # hover flags, +0xDD, decide whether a panel offers a press outside its rectangle: rva 0x2AAA1B)
+                ev = ['move %d %d 0' % p, 'down %d %d %d' % (p[0], p[1], s)] + after
                 if tn == 'jx3pSlider' and kind < 0.5:            # a drag: moves up and down the travel
                     y = p[1]
                     for _ in range(rnd.randrange(1, 6)):
@@ -664,6 +685,9 @@ def script(tree, parents, jx, opens_by_cfg, configs, seed, quick=False):
                     up = q2
                 else:
                     up = p
+                last = p if not ev[-4].startswith('move') else tuple(int(v) for v in ev[-4].split()[1:3])
+                if up != last:
+                    ev += ['move %d %d %d' % (up[0], up[1], s)] + after
                 ev += ['up %d %d' % up] + after
                 if rnd.random() < 0.2:                           # a double click: down, up, double click, up
                     ev += ['dbl %d %d %d' % (up[0], up[1], 0)] + after + ['up %d %d' % up] + after
