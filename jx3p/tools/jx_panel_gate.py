@@ -35,7 +35,7 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
   --tooth N      builds JX-3P.exe with -DEXE_TOOTH=N (jx3p/gui/win/jx3p_win.c) and runs it: must FAIL --
                  3 a jx3pLatchButton flips its other bit, 4 a jx3pSlider's click does not turn at the ends,
                  5 exprLatchButton's on and off pairs swapped, 6 patchSelectButton's lanes swapped,
-                 7 patchBlock loads the next patch
+                 7 patchBlock loads the next patch, 8 the latch family presses at the down (the plugin: at the up)
   --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 2 the right and bottom edges inside,
                  3 closed panels searched, 4 Shift / Ctrl / Alt ignored, 5 a greyed Forget acts, 6 labels and displays
                  searched, 7 controls with many values searched): must FAIL
@@ -85,7 +85,8 @@ MODS = CG.MODS
 # the panel configurations: (vm.vs.mode, vm.vs.edit, TEMPO SYNC, DELAY TYPE, vm.vs.setup) -- every open condition of
 # jx3p/truth/Script.xml but the patch window's, the setup page's sub-panels and the activation's
 CONFIGS = [(m, e, s, d, u) for m in (0, 1) for e in (0, 1) for s in (0, 1) for d in (0, 2, 5) for u in (0, 1)]
-QUICK = [(0, 0, 0, 0, 0), (0, 1, 1, 5, 1), (1, 0, 1, 2, 0)]      # the teeth's: every JX class live in one of them
+QUICK = [(0, 0, 0, 0, 0), (0, 1, 1, 5, 0), (1, 0, 1, 2, 1)]      # the teeth's: every JX class live in one of them
+                                                                # (the SETUP page, modal, over the last)
 CONFIG_REFS = ('vm.vs.mode', 'vm.vs.edit', 'fm.PATCH.CTRL.TEMPO SYNC', 'fm.PATCH.NAME3.DELAY TYPE', 'vm.vs.setup')
 
 
@@ -274,9 +275,15 @@ class Plugin:
 
 
 def plugin_tree(_):
-    """the plugin's tree and its JX controls (a worker: Unicorn only)"""
+    """the plugin's tree, its JX controls and the rectangles of the controls a CC drives at the start (a worker:
+    Unicorn only)"""
     g = Plugin(48000.0)
-    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx
+    st = g.h.get_state()
+    n = struct.unpack('>I', st[:4])[0] // 8
+    mapped = {v for k, v in (struct.unpack('>Ii', st[4 + 8 * j: 12 + 8 * j]) for j in range(n)) if k >= 0x10000000 and v >= 0}
+                                                     # (the state's CC map: entries 0x10000000 + CC -> a parameter id)
+    rects = sorted(set((c[1], c[2], c[3], c[4]) for t in g.tree for c in t[3] if CG.searchable(c) and c[7] in mapped))
+    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx, rects
 
 
 def jx_by_panel(items):
@@ -585,7 +592,7 @@ def probe_script(configs):
     return out
 
 
-def script(tree, parents, jx, opens_by_cfg, configs, seed, quick=False):
+def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False):
     """the seeded kbscript: the CC probes (cc_menu_gate.script's) and the mouse on every live JX control"""
     rnd = random.Random(seed)
     refs = script_refs()
@@ -621,8 +628,11 @@ def script(tree, parents, jx, opens_by_cfg, configs, seed, quick=False):
             l, t, r, b = rnd.choice(rects)
             out.append('ccmsg %d %d %d' % (rnd.randrange(l, r), rnd.randrange(t, b), rnd.choice(MODS)))
         for _ in range(4 if quick else 6):
-            l, t, r, b = rnd.choice(rects)
-            out.append('ccmsg %d %d 0 %d' % (rnd.randrange(l, r), rnd.randrange(t, b), rnd.choice((0, 0, 1, 1, 2))))
+            if mapped and rnd.random() < 0.5:            # Forget on a control a CC drives (its menu item enabled)
+                (l, t, r, b), item = rnd.choice(mapped), 1
+            else:
+                (l, t, r, b), item = rnd.choice(rects), rnd.choice((0, 0, 1, 1, 2))
+            out.append('ccmsg %d %d 0 %d' % (rnd.randrange(l, r), rnd.randrange(t, b), item))
             if rnd.random() < 0.6:
                 out += ['cc %d %d' % (rnd.randrange(0, 120), rnd.randrange(0, 128)), 'block', 'tick', 'cctree']
             out.append('state')
@@ -729,7 +739,7 @@ def main():
         exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth)
     ctx = mp.get_context('spawn')
     with ctx.Pool(1) as pool:
-        tree, parents, jx = pool.map(plugin_tree, [0])[0]
+        tree, parents, jx, mapped = pool.map(plugin_tree, [0])[0]
     configs = QUICK if quick else CONFIGS
     if '--log' in sys.argv:                     # a saved log (debugging): the program is not run
         log = open(arg('--log', None)).read().splitlines()
@@ -741,7 +751,7 @@ def main():
         opens = [[int(c) for c in ln.split()[2]] for ln in plog if ln.startswith('# opens ')]
         if len(opens) != len(configs):
             raise SystemExit('the program gave %d open flag lines for %d configurations' % (len(opens), len(configs)))
-        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, opens, configs, seed, quick), work,
+        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, mapped, opens, configs, seed, quick), work,
                       'panel.txt')
         if '--keep' in sys.argv:
             shutil.copyfile(os.path.join(work, 'panel.txt.log'), arg('--keep', None))

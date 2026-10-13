@@ -420,6 +420,18 @@ if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/w
 else
   echo "[jx verify] FAIL -- no mingw-w64 or Wine: JX-3P.exe cannot be built and graded"; exit 1
 fi
+echo "=== JX GATE 5c: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (SCOPE_AUDIT row 20: jx3p/docs/JX_PANEL.md) ==="
+# JX-3P.exe's mouse on the five JX classes and its CC menu, each event through the plugin's own panel dispatch on its
+# own GUI tree (jx_panel_gate.py): the state, the pending engine records, the host's edits and the press's target equal
+# after every event; the teeth: the program built with a defect in each class (EXE_TOOTH 3-8) and in the CC search
+# (CC_TOOTH 2-7) -- each run exits 0 only when its tooth bites
+if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/wine/wine64}" ]; then
+  python3 "$HERE/jx_panel_gate.py"
+  for t in 3 4 5 6 7 8; do python3 "$HERE/jx_panel_gate.py" --quick --tooth $t; done
+  for t in 2 3 4 5 6 7; do python3 "$HERE/jx_panel_gate.py" --quick --cc-tooth $t; done
+else
+  echo "[jx verify] FAIL -- no mingw-w64 or Wine: the drawn panel cannot be graded"; exit 1
+fi
 echo "=== JX GATE 6: THE LEDGERS (every file's origin and proof; every JUNO gate class's JX twin) ==="
 python3 "$HERE/jx_provenance.py"
 python3 "$HERE/jx_provenance.py" --self-test
