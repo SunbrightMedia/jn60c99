@@ -269,7 +269,9 @@ mine is a hypothesis (playbook 80).
   (performEdit; a load's performEdits too, playbook 210), and the editor's own
   logic (2026-10-11, S3_STATUS (13)): zoom, meters, the CC menu's model, the
   record image, the patch window (gui/juno_pm.c on the JX bridge) -- every
-  SCOPE_AUDIT row closed but row 20, the drawn panel (no JX art in truth/).
+  SCOPE_AUDIT row closed but row 20, the drawn panel: drawn in JX-3P.exe since 2026-10-13 (the user's Script
+  folder, jx3p/truth/Script; jx3p/gui/win, make_native_jx.py, jx_exe_check.py EXACT; jx3p/docs/JX_PANEL.md) -- its
+  five JX control classes READ, not yet run on the plugin's own tree.
   The JUNO-60's gate classes on the JX (JX-26, S3_STATUS (14)): every class of
   docs/GATE_PARITY.tsv has a JX gate jx_verify.sh runs (gate_parity.py rule 4),
   but 2 BLOCKED on inputs (the art; the user's JX banks); ISO C99 checked

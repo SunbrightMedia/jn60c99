@@ -558,6 +558,13 @@ int juno_pm_select(juno_pm *pm, int idx)                  /* rva 0x334E90: no cl
     pm->sel[0] = idx;
     return 1;
 }
+int juno_pm_pick(juno_pm *pm, int idx)                    /* select, then load the selection, pushed */
+{
+    if (!pm) return 0;
+    pm->sel[0] = idx;
+    cmd_load(pm, 1, -1);
+    return 1;
+}
 
 /* ------------------------------------------------------------------ bank files */
 static const char KOA[16] = { 'K','o','a','B','a','n','k','F','i','l','e','0','0','0','0','3' };

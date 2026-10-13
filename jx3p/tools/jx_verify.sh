@@ -398,6 +398,21 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "[jx verify] FAIL -- no node: the delivered WASM cannot be graded"; exit 1
 fi
+echo "=== JX GATE 5b: JX-3P.exe (the port and the plugin's panel as one Windows program: jx3p/docs/JX_PANEL.md) ==="
+# the program built (mingw), its --render replayed through the port's library under Wine: output EXACT, events /
+# points the host's, each JX control click its READ rule, meters and the end state equal; the teeth: a lost edit, the
+# velocity / 128, the rule's other bit, a lost MIDI learn, a lost meter tick, and a program built with a defect
+if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/wine/wine64}" ]; then
+  python3 "$HERE/make_native_jx.py"
+  python3 "$HERE/make_native_jx.py" --define EXE_TOOTH=3 --out "$REPO/scratchpad/dist/JX-3P_tooth3.exe"
+  python3 "$HERE/jx_exe_check.py" --patches 0,34
+  for t in replay glue controls state tick; do python3 "$HERE/jx_exe_check.py" --patches 0 --tooth $t; done
+  if python3 "$HERE/jx_exe_check.py" --patches 0 --exe "$REPO/scratchpad/dist/JX-3P_tooth3.exe"; then
+    echo "[jx verify] FAIL -- the program built with EXE_TOOTH=3 passed the check"; exit 1
+  fi
+else
+  echo "[jx verify] FAIL -- no mingw-w64 or Wine: JX-3P.exe cannot be built and graded"; exit 1
+fi
 echo "=== JX GATE 6: THE LEDGERS (every file's origin and proof; every JUNO gate class's JX twin) ==="
 python3 "$HERE/jx_provenance.py"
 python3 "$HERE/jx_provenance.py" --self-test

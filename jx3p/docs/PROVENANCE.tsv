@@ -9,6 +9,7 @@
 #       RUNTIME (support code) | WEB (built for the page) | DATA (a generator's input or output) | RETIRED (not built)
 # file	role	made_by	proof
 jx3p/gui/jx_bridge.c	PORTED	by hand: the host layer, render driver, DAW state, editor logic (jx3p/docs/HOST_LAYER.md)	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_state_gate.py + jx3p/tools/jx_patch_gate.py + jx3p/tools/jx_record_gate.py + jx3p/tools/jx_meter_gate.py + jx3p/tools/jx_zoom_fit_gate.py + jx3p/tools/jx_mutation_gate.py
+jx3p/gui/win/jx3p_win.c	PORTED	by hand: gui/win/juno60_win.c on the JX product path; the JX's five control classes READ (jx3p/docs/JX_PANEL.md)	jx3p/tools/jx_exe_check.py
 jx3p/gui/jx_pm_glue.c	PORTED	by hand: the patch manager's view calls on the bridge	jx3p/tools/jx_patch_manager_gate.py
 gui/juno_pm.c	SHARED	the JUNO-60's patch manager (CLAIMS A39), -DJPM_PRODUCT="PG-JX3P"	jx3p/tools/jx_patch_manager_gate.py
 src/juno_conv.c	SHARED	the JUNO-60's render object (CLAIMS A25); the JX's table and vectors equal	jx3p/tools/jx_conv_tables.py + jx3p/tools/jx_product_gate.py

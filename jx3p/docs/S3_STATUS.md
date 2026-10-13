@@ -3,6 +3,26 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-13 (19) — JX-3P.exe: THE DRAWN PANEL (the user's Script folder, scope row 20) (playbooks 249, 250)
+
+- THE ART: the user's JX Script folder (Script.xml byte-identical to truth/), its 24 sprite sheets pinned in
+  jx3p/truth/Script/ with SHA256SUMS (Roland's artwork: local repository only, never published).
+- THE PROGRAM: jx3p/gui/win/jx3p_win.c = gui/win/juno60_win.c on the JX product path (jx3p_product_*), the JX's own
+  host round trip (every performEdit back as a parameter point of the next block), the guest image and the factory
+  bank as resources (jx_bridge.c JX_MEMFS), the keyboard's send (jx3p_keybed_write = the JUNO's A36 rule), the
+  patch window (gui/juno_pm.c, PG-JX3P; juno_pm_pick: select + load pushed). jx3p/tools/make_native_jx.py builds
+  scratchpad/dist/JX-3P.exe (local only).
+- THE JX's OWN CONTROLS, READ (jx3p/docs/JX_PANEL.md): jx3pLatchButton, jx3pSlider, exprLatchButton,
+  patchSelectButton, patchBlock -- their classes found by type name (factory rva 0x34DF10), their press / update /
+  init methods read; the two vs values they read EXECUTED (patchId, bankId). A value's positions are its OWN number
+  table (playbook 249).
+- PROOF: jx3p/tools/jx_exe_check.py -- the program's --render (MIDI, edits, a key, the five JX controls, the arp,
+  patch changes, the CC menu) replayed through the port's Linux library: output EXACT; events / points = the host's;
+  each JX click = its rule; meters and the end state equal; five teeth bite (see the job's log). The script plays
+  after each 0.5 s writePatch mute (playbook 250).
+- NOT YET: the five classes' presses run on the plugin's own tree in the oracle (the JUNO's cc_menu_gate method);
+  until then their rules are READ, re-stated by the checker. Row 20 stays OPEN for that.
+
 ## 2026-10-12 (18) — ROW 24 ACCEPTED BY THE USER; THE LIFT EXPERIMENT; THE FULL VERIFY RED, FIXED (playbooks 230, 231)
 
 - ROW 24 (two different NaNs meeting): the user's decision, in writing (2026-10-12): accepted for now; it closes when

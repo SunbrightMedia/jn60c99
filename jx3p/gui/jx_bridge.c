@@ -233,11 +233,29 @@ static void jx_release(void)
     jx_g2h_delta = 0;
 }
 
+#ifdef JX_MEMFS
+/* A program that carries its files inside itself (jx3p/gui/win/jx3p_win.c: the guest image and the factory bank are
+ * resources of JX-3P.exe) answers this: the bytes of `path`, or NULL for a path it does not hold (then the disk). */
+const unsigned char *jx_memfs(const char *path, size_t *len);
+#endif
 static uint8_t *read_file(const char *path, size_t *len)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f;
     uint8_t *b;
     long L;
+#ifdef JX_MEMFS
+    {
+        size_t n = 0;
+        const unsigned char *m = jx_memfs(path, &n);
+        if (m) {
+            if (!n || !(b = malloc(n))) return NULL;
+            memcpy(b, m, n);
+            *len = n;
+            return b;
+        }
+    }
+#endif
+    f = fopen(path, "rb");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END); L = ftell(f); rewind(f);
     if (L <= 0 || !(b = malloc((size_t)L))) { fclose(f); return NULL; }
@@ -1243,6 +1261,22 @@ void jx3p_ui_tick(void)
 }
 /* the keyboard's note value of `key` (what a panel keyboard draws: down above 0) */
 int jx3p_keybed_state(int key) { return key >= 0 && key < 128 ? g_ks_note[key] : 0; }
+/* THE PANEL KEYBOARD'S SEND (the JUNO-60's gui/juno_bridge.c juno_gui_keybed_write, CLAIMS A36: rva 0x2D47E0 there;
+ * the JX's keyboardX control is the same framework class, jx3p/tools/fw_map.py): a write of the keyboard's note value
+ * of `key` -- a change goes on the change list -- then the value's listener queues the change list (jx_ks_queue: the
+ * wrapper's rules, a record for the next block) and the model's commit empties it. Returns the changes queued. */
+int jx3p_keybed_write(int key, int value)
+{
+    int n;
+    if (key < 0 || key > 127) return 0;
+    if (g_ks_note[key] != value) { g_ks_note[key] = value; jx_ks_append(key, value); }
+    n = g_ks_ln;
+    jx_ks_listen();
+    jx_ks_commit();
+    return n;
+}
+/* the MIDI-mapping parameters' first id (process(): base + n CC n, + 128 aftertouch, + 129 bend) */
+unsigned int jx3p_midi_base(void) { return JX_MIDI_BASE; }
 /* MIDI LEARN (the GUI's menu): arm for the parameter `id` (rva 0x31A920) -- the next drain gives it the first CC
  * below 120 queued since the last drain; while it waits no CC drives a parameter -- or forget its CC (rva
  * 0x3191C0). 0 for an id the CC map has no record of. */

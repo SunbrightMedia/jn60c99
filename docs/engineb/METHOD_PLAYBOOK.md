@@ -4340,3 +4340,24 @@ included, EXACTLY 0. The native oracle (the plugin on a CPU, FTZ real) then equa
 ### The rule
 A "because" in a status row is a claim like any other: count it before writing it. A right conclusion on a wrong
 reason is a defect waiting for the drive that breaks the reason.
+
+## 249. A NAME THAT COINCIDES IS NOT A LINK -- THE NUMBER TABLE BELONGS TO THE VALUE
+Paid 2026-10-13 (JX-3P.exe, built from JUNO-60.exe's source). The JUNO's program found a knob's positions with the
+number table named by the CONTROL's stringTableRef. That worked only because the JUNO's names coincide (control
+arpType, value arpType); the plugin reads the table the VALUE names (`<value><numberTableRef>`, its range object,
+rva 0x2BFAD0 / 0x2BBB60). The JX's names differ (value oscMod, control oscModL): copied as it was, every JX knob on a
+DCO waveform or FREQ MOD would have swept the raw range and shown wrong labels. Found by reading the slider class's
+set (rva 0x283A60: a position through the value's table) before porting, not by a test.
+### The rule
+When code works on one instrument, list the links it relies on and check each is the plugin's, not a coincidence of
+names; a second instrument breaks every coincidence.
+
+## 250. EXACT IS NOT AUDIBLE -- A COPIED SCRIPT CARRIES THE OLD INSTRUMENT'S TIMING
+Paid 2026-10-13 (JX-3P.exe). The render check replayed the program's log EXACTLY through the port -- and most of the
+render was silence: the JUNO's script plays its first notes at 10 ms, but the JX mutes 0.5 s and fades in 10 ms after
+every writePatch (initialize and EVERY patch change, HOST_LAYER.md 2), so the notes fell in the mute; after the
+script's patch clicks the rest did too. Port and program agreed on silence; nothing was wrong but the test. Found by
+printing the render's level envelope. The script now plays after each mute, and the check requires sound.
+### The rule
+An exact comparison grades agreement, not reach: before trusting a render check, look at what it rendered (its level
+over time), and re-time any script carried over from another instrument.

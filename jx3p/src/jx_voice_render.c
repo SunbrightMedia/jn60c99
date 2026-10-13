@@ -18,8 +18,10 @@ extern unsigned long long jx_g2h_delta;   /* defined once, in jx_voice_helpers.c
 
 typedef uint32_t _DWORD; typedef uint64_t _QWORD;
 typedef uint16_t _WORD;  typedef uint8_t _BYTE;
+#if !defined(_WIN32)   /* MinGW / MSVC have __int64 .. __int8 as built-in names (the same types): a typedef clashes */
 typedef int64_t __int64; typedef int32_t __int32;
 typedef int16_t __int16; typedef int8_t __int8;
+#endif
 #define LODWORD(x)  (*((uint32_t *)&(x)))
 #define HIDWORD(x)  (*((uint32_t *)&(x)+1))
 #define SLODWORD(x) (*((int32_t *)&(x)))
