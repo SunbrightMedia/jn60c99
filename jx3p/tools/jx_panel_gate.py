@@ -20,9 +20,10 @@ PNG's own header (jx3p/truth/Script/, checksummed); nothing else of the images i
   3. plays the log into the plugin (a worker process: Unicorn only), booted with its patch manager's files (the factory
      bank, jx3p/tools/jx_pm_emu.py): every engine call the program made OUTSIDE a mouse event (its boot, the scripted
      sets and patch loads, CCs, blocks, drains), as cc_menu_gate.py; at each CC probe the handler rva 0x31D300 on the
-     plugin's own CC assign control (attached by its own attach); at each mouse event "# kb ..." ITS OWN PANEL DISPATCH
-     (rva 0x2AA9D0 = the JUNO's 0x2AAAF0, on the root panel) with the same message -- type 0 down, 1 up, 2 double
-     click, 3 move; the point; the modifier bits (1 Shift) -- and the program's calls after the event are NOT played:
+     plugin's own CC assign control (attached by its own attach); at each mouse event "# kb ..." THE ROOT PANEL'S OWN
+     MOUSE HANDLER (its vt+0x48, rva 0x2AAD50: the window's resize corner, rva 0x2AAEF0, then the panel dispatch rva
+     0x2AA9D0 = the JUNO's 0x2AAAF0) with the same message -- type 0 down, 1 up, 2 double click, 3 move; the point;
+     the modifier bits (1 Shift, 2 Ctrl) -- and the program's calls after the event are NOT played:
      the plugin makes its own. The panels' open bytes are the program's (its evaluation of the open conditions,
      CLAIMS C5: the template has no live view), written before every message.
 Compared: after every event and probe, getState's bytes (every state value, the CC map), the engine records pending
@@ -68,6 +69,9 @@ DATA = 'C:\\ProgramData\\Roland Cloud\\JX-3P'
 # the JX twins of the JUNO's addresses (jx3p/tools/fw_map.py --pair: the code equal, JX = JUNO - 0x120 here; the
 # data by the twin instruction; the CC assign class by its attach in vt+0xB0)
 DISPATCH = 0x2AA9D0                            # a panel's message dispatch (JUNO 0x2AAAF0)
+ROOT_MOUSE = 0x2AAD50                          # the root panel's own (its vt+0x48): the window's resize corner (rva
+                                               # 0x2AAEF0: a press within 20 px of the bottom right corner less 20),
+                                               # then the dispatch -- what the editor calls on a mouse message
 OFFER, OFFER_RET = 0x2AAC35, 0x2AAC38          # its offer of the message to a control (vt+0x48) and the answer
 HANDLER, SEARCH_RET = 0x31D300, 0x31D379       # the CC assign control's handler (0x31D420) and its search's return
 LEARN, FORGET = 0x31A920, 0x3191C0             # (0x31AA40, 0x3192E0)
@@ -173,10 +177,17 @@ class Plugin:
         uc.hook_add(UC_HOOK_CODE, self._offer, begin=IB + OFFER, end=IB + OFFER)
         uc.hook_add(UC_HOOK_CODE, self._answer, begin=IB + OFFER_RET, end=IB + OFFER_RET)
         self.msg = h.alloc_com(0x20)
+        self.root_mouse = self.q(self.q(self.root) + 0x48)        # the root panel's mouse handler, from its vtable
+        if self.root_mouse != IB + ROOT_MOUSE or self.q(self.q(self.tree_panel(1)) + 0x48) != IB + DISPATCH:
+            raise SystemExit('the root panel\'s mouse handler 0x%X / a child panel\'s: not 0x%X / 0x%X'
+                             % (self.root_mouse - IB, ROOT_MOUSE, DISPATCH))
         self.opens = [0] * len(self.panels)
 
     def q(self, a):
         return struct.unpack('<Q', bytes(self.uc.mem_read(a, 8)))[0]
+
+    def tree_panel(self, k):
+        return self.panels[k]
 
     def sstr(self, a):
         n, cap = self.q(a + 0x10), self.q(a + 0x18)
@@ -263,7 +274,7 @@ class Plugin:
         self.st = dict(choice=-1, items=None, calls=[], pick=None)
         self.taker = None
         self.uc.mem_write(self.msg, struct.pack('<iiii', typ, x, y, flags))
-        return self.h.call(self.IB + DISPATCH, rcx=self.root, rdx=self.msg, count=4_000_000_000) & 0xFF
+        return self.h.call(self.root_mouse, rcx=self.root, rdx=self.msg, count=4_000_000_000) & 0xFF
 
     def live(self, k):
         """panel k and every panel above it open"""
