@@ -70,7 +70,7 @@ host_rate_change	tools/verify/host_rate_gate.py	jx3p/tools/jx_product_gate.py	OK
 keyhold	tools/verify/keyhold_gate.py	jx3p/tools/jx_state_gate.py	OK	KEY HOLD and the UI timer's keyboard (chains 4, 5; JX-17b)
 led_meter	tools/verify/led_meter_gate.py	jx3p/tools/jx_meter_gate.py	OK	the two meters (the JX has no LFO LED): the engine's peaks, read, tick, draw (JX-22)
 midi_ctl	tools/verify/midi_ctl_gate.py	jx3p/tools/jx_product_gate.py	OK	bend, mod, expression, the CC map, sustain, all notes off through process() (--ctl)
-patch_manager	tools/verify/patch_manager_gate.py	jx3p/tools/jx_patch_manager_gate.py	OK	the JUNO's gate on the JX plugin's own manager; 17 of 19 teeth (18, 19: panel_drawn)
+patch_manager	tools/verify/patch_manager_gate.py	jx3p/tools/jx_patch_manager_gate.py	OK	the JUNO's gate on the JX plugin's own manager, booted with the art's sheet sizes; all 19 teeth bite (18 and 19, the bank name control's presses on the art's button: seeds 5 and 1, 2026-10-13)
 rate_switch	tools/verify/rate_switch_gate.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_lift_gate.py	OK	the engine-rate setting on a running engine through process() (--state rV) and lifted (--loads rate)
 script_ab	tools/verify/script_ab.py	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_master_bisect.py	OK	A5's twin: TEMPO SYNC (0x60006A, Script.xml) engaged and released under a held note on every factory patch (bank run); A6's: --modes, every voice-mode value no factory patch holds (19), rendered
 state_load	tools/verify/state_load_gate.py	jx3p/tools/jx_state_gate.py	OK	setState: the payload's host edits and records in the plugin's order (JX-17)

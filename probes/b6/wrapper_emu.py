@@ -55,6 +55,9 @@ else:
     CONTROLLER_CID = P.get('CONTROLLER_CID')   # None: asked from the component (getControllerClassId)
 TEB = 0x580000000                      # free: heap ends at 0x510000000
 COM = 0x5A0000000                      # fake COM objects + pidls
+COM_SIZE = 0x10000000                  # 256 MB, never freed (a bump arena; the stubs start at 0x600000000): 4 MB
+                                       # held ~200 patch loads of the JX's 20 KB records -- jx_panel_gate.py's full
+                                       # run makes 1,337 (2026-10-13). Mapped pages cost nothing until written
 DYN = E.STUB_BASE + 0x4000             # named stubs for GetProcAddress / COM methods
 DYN_END = E.STUB_BASE + 0x7FF0
 SCRIPT_DIR = MODPATH.rsplit('\\', 1)[0] + '\\Script'     # where the module init looks for Script.xml (MEASURED)
@@ -123,7 +126,7 @@ class Wrapper(BASE):
         uc.mem_write(tlsblk, bytes(E.IMG[TLS_TEMPLATE[0]:TLS_TEMPLATE[1]]))
         uc.mem_write(IB + TLS_INDEX, struct.pack('<I', 0))
         uc.reg_write(UC_X86_REG_GS_BASE, TEB)
-        uc.mem_map(COM, 0x400000, UC_PROT_ALL)
+        uc.mem_map(COM, COM_SIZE, UC_PROT_ALL)
         self.com_next = COM
         self.dyn_next, self.dyn = DYN, {}
         uc.hook_add(UC_HOOK_CODE, self._imp, begin=DYN, end=DYN_END)
@@ -162,6 +165,8 @@ class Wrapper(BASE):
 
     def alloc_com(self, n):
         p = self.com_next; self.com_next += (n + 15) & ~15
+        if self.com_next > COM + COM_SIZE:
+            raise MemoryError('the host arena (COM, %d MB) is full' % (COM_SIZE >> 20))
         return p
 
     def new_obj(self, kind, **kw):

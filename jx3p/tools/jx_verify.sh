@@ -311,10 +311,11 @@ for sp in 9:40 1:200 5:200 100:150; do
   fi
   echo "$out" | grep -v '^REACH'
 done
-# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19, the bank name control's
-# presses, wait for the art's runs (SCOPE_AUDIT row 20, in progress)
+# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
+# presses on the art's button (18 no tail after the bank menu: seed 5; 19 the menu on the button: seed 1; 2026-10-13,
+# job jxpm_teeth1819 -- 18 did not bite on seeds 1, 9, 100: no menu answered with a bank there)
 for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
-          14:9:40 15:9:40 16:1:200 17:9:40; do
+          14:9:40 15:9:40 16:1:200 17:9:40 18:5:200 19:1:200; do
   t=${ts%%:*}; r=${ts#*:}
   if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t); then
     echo "$out" | tail -3; echo "[jx verify] FAIL -- patch manager tooth $t did not bite"; exit 1

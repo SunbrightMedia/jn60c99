@@ -32,10 +32,14 @@ waits no CC drives a parameter -- are CLAIMS A32 (state_save_gate.py).
   close every panel. The gate attaches the control with the plugin's own attach (vt+0xB0, rva
   0x31D7B0, which sets +0x80 to the core) and writes the open bytes before every press.
 - The plugin's tree has two controls the apps do not build: a `<control-pi>` label ("disable",
-  plug-in builds only) over the TEMPO knob, in both layouts -- the apps read only `<control>` and
-  keep TEMPO live (they run no host clock); the search skips labels, so the menu is the same. And
-  the patch name's rectangle is its Script.xml position and size (258 x 42); the apps' click area is
-  its button (28 x 34). It has nine values: never a CC target. Its left click is not graded here.
+  plug-in builds only: black at alpha 0x60) over the TEMPO knob, in both layouts -- the apps read only
+  `<control>`: in the apps the TEMPO knob IS the host's tempo (they are the host). The plugin's knob is
+  live under that layer too: a label takes no mouse event (rva 0x2D8C40; EXECUTED on the JX-3P's twin,
+  rva 0x2D8B20 -- the same code, fw_map --pair -- 2026-10-13, jx3p/docs/JX_PANEL.md); the search
+  skips labels, so the menu is the same. And the patch name's rectangle is its Script.xml position and
+  size (258 x 42); the apps' click area is its button (28 x 34). It has nine values: never a CC target.
+  Its left click (rva 0x33EA70) takes a down on its button and changes nothing -- no model call, record
+  or state (EXECUTED on the JX's twin 0x33E950); the apps' changes nothing either. Not graded here.
 
 ## The apps' MIDI input
 

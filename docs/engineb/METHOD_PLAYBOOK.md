@@ -4361,3 +4361,33 @@ printing the render's level envelope. The script now plays after each mute, and 
 ### The rule
 An exact comparison grades agreement, not reach: before trusting a render check, look at what it rendered (its level
 over time), and re-time any script carried over from another instrument.
+
+## 251. A PIPE HIDES A GATE -- `sh` HAS NO PIPEFAIL
+Paid 2026-10-13 (jx3p/tools/jx_verify.sh). The patch manager gate ran as `python3 gate.py ... | grep -v '^REACH'`
+under `set -e`: in dash a pipeline's status is its LAST command's, and grep found lines, so a RED gate passed the
+suite. Shown by execution (a two-line script: `false | grep -v x` under `set -e` goes on). Found while adding the art's
+runs: the suite printed a gate's verdict that its exit status had never been allowed to decide.
+### The rule
+Never pipe a gate in a suite. Capture its output, test ITS exit status, then filter what you print:
+`if ! out=$(gate); then echo "$out"; exit 1; fi`.
+
+## 252. THE DOWN IS NOT THE PRESS -- PORT WHEN THE DISPATCH CALLS A HANDLER, NOT ONLY WHAT IT DOES
+Paid 2026-10-13 (JX-3P.exe, scope row 20). The five JX control classes' press functions were READ exactly, and the
+program called them at the mouse DOWN. Run on the plugin's own panel dispatch (jx_panel_gate.py), the latch family
+captures at the down and presses at the UP; two of its classes press only when the up is still on the control; a
+modal panel takes what no control took and closes on a down outside it; the slider's click acts at the release. Every
+rule was in functions nobody had read because they are the BASE classes' (the latchButton handler, the panel
+dispatch), not the JX's.
+### The rule
+A control's behaviour is its handler AND the code that decides which message reaches it. Run the plugin's own
+dispatch on its own tree with the program's real event sequence; a READ of the leaf functions grades what happens,
+not when.
+
+## 253. A TEST MOUSE MUST MOVE LIKE A REAL ONE
+Paid 2026-10-13 (jx_panel_gate.py). The gate pressed at points the mouse had never moved to. The plugin's panels keep
+a hover flag (+0xDD) from the last move, and a hovered panel is offered a press outside its rectangle: with the
+stale flag the plugin took a press the program correctly ignored -- a harness defect that looked like a port defect.
+No real mouse can reach that state.
+### The rule
+A harness that drives a GUI sends the event sequence the device sends (a move to the point before every down and up),
+or it grades states no user can make -- and blames the port for them.

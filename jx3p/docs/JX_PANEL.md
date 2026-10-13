@@ -47,8 +47,58 @@ meter ticks and the end state (getState's bytes) equal. Teeth: the replay drops 
 the rule's other bit; a lost UI drain; and an EXE built with a defect (EXE_TOOTH=3: a DCO switch flips the other
 bit) -- each must make the check RED.
 
-NOT graded against the plugin's own GUI code: the five classes' rules are READ, the checker re-states them. The
-next step is the JUNO's cc_menu_gate.py method: run each class's own press on the plugin's own tree in the oracle.
+That check re-states the rules it grades; the next section grades the program against the plugin's own code.
+
+## Proof against the plugin's own GUI code (jx3p/tools/jx_panel_gate.py, scope rows 18-20)
+
+The JUNO's tools/verify/cc_menu_gate.py method (CLAIMS A38), widened from the CC menu to every mouse event on the
+five JX classes. The plugin builds its GUI tree at its module init (32 panels, 371 controls: 144 the CC search can
+stop at, 177 of the five JX classes); the emulator's GDI+ gives each sprite sheet its size from the PNG header. The
+gate requires the program's tree (kbscript `cctree`) to give the CC search the same input and the five classes the
+same controls and rectangles, every panel's rectangle and modal byte equal; then it runs a seeded kbscript in the
+program under Wine -- per panel configuration (vm.vs.mode, vm.vs.edit, TEMPO SYNC, DELAY TYPE, vm.vs.setup: 48) the
+CC search at every corner and edge of every control and at random points, right presses with Shift / Ctrl / Alt,
+Learn and Forget, CCs, blocks and drains; and on every live JX control a move, the down, moves, the up, double clicks,
+inside, on the edges and just off them, from random values of what the control reads -- and plays the log into the
+plugin (a worker: Unicorn only): the program's engine calls outside the mouse events, and at each mouse event the
+plugin's OWN panel dispatch (rva 0x2AA9D0) on its root panel with the same message. After every event: getState's
+bytes (every value, the CC map), the engine records pending for the next block and the host's edits (begin /
+perform / end, each value) EQUAL, and the control the program hit = the control that took the message in the plugin.
+
+What the plugin's own code showed (EXECUTED; each was a defect of the program, fixed):
+
+* **The down is not the press.** The latch family (jx3pLatchButton, exprLatchButton, patchSelectButton: the
+  latchButton handler, rva 0x2CD350) captures the mouse at the down and presses (vt+0x120) at the UP --
+  jx3pLatchButton wherever the up is, exprLatchButton and patchSelectButton only with the up on the control (its hit
+  flag +0x104). The program pressed at the down. patchBlock (rva 0x351C90) does load at a down or a double click.
+* **The slider class whole**: jx3pSlider runs the slider handler (rva 0x2D0660): the down (vt+0x130, 0x2E6B20) --
+  Ctrl: the default (0x2E6960), no drag; on the cap: a grab; off it without `clickable`: a jump and a drag from the
+  centre --, the move (vt+0x140, 0x2E7940), the release (vt+0x138, 0x2E7AD0: a drag sets the point's position, a
+  click on a clickable slider steps one position, turning at the ends), the point's position (vt+0x148, 0x2E7D80) and
+  the cap (vt+0x150, 0x2E7C00). The program had a click rule only; each function is now ported.
+* **The dispatch**: an open panel (+0x70) holding the point (+0x18) -- or hovered (+0xDD) -- offers the message to
+  its controls from the last, then to its open panels from the last; a MODAL panel (+0xDC, Script.xml `<modal>`)
+  takes what none of them took, and a down outside all its panels closes it (rva 0x2A77A0: its open condition's
+  value set to 0, flag 1, the trio and the commit). The SETUP page is modal, its size Script.xml's `size-win-pi`
+  (800 x 260). The program now hit-tests in that order and closes the SETUP page so.
+* **A label takes no mouse event** (rva 0x2D8B20): the plug-in-only "disable" layer over TEMPO (`<control-pi>`,
+  black at alpha 0x60) passes presses to the knob under it. The program does not draw that layer: in the program the
+  TEMPO knob IS the host's tempo (it is the host, JX-8) -- the same choice as JUNO-60.exe (docs/CC_MENU.md).
+* **The patch name** (rva 0x33E950): its rectangle is Script.xml's (231,294)-(501,324); it takes a down on its
+  button (the art's frame, 20 x 32) and changes nothing -- no model call, record or state (EXECUTED). The program
+  takes the button's frame (two rows lower, 324-325, than the plugin's rectangle lets through) and changes nothing.
+
+The harness's own defects, found the same way: the plugin's queue at the boot (the script starts with a block); a
+mouse that pressed where it had not moved (the hover flags decide what a panel offers: playbook 253); a pipe in
+jx_verify.sh that hid a gate's verdict (playbook 251).
+
+Evidence: the quick run (three configurations) GREEN, job jxpanel_q5; the full run and the teeth: in progress.
+
+Scope: the five JX classes, the CC search and Learn / Forget on the plugin's tree, the bank name control's presses
+(jx_patch_manager_gate.py with the art's sizes). NOT graded against the plugin's own handlers: the generic classes'
+presses (knob, slider, latchButton, unlatchButton, menuButton, setupButton, keyboardX, patchName, label, display,
+barGraphX -- the JUNO's program's code, graded through their engine calls only: scope row 25) and the drawn pixels
+(the oracle's template has no live view: the drawing is READ).
 
 ## Build, check, use (LOCAL ONLY: the program embeds Roland's artwork)
 
