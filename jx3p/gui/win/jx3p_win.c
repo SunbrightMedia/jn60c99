@@ -572,10 +572,12 @@ typedef struct Ctl {
     int dir, dragged;                      /* jx3pSlider: a click's direction (+0xCC), a drag moved it (+0xBC) */
     int gx, gy, lx, ly, fine;              /* jx3pSlider: the grab (+0xB4), the last point (+0xAC), Shift (+0xBD) */
     int horiz, decay, ch, fade, state, rect[4], blits[7 * BAR_BLITS], nblits;   /* barGraphX (rva 0x31C450) */
+    struct Panel *panel;                   /* the panel that holds it */
 } Ctl;
 typedef struct Panel Panel;
 typedef struct { Panel *p; Ctl *c; } Item;
-struct Panel { char *type; int x, y, w, h, has_size, modal; const char *cond; Bmp *bmp; Item *items; int n, cap; };
+struct Panel { char *type; int x, y, w, h, has_size, modal; const char *cond; Bmp *bmp; Item *items; int n, cap;
+               int hover; Panel *parent; };   /* hover: the dispatch's +0xDD; parent: the panel that holds it */
 
 static XN *paneltype(const char *type)
 {
@@ -599,6 +601,8 @@ static void item_add(Panel *p, Panel *sub, Ctl *c)
     }
     p->items[p->n].p = sub;
     p->items[p->n].c = c;
+    if (sub) sub->parent = p;
+    if (c) c->panel = p;
     ++p->n;
 }
 
@@ -780,7 +784,8 @@ static Panel *build(const char *type, int ox, int oy)
                                              * 4 a jx3pSlider's click does nothing, 5 exprLatchButton's on and off pairs
                                              * swapped, 6 patchSelectButton's lanes swapped, 7 patchBlock loads the next
                                              * patch, 8 the latch family presses at the down, 9 a jx3pSlider's drag
-                                             * steps are final sets (jx_panel_gate.py) */
+                                             * steps are final sets, 10 a panel's hover flag ignored
+                                             * (jx_panel_gate.py) */
 #endif
 static void *g_eng;
 static CRITICAL_SECTION g_lock;            /* every engine call */
@@ -2574,6 +2579,48 @@ static Ctl *hit_in(Panel *p, int x, int y, Panel **modal)
 }
 static Ctl *hit_m(int x, int y, Panel **modal) { *modal = NULL; return hit_in(g_tree, x, y, modal); }
 static Ctl *hit(int x, int y) { Panel *m; return hit_m(x, y, &m); }
+/* ... ON A MOUSE MESSAGE (EXECUTED 2026-10-13, jx3p/docs/JX_PANEL.md): an open panel takes part when it holds the
+ * point, when it holds the mouse (+0x30: a control in it took a down and captured it -- the latch family, knobs and
+ * sliders capture their panels too; the keyboard only itself; patchBlock and patchName nothing) or when it was in
+ * the last message's way (+0xDD: offered once more outside it, then cleared) -- a control may stand out of its panel
+ * (the patch select row, 2 rows below); then its controls from the last, then its open panels from the last, the
+ * first that takes the message ending the walk, and a modal panel takes the rest. A control takes a down or a double
+ * click on its rectangle -- never a label, a display or a bar graph -- and a move or an up only while it holds the
+ * mouse. Every message walks (a move too): the panels' hover flags are the plugin's. (The root panel's own handler,
+ * rva 0x2AAD50, first tests the window's resize corner: not here, scope row 25.) */
+static Ctl *g_cap;                         /* the control that holds the mouse (from its down to its up) */
+static Panel *g_cap_panel;                 /* its panel when its panels hold it too */
+static int panel_held(const Panel *p)
+{
+    const Panel *q;
+    for (q = g_cap_panel; q; q = q->parent) if (q == p) return 1;
+    return 0;
+}
+static int ctl_takes(const Ctl *c, int x, int y, int type)
+{
+    int b[4];
+    if (type == 1 || type == 3) return c == g_cap;
+    if (c->type == C_DISPLAY || c->type == C_BARGRAPH || !strcmp(c->typestr, "label") ||
+        (c->fn && !strcmp(c->fn, "PlugOut"))) return 0;
+    return bounds(c, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
+}
+static Ctl *dispatch_in(Panel *p, int x, int y, int type, Panel **modal)
+{
+    int i, in;
+    Ctl *c;
+    if (!panel_open(p)) return NULL;
+    in = panel_held(p) || !p->has_size || (x >= p->x && y >= p->y && x < p->x + p->w && y < p->y + p->h);
+    if (!in && (!p->hover || EXE_TOOTH == 10)) return NULL;    /* TOOTH 10: no hover (a panel's rectangle alone) */
+    p->hover = in;
+    for (i = p->n - 1; i >= 0; --i)
+        if ((c = p->items[i].c) && ctl_takes(c, x, y, type)) return c;
+    for (i = p->n - 1; i >= 0; --i)
+        if (p->items[i].p && ((c = dispatch_in(p->items[i].p, x, y, type, modal)) || *modal)) return c;
+    if (p->modal) *modal = p;
+    return NULL;
+}
+/* type 0 down, 1 up, 2 double click, 3 move */
+static Ctl *dispatch(int x, int y, int type, Panel **modal) { *modal = NULL; return dispatch_in(g_tree, x, y, type, modal); }
 /* a down a modal panel took, outside every one of its panels, closes it (rva 0x2A77A0): its open condition's value
  * set to 0, flag 1, the commit (EXECUTED: the setup page, vm.vs.setup 0) */
 static void modal_down(Panel *p, int x, int y)
@@ -2697,7 +2744,11 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
     int shift = mods & 1;
     g_mx = x; g_my = y;
     if (get("vm.vs.panelPatch") == 1 && patch_down(x, y, dbl)) return;
-    c = hit_m(x, y, &modal);
+    c = dispatch(x, y, dbl ? 2 : 0, &modal);
+    if (c) {                                     /* it holds the mouse until the up (patchBlock, patchName: never) */
+        g_cap = c->type == C_PATCHBLOCK || c->type == C_PATCHNAME ? NULL : c;
+        g_cap_panel = g_cap && c->type != C_KEYBOARD ? c->panel : NULL;
+    }
     if (g_log) {                          /* the control the dispatch found (jx_panel_gate.py compares the plugin's) */
         int hb[4];
         if (c && bounds(c, hb)) fprintf(g_log, "# hit %s %d %d %d %d\n", c->typestr, hb[0], hb[1], hb[0] + hb[2], hb[1] + hb[3]);
@@ -2819,7 +2870,9 @@ static void mouse_move(int x, int y, int mods)
     Leaf *L;
     int shift = mods & 1;
     double fine = shift ? 0.1 : 1.0;
+    Panel *m;
     g_mx = x; g_my = y;
+    if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 3, &m);    /* the panels' hover flags */
     if (!c) return;
     L = cleaf(c);
     if (c->type == C_SLIDER && L) {
@@ -2866,6 +2919,8 @@ static void mouse_move(int x, int y, int mods)
  * is replaced, offVel being 1..127) */
 static void mouse_up_at(int x, int y)
 {
+    Panel *m;
+    if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 1, &m);    /* the panels' hover flags; the holder takes it */
     if (g_drag && g_drag->type == C_KEYBOARD && g_kb_drag) { g_kb_drag = 0; kb_release(1); }
     if (g_drag && (g_drag->type == C_JXLATCH || g_drag->type == C_EXPRLATCH || g_drag->type == C_PATCHSEL)) {
         int b[4], in = bounds(g_drag, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
@@ -2889,6 +2944,8 @@ static void mouse_up_at(int x, int y)
         c->dragged = c->fine = 0;
     }
     g_drag = NULL;
+    g_cap = NULL;                         /* the up releases the mouse */
+    g_cap_panel = NULL;
     g_npressed = 0;
     g_has_tip = 0;
     g_dirty = 1;

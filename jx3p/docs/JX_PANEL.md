@@ -76,11 +76,18 @@ What the plugin's own code showed (EXECUTED; each was a defect of the program, f
   centre --, the move (vt+0x140, 0x2E7940), the release (vt+0x138, 0x2E7AD0: a drag sets the point's position, a
   click on a clickable slider steps one position, turning at the ends), the point's position (vt+0x148, 0x2E7D80) and
   the cap (vt+0x150, 0x2E7C00). The program had a click rule only; each function is now ported.
-* **The dispatch**: an open panel (+0x70) holding the point (+0x18) -- or hovered (+0xDD) -- offers the message to
-  its controls from the last, then to its open panels from the last; a MODAL panel (+0xDC, Script.xml `<modal>`)
-  takes what none of them took, and a down outside all its panels closes it (rva 0x2A77A0: its open condition's
-  value set to 0, flag 1, the trio and the commit). The SETUP page is modal, its size Script.xml's `size-win-pi`
-  (800 x 260). The program now hit-tests in that order and closes the SETUP page so.
+* **The dispatch** (rva 0x2AA9D0; the root's own handler, 0x2AAD50, first tests the window's resize corner): an open
+  panel (+0x70) takes part in a message when it holds the point (+0x18), when it holds the mouse (+0x30), or when it
+  was in the last message's way (+0xDD: offered once more outside it, then cleared); then its controls from the last,
+  then its open panels from the last -- the first that takes the message ends the walk; a MODAL panel (+0xDC,
+  Script.xml `<modal>`) takes what none of them took, and a down outside all its panels closes it (rva 0x2A77A0: its
+  open condition's value set to 0, flag 1, the trio and the commit). The SETUP page is modal, its size Script.xml's
+  `size-win-pi` (800 x 260). EXECUTED by class: a control takes a down or a double click on its rectangle -- never a
+  label, a display or a bar graph -- and no class takes a move or an up unless it holds the mouse; a down captures it
+  until the up: the latch family, knobs and sliders with their panels (+0x30 up the chain), the keyboard alone,
+  patchBlock and patchName nothing. A control may stand out of its panel (the patch select row: 2 rows below it): a
+  press there reaches it only through the panel's hover. The program now walks every message (moves too) this way,
+  with the same hover flags and capture, and closes the SETUP page so (tooth 10: no hover).
 * **A label takes no mouse event** (rva 0x2D8B20): the plug-in-only "disable" layer over TEMPO (`<control-pi>`,
   black at alpha 0x60) passes presses to the knob under it. The program does not draw that layer: in the program the
   TEMPO knob IS the host's tempo (it is the host, JX-8) -- the same choice as JUNO-60.exe (docs/CC_MENU.md).

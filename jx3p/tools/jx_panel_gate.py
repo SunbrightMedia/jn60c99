@@ -37,7 +37,8 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
                  3 a jx3pLatchButton flips its other bit, 4 a jx3pSlider's click does not turn at the ends,
                  5 exprLatchButton's on and off pairs swapped, 6 patchSelectButton's lanes swapped,
                  7 patchBlock loads the next patch, 8 the latch family presses at the down (the plugin: at the up),
-                 9 a jx3pSlider's drag steps are final sets (the plugin keeps one host edit open through a drag)
+                 9 a jx3pSlider's drag steps are final sets (the plugin keeps one host edit open through a drag),
+                 10 a panel's hover flag ignored (a press just outside a panel never reaches its controls)
   --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 1 a panel's controls searched first
                  to last -- the JX has three overlapping pairs, each in one panel --, 2 the right and bottom edges inside,
                  3 closed panels searched, 4 Shift / Ctrl / Alt ignored, 5 a greyed Forget acts, 6 labels and displays
@@ -157,7 +158,7 @@ class Plugin:
         if self.q(self.cca + 0x80) != h.core:
             raise SystemExit('the plugin\'s attach (rva 0x%X) left +0x80 = %x, not the core %x'
                              % (CCA_ATTACH, self.q(self.cca + 0x80), h.core))
-        self.names, self.panels, self.tree, self.jx, self.info = {}, [], [], [], {}
+        self.names, self.panels, self.tree, self.jx, self.info, self.ctl_panel = {}, [], [], [], {}, {}
         self._walk(self.root)
         mp_ = h.core + 24
         vb, ve = self.q(mp_), self.q(mp_ + 8)
@@ -223,6 +224,7 @@ class Plugin:
             tn = self.tname(c)
             ctl.append((tn, l, t, r, b, nrefs, rec, pid))
             self.info[c] = (tn, l, t, r, b)
+            self.ctl_panel[c] = p
             if q(c) - self.IB in JX_VT:
                 if JX_VT[q(c) - self.IB] != tn:
                     raise SystemExit('class at vtable 0x%X names itself %r' % (q(c) - self.IB, tn))
@@ -419,6 +421,9 @@ def oracle(log):
                 elif down_ctl == 'jx3pSlider':
                     res['n']['slider moves'] += 1
                 taken = g.mouse(typ, x, y, s)
+                if kind in ('down', 'dbl') and g.taker is not None:      # a press its panel's hover let through
+                    pl, pt, pr, pb = struct.unpack('<iiii', bytes(g.uc.mem_read(g.ctl_panel[g.taker] + 0x18, 16)))
+                    res['n']['outside'] += not (pl <= x < pr and pt <= y < pb)
             res['n']['events'] += 1
             res['n']['taken'] += bool(taken)
             in_event = True
@@ -644,6 +649,10 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False):
         for _ in range(20 if quick else 30):
             l, t, r, b = rnd.choice(rects)
             out.append('ccmsg %d %d %d' % (rnd.randrange(l, r), rnd.randrange(t, b), rnd.choice(MODS)))
+        if quick and mapped:                             # the quick run: one Learn for sure (then a CC learns it)
+            l, t, r, b = rnd.choice(mapped)
+            out += ['ccmsg %d %d 0 0' % (rnd.randrange(l, r), rnd.randrange(t, b)),
+                    'cc %d %d' % (rnd.randrange(0, 120), rnd.randrange(0, 128)), 'block', 'tick', 'cctree', 'state']
         for _ in range(4 if quick else 6):
             if mapped and rnd.random() < 0.5:            # Forget on a control a CC drives (its menu item enabled)
                 (l, t, r, b), item = rnd.choice(mapped), 1
@@ -780,6 +789,7 @@ def main():
         'every JX class pressed and changing the state': all(ch[c] > 0 for c in JX_TYPES),
         'a slider dragged': n['slider moves'] > 0,
         'a drag holding the host edit open (beginEdit, no endEdit yet)': n['open edits'] > 0,
+        'a press outside its panel that the panel\'s hover let through': n['outside'] > 0,
         'double clicks': sum(v for k, v in pr.items() if k.endswith(' dbl')) > 0,
         'the CC menu taken, a learn, a forget, the CC map moved': n['cc taken'] > 0 and n['learn'] > 0
         and n['forget'] > 0 and n['moved'] > 0,
