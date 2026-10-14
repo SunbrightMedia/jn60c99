@@ -9,9 +9,10 @@ letter cases) because the bank name presses of row 20 shifted the JX script and 
 is missing), the unchanged port GREEN on each (else every tooth would seem to bite there), every tooth's library
 once, then each tooth on each seed -- the port side only, the references shared.
 
-usage: jx_pm_teeth_sweep.py [--seeds 9:40,1:200,5:200,100:150] [--teeth 1-19] [--jobs 3]
-prints each tooth's biting seeds and the list for jx_verify.sh (the first candidate that bites, in the order given);
-exits 1 when a seed is RED or a tooth bites on none of the candidates.
+usage: jx_pm_teeth_sweep.py [--juno] [--seeds 9:40,1:200,5:200,100:150] [--teeth 1-20] [--jobs 3]
+prints each tooth's biting seeds and the list for jx_verify.sh -- with --juno, the JUNO-60's gate
+(tools/verify/patch_manager_gate.py on libjuno's sources) and the list for the Makefile's verify target -- the first
+candidate that bites, in the order given; exits 1 when a seed is RED or a tooth bites on none of the candidates.
 """
 import os
 import re
@@ -21,7 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-GATE = os.path.join(HERE, 'jx_patch_manager_gate.py')
+JUNO = '--juno' in sys.argv
+GATE = os.path.join(REPO, 'tools', 'verify', 'patch_manager_gate.py') if JUNO else os.path.join(HERE, 'jx_patch_manager_gate.py')
 sys.path.insert(0, HERE)
 
 
@@ -30,7 +32,22 @@ def opt(k, d):
 
 
 def ref_path(seed, steps):
-    return os.path.join(REPO, 'scratchpad', 'jx_art_patch_manager_ref2_%d_%d.pkl' % (seed, steps))
+    return os.path.join(REPO, 'scratchpad', '%spatch_manager_ref2_%d_%d.pkl' % ('' if JUNO else 'jx_art_', seed, steps))
+
+
+def build(tooth):
+    """the port's library for a tooth (None: the unchanged port) -- the gate's own build"""
+    if not JUNO:
+        import jx_patch_manager_gate as J
+        return J.build(tooth)
+    if tooth is None:                          # the JUNO gate's port side loads the repo's libjuno.so
+        subprocess.run(['make', '-s', '-C', REPO, 'libjuno.so'], check=True)
+        return
+    srcs = subprocess.run(['make', '-s', '-C', REPO, '--no-print-directory', 'print-libjuno-srcs'],
+                          capture_output=True, text=True).stdout.split()
+    subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC',
+                    '-DPM_TOOTH=%s' % tooth, '-o', os.path.join(REPO, 'scratchpad', 'libjuno_pmtooth_%s.so' % tooth)]
+                   + srcs + ['-lm'], cwd=REPO, check=True)
 
 
 def port(pkl, tooth=None):
@@ -44,11 +61,9 @@ def port(pkl, tooth=None):
 
 def main():
     seeds = [tuple(int(v) for v in x.split(':')) for x in opt('--seeds', '9:40,1:200,5:200,100:150').split(',')]
-    lo, _, hi = opt('--teeth', '1-19').partition('-')
+    lo, _, hi = opt('--teeth', '1-20').partition('-')
     teeth = list(range(int(lo), int(hi or lo) + 1))
     jobs = int(opt('--jobs', '3'))
-    import jx_patch_manager_gate as J
-
     def make_ref(sn):                          # the plugin's reference (its own process, as the gate makes it)
         s, n = sn
         p = ref_path(s, n)
@@ -60,7 +75,7 @@ def main():
             os.replace(p + '.partial', p)
     with ThreadPoolExecutor(jobs) as ex:       # the references and every library (each its own file)
         list(ex.map(make_ref, seeds))
-        list(ex.map(lambda t: J.build(t), [None] + [str(t) for t in teeth]))
+        list(ex.map(build, [None] + [str(t) for t in teeth]))
     with ThreadPoolExecutor(jobs) as ex:
         base = list(ex.map(lambda sn: port(ref_path(*sn)), seeds))
     red = [sn for sn, f in zip(seeds, base) if f]
@@ -79,7 +94,7 @@ def main():
             out.append('%d:%d:%d' % (t, bites[0][0], bites[0][1]))
         else:
             bad.append(t)
-    print('jx_verify.sh list: ' + ' '.join(out))
+    print('%s list: ' % ('Makefile verify' if JUNO else 'jx_verify.sh') + ' '.join(out))
     if bad:
         print('teeth that bite on no candidate: %s' % ' '.join(map(str, bad)))
         return 1
