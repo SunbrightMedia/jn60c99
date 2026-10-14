@@ -4410,3 +4410,16 @@ written) with a clear error when full.
 ### The rule
 A harness resource sized by its first runs is a limit nobody chose: size it for the longest run planned, and make
 running out a named error, not a fault deep in the emulator.
+
+## 256. A CHANGE TO A SEEDED SCRIPT RE-SEEDS EVERY TOOTH -- RE-RUN THEM ALL, AND RUN THE CHEAP FRAGILE GATES FIRST
+Paid 2026-10-14 (jxverify_144e, EXIT 2 after 15.7 hours). Row 20 gave the JX patch window gate the bank name
+control's presses (the art's button, half the presses on its edges): a new command kind and one more random draw.
+Every JX seed's script changed from that command on. Only the two new teeth (18, 19) were run on the new script;
+tooth 5 (a bank renamed to another bank's name in other letter cases) had bitten on seed 1, and seed 1 no longer made
+such a rename. The tooth was not wrong and the port was not wrong -- the seed list was stale, and the full verify
+found it 15.7 hours in, on a check that takes a minute (the references are made at the section's start).
+### The rule
+A seeded tooth list belongs to one script: when the script changes, re-run the WHOLE list (jx_pm_teeth_sweep.py:
+every tooth on every candidate seed, each seed's unchanged port GREEN first, or every tooth would "bite" there).
+And order a long verify so the cheap, fragile gates (seeded teeth, generated-table checks) run before the hours of
+renders: a stale seed must cost minutes, not a day.

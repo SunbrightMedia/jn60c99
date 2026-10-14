@@ -41,11 +41,16 @@
 #                  level meters against the plugin's own code, its editor attached
 #                  (GATE 3h).
 #
+#   F. THE DRAWN PANEL (2026-10-14, row 20) -- JX-3P.exe from the user's Script
+#                  folder: the five JX classes' mouse, the CC search and the bank
+#                  name presses against the plugin's own dispatch on its own tree
+#                  (GATES 5b, 5c; 3h's patch window gate on the art's sizes).
+#
 # What this does NOT cover, stated so "green" is not read wider than it is
-# (jx3p/docs/SCOPE_AUDIT.md is the full table, row 20 open; docs/GATE_PARITY.tsv
-# the gate classes still owed): the editor's GRAPHICS -- the panel is not drawn
-# (no JX art in truth/), so neither the CC assign menu's search on the panel nor
-# the bank name control's presses run; their models are graded (3f, 3h).
+# (jx3p/docs/SCOPE_AUDIT.md is the full table; docs/GATE_PARITY.tsv the gate
+# classes still owed): row 25 -- the generic classes' mouse, the wheel on every
+# class, the resize corner (the program's handlers are the JUNO-60's, graded
+# through their engine calls only).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -57,6 +62,14 @@ WARM=${JX_VERIFY_WARM:-6}
 PATCHES=${JX_VERIFY_PATCHES:-"$(seq 0 63)"}
 echo "[jx verify] work dir $WORK  rates=$RATES  n=$N warm=$WARM"
 
+# JX_VERIFY_ONLY="3h 3i ...": run only these sections (a run resumed after a RED: the others' verdicts come from
+# an earlier run of the same sources, and the record must name it -- playbook 189 / 256); empty: every section.
+# The order puts the cheap, fragile gates (the seeded teeth of 3h, the ledgers) before the hours of renders.
+ONLY=${JX_VERIFY_ONLY:-}
+sec() { [ -z "$ONLY" ] && return 0; case " $ONLY " in *" $1 "*) return 0;; esac
+        echo "=== JX GATE $1: not run (JX_VERIFY_ONLY=$ONLY) ==="; return 1; }
+
+if sec S; then
 echo "=== JX GATE S: THE SOURCES (ISO C99 in a generic and the native configuration; no approximation marker) ==="
 # the port must stand on ISO C99 alone: gcc -std=c99 -pedantic-errors and a scan of the live code (2026-10-11: the
 # lifted mul / div and the voice helpers used __int128, a builtin and x86 asm -- none of them C99)
@@ -68,6 +81,54 @@ python3 "$REPO/tools/verify/c99_helpers_check.py"
 python3 "$REPO/tools/verify/c99_helpers_check.py" --self-test   # five planted mutations, each must be seen
 python3 "$REPO/tools/verify/approx_audit.py" --jx
 
+fi
+if sec 3h; then
+echo "=== JX GATE 3h: THE EDITOR'S LOGIC (zoom, meters, the record image, the patch window: JX-22, JX-24, JX-25) ==="
+# the plugin's editor attached under the oracle (its GUI from jx3p/truth/Script.xml, blank images): every fit its
+# windows' getter computes on 16 screens, both zooms and the engine records after every step
+python3 "$HERE/jx_zoom_fit_gate.py" --ref
+python3 "$HERE/jx_zoom_fit_gate.py" --port
+python3 "$HERE/jx_zoom_fit_gate.py" --port-tooth
+# the meters: the engine's peaks (the JX's own loop), the read, the tick and the draw on edge inputs, and the
+# meters read in the running plugin through process()
+python3 "$HERE/jx_meter_gate.py"
+python3 "$HERE/jx_meter_gate.py" --tooth --reuse
+# the model's record image (JX-24): the plugin's serializer after the boot, 738 sets, loads and setStates; the
+# committed boot image equal to the one the plugin makes now; the port's image after every step
+python3 "$HERE/jx_record_census.py" >/dev/null
+python3 "$HERE/jx_gen_record_tables.py" --check
+python3 "$HERE/jx_record_gate.py"
+python3 "$HERE/jx_record_gate.py" --tooth
+# the patch window (JX-24): the JUNO-60's patch manager gate on the JX plugin's own manager (jx_pm_emu.py) and the
+# port (gui/juno_pm.c on the JX bridge); its teeth are the JUNO's PM_TOOTH set
+rm -f "$REPO"/scratchpad/jx_art_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
+# (each gate's own exit status decides: sh has no pipefail, a pipe after the gate would hide it -- playbook 251)
+for sp in 9:40 1:200 5:200 100:150; do
+  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:}); then
+    echo "$out" | grep -v '^REACH'; echo "[jx verify] FAIL -- the patch manager gate, seed ${sp%%:*}"; exit 1
+  fi
+  echo "$out" | grep -v '^REACH'
+done
+# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
+# presses on the art's button (18 no tail after the bank menu: seed 5; 19 the menu on the button: seed 1; 2026-10-13,
+# job jxpm_teeth1819 -- 18 did not bite on seeds 1, 9, 100: no menu answered with a bank there)
+for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
+          14:9:40 15:9:40 16:1:200 17:9:40 18:5:200 19:1:200; do
+  t=${ts%%:*}; r=${ts#*:}
+  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t); then
+    echo "$out" | tail -3; echo "[jx verify] FAIL -- patch manager tooth $t did not bite"; exit 1
+  fi
+  echo "$out" | tail -1
+done
+fi
+if sec 6; then
+echo "=== JX GATE 6: THE LEDGERS (every file's origin and proof; every JUNO gate class's JX twin) ==="
+python3 "$HERE/jx_provenance.py"
+python3 "$HERE/jx_provenance.py" --self-test
+python3 "$REPO/tools/verify/gate_parity.py"
+python3 "$REPO/tools/verify/gate_parity.py" --self-test
+fi
+if sec 0; then
 echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="
 # Every defect that cost this port days was a DRIVE defect, invisible to an
 # A/B gate because both sides shared it. These teeth check the drive itself:
@@ -76,12 +137,16 @@ echo "=== JX GATE 0/5: THE DRIVE GATE (playbook 87/88/89/90) ==="
 # shipped template and aux come from ONE boot.
 python3 "$HERE/jx_drive_gate.py"
 python3 "$HERE/jx_drive_gate.py" --tooth                  # the base match RED on the heap after initialize's records
+fi
+if sec 1; then
 echo "=== JX GATE 1/5: RECALL ON THE PLUGIN'S OWN PATCH LOAD (playbook 197) ==="
 python3 "$HERE/jx_recall_product_check.py" 0 49          # the drive == the booted plugin, every unit, word for word
 python3 "$HERE/jx_recall_product_check.py" --tooth       # one record left out must be seen
 python3 "$HERE/jx_recall_data_gate.py"                   # the port's recall == the drive, every window, 64/64
 python3 "$HERE/jx_recall_data_gate.py" --patches 0,20 --tooth
 
+fi
+if sec 2; then
 echo "=== JX GATE 2/5: INTEGRATION RENDER A/B (voice+master, C == plugin) ==="
 cc -O2 -fno-strict-aliasing -ffp-contract=off -frounding-math -fsignaling-nans -shared -fPIC \
    -o "$WORK/libjxengine.so" \
@@ -108,8 +173,12 @@ rm -rf "$WORK/ab"
 if [ "$fails" -ne 0 ]; then
   echo "[jx verify] FAIL -- $fails patch/rate cases not EXACTLY 0"; exit 1
 fi
+fi
+if sec 3; then
 echo "=== JX GATE 3/5: FULL CHAIN (shipping entry path, reach 12000) ==="
 JX_FULL_SKIP_DERIVE=1 sh "$HERE/jx_full_gate.sh"
+fi
+if sec 3b; then
 echo "=== JX GATE 3b: THE MASTER, EVERY SAMPLE OF STATE (64 patches + the mode variants + tooth; playbook 198) ==="
 # every unit's state, the 36 control objects and L/R per 256-sample chunk over 4,096 idle + a note +
 # 12,000, against the plugin; the variants set the two effect-mode cells to the values no factory
@@ -127,6 +196,8 @@ python3 "$HERE/jx_master_bisect.py" --script 2 --patches 0 --tooth-key 6000
 # every effect parameter at 0, 128 and 255 -- rendered, every unit's state per chunk
 python3 "$HERE/jx_master_bisect.py" --modes 4000
 python3 "$HERE/jx_master_bisect.py" --fxrender 4000
+fi
+if sec 3c; then
 echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object after every event; JX-7) ==="
 # 5 factory patches x 1,500 events, 12 variants of the plugin's own patch load (every step mode the
 # product reaches: a REFUSE if one is missing), all 19 modes through the plugin's own setter; the port's tick,
@@ -135,6 +206,8 @@ echo "=== JX GATE 3c: THE CLOCK TICK AND THE STEP MACHINE (every control object 
 python3 "$HERE/jx_tick_gate.py"
 python3 "$HERE/jx_tick_gate.py" --tooth --patches 34,61 --variants '34:+0x600120=8' --no-setmode \
         --events 300 --variant-events 300
+fi
+if sec 3d; then
 echo "=== JX GATE 3d: THE PRODUCT PATH (the plugin's own process(): render driver, 96 kHz engine, render object) ==="
 python3 "$HERE/jx_product_gate.py" --patches 0,34,61,20
 python3 "$HERE/jx_product_gate.py" --exact --patches 34,61 --on 0.61 --off 0.93 --secs 1.2
@@ -223,6 +296,8 @@ python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --poly 1 --on 0.55 
 python3 "$HERE/jx_product_gate.py" --rates 44100 --patches 34 --poly 1 --on 0.55 --secs 2.0 --state 'r3@0;r2@0;r1@0.6'
 python3 "$HERE/jx_product_gate.py" --rates 48000 --patches 0 --on 0.55 --secs 1.0 --state 'r6@0' --expect-silent  # a setting past the rates
 python3 "$HERE/jx_product_gate.py" --tooth-state --rates 48000 --patches 0 --poly 1 --on 0.55 --secs 2.0 --state '2@0.3;r2@0'
+fi
+if sec 3e; then
 echo "=== JX GATE 3e: THE PARAMETER SYSTEM, LIFTED (the plugin's host entry vs the lifted C twin, the whole heap; JX-11) ==="
 # the engine running (a patch, a key held, 2048 samples); the plugin's host entry 0x3F9A30 and its lifted twin
 # (jx_lift.py: the JP8 lifter on the JX binary, the oracle's dynamic reach) take the same calls; every return
@@ -271,6 +346,8 @@ python3 "$HERE/jx_lift_gate.py" --loads exhaustive --tooth-skip w
 python3 "$HERE/jx_lift_gate.py" --loads fxmodes --keep
 python3 "$HERE/jx_lift_gate.py" --loads fxmodes --tooth-skip w
 python3 "$HERE/jx_lift_gate.py" --base 34 --loads fxmodes
+fi
+if sec 3f; then
 echo "=== JX GATE 3f: THE DAW STATE, THE UI TIMER, THE PATCH BROWSER (JX-16, JX-17) ==="
 # the tables from the booted plugin again (Unicorn, each its own process) and the committed ones equal to them
 python3 "$HERE/jx_state_census.py" >/dev/null
@@ -285,43 +362,8 @@ python3 "$HERE/jx_state_gate.py" --mutants
 # the patch browser's load of any record (the factory bank, random bytes, a bank file): records, saves, samples
 python3 "$HERE/jx_patch_gate.py"
 python3 "$HERE/jx_patch_gate.py" --tooth --chains 0,1
-echo "=== JX GATE 3h: THE EDITOR'S LOGIC (zoom, meters, the record image, the patch window: JX-22, JX-24, JX-25) ==="
-# the plugin's editor attached under the oracle (its GUI from jx3p/truth/Script.xml, blank images): every fit its
-# windows' getter computes on 16 screens, both zooms and the engine records after every step
-python3 "$HERE/jx_zoom_fit_gate.py" --ref
-python3 "$HERE/jx_zoom_fit_gate.py" --port
-python3 "$HERE/jx_zoom_fit_gate.py" --port-tooth
-# the meters: the engine's peaks (the JX's own loop), the read, the tick and the draw on edge inputs, and the
-# meters read in the running plugin through process()
-python3 "$HERE/jx_meter_gate.py"
-python3 "$HERE/jx_meter_gate.py" --tooth --reuse
-# the model's record image (JX-24): the plugin's serializer after the boot, 738 sets, loads and setStates; the
-# committed boot image equal to the one the plugin makes now; the port's image after every step
-python3 "$HERE/jx_record_census.py" >/dev/null
-python3 "$HERE/jx_gen_record_tables.py" --check
-python3 "$HERE/jx_record_gate.py"
-python3 "$HERE/jx_record_gate.py" --tooth
-# the patch window (JX-24): the JUNO-60's patch manager gate on the JX plugin's own manager (jx_pm_emu.py) and the
-# port (gui/juno_pm.c on the JX bridge); its teeth are the JUNO's PM_TOOTH set
-rm -f "$REPO"/scratchpad/jx_art_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
-# (each gate's own exit status decides: sh has no pipefail, a pipe after the gate would hide it -- playbook 251)
-for sp in 9:40 1:200 5:200 100:150; do
-  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:}); then
-    echo "$out" | grep -v '^REACH'; echo "[jx verify] FAIL -- the patch manager gate, seed ${sp%%:*}"; exit 1
-  fi
-  echo "$out" | grep -v '^REACH'
-done
-# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
-# presses on the art's button (18 no tail after the bank menu: seed 5; 19 the menu on the button: seed 1; 2026-10-13,
-# job jxpm_teeth1819 -- 18 did not bite on seeds 1, 9, 100: no menu answered with a bank there)
-for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
-          14:9:40 15:9:40 16:1:200 17:9:40 18:5:200 19:1:200; do
-  t=${ts%%:*}; r=${ts#*:}
-  if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t); then
-    echo "$out" | tail -3; echo "[jx verify] FAIL -- patch manager tooth $t did not bite"; exit 1
-  fi
-  echo "$out" | tail -1
-done
+fi
+if sec 3i; then
 echo "=== JX GATE 3i: SEEDS, NaN, RAMPS, TABLES (the JUNO-60's gate classes the JX lacked: docs/GATE_PARITY.tsv, JX-26e) ==="
 # the seeded fuzz of the render (patch x rate x warm x notes), its tooth a slip in a voice helper every voice runs
 sh "$HERE/fuzz_gate.sh" 0 24
@@ -383,16 +425,22 @@ sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"
 # JUNO-60's (src/juno_conv.c), its tooth one coefficient bit
 python3 "$HERE/jx_conv_tables.py" --check
 python3 "$HERE/jx_conv_tables.py" --tooth
+fi
+if sec 3g; then
 echo "=== JX GATE 3g: THE MUTATION REACH (docs/PORT_COMPLETENESS_CHARTER.md section 4) ==="
 # one plausible slip per part of the port, in lines that run (gcov), the library rebuilt, one fast gate on the
 # mutated tree: every mutation must be KILLED. It edits the tree it runs in (one file at a time, restored):
 # run make verify-jx3p from a snapshot (tools/snap_tree.sh)
 python3 "$HERE/jx_mutation_gate.py"
+fi
+if sec 4; then
 echo "=== JX GATE 4/5: LISTEN PROOFS (oracle + C twin, dry + master) ==="
 python3 "$HERE/jx_listen.py" 0 48,60,72 2>/dev/null
 python3 "$HERE/jx_listen.py" 5 48,60,72 --master 2>/dev/null
 python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 0,20,49,35 48,60,72
 python3 "$HERE/jx_listen_c.py" "$REPO/build/jx_full_ab/libjx3p.so" 5,20 48,60,72 --master
+fi
+if sec 5; then
 echo "=== JX GATE 5/5: THE DELIVERED WEB ENGINE (WASM == native on the page's product-path calls, playbook 196) ==="
 if command -v node >/dev/null 2>&1; then
   python3 "$HERE/jx_wasm_check.py" --patches "$(seq -s, 0 63)"   # 3 host rates, events inside blocks
@@ -406,6 +454,8 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "[jx verify] FAIL -- no node: the delivered WASM cannot be graded"; exit 1
 fi
+fi
+if sec 5b; then
 echo "=== JX GATE 5b: JX-3P.exe (the port and the plugin's panel as one Windows program: jx3p/docs/JX_PANEL.md) ==="
 # the program built (mingw), its --render replayed through the port's library under Wine: output EXACT, events /
 # points the host's, each JX control click its READ rule, meters and the end state equal; the teeth: a lost edit, the
@@ -421,6 +471,8 @@ if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/w
 else
   echo "[jx verify] FAIL -- no mingw-w64 or Wine: JX-3P.exe cannot be built and graded"; exit 1
 fi
+fi
+if sec 5c; then
 echo "=== JX GATE 5c: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (SCOPE_AUDIT row 20: jx3p/docs/JX_PANEL.md) ==="
 # JX-3P.exe's mouse on the five JX classes and its CC menu, each event through the plugin's own panel dispatch on its
 # own GUI tree (jx_panel_gate.py): the state, the pending engine records, the host's edits and the press's target equal
@@ -436,9 +488,5 @@ if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/w
 else
   echo "[jx verify] FAIL -- no mingw-w64 or Wine: the drawn panel cannot be graded"; exit 1
 fi
-echo "=== JX GATE 6: THE LEDGERS (every file's origin and proof; every JUNO gate class's JX twin) ==="
-python3 "$HERE/jx_provenance.py"
-python3 "$HERE/jx_provenance.py" --self-test
-python3 "$REPO/tools/verify/gate_parity.py"
-python3 "$REPO/tools/verify/gate_parity.py" --self-test
-echo "[jx verify] GREEN -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0; the clock and every step mode == the plugin's; process() == the product path at 3 host rates; the web engine == native"
+fi
+echo "[jx verify] GREEN${ONLY:+ (sections $ONLY only)} -- recall 64/64 + render 64/64 x $(echo $RATES | wc -w) rates, all EXACTLY 0; the clock and every step mode == the plugin's; process() == the product path at 3 host rates; the web engine == native"
