@@ -299,7 +299,8 @@ def plugin_tree(_):
     mapped = {v for k, v in (struct.unpack('>Ii', st[4 + 8 * j: 12 + 8 * j]) for j in range(n)) if k >= 0x10000000 and v >= 0}
                                                      # (the state's CC map: entries 0x10000000 + CC -> a parameter id)
     rects = sorted(set((c[1], c[2], c[3], c[4]) for t in g.tree for c in t[3] if CG.searchable(c) and c[7] in mapped))
-    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx, rects
+    prects = [struct.unpack('<iiii', bytes(g.uc.mem_read(p + 0x18, 16))) for p in g.panels]   # each panel's +0x18
+    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx, rects, prects
 
 
 def jx_by_panel(items):
@@ -614,7 +615,7 @@ def probe_script(configs):
     return out
 
 
-def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False):
+def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, prects=()):
     """the seeded kbscript: the CC probes (cc_menu_gate.script's) and the mouse on every live JX control"""
     rnd = random.Random(seed)
     refs = script_refs()
@@ -728,6 +729,23 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False):
                 if rnd.random() < 0.2:                           # a double click: down, up, double click, up
                     ev += ['dbl %d %d %d' % (up[0], up[1], 0)] + after + ['up %d %d' % up] + after
                 out += ev + ['block', 'state']
+        # a JX control standing out of its panel (the patch select row: 2 rows below it), pressed as a hand does: a
+        # down inside, the mouse out to the part that stands out, the up there (the control held the mouse: its panel
+        # was in the way), then a double click there -- it reaches the control only through the panel's hover flag
+        # (+0xDD); the choice is fixed (no draw from the seeded stream: the rest of the script stays the same)
+        out_of = []
+        for k, tn, l, t, r, b in jx:
+            if not live(k) or k >= len(prects):
+                continue
+            pl, pt, pr, pb = prects[k]
+            if b > pb and l < r and t < pb:
+                out_of.append(((l + r) // 2, (t + pb) // 2, (l + r) // 2, pb))
+        if out_of:
+            cx, cy, sx, sy = out_of[ci % len(out_of)]
+            after = ['opens', 'state', 'pending']
+            out += (['move %d %d 0' % (cx, cy), 'down %d %d 0' % (cx, cy)] + after + ['move %d %d 0' % (sx, sy)] + after +
+                    ['up %d %d' % (sx, sy)] + after + ['dbl %d %d 0' % (sx, sy)] + after + ['up %d %d' % (sx, sy)] + after +
+                    ['block', 'state'])
         out += ['state', 'pending']
     return out
 
@@ -765,7 +783,7 @@ def main():
         exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth)
     ctx = mp.get_context('spawn')
     with ctx.Pool(1) as pool:
-        tree, parents, jx, mapped = pool.map(plugin_tree, [0])[0]
+        tree, parents, jx, mapped, prects = pool.map(plugin_tree, [0])[0]
     configs = QUICK if quick else CONFIGS
     if '--log' in sys.argv:                     # a saved log (debugging): the program is not run
         log = open(arg('--log', None)).read().splitlines()
@@ -777,7 +795,7 @@ def main():
         opens = [[int(c) for c in ln.split()[2]] for ln in plog if ln.startswith('# opens ')]
         if len(opens) != len(configs):
             raise SystemExit('the program gave %d open flag lines for %d configurations' % (len(opens), len(configs)))
-        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, mapped, opens, configs, seed, quick), work,
+        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, mapped, opens, configs, seed, quick, prects), work,
                       'panel.txt')
         if '--keep' in sys.argv:
             shutil.copyfile(os.path.join(work, 'panel.txt.log'), arg('--keep', None))
