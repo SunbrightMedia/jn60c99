@@ -3,6 +3,26 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-14 (20) — ROW 20 CLOSED: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (playbooks 251-255)
+
+- THE GATE: jx3p/tools/jx_panel_gate.py -- the JUNO's cc_menu_gate method widened to every mouse event on the five JX
+  classes: JX-3P.exe under Wine with a seeded script; the plugin (Unicorn) with its GUI tree from its module init (the
+  sheet sizes from the PNG headers) gets each event through the root panel's own handler (rva 0x2AAD50 -> the dispatch
+  0x2AA9D0). After every event: getState, the engine records pending, the host's edits and the control that took it.
+- FULL RUN GREEN (job jxpanel_s6): 48 configurations (24 open-flag sets), 4,283 mouse events (1,846 taken), 5,786
+  states, 4,332 pending lists (300,531 records), 89,379 host edits, 20,546 CC probes (x2), 1,728 right presses (22
+  learns, 42 forgets), 51 CC map entries moved -- all EQUAL, every reach item (a drag's open edit, a press through a
+  panel's hover). Teeth: exe 3-10 and CC 1-7 bite; CC 8 cannot (no overlap across panels, computed); the patch
+  window's bank name teeth 18 (seed 5) and 19 (seed 1) bite with the art.
+- FOUND AND FIXED IN THE PROGRAM (each by the plugin's own code, EXECUTED): the latch family presses at the up (two
+  classes only with the up on the control); the slider class whole (press, move, release, map, cap); the dispatch's
+  order, the modal SETUP page (size-win-pi) and its close; the dispatch's hover (+0xDD) and capture (+0x30) state --
+  a control may stand out of its panel; a drag holds ONE host edit open for the whole controller (the model's set
+  flag; the bridge: jx3p_model_set_flag, jx_state_gate.py chain 7, mutant). The harness: the root's own handler (the
+  resize corner first), a mouse that moves like a hand (253), a 256 MB host arena (255), a piped gate verdict (251).
+- OPEN: row 25 -- the panel's other inputs (the generic classes' mouse, the wheel on every class incl. the JX
+  switches, the keyboard's capture, the resize corner); row 23 closes with the full verify-jx3p (owed).
+
 ## 2026-10-13 (19) — JX-3P.exe: THE DRAWN PANEL (the user's Script folder, scope row 20) (playbooks 249, 250)
 
 - THE ART: the user's JX Script folder (Script.xml byte-identical to truth/), its 24 sprite sheets pinned in

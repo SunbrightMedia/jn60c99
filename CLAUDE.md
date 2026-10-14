@@ -269,12 +269,15 @@ mine is a hypothesis (playbook 80).
   (performEdit; a load's performEdits too, playbook 210), and the editor's own
   logic (2026-10-11, S3_STATUS (13)): zoom, meters, the CC menu's model, the
   record image, the patch window (gui/juno_pm.c on the JX bridge) -- every
-  SCOPE_AUDIT row closed but row 20, the drawn panel: drawn in JX-3P.exe since 2026-10-13 (the user's Script
-  folder, jx3p/truth/Script; jx3p/gui/win, make_native_jx.py, jx_exe_check.py EXACT; jx3p/docs/JX_PANEL.md) -- its
-  five JX control classes READ, not yet run on the plugin's own tree.
+  SCOPE_AUDIT row closed but row 25 (opened 2026-10-13: the panel's other inputs -- the generic classes' mouse,
+  the wheel, the resize corner). Row 20, the drawn panel, CLOSED 2026-10-14: JX-3P.exe (the user's Script folder,
+  jx3p/truth/Script; jx3p/gui/win, make_native_jx.py; jx3p/docs/JX_PANEL.md) -- its five JX classes' mouse, the CC
+  search and the bank name presses against the plugin's own dispatch and handlers on its own tree EQUAL
+  (jx_panel_gate.py, S3_STATUS (20); fixed on the way: the press at the up, the slider whole, the dispatch's hover /
+  capture, a drag's one open host edit -- playbooks 251-255).
   The JUNO-60's gate classes on the JX (JX-26, S3_STATUS (14)): every class of
   docs/GATE_PARITY.tsv has a JX gate jx_verify.sh runs (gate_parity.py rule 4),
-  but 2 BLOCKED on inputs (the art; the user's JX banks); ISO C99 checked
+  but 1 BLOCKED on an input (the user's JX banks); ISO C99 checked
   (tools/verify/c99_gate.py, both ports); every JX file's role and proof in
   jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Row 23 (NaN parity, the JUNO's
   A41 classes: 53 + 37 equalities, 3 helpers, 12 sign folds, the page's

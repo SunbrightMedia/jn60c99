@@ -104,7 +104,7 @@ The harness's own defects, found the same way: the plugin's queue at the boot (t
 mouse that pressed where it had not moved (the hover flags decide what a panel offers: playbook 253); a pipe in
 jx_verify.sh that hid a gate's verdict (playbook 251).
 
-Evidence: the quick run (three configurations) GREEN, job jxpanel_q5; the full run and the teeth: in progress.
+Evidence (2026-10-13/14): the full run GREEN -- 4283 mouse events (1846 taken), 5786 states, 4332 pending lists (300531 records), 89379 host edits, 20546 CC probes (x2), 1728 right presses (22 learns, 42 forgets), 51 CC map entries moved, 24 open-flag sets, every reach item (job jxpanel_s6); the quick run GREEN. Teeth: exe 3-8 and CC 1-7 bit on the program before its last two fixes (jobs jxpanel_teeth, jxpanel_cc18), exe 9 and 10 on the final one (job jxpanel_s5); the full verify-jx3p runs every one again (section 5c); CC tooth 8 cannot bite (computed). The bridge's open edit: jx_state_gate.py chain 7 GREEN, 7 mutants bite (job jxstate_gesture).
 
 Scope: the five JX classes, the CC search and Learn / Forget on the plugin's tree, the bank name control's presses
 (jx_patch_manager_gate.py with the art's sizes). NOT graded against the plugin's own handlers: the generic classes'
