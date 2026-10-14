@@ -20,6 +20,13 @@ means null EXACTLY 0; nothing below is called done that is not.
   gates first (S, 3h, 6), every seed a tooth uses graded GREEN in the same run. The rest of the verify runs on b6a0562d
   as job jxverify_b6a0: S, 3h, 6, 3i, 3g, 4, 5, 5b, 5c; sections 0-3f carry over from jxverify_144e (their commands are
   identical and none of their gates builds gui/juno_pm.c, the one source changed -- EXECUTED: section compare, diff).
+- jxverify_b6a0 (b6a0562d): S, 3h (the patch window GREEN on its six seeds, all 20 teeth bite) and 6 GREEN; EXIT 2 in
+  3i, 2.5 h in: the NaN census tooth named line 1162 of jx_voice_render.c, and row 20's commit 9857339e had moved the
+  site to 1164 (two lines added at the top: playbook 257). The tooth now names its site's text
+  (1164:0x3a22fd:jx_feq(...)), REFUSES with the new line when the text moves, and `make static` checks every census
+  tooth's line (nan_sites.py --check-census-teeth, self-test BITES). Both census teeth (JX, JUNO-60) BITE in the new
+  form (EXECUTED). The JUNO-60's apps after the backup-name fix: make native and make webapp GREEN (jobs pmfix_apps,
+  pmfix_web). Owed: sections 6, 3i, 3g, 4, 5, 5b, 5c on the new commit.
 
 ## 2026-10-14 (20) — ROW 20 CLOSED: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (playbooks 251-255)
 

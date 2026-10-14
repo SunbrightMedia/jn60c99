@@ -4423,3 +4423,15 @@ A seeded tooth list belongs to one script: when the script changes, re-run the W
 every tooth on every candidate seed, each seed's unchanged port GREEN first, or every tooth would "bite" there).
 And order a long verify so the cheap, fragile gates (seeded teeth, generated-table checks) run before the hours of
 renders: a stale seed must cost minutes, not a day.
+
+## 257. A TOOTH THAT NAMES A LINE NUMBER BREAKS ON ANY EDIT ABOVE THE LINE -- NAME THE TEXT, CHECK IT AT COMMIT
+Paid 2026-10-14 (jxverify_b6a0, EXIT 2 after 2.5 hours, section 3i). The NaN census tooth `--tooth-census 1162:RVA`
+takes the C site on line 1162 of jx_voice_render.c out of the map. Row 20's commit 9857339e added two lines at the
+top of that file (a `#if !defined(_WIN32)` guard around the decompiler's typedefs): the site moved to 1164, the tooth
+REFUSED, and no full verify had reached section 3i since. The same day as 256: a tooth tied to a position in a file
+that another change moved.
+### The rule
+A tooth that points into a source names what it points at, not only where: `LINE:RVA:TEXT`, and a moved line makes
+it REFUSE naming the line(s) where TEXT now is. And a check that costs a second runs at commit: `make static` runs
+`nan_sites.py --check-census-teeth` (every census tooth's line still holds its site and its text; its self-test moves
+each tooth one line down and must see it STALE).

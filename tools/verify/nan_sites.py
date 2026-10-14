@@ -38,8 +38,14 @@ MATCH   a C site and an instruction whose first executions saw the same operand 
     ... --all-run the REACH guard: every C site must run in some scene (a site no scene reaches is not graded), and the
                   CENSUS: every float compare / min-max instruction that ran is graded through a site (READ_INLINE
                   lists the plugin's inlined helper tests the port keeps outside the function)
-    ... --tooth-census LINE:RVA   the C site(s) on LINE taken out of the map: the census must report the
-                                  instruction RVA (the one LINE grades) UNCLAIMED
+    ... --tooth-census LINE:RVA:TEXT   the C site(s) on LINE taken out of the map: the census must report the
+                                  instruction RVA (the one LINE grades) UNCLAIMED. TEXT, a piece of LINE's source: an
+                                  edit that moves the line makes the tooth REFUSE at once, naming where TEXT went
+    python3 tools/verify/nan_sites.py --check-census-teeth [--self-test]   static, for `make static`: every census
+                                  tooth in the Makefile and jx3p/tools/jx_verify.sh names a line that holds a site and
+                                  its TEXT (2026-10-14: a 2-line edit above moved the JX tooth's site; the full verify
+                                  found it 17 hours in -- playbook 257); --self-test: each tooth moved one line down
+                                  must be seen STALE
 exit 0 = every executed site matched and right; 1 = a WRONG, unmatched, conflicting or unresolved (review) site, or
 with --all-run a site that never ran or an instruction no site grades (listed).
 """
@@ -1041,8 +1047,71 @@ def fix_of(s, src, port, ad, sw, m):
                 swapped=sw)
 
 
+def census_spec(spec):
+    """LINE:RVA[:TEXT] -> (line, rva, text or None)"""
+    f = spec.split(':', 2)
+    return int(f[0]), int(f[1], 16), (f[2] if len(f) > 2 else None)
+
+
+def census_stale(src, fn, spec, need_text=False):
+    """why the census tooth `spec` no longer names its site in src (None: it does)"""
+    line, rva, text = census_spec(spec)
+    sites, _ = sites_of(src, fn)
+    lines = src.split('\n')
+    if text is None:
+        return 'no TEXT named (LINE:RVA:TEXT)' if need_text else (
+            None if any(s['line'] == line for s in sites) else 'no site on line %d' % line)
+    if not any(s['line'] == line for s in sites) or text not in lines[line - 1]:
+        now = sorted({s['line'] for s in sites if text in lines[s['line'] - 1]})
+        return 'line %d %s; "%s" is on the site line(s) %s' % (
+            line, 'holds no site' if not any(s['line'] == line for s in sites) else 'does not hold the text',
+            text, ', '.join(map(str, now)) or 'none')
+    return None
+
+
+def census_teeth():
+    """every census tooth the suites run: (where, port, func, spec)"""
+    out = []
+    for path in ('Makefile', 'jx3p/tools/jx_verify.sh'):
+        for n, ln in enumerate(open(os.path.join(REPO, path)), 1):
+            if 'nan_sites.py' not in ln or '--tooth-census' not in ln or ln.lstrip().startswith('#'):
+                continue
+            port = re.search(r'--port-of\s+(\w+)', ln).group(1)
+            func = re.search(r'--func\s+(\w+)', ln).group(1)
+            spec = re.search(r"--tooth-census\s+(?:'([^']*)'|(\S+))", ln)
+            out.append(('%s:%d' % (path, n), port, func, spec.group(1) or spec.group(2)))
+    return out
+
+
+def check_census_teeth(self_test):
+    teeth = census_teeth()
+    if not teeth:
+        raise SystemExit('REFUSE: no census tooth found in the Makefile or jx_verify.sh')
+    bad = 0
+    for where, port, func, spec in teeth:
+        t = TARGETS[(port, func)]
+        src = open(os.path.join(REPO, t['c'])).read()
+        if self_test:                          # the tooth moved one line down: must be seen STALE
+            line, rva, text = census_spec(spec)
+            moved = '%d:0x%x:%s' % (line + 1, rva, text or '')
+            why = census_stale(src, t['fn'], moved, need_text=True)
+            print('  self-test %-34s %s' % (where, 'STALE (seen: %s)' % why if why else 'NOT SEEN'))
+            bad += why is None
+        else:
+            why = census_stale(src, t['fn'], spec, need_text=True)
+            print('  %-34s %s %s: %s' % (where, port, func, 'STALE -- ' + why if why else 'line holds its site'))
+            bad += why is not None
+    if self_test:
+        print('nan_sites --check-census-teeth --self-test: %s' % ('BITES' if not bad else 'DID NOT BITE'))
+    else:
+        print('nan_sites --check-census-teeth: %s' % ('GREEN (%d teeth)' % len(teeth) if not bad else 'RED'))
+    return 1 if bad else 0
+
+
 def main():
     a = sys.argv[1:]
+    if '--check-census-teeth' in a:
+        return check_census_teeth('--self-test' in a)
     opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
     if a[:1] == ['--oracle']:
         json.dump(oracle(a[1], a[2], a[3], int(a[4]), int(a[5])), sys.stdout)
@@ -1126,7 +1195,10 @@ def main():
             raise SystemExit('REFUSE --tooth: no site written !( ) in %s' % t['c'])
     sites, body0 = sites_of(src, t['fn'])
     if opt('--tooth-census'):                     # the census's tooth: one C site taken out of the map -- the
-        drop = int(opt('--tooth-census').split(':')[0])   # instruction it grades must then be reported UNCLAIMED
+        why = census_stale(src, t['fn'], opt('--tooth-census'))   # instruction it grades must then be UNCLAIMED
+        if why:
+            raise SystemExit('REFUSE --tooth-census: %s of %s' % (why, t['c']))
+        drop = census_spec(opt('--tooth-census'))[0]
         n0 = len(sites)
         sites = [s for s in sites if s['line'] != drop]
         if len(sites) == n0:
@@ -1244,7 +1316,7 @@ def main():
             'BITES (%d graded WRONG)' % len(hit) if hit else 'DID NOT BITE'))
         return 0 if hit else 1
     if opt('--tooth-census'):                     # LINE:RVA -- the very instruction the dropped line grades
-        want = int(opt('--tooth-census').split(':')[1], 16)
+        want = census_spec(opt('--tooth-census'))[1]
         print('nan_sites --tooth-census (line %s taken out): %s' % (
             opt('--tooth-census'), 'BITES (rva 0x%x UNCLAIMED)' % want if want in uncl else 'DID NOT BITE'))
         return 0 if want in uncl else 1

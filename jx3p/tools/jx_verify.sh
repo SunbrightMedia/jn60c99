@@ -387,7 +387,7 @@ python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func master --patches 0
 python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5,34 --frames 256 --release 512 --tooth
 # the census's tooth: line 1162 (`jx_feq(cell +270208, 1.0)`) taken out of the map -- its instruction (ucomiss at rva
 # 0x3A22FD, the cell it reads) must be reported UNCLAIMED
-python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5 --frames 256 --release 512 --from-boot --tooth-census 1162:0x3a22fd
+python3 "$REPO/tools/verify/nan_sites.py" --port-of jx --func voice --patches 5 --frames 256 --release 512 --from-boot --tooth-census '1164:0x3a22fd:jx_feq(*(float *)(st + 270208 + 32*(v)), 1.0)'
 # the helpers the render functions call (wraps, triangle, pitch spline, expf, tanf, the CRT's fmodf), each alone on NaNs,
 # infinities, denormals and random bits: every output bit the plugin's (playbook 222); the teeth: the wrap's `<` back,
 # and the oracle at the CPU's reset MXCSR (its FP mode must be live)

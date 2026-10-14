@@ -80,6 +80,9 @@ static: libjuno.so
 	if python3 tools/repro/hostparams_check.py > $(SCRATCH)/static_hostparams_check.log 2>&1; then echo "  ok   hostparams_check"; \
 	else echo "  RED  hostparams_check: a host parameter row differs from the plugin's data (log: $(SCRATCH)/static_hostparams_check.log)"; FAIL=1; fi; \
 	python3 tools/repro/hostparams_check.py --tooth > /dev/null 2>&1 || { echo "  RED  hostparams_check tooth DID NOT BITE"; FAIL=1; }; \
+	if python3 tools/verify/nan_sites.py --check-census-teeth > $(SCRATCH)/static_census_teeth.log 2>&1; then echo "  ok   census_teeth"; \
+	else echo "  RED  census_teeth: a NaN census tooth names a line that no longer holds its site (log: $(SCRATCH)/static_census_teeth.log)"; FAIL=1; fi; \
+	python3 tools/verify/nan_sites.py --check-census-teeth --self-test > /dev/null 2>&1 || { echo "  RED  census_teeth self-test DID NOT BITE"; FAIL=1; }; \
 	if cc -O2 -std=c99 -ffp-contract=off -o $(SCRATCH)/pi_log10_check tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_check > $(SCRATCH)/static_pi_log10.log 2>&1; \
 	then echo "  ok   pi_log10_check"; else echo "  RED  pi_log10_check (log: $(SCRATCH)/static_pi_log10.log)"; FAIL=1; fi; \
 	{ cc -O2 -std=c99 -ffp-contract=off -DTOOTH -o $(SCRATCH)/pi_log10_tooth tools/repro/pi_log10_check.c -lm && $(SCRATCH)/pi_log10_tooth > /dev/null 2>&1; } || { echo "  RED  pi_log10_check tooth DID NOT BITE"; FAIL=1; }; \
@@ -124,7 +127,7 @@ verify-recipe:
 	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 0-63 --frames 256 --release 512 --scenes 'p:0@48000;w:0|1168=5.0' --all-run || FAIL=1; \
 	python3 tools/verify/nan_sites.py --port-of juno --func master --patches 0-63 --frames 256 --release 512 --scenes 'v:0:634=4;v:0:618=0;e:0:24:' --all-run || FAIL=1; \
 	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 5 --frames 256 --release 512 --tooth || FAIL=1; \
-	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 5 --frames 256 --release 512 --tooth-census 590:0x3690bd || FAIL=1; \
+	python3 tools/verify/nan_sites.py --port-of juno --func voice --patches 5 --frames 256 --release 512 --tooth-census '590:0x3690bd:juno_feq(JF(base, auxoff), 1.0)' || FAIL=1; \
 	python3 tools/verify/nan_ab.py --seeds 1,2 --cells 16 || FAIL=1; \
 	python3 tools/verify/nan_ab.py --tooth || FAIL=1; \
 	python3 tools/verify/nan_helpers.py --port-of juno || FAIL=1; \
