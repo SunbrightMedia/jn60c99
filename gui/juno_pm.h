@@ -92,8 +92,8 @@ int  juno_pm_key(juno_pm *pm, int code, int flags, int *close);
 int  juno_pm_func(juno_pm *pm, const char *fn, const char *args);
 /* the list's mouse: select (a click), read (a double click), move (a drag from -> to) */
 int  juno_pm_select(juno_pm *pm, int idx);
-/* the JX-3P panel's patch blocks and patch select buttons (rva 0x351C90 / 0x355040 there): the selection of
- * the main list, then its load, pushed (rva 0x334D70 / 0x337F70 = the JUNO-60's 0x334E90 / 0x338090) */
+/* the JX-3P panel's patch blocks and patch select buttons (their JX addresses: jx3p/gui/win/jx3p_win.c): the
+ * selection of the main list, then its load, pushed (rva 0x334E90 / 0x338090) */
 int  juno_pm_pick(juno_pm *pm, int idx);
 int  juno_pm_mouse(juno_pm *pm, int type, int x, int y, const int rect[4]);   /* rva 0x327D70 */
 /* the bank name control's mouse (rva 0x33F0A0): a down or a double click on its button (button: the

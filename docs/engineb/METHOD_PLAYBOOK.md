@@ -4435,3 +4435,26 @@ A tooth that points into a source names what it points at, not only where: `LINE
 it REFUSE naming the line(s) where TEXT now is. And a check that costs a second runs at commit: `make static` runs
 `nan_sites.py --check-census-teeth` (every census tooth's line still holds its site and its text; its self-test moves
 each tooth one line down and must see it STALE).
+
+## 258. A NUMBER IS A NAME ONLY WHERE A NAME CAN BE -- AND A REACH READS EVERY FILE THE PRODUCT COMPILES
+Paid 2026-10-14 (jxverify_5961, EXIT 2 after 1.5 hours, section 3i; the JUNO-60's census RED the same day).
+cpu_census.py builds the port's reach from every rva-shaped number in the port's sources. Three defects, one root:
+(1) Row 20's JX-3P.exe wrote its --render script's MIDI words in hex: 0x6401B0 (CC 1, value 100) lies in the JX's
+function 0x63ff20, which reaches the CRT's wcsstr, whose SSE2 and SSE4.2 paths give different results -- NOT ALL
+GRADED. 3509 JX functions can reach wcsstr; none is in the plugin's own classes or in the port's reach. (2) A shared
+header (gui/juno_pm.h) cited two JX-3P addresses ("there"): in the JUNO-60's image one lies in a function that calls
+three FMA3 math routines crt_fma_gate.py does not grade -- the JUNO census failed on code the JUNO port never runs.
+(3) The other way: the JX's products compile gui/juno_pm.c and src/juno_conv.c (the JUNO-60's addresses), which the
+JX census never read: 11 JX twins of the functions they port were outside its reach -- a hole on the unsafe side.
+(4) Looking for the hole found another: 10 reads of a CPU answer in each image lay outside every function the census
+models (code with no .pdata entry and no direct call) and were dropped unseen. All 10 are dead code: no code flows
+there, no lea, 8-byte pointer or nearby switch table takes their address (EXECUTED, both images).
+### The rule
+A number names a function only in prose (a comment, a string), as a lifted identifier, or in the lifted code; a
+number in hand-written code is data unless it starts a function (tooth --tooth-data: the old rule must fail). A
+source cites only the addresses of the plugin whose census reads it. And the reach reads every file the product
+compiles or includes: the JX census takes the shared sources' JUNO-60 names as their JX twins (fw_map's equal
+code, the table JX_TWINS, `--twins` makes it again); a cited number with no row makes it REFUSE (tooth
+--tooth-twins). Every read is accounted for: owned by the code that flows to it, or proven DEAD, else the census
+fails (tooth --tooth-dead: a DEAD read made reachable by flow alone must be graded). An over-wide reach fails loudly
+and costs a verify; a narrow one passes silently -- check both.

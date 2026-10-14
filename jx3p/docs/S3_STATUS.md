@@ -27,6 +27,18 @@ means null EXACTLY 0; nothing below is called done that is not.
   tooth's line (nan_sites.py --check-census-teeth, self-test BITES). Both census teeth (JX, JUNO-60) BITE in the new
   form (EXECUTED). The JUNO-60's apps after the backup-name fix: make native and make webapp GREEN (jobs pmfix_apps,
   pmfix_web). Owed: sections 6, 3i, 3g, 4, 5, 5b, 5c on the new commit.
+- jxverify_5961 (5961dd55): 6 GREEN; EXIT 2 in 3i, 1.5 h in: cpu_census NOT ALL GRADED -- the CRT's wcsstr (its SSE2 and
+  SSE4.2 paths give different results) in the reach. Cause: the census took JX-3P.exe's script MIDI word 0x6401B0
+  (CC 1, value 100) as a function name; it lies in 0x63ff20, which reaches wcsstr. No port code reaches wcsstr (3509
+  JX functions can; none in the plugin's own classes, none in the reach). The JUNO-60's census was RED the same way
+  (gui/juno_pm.h cited two JX addresses). Two more holes found on the way: the JX census never read the shared
+  sources its products compile (gui/juno_pm.c, src/juno_conv.c: 11 JX twins outside its reach), and 10 reads per
+  image lay outside every modelled function (all DEAD code). Fixed (playbook 258): names only in prose, lifted code,
+  or at a function start; the shared sources through their JX twins (JX_TWINS, `--twins`, 94 cited numbers); every
+  read owned by code flow or proven DEAD. EXECUTED: JX census GREEN (2181 functions from 845 names, 108 of them
+  twins), JUNO-60 census GREEN (1811 from 320); teeth --tooth-data, --tooth-twins, --tooth-dead (both ports),
+  --tooth-roots, --tooth, --tooth-mxcsr (both ports) all BITE; the juno_pm.h edit is comment-only (objects identical,
+  both product defines). Owed: 3i, 3g, 4, 5, 5b, 5c on the new commit.
 
 ## 2026-10-14 (20) — ROW 20 CLOSED: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (playbooks 251-255)
 

@@ -9,7 +9,11 @@ run different code. crt_fma_gate.py grades one such answer (the CRT's FMA3 flag)
     OPENSSL_ia32_cpuid: it returns its answer, its caller stores it); the globals each writes.
 (2) THE READERS: every instruction that reads one of those globals by its address (lea included); the port's REACH:
     the functions its sources name by rva and their direct callees (a `rip + 0x..` displacement in a lifted
-    instruction's comment names no function -- one in jx_lift.c fell in JUCE's CPU-info getter, playbook 228).
+    instruction's comment names no function -- one in jx_lift.c fell in JUCE's CPU-info getter, playbook 228; nor
+    does a number in hand-written code that starts no function -- the exe scripts' MIDI words, masks: the JX-3P.exe's
+    0x6401B0, CC 1 value 100, fell in a function that reaches wcsstr, playbook 258); the JX's reach also reads the
+    sources outside jx3p/ its products compile (gui/juno_pm.c, src/juno_conv.c: the JUNO-60's addresses), each name
+    taken as its JX twins (JX_TWINS: fw_map's equal code; a cited number with no row makes the census REFUSE).
 (3) THE ANSWERS, three sets: the CRT's own inits (__isa_available_init, the FMA3 init) run NATIVELY on this CPU
     (tools/verify/cpu_census_native.c), run in UNICORN (the oracles' CPU model: the process() oracles run DllMain, so
     they hold these), and not run at all -- the image's STATIC values (the engine oracles skip DllMain).
@@ -45,6 +49,12 @@ run different code. crt_fma_gate.py grades one such answer (the CRT's FMA3 flag)
     python3 tools/verify/cpu_census.py --tooth-roots    memory-operand displacements admitted as names again (the
                                                         lifted code's comments): the JX reaches JUCE's CPU-info
                                                         getter and OpenSSL, ungraded readers -- the census must fail
+    python3 tools/verify/cpu_census.py --tooth-data     hand-written code's numbers admitted as names again: the
+                                                        JX-3P.exe's MIDI words reach wcsstr, whose two paths differ --
+                                                        the census must fail
+    python3 tools/verify/cpu_census.py --twins          JX_TWINS made again from the two images (minutes); exit 1 when
+                                                        the committed table differs
+    python3 tools/verify/cpu_census.py --tooth-twins    one number taken out of JX_TWINS: the census must refuse
 exit 0 = every reached reader graded (or, a tooth, the defect seen); 1 = not; 2 = the harness failed.
 """
 import bisect
@@ -72,6 +82,121 @@ PORTS = {   # READ from each image: the CRT inits and the CRT routines the port'
 }   # native: leaf routines (no .pdata entry) whose path for __isa_available >= 5 is AVX2 code Unicorn cannot run
 
 
+RUNTIME = ('jp8/src/',)     # the lifter's runtime the JX includes: plumbing, its sites the JUPITER-8's addresses
+# made by `cpu_census.py --twins` (2026-10-14): each number the JX's shared sources cite -> the JX functions whose
+# code equals its JUNO-60 function's (several: every equal copy; none: it names no function -- a table, a global)
+JX_TWINS = {
+    0x283120: (0x283000,), 0x283db0: (0x283c90,), 0x2853c0: (0x2852a0,), 0x2de890: (0x2de770,), 0x320420:
+    (0x320300,), 0x3222f0: (0x3221d0,), 0x322e60: (0x322d40,), 0x3232f6: (0x322d40,), 0x323fd0: (0x323eb0,),
+    0x3245c0: (0x3244a0,), 0x324850: (0x324730,), 0x325c60: (0x325b40,), 0x3262c0: (0x3261a0,), 0x326930:
+    (0x326810,), 0x3278c0: (0x3277a0,), 0x327cf8: (0x3277a0,), 0x327d70: (0x327c50,), 0x327e95: (0x327c50,),
+    0x328038: (0x327c50,), 0x328330: (0x328210,), 0x3285f0: (0x3284d0,), 0x32c6e0: (0x32c5c0,), 0x32c970:
+    (0x32c850,), 0x32ca60: (0x32c940,), 0x32d180: (0x32d060,), 0x32d6e0: (0x32d5c0,), 0x32d950: (0x32d830,),
+    0x32ddc0: (0x32dca0,), 0x32e070: (0x32df50,), 0x32e190: (0x32e070,), 0x32ead0: (0x32e9b0,), 0x32eec0:
+    (0x32eda0,), 0x32f100: (0x32efe0,), 0x32f280: (0x32f160,), 0x32f2b0: (0x32f190,), 0x32fd50: (0x32fc30,),
+    0x3307c0: (0x3306a0,), 0x3308c0: (0x3307a0,), 0x330a80: (0x330960,), 0x330d10: (0x330bf0,), 0x330e10:
+    (0x330cf0,), 0x330ed0: (0x330db0,), 0x331530: (0x331410,), 0x331d50: (0x331c30,), 0x3326a0: (0x332580,),
+    0x332960: (0x332840,), 0x332d30: (0x332c10,), 0x333480: (0x333360,), 0x333960: (0x333840,), 0x333be0:
+    (0x333ac0,), 0x334070: (0x333f50,), 0x3344c0: (0x3343a0,), 0x334e20: (0x334d00,), 0x334e90: (0x334d70,),
+    0x334ea0: (0x334d80,), 0x334f20: (0x334e00,), 0x335640: (0x335520,), 0x335850: (0x335730,), 0x335990:
+    (0x335870,), 0x335ae0: (0x3359c0,), 0x336830: (0x336710,), 0x336a80: (0x336960,), 0x336fd0: (0x336eb0,),
+    0x337cc0: (0x337ba0,), 0x338090: (0x337f70,), 0x338220: (0x338100,), 0x33bc80: (0x33bb60,), 0x33cda0:
+    (0x33cc80,), 0x33f0a0: (0x33ef80,), 0x33f190: (0x33f070,), 0x33f200: (0x33f0e0,), 0x33f260: (0x33f140,),
+    0x33f402: (0x33f140,), 0x33f4c2: (0x33f140,), 0x33f4f0: (0x33f3d0,), 0x340b80: (0x340a50,), 0x341f10:
+    (0x341dd0,), 0x343a80: (0x343940,), 0x343e30: (0x343cf0,), 0x343ed8: (0x343cf0,), 0x344270: (), 0x344280:
+    (0x344140,), 0x34b260: (0x34b120,), 0x34e170: (0x413140, 0x413150,), 0x3e33f0: (0x419800, 0x4198f0,), 0x3e3d30:
+    (0x4199a0, 0x41a140,), 0x3e3f20: (0x41a330,), 0x3f2700: (0x428b10,), 0x40b5d0: (0x279d70, 0x292330, 0x297700,
+    0x2a0fb0, 0x2a1020, 0x2a28e0, 0x2ad930, 0x2ed2b0, 0x2eeec0, 0x3148e0, 0x341ab0, 0x346e30, 0x34dea0, 0x4292e0,
+    0x42c270, 0x430330, 0x43dfa0, 0x43f380, 0x4419e0, 0x44c480, 0x77f750, 0x78b110, 0x7bb590, 0x7dfc70,), 0x6bea7c:
+    (0x6f4e8c,), 0x94ab80: (), 0xc43b50: (), 0xc43c30: (), 0xcb05b8: ()}
+NAME_RE = re.compile(r'(?:rva|sub_18|f_|0x)\s*(?:0x)?([0-9a-fA-F]{5,6})\b')
+SPAN_RE = re.compile(r'/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'', re.S)
+
+
+def cites(src, tooth_roots=False):
+    """every rva-shaped number of a C source: (value, in prose -- a comment or a string --, in lifted code, the bare
+    0x form)"""
+    lifted = re.search(r'^L_[0-9a-f]{5,6}:', src, re.M) is not None
+    parts, pos = [], 0
+    for m in SPAN_RE.finditer(src):
+        parts += [(src[pos:m.start()], False), (m.group(0), True)]
+        pos = m.end()
+    parts.append((src[pos:], False))
+    out = []
+    for t, prose in parts:
+        if not tooth_roots:   # a memory operand's displacement is no name: `[rip + 0x79fb9d]`, `[rcx + 0x12a60]` in a
+            t = re.sub(r'\[[^\]\n]*\]', '', t)     # lifted instruction's comment
+        out += [(int(m.group(1), 16), prose, lifted, m.group(0).startswith('0x')) for m in NAME_RE.finditer(t)]
+    return out
+
+
+def is_name(fn_of, v, prose, lifted, bare, tooth_data=False):
+    """the function a cited number names, or None: an rva in a comment or a string, a lifted identifier (f_...,
+    sub_18...), a number in the lifted code (its trap sites); a number in hand-written code is data -- the exe scripts'
+    MIDI words (0x6401B0: CC 1, value 100, lies in the JX's 0x63ff20, which reaches wcsstr), masks (0x200000) --
+    unless it starts a function (playbook 258)"""
+    f = fn_of(v)
+    return f if f and (prose or lifted or tooth_data or not bare or f[0] == v) else None
+
+
+def jx_shared():
+    """the files outside jx3p/ the JX's products compile or include (the build lists' SRCS, every #include reached),
+    less the lifter's runtime: they cite the JUNO-60's addresses (gui/juno_pm.c, src/juno_conv.c)"""
+    todo = []
+    for t in ('jx3p/tools/make_native_jx.py', 'jx3p/tools/jx_patch_manager_gate.py'):
+        m = re.search(r'^SRCS = \[(.*?)\]', open(os.path.join(REPO, t)).read(), re.S | re.M)
+        todo += re.findall(r"'([^']+)'", m.group(1))
+    for d in PORTS['jx']['srcs']:
+        for root, _, files in os.walk(os.path.join(REPO, d)):
+            todo += [os.path.relpath(os.path.join(root, n), REPO) for n in files if n.endswith(('.c', '.h'))]
+    seen, out = set(), set()
+    while todo:
+        f = os.path.normpath(todo.pop())
+        if f in seen or not os.path.isfile(os.path.join(REPO, f)):
+            continue
+        seen.add(f)
+        if f.startswith(RUNTIME):
+            continue
+        if not f.startswith('jx3p/'):
+            out.add(f)
+        src = open(os.path.join(REPO, f), errors='replace').read()
+        todo += [os.path.join(os.path.dirname(f), i) for i in re.findall(r'^\s*#\s*include\s+"([^"]+)"', src, re.M)]
+    return sorted(out)
+
+
+def shared_cites():
+    """{number: [occurrences]} over the JX's shared sources, and the numbers JX_TWINS lacks"""
+    occ = collections.defaultdict(list)
+    for fl in jx_shared():
+        for c in cites(open(os.path.join(REPO, fl), errors='replace').read()):
+            occ[c[0]].append(c[1:])
+    return occ, sorted(v for v in occ if v not in JX_TWINS)
+
+
+def twins_table():
+    """JX_TWINS made again: each number the shared sources cite that names a JUNO-60 function (is_name, in the JUNO's
+    image) -> the JX functions whose normalized code equals that function's (jx3p/tools/fw_map.py; a leaf by its
+    prefix up to a branch, against the JX's function and leaf starts; every match kept when there are several); ()
+    for a number that names nothing"""
+    sys.path.insert(0, os.path.join(REPO, 'jx3p', 'tools'))
+    import fw_map
+    C, X = census('juno'), census('jx', twins=False)
+    m = fw_map.Map()
+    (jimg, jib, _), (timg, tib, _) = m.j, m.t
+    pre = {}                                    # a leaf's twin starts where a JX function or leaf does
+    def leaf(rva):
+        p = fw_map.norm(jimg, jib, rva, rva + 0x400, stop_at_branch=True)
+        if not pre:
+            pre.update((t, fw_map.norm(timg, tib, t, t + 0x400, stop_at_branch=True)) for t in X['starts'])
+        return [t for t, q in pre.items() if q[:len(p)] == p]
+    occ, _ = shared_cites()
+    tab = {}
+    for v in sorted(occ):
+        f = next((g for g in (is_name(C['fn_of'], v, *o) for o in occ[v]) if g), None)
+        tab[v] = tuple(sorted(set(m.find(f[0])[0] if f[0] in m.jend else leaf(f[0])))) if f else ()
+    return tab
+
+
 def pe_path(port):
     p = PORTS[port]['pe']
     if p is None:
@@ -80,9 +205,16 @@ def pe_path(port):
     return p
 
 
-def census(port, tooth_roots=False):
+def census(port, tooth_roots=False, tooth_data=False, twins=True, tooth_dead=None):
     import pefile
     import capstone
+    shared = {}
+    if port == 'jx' and twins:
+        shared, stale = shared_cites()
+        if stale:
+            print('cpu_census: the JX\'s shared sources (%s) cite %s, not in JX_TWINS -- run `cpu_census.py --twins` '
+                  'and paste its table -- REFUSE' % (', '.join(jx_shared()), ', '.join('%#x' % v for v in stale)))
+            raise SystemExit(2)
     path = pe_path(port)
     pe = pefile.PE(path)
     base = pe.OPTIONAL_HEADER.ImageBase
@@ -109,7 +241,9 @@ def census(port, tooth_roots=False):
             t = int(x.op_str, 16) - base
             if lo <= t < hi and fn_pd(t) is None and (x.mnemonic == 'call' or fn_pd(x.address - base)):
                 leaf_starts.add(t)
-    bounds = sorted(set(starts) | set(e for _, e in rf) | leaf_starts | {hi})
+    if tooth_dead:              # a DEAD routine called: its start a leaf start, cut after its first instruction, so its
+        leaf_starts.add(tooth_dead[0])          # read is reached by code flow only
+    bounds = sorted(set(starts) | set(e for _, e in rf) | leaf_starts | {hi} | ({tooth_dead[1]} if tooth_dead else set()))
     lst = sorted(leaf_starts)
 
     def fn_of(a):
@@ -160,19 +294,21 @@ def census(port, tooth_roots=False):
         glob[f] = set(rip(x) for x in ins if f[0] <= x.address - base < f[1] and store(x))
     allg = set().union(*glob.values())
     # (2) the readers and the reach
-    text = ''
+    roots = set()
     for d in PORTS[port]['srcs']:
         for root, _, files in os.walk(os.path.join(REPO, d)):
             for n in files:
                 if n.endswith(('.c', '.h')):
-                    text += open(os.path.join(root, n), errors='replace').read()
-    if not tooth_roots:   # a memory operand's displacement is no name: `[rip + 0x79fb9d]`, `[rcx + 0x12a60]` in a
-        text = re.sub(r'\[[^\]\n]*\]', '', text)        # lifted instruction's comment
-    roots = set()
-    for m in re.finditer(r'(?:rva|sub_18|f_|0x)\s*(?:0x)?([0-9a-fA-F]{5,6})\b', text):
-        f = fn_of(int(m.group(1), 16))
-        if f:
-            roots.add(f)
+                    for c in cites(open(os.path.join(root, n), errors='replace').read(), tooth_roots):
+                        f = is_name(fn_of, *c, tooth_data=tooth_data)
+                        if f:
+                            roots.add(f)
+    twins = set()
+    for v in shared:                            # the JX's shared sources' JUNO-60 names, as their JX twins
+        twins |= set(f for f in map(fn_of, JX_TWINS[v]) if f)
+    roots |= twins
+    if tooth_dead:                              # ... from a function the port names
+        edges[min(roots)].add(fn_of(tooth_dead[0]))
     seen, q = set(roots), list(roots)
     while q:
         for g in edges[q.pop()]:
@@ -181,14 +317,76 @@ def census(port, tooth_roots=False):
                 q.append(g)
     wset = set(writers)
     reads = collections.defaultdict(list)    # reader function -> [(insn, global)]
+    lost = []
     for k, x in enumerate(ins):
         a = rip(x)
         if a in allg:
             f = fn_of(x.address - base)
-            if f and f not in wset:
+            if f is None:
+                lost.append((k, a))
+            elif f not in wset:
                 reads[f].append((k, a))
+    # a read outside every function's extent belongs to each function whose code FLOWS to it outside .pdata (from a
+    # leaf start or a call target before .pdata: fall-through, direct jumps, a call returning); a read no code flows
+    # to is DEAD -- unless an instruction or a pointer in the image takes its routine's address: an indirect call can
+    # enter it, and the census fails (playbook 258: 10 reads in each image had been dropped unseen)
+    idx = {x.address - base: k for k, x in enumerate(ins)}
+    want, owner = {k for k, _ in lost}, collections.defaultdict(set)
+    for s0 in sorted(leaf_starts | set(t for t in targets if lo <= t < hi)) if lost else ():
+        stack, vis = [idx.get(s0)], set()
+        while stack:
+            k = stack.pop()
+            if k is None or k in vis or k >= len(ins) or fn_pd(ins[k].address - base) is not None:
+                continue
+            vis.add(k)
+            x = ins[k]
+            if k in want:
+                owner[k].add(s0)
+            if x.mnemonic in ('ret', 'int3', 'ud2') or (x.mnemonic == 'jmp' and not x.op_str.startswith('0x')):
+                continue
+            if x.mnemonic.startswith('j') and x.op_str.startswith('0x'):
+                stack.append(idx.get(int(x.op_str, 16) - base))
+                if x.mnemonic == 'jmp':
+                    continue
+            stack.append(k + 1)
+    dead, taken = [], []
+    img, bset = None, set(bounds)
+    for k, g in lost:
+        for f in set(map(fn_of, owner[k])) - {None} - wset:
+            reads[f].append((k, g))
+        if owner[k]:
+            continue
+        j, e = k, k             # its routine: back to padding, a ret, a jump or a bound; on to padding or a bound
+        while j > 0 and ins[j - 1].mnemonic not in ('int3', 'ret', 'jmp') and ins[j].address - base not in bset:
+            j -= 1
+        while e < len(ins) - 1 and ins[e].mnemonic != 'int3' and ins[e + 1].address - base not in bset:
+            e += 1
+        r0, r1 = ins[j].address - base, ins[e].address - base + ins[e].size
+        refs = ['lea %x' % (y.address - base) for y in ins if y.mnemonic == 'lea' and r0 <= (rip(y) or -1) < r1
+                and not r0 <= y.address - base < r1]
+        if img is None:
+            img = pe.get_memory_mapped_image()
+            disp = collections.defaultdict(list)    # MSVC's switch tables: [base + index*4 + table] -> its indexers
+            for y in ins:
+                m = re.search(r'\*\s*4\s*\+\s*(0x[0-9a-f]+)\]', y.op_str)
+                if m:
+                    disp[int(m.group(1), 16)].append(y.address - base)
+            tabs = sorted(disp)
+        hits = (img.find(struct.pack('<Q', base + t)) for t in range(r0, r1))
+        refs += ['pointer %x' % h for h in hits if h >= 0]
+        for t in range(r0, r1):     # a 4-byte rva of it in a switch table (its first 256 entries) indexed from outside
+            q = img.find(struct.pack('<I', t))      # it within 64 KB: a switch's cases lie in the indexing function
+            while q >= 0:
+                i = bisect.bisect_right(tabs, q) - 1
+                if i >= 0 and q - tabs[i] < 0x400 and (q - tabs[i]) % 4 == 0:
+                    refs += ['switch table %x (indexed at %x)' % (q, d) for d in disp[tabs[i]]
+                             if not r0 <= d < r1 and abs(d - t) < 0x10000]
+                q = img.find(struct.pack('<I', t), q + 1)
+        (taken if refs else dead).append((ins[k].address - base, g, r0, r1, refs))
     return dict(path=path, base=base, ins=ins, fn_of=fn_of, questions=qf, leaf=leaf, leaf_callers=leaf_callers, entries=entries,
-                glob=glob, allg=allg, reads=reads, reach=seen, roots=roots, callers=callers)
+                glob=glob, allg=allg, reads=reads, reach=seen, roots=roots, callers=callers, twins=twins, dead=dead,
+                taken=taken,
+                starts=sorted(set(starts) | leaf_starts))
 
 
 def decisions(C, f):
@@ -498,16 +696,17 @@ def driver_count(port, C, tooth_mxcsr=False):
     return len(addrs), sum(hits.values()), drv[1], sum(ld.values()), sw - C['base'], dict(loaded)
 
 
-def run(port, tooth=False, tooth_roots=False, no_driver=False):
+def run(port, tooth=False, tooth_roots=False, tooth_data=False, no_driver=False, tooth_dead=None):
     import crt_fma_gate as F
-    C = census(port, tooth_roots)
-    print('%s: %d functions ask (%s); %d globals; the port reaches %d functions from %d it names' % (
+    C = census(port, tooth_roots, tooth_data, tooth_dead=tooth_dead)
+    print('%s: %d functions ask (%s); %d globals; the port reaches %d functions from %d it names%s' % (
         port, sum(1 for f in C['questions'] if f[1] is not None), ', '.join(
             '%x' % f[0] for f in C['questions'] if f[1] is not None) + ' + %d sites '
         'before .pdata (function %s, called from %s)' % (sum(len(v) for f, v in C['questions'].items() if f[1] is None),
                                                          ' '.join('%x' % e for e in sorted(C['entries'])),
                                                          ' '.join('%x' % c[0] for c in sorted(C['leaf_callers']))),
-        len(C['allg']), len(C['reach']), len(C['roots'])))
+        len(C['allg']), len(C['reach']), len(C['roots']), ' (%d of them the JX twins of the JUNO-60 functions its shared '
+        'sources name)' % len(C['twins']) if port == 'jx' else ''))
     gl, static, uni, cpu = answers(port, C)
     print('  answers (global: static / Unicorn / this CPU): %s' % ', '.join('%x: %d / %d / %d' % (
         g, static[g], uni[g], cpu[g]) for g in gl))
@@ -543,6 +742,13 @@ def run(port, tooth=False, tooth_roots=False, no_driver=False):
             ungraded.append(f)
             print('  UNGRADED %x-%x: %s' % (f[0], f[1], '; '.join('%x: %s %s' % (
                 C['ins'][d[0]].address - C['base'], C['ins'][d[0]].mnemonic, C['ins'][d[0]].op_str) for d in ds)))
+    for a, g, r0, r1, _ in C['dead']:
+        print('  DEAD   %x: reads %x in %x-%x -- no code flows there, no instruction or pointer takes its address' % (
+            a, g, r0, r1))
+    for a, g, r0, r1, refs in C['taken']:
+        ungraded.append(a)
+        print('  UNGRADED %x: reads %x in %x-%x, which no code flows to but %s takes -- an indirect call can enter it' % (
+            a, g, r0, r1, ', '.join(refs[:4])))
     bad = len(ungraded)
     if tooth_roots:
         return bad
@@ -583,6 +789,47 @@ def main():
             bites &= bool(loaded) and set(loaded) != {0x9FC0}
         print('cpu_census --tooth-mxcsr: %s' % ('BITES (an oracle entering process() with MXCSR 0 is seen)' if bites
                                                  else 'DID NOT BITE'))
+        return 0 if bites else 1
+    if '--twins' in a:          # JX_TWINS made again (fw_map: about 2 minutes, a leaf's prefix scan longer)
+        tab = twins_table()
+        print('JX_TWINS = {%s}' % ', '.join('%#x: (%s)' % (v, ''.join('%#x, ' % t for t in tw)) for v, tw in tab.items()))
+        same = tab == JX_TWINS
+        print('cpu_census --twins: %d numbers, %d with a JX twin (%d with several), %d naming no JUNO-60 function or '
+              'none with a twin; %s' % (len(tab), sum(1 for v in tab.values() if v), sum(1 for v in tab.values() if
+              len(v) > 1), sum(1 for v in tab.values() if not v), 'the committed table is THE SAME' if same else
+              'the committed table DIFFERS -- paste the one above'))
+        return 0 if same else 1
+    if '--tooth-twins' in a:    # one number of JX_TWINS taken out: the census must refuse before it reads the image
+        occ, _ = shared_cites()
+        drop = sorted(occ)[len(occ) // 2]
+        del JX_TWINS[drop]
+        try:
+            census('jx')
+            code = 0
+        except SystemExit as e:
+            code = e.code
+        print('cpu_census --tooth-twins: %#x taken out of JX_TWINS -- %s' % (drop, 'BITES (refused)' if code == 2 else
+                                                                            'DID NOT BITE'))
+        return 0 if code == 2 else 1
+    if '--tooth-dead' in a:     # a DEAD read made reachable by code flow alone: the census must grade it -- and fail
+        bites = True
+        for p in ports:
+            C = census(p)
+            pick = next(((r0, C['ins'][C['ins'].index(next(x for x in C['ins'] if x.address - C['base'] == r0)) + 1]
+                          .address - C['base'], a) for a, g, r0, r1, _ in C['dead'] if a > r0), None)
+            if pick is None:
+                print('  %s: no DEAD read past its routine\'s first instruction -- REFUSE' % p)
+                return 2
+            print('  %s: the DEAD routine at %x called by a named function, cut at %x: its read at %x by flow only' % (
+                p, pick[0], pick[1], pick[2]))
+            bites &= run(p, tooth_dead=pick[:2], no_driver=True) > 0
+        print('cpu_census --tooth-dead: %s' % ('BITES (a read reached by code flow alone is graded)' if bites else
+                                                'DID NOT BITE'))
+        return 0 if bites else 1
+    if '--tooth-data' in a:     # hand-written code's numbers names again: the JX-3P.exe's MIDI words reach wcsstr
+        bites = run('jx', tooth_data=True, no_driver=True) > 0
+        print('cpu_census --tooth-data: %s' % ('BITES (a data word as a name: a routine whose paths differ reached)'
+                                                if bites else 'DID NOT BITE'))
         return 0 if bites else 1
     if '--tooth-roots' in a:
         bites = run('jx', tooth_roots=True) > 0

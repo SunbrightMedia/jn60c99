@@ -686,8 +686,13 @@ patch 34's load (the port: its transcription), the 12 no input reaches included.
   functions above. The answers: static (the engine oracle jx_emu skips DllMain: 1, 0, 8239),
   Unicorn (JXHost runs DllMain: 2, 2, no limit), this CPU (5, 2, no limit). The census also found false roots: the
   lifted code's comments carry memory-operand displacements (`[rip + 0x79fb9d]` fell in JUCE's CPU-info getter);
-  a bracketed operand names no function. Teeth: the answers written off their globals (no path moves: refused);
-  displacements taken as names (ungraded readers: the census fails). And the FP mode: Unicorn starts at MXCSR 0
+  a bracketed operand names no function. Nor does a number in hand-written code that starts no function (playbook
+  258: JX-3P.exe's MIDI word 0x6401B0 fell in a function that reaches the CRT's wcsstr, whose SSE2 and SSE4.2 paths
+  differ -- no port code reaches it). And the census reads every source the JX's products compile: the shared
+  gui/juno_pm.c, src/juno_conv.c cite the JUNO-60's addresses, taken as their JX twins (fw_map's equal code, the
+  table JX_TWINS, `--twins` makes it again; 11 twins had been outside the reach). Teeth: the answers written off
+  their globals (no path moves: refused); displacements taken as names (ungraded readers: the census fails); data
+  words taken as names (wcsstr back: the census fails); one twin taken out (refused). And the FP mode: Unicorn starts at MXCSR 0
   and JXHost never set it, so process() ran with every exception unmasked (the plugin's ScopedNoDenormals, rva
   0x34AC18, made 0x8040, not a host's 0x9FC0); jx_emu now starts at 0x1F80 as a Windows thread does, and the census
   checks the switch loads 0x9FC0 (its --tooth-mxcsr: entry 0 is seen). The JUNO's 21 process() chains gave the
