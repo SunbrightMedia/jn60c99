@@ -4391,3 +4391,22 @@ No real mouse can reach that state.
 ### The rule
 A harness that drives a GUI sends the event sequence the device sends (a move to the point before every down and up),
 or it grades states no user can make -- and blames the port for them.
+
+## 254. A CENSUS AT ONE VALUE OF A MODE ARGUMENT IS NOT THE FUNCTION'S CENSUS
+Paid 2026-10-13 (JX-3P, HOST_LAYER.md 3n). The editor's set was EXECUTED on every record at 14 values (1,162 sets) and
+ported -- every call FINAL. Its fourth argument is a flag: a slider's drag sets with 0, its release with 1, and the
+host's beginEdit / endEdit follow one open edit for the whole controller. The port sent a full triple per step; the
+census could not see it because it never passed 0. Found by the drawn panel's full run (a real drag through the
+plugin's own dispatch), then mapped by executing the flags in sequences: one open edit, not one per parameter.
+### The rule
+List every argument a ported entry point takes and every value the product passes it; a census that holds one
+argument fixed proves the function at that value only.
+
+## 255. A TEST'S OWN ARENA RUNS OUT BEFORE THE PLUGIN DOES
+Paid 2026-10-13 (jx_panel_gate.py's first full run). The oracle's host-side bump arena (wrapper_emu.py COM, never
+freed) was 4 MB; the quick runs (52 patch loads of ~20 KB) fit, the full run (1,337) wrote past it after ~200 and
+died in Unicorn (UC_ERR_WRITE_UNMAPPED) -- inside the harness, 11 minutes in. Now 256 MB (pages cost nothing until
+written) with a clear error when full.
+### The rule
+A harness resource sized by its first runs is a limit nobody chose: size it for the longest run planned, and make
+running out a named error, not a fault deep in the emulator.

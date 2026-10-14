@@ -71,6 +71,7 @@ def build_lib():
                     ('jx3p_product_note', [I, I, I, I, F], I), ('jx3p_product_param', [U, I, D], I),
                     ('jx3p_product_tempo', [I, D], None), ('jx3p_product_block', [P, P, I, P, I], I),
                     ('jx3p_model_set', [U, ctypes.c_int32], I), ('jx3p_model_get', [U], ctypes.c_int32),
+                    ('jx3p_model_set_flag', [U, ctypes.c_int32, I], I),
                     ('jx3p_model_commit', [], None), ('jx3p_value_set', [U, ctypes.c_int32], I),
                     ('jx3p_host_edits', [P, P, P, I], I), ('jx3p_state_save', [P, I], I), ('jx3p_ui_tick', [], None),
                     ('jx3p_keybed_write', [I, I], I), ('jx3p_midi_base', [], U), ('jx3p_cc_learn', [U], I),
@@ -310,7 +311,10 @@ def replay(lib, log, tooth):
                 continue
             if click and t[0] == 'model_set':
                 click[2].append(('model_set', int(t[1]), int(t[2])))
-            lib.jx3p_model_set(int(t[1]), int(t[2]))
+            if len(t) > 3 and t[0] == 'model_set':           # a drag's step: the set's flag (the one open edit)
+                lib.jx3p_model_set_flag(int(t[1]), int(t[2]), int(t[3]))
+            else:
+                lib.jx3p_model_set(int(t[1]), int(t[2]))
             edits()
         elif t[0] in ('commit', 'pm_commit'):
             lib.jx3p_model_commit()

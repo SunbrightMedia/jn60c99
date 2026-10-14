@@ -66,6 +66,7 @@ int jx3p_product_param(unsigned int id, int offset, double value);
 void jx3p_product_tempo(int valid, double tempo);
 int jx3p_product_block(float *L, float *R, int n, const int *ev, int nev);
 int jx3p_model_set(uint32_t id, int32_t v);
+int jx3p_model_set_flag(uint32_t id, int32_t v, int final);
 int32_t jx3p_model_get(uint32_t id);
 void jx3p_model_commit(void);
 int jx3p_value_set(uint32_t id, int32_t v);
@@ -778,7 +779,8 @@ static Panel *build(const char *type, int ox, int oy)
                                              * conversion at the patch window's open, 3 a DCO switch flips the other bit,
                                              * 4 a jx3pSlider's click does nothing, 5 exprLatchButton's on and off pairs
                                              * swapped, 6 patchSelectButton's lanes swapped, 7 patchBlock loads the next
-                                             * patch, 8 the latch family presses at the down (jx_panel_gate.py) */
+                                             * patch, 8 the latch family presses at the down, 9 a jx3pSlider's drag
+                                             * steps are final sets (jx_panel_gate.py) */
 #endif
 static void *g_eng;
 static CRITICAL_SECTION g_lock;            /* every engine call */
@@ -810,6 +812,20 @@ static void collect_edits(void)
         g_rt[k].id = ids[i];
         g_rt[k].v = vals[i];
     }
+}
+/* the editor's set with its flag (jx3p_model_set_flag): 1 final, 0 a step of a drag -- the controller's one open edit
+ * (beginEdit while none is open, endEdit at a final set; EXECUTED, jx3p/docs/JX_PANEL.md). Logged with its flag when
+ * it is a step */
+static int E_model_set_flag(uint32_t id, int32_t v, int final)
+{
+    int r;
+    if (g_log) {
+        if (final) fprintf(g_log, "model_set %u %d\n", (unsigned)id, (int)v);
+        else fprintf(g_log, "model_set %u %d 0\n", (unsigned)id, (int)v);
+    }
+    r = jx3p_model_set_flag(id, v, final);
+    collect_edits();
+    return r;
 }
 static int E_model_set(uint32_t id, int32_t v)
 {
@@ -960,18 +976,19 @@ static void val_set(const Leaf *L, int v)
 }
 static void set(const char *ref, int v) { val_set(resolve(ref), v); }
 /* the JX's own controls' set (jx3pLatchButton, jx3pSlider, exprLatchButton): their value as computed, no clamp */
-static void val_set_raw(const Leaf *L, int v)
+static void val_set_raw_flag(const Leaf *L, int v, int final)
 {
     int r;
     if (!L) return;
     EnterCriticalSection(&g_lock);
-    r = E_model_set(L->id, v);
+    r = E_model_set_flag(L->id, v, final);
     E_commit();
     if (r) eng_refresh();
     LeaveCriticalSection(&g_lock);
     if (!r) local_put(L->id, v);
     g_dirty = 1;
 }
+static void val_set_raw(const Leaf *L, int v) { val_set_raw_flag(L, v, 1); }
 
 /* postfix condition */
 static int eval_cond(const char *expr)
@@ -1199,6 +1216,7 @@ static void patch_name(char *out)
 /* a set as the control's own code makes it: the value as computed -- no clamp to the range (the editor's set
  * rva 0x283C90 takes it as it is) -- then the panel's commit */
 static void val_set_raw(const Leaf *L, int v);
+static void val_set_raw_flag(const Leaf *L, int v, int final);
 /* jx3pLatchButton (vt 0x99F690: the latchButton's class and its role, +0x170): the press (vt+0x120, rva 0x350F80)
  * flips one bit of the value -- value ^ (role ? 2 : 1); the frame (vt+0xB0, rva 0x3510C0) 2 while the bit is set */
 #if EXE_TOOTH == 3                     /* TOOTH 3 (make_native_jx.py --define EXE_TOOTH=3): the other bit */
@@ -1220,7 +1238,8 @@ static void jxslider_set(const Ctl *c, int p, int flag)
     if (!L) return;
     n = (v & (2 >> c->role)) | (p << c->role);
     if (n == v && !flag) return;
-    val_set_raw(L, value_of(L, n));
+    val_set_raw_flag(L, value_of(L, n), flag || EXE_TOOTH == 9);   /* the position's set (rva 0x283A60) with its flag:
+                                                                   * a drag's steps 0, its end 1 (TOOTH 9: every set final) */
 }
 /* the cap's place at a position (rva 0x2E7C00, vertical; positions 2, its step offset +0xA4 0): centred across,
  * from the bottom (position 0) to the top (position 1), C division */

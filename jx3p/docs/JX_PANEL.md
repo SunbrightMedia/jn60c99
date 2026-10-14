@@ -88,6 +88,11 @@ What the plugin's own code showed (EXECUTED; each was a defect of the program, f
   button (the art's frame, 20 x 32) and changes nothing -- no model call, record or state (EXECUTED). The program
   takes the button's frame (two rows lower, 324-325, than the plugin's rectangle lets through) and changes nothing.
 
+* **A drag holds the host's edit open.** The slider's steps set the position with the flag 0 and its release with
+  1 (rva 0x283A60); the controller keeps one open edit (beginEdit at the first step, endEdit at the final set:
+  HOST_LAYER.md 3n). The program sent beginEdit / performEdit / endEdit at every step. Now the switch passes the
+  flag (jx3p_model_set_flag); tooth 9 makes every step final again.
+
 The harness's own defects, found the same way: the plugin's queue at the boot (the script starts with a block); a
 mouse that pressed where it had not moved (the hover flags decide what a panel offers: playbook 253); a pipe in
 jx_verify.sh that hid a gate's verdict (playbook 251).

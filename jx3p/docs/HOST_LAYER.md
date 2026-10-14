@@ -395,6 +395,19 @@ save, queued record and host edit equal to the plugin's -- the round trips throu
 ranges, a bipolar range, KEY HOLD at 0 with drained keys, the rate setting through the editor; mutant: the
 performEdit value as stored / max -- RED (the bipolar entry).
 
+THE EDIT GESTURE (EXECUTED 2026-10-13; PORTED). The census above ran every set FINAL. The model's sets (0x283C90;
+the position's, 0x283A60) pass a flag to the multiset (0x283B30) and its listener: 1 final, 0 a step of a drag (a
+slider's move). The controller keeps ONE open edit, not one per parameter: a host parameter's set sends beginEdit only
+while none is open, then performEdit, and when final endEdit (none open); a step leaves it open. A set no host sees
+(the patch name) and a load's performEdits leave it as it is; a final set of ANOTHER parameter after a step ends the
+edit without a beginEdit of its own (the plugin's quirk, kept). Found by jx_panel_gate.py's full run (a JX switch
+dragged: the plugin beginEdit ... endEdit across the events, the program a triple per step). PORTED:
+jx3p_model_set_flag (kinds 2 beginEdit / performEdit, 3 performEdit, 4 performEdit / endEdit), jx3p_model_set =
+the final set. MEASURED: jx_state_gate.py chain 'gesture' (29 steps: a final set alone, a drag, steps with no change,
+two parameters crossing, a set no host sees and a patch load inside an open edit, round trips in a drag, the plain
+set after a step) -- every save, record and host edit EQUAL (85 host edits); mutant JX_GESTURE_TOOTH 1 (one open edit
+per parameter) RED.
+
 ## 3n2. The loads' host edits and the CC menu's model (EXECUTED, 2026-10-11; PORTED)
 
 A LOAD TELLS THE HOST TOO. setState and the patch browser's load call performEdit -- alone, no beginEdit while

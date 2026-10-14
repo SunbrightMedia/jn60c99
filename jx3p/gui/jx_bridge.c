@@ -1061,10 +1061,12 @@ static void jx_cc_clear(void) { memset(g_cc.map, 0xFF, sizeof g_cc.map); memset(
 /* the instance as the plugin creates it: the store at initialize's defaults, the boot's CC assignment, no learn */
 static void jx_ks_boot(void);
 static int g_nedit;                                  /* the editor's host edits pending (JX-18) */
+static int g_edit_open;                              /* the controller's one open edit (beginEdit, no endEdit yet) */
 static void jx_state_boot(void)
 {
     jx_ks_boot();
     g_nedit = 0;
+    g_edit_open = 0;
     for (int k = 0; k < JX_STATE_N; ++k) g_store[k] = JX_STATE_ENT[k].dflt;
     memcpy(g_prec, JX_DEFAULT_REC, JX_REC_BODY);     /* the boot image: the defaults' leaves and the rest */
     jx_cc_clear();
@@ -1333,7 +1335,8 @@ int jx3p_cc_of(uint32_t id)
 static struct { uint32_t id; double v; int kind; } g_edit[JX_EDIT_MAX];   /* g_nedit: with the state's boot */
 /* one host edit of a stored value: performEdit's value (float)(stored - min) / (float)(max - min), both unsigned
  * 32-bit; kind 0 the editor's (beginEdit / performEdit / endEdit), 1 a load's (performEdit alone: no beginEdit while
- * loading -- the JUNO-60's census, docs/B6_WRAPPER_BOOT.md) */
+ * loading -- the JUNO-60's census, docs/B6_WRAPPER_BOOT.md); the editor's inside a gesture (jx3p_model_set_flag): 2
+ * beginEdit / performEdit, 3 performEdit, 4 performEdit / endEdit */
 static int jx_edit_push(uint32_t id, int32_t st, int kind)
 {
     int e = jx_midi_entry(id);
@@ -1348,9 +1351,21 @@ static int jx_edit_push(uint32_t id, int32_t st, int kind)
     g_edit[g_nedit].id = id; g_edit[g_nedit].v = (double)f; g_edit[g_nedit].kind = kind; ++g_nedit;
     return 1;
 }
-int jx3p_model_set(uint32_t id, int32_t v)
+/* THE EDIT GESTURE (EXECUTED 2026-10-13, jx3p/docs/JX_PANEL.md): the model's sets (rva 0x283C90; the position's,
+ * 0x283A60) pass a flag to the multiset (0x283B30) and its listener: final (1) or a step of a drag (0). The controller
+ * keeps ONE open edit, not one per parameter: a host parameter's set sends beginEdit only while none is open, then
+ * performEdit, and when final endEdit, none open; a step leaves it open. The sets a host never sees and the loads'
+ * performEdits leave it as it is (a final set of another parameter after a step ends without a beginEdit of its own:
+ * the plugin's). */
+#ifndef JX_GESTURE_TOOTH /* MUTANT (jx_state_gate.py --mutants): 1 one open edit per parameter, not one for all */
+#define JX_GESTURE_TOOTH 0
+#endif
+#if JX_GESTURE_TOOTH == 1
+static uint32_t g_edit_open_id;
+#endif
+int jx3p_model_set_flag(uint32_t id, int32_t v, int final)
 {
-    int k = jx_state_index(id);
+    int k = jx_state_index(id), open;
     int32_t st;
     if (id == JX_STATE_WRITEPATCH) {
         drv_pend(2, 0, 0, (int)id, (int32_t)((uint32_t)v & JX_STATE_WRITEPATCH_MASK));
@@ -1364,7 +1379,19 @@ int jx3p_model_set(uint32_t id, int32_t v)
         drv_pend(2, 0, 0, (int)id, st);
         return 1;
     }
-    return jx_edit_push(id, st, 0);
+    if (jx_midi_entry(id) < 0) return 0;
+#if JX_GESTURE_TOOTH == 1
+    open = g_edit_open && g_edit_open_id == id;
+    g_edit_open_id = id;
+#else
+    open = g_edit_open;
+#endif
+    g_edit_open = !final;
+    return jx_edit_push(id, st, open ? (final ? 4 : 3) : (final ? 0 : 2));
+}
+int jx3p_model_set(uint32_t id, int32_t v)
+{
+    return jx3p_model_set_flag(id, v, 1);
 }
 /* the host edits the plugin made since the last call, in order -- performEdit's id and value, and (kinds, may be
  * NULL) 0 for the editor's set (beginEdit / performEdit / endEdit: the host sends the value back through process(),

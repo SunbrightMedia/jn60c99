@@ -18,6 +18,8 @@ Steps (each followed by a save and the queue's new records, both sides):
   ('forget', id)          its CC forgotten (rva 0x3191C0); jx3p_cc_forget
   ('model', id, v)        a panel control's set through the model (rva 0x283C90, JX-18); jx3p_model_set -- the host
                           edits it makes (beginEdit / performEdit / endEdit) compared too (jx3p_host_edits)
+  ('modelf', id, v, f)    the same set with its flag f: 1 final, 0 a step of a drag (2026-10-13: the controller's one
+                          open edit -- beginEdit while none is open, endEdit at a final set); jx3p_model_set_flag
   ('commit',)             the control's notifies and commit (rva 0x285200, 0x2852A0, 0x283000); jx3p_model_commit
   ('roundtrip',)          one block whose host parameter points are the performEdit values since the last round
                           trip -- what a host sends back (each side its own)
@@ -27,7 +29,8 @@ makes for the keys the drain has seen -- and (kind, offset, id, value) for a par
     python3 jx3p/tools/jx_state_gate.py --tooth                 the port's save with its last CC entry flipped: RED
     python3 jx3p/tools/jx_state_gate.py --mutants               the port built with JX_STATE_TOOTH 1 (no float
         link), 2 (the framing limit from the state list: 2688), 3 (the store unmasked), JX_KS_TOOTH 1 (KEY HOLD at
-        0 releases nothing), JX_EDIT_TOOTH 1 (performEdit's value the stored value / max): each must be RED
+        0 releases nothing), JX_EDIT_TOOTH 1 (performEdit's value the stored value / max), JX_CCOF_TOOTH 1,
+        JX_GESTURE_TOOTH 1 (one open edit per parameter, not one for all): each must be RED
 exit 0 = every save and every step's queued records equal.
 """
 import atexit
@@ -138,7 +141,29 @@ def chains():
           P([], on3), ('drain',), ('model', KH, 0), ('commit',), P(), ('model', KH, 1), RT,
           ('model', 0x0FFFC01D, 1), P(), ('model', P1, -1), RT, ('model', 0x00600108, 1), RT, P(), P([], off3), P()]
     out.append(('editor', 48000.0, st))
+    # 7. THE EDIT GESTURE (2026-10-13, jx3p/docs/JX_PANEL.md): the model's set with its flag -- a drag's steps (0) and
+    #    its final set (1): ONE open edit for the controller (beginEdit while none is open, endEdit at a final set),
+    #    a final set alone, steps with no change, two parameters crossing, a set no host sees and a patch load inside
+    #    an open edit (both leave it open), the round trips in a drag, the plain set after a step
+    S = 0x00600012                                 # the first JX switch pair's value (jx3pSlider, bit fields)
+    st = [('modelf', S, 1, 1),
+          ('modelf', S, 2, 0), ('modelf', S, 3, 0), ('modelf', S, 3, 1),
+          ('modelf', S, 3, 0), ('modelf', S, 3, 1),
+          ('modelf', S, 0, 0), ('modelf', P1, 40, 1), ('modelf', P1, 41, 0), ('modelf', S, 2, 1), ('modelf', P1, 42, 1),
+          ('modelf', S, 1, 0), ('modelf', NAME0, 0x4142, 1), ('modelf', S, 2, 1),
+          ('modelf', S, 1, 0), ('modelf', NAME0, 0x4143, 0), ('modelf', P1, 43, 1),
+          ('modelf', S, 1, 0), ('patch', 3), ('modelf', P1, 44, 1),
+          ('modelf', S, 3, 0), RT, ('modelf', S, 0, 1), RT,
+          ('model', P1, 45), ('modelf', P1, 46, 0), ('model', P1, 47), ('commit',), P()]
+    out.append(('gesture', 48000.0, st))
     return out
+
+
+def host_calls(pid, v, kind):
+    """one bridge host edit (jx3p_host_edits) as the host's calls: kind 1 a load's performEdit, 3 one inside an open
+    edit; 0 beginEdit / performEdit / endEdit, 2 beginEdit / performEdit, 4 performEdit / endEdit"""
+    return (([['beginEdit', pid, None]] if kind in (0, 2) else []) + [['performEdit', pid, v]] +
+            ([['endEdit', pid, None]] if kind in (0, 4) else []))
 
 
 def payload(entries, w=4):
@@ -188,8 +213,9 @@ def oracle(ci):
         elif k == 'forget':
             if stp[1] in index:
                 h.call(X.IB + FORGET, rcx=h.core + 24, rdx=index[stp[1]])
-        elif k == 'model':                        # a panel control's set (rva 0x283C90, JX-18)
-            h.call(X.IB + MODEL_SET, rcx=model, rdx=obj[stp[1]], r8=stp[2] & 0xFFFFFFFF, r9=1, count=500_000_000)
+        elif k in ('model', 'modelf'):            # a panel control's set (rva 0x283C90, JX-18), with its flag
+            h.call(X.IB + MODEL_SET, rcx=model, rdx=obj[stp[1]], r8=stp[2] & 0xFFFFFFFF, r9=stp[3] if k == 'modelf' else 1,
+                   count=500_000_000)
         elif k == 'commit':                       # its notifies and commit
             for rva in MODEL_COMMIT:
                 h.call(X.IB + rva, rcx=model, count=500_000_000)
@@ -265,6 +291,8 @@ def port(so, ci, tooth, idfile):
             lib.jx3p_cc_forget(ctypes.c_uint32(stp[1]))
         elif k == 'model':
             lib.jx3p_model_set(ctypes.c_uint32(stp[1]), ctypes.c_int32(stp[2]))
+        elif k == 'modelf':
+            lib.jx3p_model_set_flag(ctypes.c_uint32(stp[1]), ctypes.c_int32(stp[2]), ctypes.c_int(stp[3]))
         elif k == 'commit':
             lib.jx3p_model_commit()
         elif k == 'roundtrip':
@@ -275,10 +303,7 @@ def port(so, ci, tooth, idfile):
         ne = lib.jx3p_host_edits(eid, ev_, ekind, 512)
         edits = []
         for i in range(ne):
-            if ekind[i] == 1:                        # a load's: performEdit alone
-                edits.append(['performEdit', eid[i], ev_[i]])
-            else:
-                edits += [['beginEdit', eid[i], None], ['performEdit', eid[i], ev_[i]], ['endEdit', eid[i], None]]
+            edits += host_calls(eid[i], ev_[i], ekind[i])
             rt.append((eid[i], ev_[i]))              # the round trip sends every performEdit back, as the oracle's
         n1 = lib.jx3p_product_pending(pend, 5 * 512)
         flat = list(pend)
@@ -306,22 +331,26 @@ def main():
     if '--mutants' in a:                     # each mutant must make at least one chain RED
         # ... on chains that are GREEN without it: a RED a mutant finds on a chain already RED proves nothing
         # (playbook 210: at JX-18 the clean chains 0 and 1 were RED and 'BITES' hid the loads' host edits)
-        r = subprocess.run([sys.executable, __file__, '--chains', '0,1,4,5,6'], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, __file__, '--chains', '0,1,4,5,6,7'], capture_output=True, text=True)
         if r.returncode:
             print('jx_state_gate --mutants: REFUSE -- the clean chains are RED:\n' + r.stdout[-1500:])
             return 1
         bitten = 0
-        for m in (1, 2, 3, 'ks', 'edit', 'ccof'):
-            r = subprocess.run([sys.executable, __file__, '--chains', {'ks': '4', 'edit': '6', 'ccof': '5'}.get(m, '0,1'),
+        muts = (1, 2, 3, 'ks', 'edit', 'ccof', 'gesture')
+        for m in muts:
+            r = subprocess.run([sys.executable, __file__, '--chains',
+                                {'ks': '4', 'edit': '6', 'ccof': '5', 'gesture': '7'}.get(m, '0,1'),
                                 '--mutant', str(m)], capture_output=True, text=True)
             print('  mutant %s: %s' % (m, 'RED (bites)' if r.returncode else 'GREEN -- DID NOT BITE'), flush=True)
             bitten += r.returncode != 0
-        print('jx_state_gate --mutants: %s' % ('BITES (6 of 6)' if bitten == 6 else 'DID NOT BITE on %d of 6' % (6 - bitten)))
-        return 0 if bitten == 6 else 1
+        print('jx_state_gate --mutants: %s' % ('BITES (%d of %d)' % (bitten, len(muts)) if bitten == len(muts) else
+                                               'DID NOT BITE on %d of %d' % (len(muts) - bitten, len(muts))))
+        return 0 if bitten == len(muts) else 1
     so = os.path.join(tmp, 'libjx3p.so')
     mv = a[a.index('--mutant') + 1] if '--mutant' in a else None
     mut = [] if mv is None else ['-DJX_KS_TOOTH=1'] if mv == 'ks' else ['-DJX_EDIT_TOOTH=1'] if mv == 'edit' else \
-        ['-DJX_CCOF_TOOTH=1'] if mv == 'ccof' else ['-DJX_STATE_TOOTH=%s' % mv]
+        ['-DJX_CCOF_TOOTH=1'] if mv == 'ccof' else ['-DJX_GESTURE_TOOTH=1'] if mv == 'gesture' else \
+        ['-DJX_STATE_TOOTH=%s' % mv]
     subprocess.run(['cc', '-std=c99', '-O2', '-ffp-contract=off', '-fno-strict-aliasing', '-shared', '-fPIC', '-o', so] +
                    mut + [os.path.join(REPO, s) for s in SRCS] + ['-lm'], check=True)
     bad, nsteps = 0, 0

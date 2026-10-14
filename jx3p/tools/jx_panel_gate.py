@@ -36,10 +36,13 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
   --tooth N      builds JX-3P.exe with -DEXE_TOOTH=N (jx3p/gui/win/jx3p_win.c) and runs it: must FAIL --
                  3 a jx3pLatchButton flips its other bit, 4 a jx3pSlider's click does not turn at the ends,
                  5 exprLatchButton's on and off pairs swapped, 6 patchSelectButton's lanes swapped,
-                 7 patchBlock loads the next patch, 8 the latch family presses at the down (the plugin: at the up)
-  --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 2 the right and bottom edges inside,
+                 7 patchBlock loads the next patch, 8 the latch family presses at the down (the plugin: at the up),
+                 9 a jx3pSlider's drag steps are final sets (the plugin keeps one host edit open through a drag)
+  --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 1 a panel's controls searched first
+                 to last -- the JX has three overlapping pairs, each in one panel --, 2 the right and bottom edges inside,
                  3 closed panels searched, 4 Shift / Ctrl / Alt ignored, 5 a greyed Forget acts, 6 labels and displays
-                 searched, 7 controls with many values searched): must FAIL
+                 searched, 7 controls with many values searched): must FAIL; 8 (the panels before the controls) cannot:
+                 no overlap across panels
 Wine: $WINE (default /usr/lib/wine/wine64); a private prefix in build/jx_panel_gate/wine, the program's own files
 (%APPDATA%\\JX-3P) removed before each run.
 """
@@ -305,10 +308,12 @@ def jx_by_panel(items):
 
 
 def edits_of_exe(t):
-    """a '# hostedit ID KIND BITS' line as the host sees it: an editor's set begin / perform / end, a load's perform"""
+    """a '# hostedit ID KIND BITS' line as the host sees it (jx3p_host_edits' kinds): 0 an editor's final set with no
+    edit open -- beginEdit / performEdit / endEdit; 1 a load's performEdit; the controller's one open edit (a drag):
+    2 beginEdit / performEdit, 3 performEdit, 4 performEdit / endEdit"""
     pid, kind, v = int(t[2]), int(t[3]), f64(t[4])
-    return [('performEdit', pid, v)] if kind == 1 else [('beginEdit', pid, None), ('performEdit', pid, v),
-                                                         ('endEdit', pid, None)]
+    return (([('beginEdit', pid, None)] if kind in (0, 2) else []) + [('performEdit', pid, v)] +
+            ([('endEdit', pid, None)] if kind in (0, 4) else []))
 
 
 def queue_rec(kind, off, rec):
@@ -359,6 +364,7 @@ def oracle(log):
         if mine != exe_edits:
             fail('%s: host edits -- the plugin %s, the program %s' % (where(), mine[:6], exe_edits[:6]))
         res['n']['edits'] += len(mine)
+        res['n']['open edits'] += bool(mine) and any(e[0] == 'beginEdit' for e in mine) and mine[-1][0] != 'endEdit'
         exe_edits = []
 
     def ccmap(st):
@@ -537,8 +543,8 @@ def oracle(log):
             pid, v = int(t[1]), int(t[2])
             o = g.obj.get(pid)
             if o is not None:
-                h.call(g.IB + SET, rcx=g.model, rdx=o, r8=v & 0xFFFFFFFF, r9=1 if t[0] == 'model_set' else int(t[3]),
-                       count=500_000_000)
+                h.call(g.IB + SET, rcx=g.model, rdx=o, r8=v & 0xFFFFFFFF,       # the set's flag: the program's
+                       r9=(int(t[3]) if len(t) > 3 else 1) if t[0] == 'model_set' else int(t[3]), count=500_000_000)
             else:
                 res['notes'].append('%s 0x%X: not a value object the plugin\'s records name' % (t[0], pid))
         elif t[0] == 'pm_commit':
@@ -668,7 +674,7 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False):
             if tn == 'patchBlock':
                 picks = rnd.sample(ctls, min(len(ctls), 6 if quick else 24))
             elif quick:
-                picks = rnd.sample(picks, min(len(picks), 6))
+                picks = rnd.sample(picks, min(len(picks), 12 if tn == 'jx3pSlider' else 6))
             for k, _, l, t, r, b in picks:
                 # what the control reads: its value / the CHORUS state's operands / the current patch
                 if tn in ('jx3pLatchButton', 'jx3pSlider'):
@@ -773,6 +779,7 @@ def main():
     reach = {
         'every JX class pressed and changing the state': all(ch[c] > 0 for c in JX_TYPES),
         'a slider dragged': n['slider moves'] > 0,
+        'a drag holding the host edit open (beginEdit, no endEdit yet)': n['open edits'] > 0,
         'double clicks': sum(v for k, v in pr.items() if k.endswith(' dbl')) > 0,
         'the CC menu taken, a learn, a forget, the CC map moved': n['cc taken'] > 0 and n['learn'] > 0
         and n['forget'] > 0 and n['moved'] > 0,
