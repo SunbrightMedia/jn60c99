@@ -249,14 +249,14 @@ verify-recipe:
 	fresh $(SCRATCH)/led_meter_ref.pkl || python3 tools/verify/led_meter_gate.py --ref || FAIL=1; \
 	python3 tools/verify/led_meter_gate.py --port || FAIL=1; \
 	python3 tools/verify/led_meter_gate.py --port-tooth || FAIL=1; \
-	echo "=== THE PATCH WINDOW (CLAIMS A39): the plugin's patch manager -- keys, buttons, list and bank name mouse, dialogs, files, histories, model calls after every command, plugin vs port; 19 teeth ==="; \
-	for sp in 9:40 1:200 2:200 3:200 4:200 5:200 6:200 7:200 100:200; do \
+	echo "=== THE PATCH WINDOW (CLAIMS A39): the plugin's patch manager -- keys, buttons, list and bank name mouse, dialogs, files, histories, model calls after every command, plugin vs port; 20 teeth ==="; \
+	for sp in 9:40 1:200 2:200 3:200 4:200 5:200 6:200 7:200 100:200 14:200; do \
 	  s=$${sp%%:*}; n=$${sp##*:}; \
 	  fresh $(SCRATCH)/patch_manager_ref2_$${s}_$${n}.pkl || rm -f $(SCRATCH)/patch_manager_ref2_$${s}_$${n}.pkl; \
 	  python3 tools/verify/patch_manager_gate.py --seed $$s --steps $$n > $(SCRATCH)/pm_gate_$$s.log 2>&1 || FAIL=1; \
 	  grep -v '^REACH' $(SCRATCH)/pm_gate_$$s.log | tail -5; \
 	done; \
-	for ts in 1:9:40 2:5:200 3:9:40 4:1:200 5:6:200 6:9:40 7:9:40 8:100:200 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 14:9:40 15:9:40 16:1:200 17:9:40 18:9:40 19:1:200; do \
+	for ts in 1:9:40 2:5:200 3:9:40 4:1:200 5:6:200 6:9:40 7:9:40 8:100:200 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 14:9:40 15:9:40 16:1:200 17:9:40 18:9:40 19:1:200 20:14:200; do \
 	  t=$${ts%%:*}; r=$${ts#*:}; \
 	  python3 tools/verify/patch_manager_gate.py --seed $${r%%:*} --steps $${r##*:} --tooth $$t > $(SCRATCH)/pm_tooth_$$t.log 2>&1 || { echo "patch manager tooth $$t DID NOT BITE"; FAIL=1; }; \
 	  tail -1 $(SCRATCH)/pm_tooth_$$t.log; \

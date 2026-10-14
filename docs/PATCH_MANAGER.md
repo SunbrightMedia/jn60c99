@@ -103,7 +103,12 @@ name at (column x width + left + 3, row x height + top + 1), the selected one in
   each a bank named by its file (a name not among the banks', rva 0x334F20); a malformed file is not a
   bank; none: one "Initial". The current bank: the one named by the setting PatchManager/BankName.
 - Save all (rva 0x336FD0): every bank to `<data>/<name>.bin` through tmp.tmp (written, the old file
-  deleted, tmp moved); a .bin there no bank wrote is moved to `<name>.bak` (unique: "<name> 1.bak", ...).
+  deleted, tmp moved); a .bin there no bank wrote is moved to `<name>.bak`, the first of "<name>",
+  "<name> 1", ... (to 999) whose bytes equal none of the folder's .bak names -- listed once, after the banks
+  are written, compared by length and memcmp (rva 0x334F20, READ). Letter case counts: with "Factory.bak"
+  there, "factory.bin" goes to "factory.bak", and the file system refuses the move (factory.bin stays).
+  The port had asked the file system (case-blind) and chose "factory 1.bak": found 2026-10-14 by the JX
+  gate's seed 7 (EXECUTED), fixed in gui/juno_pm.c for both apps; tooth 20 puts the case-blind compare back.
   When: at the 6002nd tick of the 50 ms timer (rva 0x32F280, ~300 s) and at the last detach.
 - A folder's names come in NTFS's order (upper case, ordinal: FindFirstFile on NTFS).
 - The open dialog (rva 0x40B5D0, EXECUTED): many files; the first item's file-system path
@@ -137,14 +142,17 @@ name at (column x width + left + 3, row x height + top + 1), the selected one in
   every bank's every history State (name, view flag, image, the 64 records), cursors, current bank,
   selection, clipboard, number format, autosave counter, the view's image and its bank / patch values,
   the window's values, the dialogs asked, the file operations in order, every file of every folder, and
-  the model calls in order. Seeds 9 (40 commands), 1-7 (200), 100 (281, the deep history): GREEN. Teeth
+  the model calls in order. Seeds 9 (40 commands), 1-7 and 14 (200), 100 (281, the deep history): GREEN
+  (seeds 8, 10-13 also, 2026-10-14). Teeth
   (`--tooth N`, `-DPM_TOOTH=N`), each seen to bite: 1 inc / dec wrap (seed 9), 2 undo without the view's
   swap (5), 3 insert replaces (9), 4 no delete question (1), 5 a bank name's duplicate test with case
   (6), 6 no .bak moves (9), 7 a drag moves nothing (9), 8 the history one State short (100), 9 the body's
   name kept (9), 10 the format's start 0 (9), 11 no key / mouse tail (9), 12 no list value in the button
   tail (9), 13 the window never closes (9), 14 the listener's reset gone (9), 15 no history collapse at
   the open (9), 16 no tail for a refused name (1), 17 an import's second name read as a path (9), 18 no
-  tail after the bank menu (9), 19 the menu on the bank name's button (1).
+  tail after the bank menu (9), 19 the menu on the bank name's button (1), 20 the backup name compared
+  case-blind (14). The seeds come from `jx3p/tools/jx_pm_teeth_sweep.py --juno` (every tooth on every
+  seed, each seed GREEN first): a change to the command script re-seeds every tooth (playbook 256).
 - `tools/dist/exe_pm_check.py`: the gate's references through JUNO-60.exe under Wine (`--pm-script`):
   its key, mouse and button handlers, its Win32 files on real folders, its dialogs answered by the
   script: all 9 seeds, every command equal to the plugin.

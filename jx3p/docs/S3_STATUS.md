@@ -3,6 +3,24 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-14 (21) — THE FULL VERIFY'S RED: A STALE TOOTH SEED, AND A REAL DEFECT THE SWEEP FOUND (playbook 256)
+
+- jxverify_144e (144eb88a) EXIT 2 after 15.7 h, in section 3h: the patch window's tooth 5 did not bite on seed 1.
+  Sections S, 0-3f GREEN in that run (3d's 201 plugin runs, 3e EXACTLY 0, 3f's 224 saves). Cause: row 20 gave the JX
+  script the bank name control's presses -- every JX seed's commands changed after the first one -- and only the new
+  teeth 18 / 19 were run on it (the miss: playbook 256).
+- THE SWEEP (jx3p/tools/jx_pm_teeth_sweep.py: every tooth on every candidate seed, each seed's unchanged port GREEN
+  first) found seed 7 RED on the unchanged port: at a save all the plugin moves a .bin no bank wrote to the first of
+  "<name>", "<name> 1", ... not among the folder's .bak names compared byte for byte (rva 0x334F20, READ) -- "Factory.bak"
+  does not stop "factory", and the file system refuses the move. The port asked the file system (case-blind) and moved
+  to "factory 1.bak". Fixed in gui/juno_pm.c (both apps); tooth 20 = the case-blind compare. EXECUTED after the fix: JX
+  seeds 1-9, 100 GREEN, teeth 1-20 bite (tooth 5 on seed 4, 20 on seed 7; job jxpm_sweep2); JUNO-60 seeds 1-8, 9 (40),
+  10-14, 100 GREEN, teeth 1-19 on the Makefile's seeds, 20 on seed 14 (jobs junopm_sweep1, junopm_t20).
+- jx_verify.sh: JX_VERIFY_ONLY (a resumed run names the sections it ran; the verdict line says so), the cheap fragile
+  gates first (S, 3h, 6), every seed a tooth uses graded GREEN in the same run. The rest of the verify runs on b6a0562d
+  as job jxverify_b6a0: S, 3h, 6, 3i, 3g, 4, 5, 5b, 5c; sections 0-3f carry over from jxverify_144e (their commands are
+  identical and none of their gates builds gui/juno_pm.c, the one source changed -- EXECUTED: section compare, diff).
+
 ## 2026-10-14 (20) — ROW 20 CLOSED: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (playbooks 251-255)
 
 - THE GATE: jx3p/tools/jx_panel_gate.py -- the JUNO's cc_menu_gate method widened to every mouse event on the five JX
