@@ -633,11 +633,15 @@ static int has_ext(const char *n, const char *ext)
 }
 
 /* save all (rva 0x336FD0): every bank to <data>/<name>.bin; a .bin there no bank wrote is moved
- * to <name>.bak (a name not among the .bak files: "<name>", "<name> 1", ...) */
+ * to <name>.bak, the first of "<name>", "<name> 1", ... (to 999) that is not among the .bak files'
+ * names -- the folder listed once, after the banks are written, and the names compared byte for
+ * byte (rva 0x334F20: same length and memcmp). So a "Factory.bak" does not stop "factory": the
+ * move to "factory.bak" is then refused by the file system, as the plugin's is (EXECUTED
+ * 2026-10-14, the JX patch window gate's seed 7) */
 int juno_pm_save_all(juno_pm *pm)
 {
-    char **bins = NULL, **all, path[1024], to[1024];
-    int nb = 0, nall = 0, i, j;
+    char **bins = NULL, **all, **baks = NULL, path[1024], to[1024], cand[600];
+    int nb = 0, nall = 0, nbak = 0, i, j;
     if (!pm || !pm->dir[0] || !pm->dir[0][0]) return 0;
     all = pm->io.list ? pm->io.list(pm->io.u, pm->dir[0], &nall) : NULL;
     for (i = 0; i < nall; ++i)
@@ -656,19 +660,37 @@ int juno_pm_save_all(juno_pm *pm)
             for (j = 0; j < nb; ++j)
                 if (bins[j] && !strcmp(bins[j], s->name)) { free(bins[j]); bins[j] = NULL; break; }
     }
+    for (j = 0; j < nb && !baks; ++j)            /* a .bin left: the .bak names, listed once */
+        if (bins[j] && PM_TOOTH != 6) {
+            int nl = 0;
+            char **l = pm->io.list ? pm->io.list(pm->io.u, pm->dir[0], &nl) : NULL;
+            baks = calloc((size_t)(nl > 0 ? nl : 1), sizeof *baks);
+            for (i = 0; baks && i < nl; ++i)
+                if (has_ext(l[i], ".bak")) {
+                    baks[nbak] = sdup(l[i]);
+                    baks[nbak++][strlen(l[i]) - 4] = 0;
+                }
+            for (i = 0; i < nl; ++i) free(l[i]);
+            free(l);
+            if (!baks) break;
+        }
     for (j = 0; j < nb; ++j) {
-        int n, hit;
+        int n, k = 0;
         if (!bins[j] || PM_TOOTH == 6) { free(bins[j]); continue; }
         for (n = 0; n < 1000; ++n) {
-            if (n) snprintf(to, sizeof to, "%s/%s %d.bak", pm->dir[0], bins[j], n);
-            else   snprintf(to, sizeof to, "%s/%s.bak", pm->dir[0], bins[j]);
-            hit = pm->io.exists && pm->io.exists(pm->io.u, to);
-            if (!hit) break;
+            if (n) snprintf(cand, sizeof cand, "%s %d", bins[j], n);
+            else   snprintf(cand, sizeof cand, "%s", bins[j]);
+            for (k = 0; k < nbak; ++k)
+                if (PM_TOOTH == 20 ? same_lower(baks[k], cand) : !strcmp(baks[k], cand)) break;   /* TOOTH 20: case-blind */
+            if (k == nbak) break;
         }
+        snprintf(to, sizeof to, "%s/%s.bak", pm->dir[0], cand);
         path_join(path, sizeof path, pm->dir[0], bins[j], ".bin");
         if (n < 1000 && pm->io.move) pm->io.move(pm->io.u, path, to);
         free(bins[j]);
     }
+    for (i = 0; i < nbak; ++i) free(baks[i]);
+    free(baks);
     free(bins);
     for (i = 0; i < nall; ++i) free(all[i]);
     free(all);
