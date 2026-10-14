@@ -103,17 +103,19 @@ python3 "$HERE/jx_record_gate.py" --tooth
 # port (gui/juno_pm.c on the JX bridge); its teeth are the JUNO's PM_TOOTH set
 rm -f "$REPO"/scratchpad/jx_art_patch_manager_ref2_*.pkl     # every reference made from the plugin in this run
 # (each gate's own exit status decides: sh has no pipefail, a pipe after the gate would hide it -- playbook 251)
-for sp in 9:40 1:200 5:200 100:150; do
+# every seed a tooth below uses is graded GREEN here first (on a RED seed every tooth would "bite")
+for sp in 9:40 1:200 5:200 100:150 4:200 7:200; do
   if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${sp%%:*} --steps ${sp##*:}); then
     echo "$out" | grep -v '^REACH'; echo "[jx verify] FAIL -- the patch manager gate, seed ${sp%%:*}"; exit 1
   fi
   echo "$out" | grep -v '^REACH'
 done
-# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites; 18 and 19 are the bank name control's
-# presses on the art's button (18 no tail after the bank menu: seed 5; 19 the menu on the button: seed 1; 2026-10-13,
-# job jxpm_teeth1819 -- 18 did not bite on seeds 1, 9, 100: no menu answered with a bank there)
-for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:1:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
-          14:9:40 15:9:40 16:1:200 17:9:40 18:5:200 19:1:200; do
+# the JUNO's teeth (gui/juno_pm.c PM_TOOTH), each on a seed where it bites -- chosen by jx_pm_teeth_sweep.py
+# (2026-10-14, job jxpm_sweep2: teeth 1-20 x seeds 1-9, 100; playbook 256: the bank name presses of row 20 had
+# re-seeded the script and tooth 5 lost seed 1). 18 and 19 are the bank name control's presses on the art's button;
+# 20 is the backup name compared case-blind (seed 7: a "Factory.bak" beside "factory.bin", gui/juno_pm.c save all)
+for ts in 1:9:40 2:1:200 3:9:40 4:1:200 5:4:200 6:9:40 7:9:40 8:100:150 9:9:40 10:9:40 11:9:40 12:9:40 13:9:40 \
+          14:9:40 15:9:40 16:1:200 17:9:40 18:5:200 19:1:200 20:7:200; do
   t=${ts%%:*}; r=${ts#*:}
   if ! out=$(python3 "$HERE/jx_patch_manager_gate.py" --seed ${r%%:*} --steps ${r##*:} --tooth $t); then
     echo "$out" | tail -3; echo "[jx verify] FAIL -- patch manager tooth $t did not bite"; exit 1
