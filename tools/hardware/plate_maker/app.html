@@ -1,0 +1,618 @@
+<title>Module Plate Maker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench -- the rack panel drawn 1:1-proportional as the main surface, tools in a side rail. */
+:root {
+  --bg: #E7EBED; --surface: #F6F8F9; --ink: #172026; --muted: #57636B; --line: #C6CFD4;
+  --plate: #D3DADE; --plate-edge: #9AA6AD; --ear: #B9C3C9; --gridline: rgba(23,32,38,.10);
+  --accent: #B45F06; --accent-soft: rgba(180,95,6,.14); --bad: #C0322A; --ok: #2D7A4B;
+  --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF;
+  --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171A; --surface: #1A2125; --ink: #E2E8EB; --muted: #8E9AA2; --line: #2D373D;
+  --plate: #283137; --plate-edge: #4A565D; --ear: #343F46; --gridline: rgba(226,232,235,.08);
+  --accent: #F2A33A; --accent-soft: rgba(242,163,58,.16); --bad: #FF6B5E; --ok: #5CC488; --sel: #6FA6FF;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12171A; --surface: #1A2125; --ink: #E2E8EB; --muted: #8E9AA2; --line: #2D373D;
+  --plate: #283137; --plate-edge: #4A565D; --ear: #343F46; --gridline: rgba(226,232,235,.08);
+  --accent: #F2A33A; --accent-soft: rgba(242,163,58,.16); --bad: #FF6B5E; --ok: #5CC488; --sel: #6FA6FF;
+  color-scheme: dark }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 14px/1.45 var(--body); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 28px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h1 { font-size: 1.5rem; } h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.num, input[type=number], .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 6px 10px; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible, .board:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+header.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 14px; }
+header.bar .sub { color: var(--muted); font-size: .9rem; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 5px 10px; font-family: var(--display); font-weight: 600; background: var(--surface); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed=true] { background: var(--ink); color: var(--bg); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.pill { font-family: var(--mono); font-size: .8rem; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.pill.bad { border-color: var(--bad); color: var(--bad); } .pill.ok { border-color: var(--ok); color: var(--ok); }
+.wrap { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+aside { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.palette { display: flex; flex-direction: column; gap: 4px; max-height: 470px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.pal { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; align-items: center; text-align: left; padding: 5px 6px; border-color: transparent; background: transparent; }
+.pal:hover { background: var(--bg); border-color: var(--line); }
+.pal svg { width: 34px; height: 26px; }
+.pal .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal .cells { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hint { color: var(--muted); font-size: .82rem; }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-size: 1.05rem; }
+.params { display: grid; grid-template-columns: minmax(0,1fr) 78px; gap: 6px 8px; align-items: center; margin-top: 8px; }
+.params label { font-size: .86rem; }
+.params input { width: 100%; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); text-align: right; }
+.params .grp { grid-column: 1 / -1; font-family: var(--display); font-weight: 600; color: var(--muted); margin-top: 6px; font-size: .85rem; letter-spacing: .05em; text-transform: uppercase; }
+main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.viewbar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.viewbar label { display: inline-flex; gap: 5px; align-items: center; font-size: .88rem; }
+.stage { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+#panel { display: block; width: 100%; min-width: 560px; height: auto; touch-action: none; user-select: none; }
+#panel .plate { fill: var(--plate); stroke: var(--plate-edge); stroke-width: .4; }
+#panel .ear { fill: url(#hatch); stroke: none; }
+#panel .gl { stroke: var(--gridline); stroke-width: .25; }
+#panel .board { cursor: grab; }
+#panel .board.drag { cursor: grabbing; }
+#panel .board .pcb { fill: var(--mask); stroke: var(--mask-edge); stroke-width: .35; }
+#panel .board .hole { fill: var(--plate); stroke: #C9A44A; stroke-width: .7; }
+#panel .board.sel .pcb { stroke: var(--sel); stroke-width: 1.2; }
+#panel .board.bad .pcb { stroke: var(--bad); stroke-width: 1.4; }
+#panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
+#panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
+#panel .dim { font: 5px var(--mono); fill: var(--muted); }
+#panel .pillar { fill: var(--accent-soft); stroke: var(--accent); stroke-width: .3; }
+.lists { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 14px; }
+@media (max-width: 880px) { .lists { grid-template-columns: minmax(0,1fr); } }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--display); font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.issues { margin: 0; padding-left: 18px; color: var(--bad); }
+.issues.warn { color: var(--accent); }
+.okline { color: var(--ok); }
+#view3d { width: 100%; aspect-ratio: 16 / 7; max-width: 100%; display: block; border-radius: 6px; background: var(--bg); touch-action: none; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: .9rem; }
+.example { font-size: .8rem; color: var(--accent); font-family: var(--mono); }
+@media (prefers-reduced-motion: no-preference) { button { transition: border-color .12s; } }
+</style>
+
+<header class="bar">
+  <div>
+    <h1>Module Plate Maker</h1>
+    <div class="sub">19 in rack panel, 21 mm grid, printed in pieces for a 180 mm bed</div>
+  </div>
+  <div class="seg" id="depths" role="group" aria-label="Panel depth"></div>
+  <div class="pills" id="pills"></div>
+</header>
+
+<div class="wrap">
+  <aside>
+    <section class="card">
+      <h2>Boards</h2>
+      <div class="hint">Click a board to add it at the first free place. Drag boards on the panel. Keys: R rotates, Delete removes, arrows move one cell.</div>
+      <div class="palette" id="palette"></div>
+    </section>
+    <section class="card" id="selCard">
+      <h2>Selected</h2>
+      <div id="selInfo" class="hint">No board selected.</div>
+      <div class="row">
+        <button id="bRot" type="button">Rotate 90°</button>
+        <button id="bDup" type="button">Duplicate</button>
+        <button id="bDel" type="button">Remove</button>
+      </div>
+    </section>
+    <section class="card">
+      <details id="paramsBox">
+        <summary>Pillars and joints</summary>
+        <div class="params" id="params"></div>
+      </details>
+    </section>
+    <section class="card">
+      <h2>Export</h2>
+      <div class="row">
+        <button class="primary" id="bStl" type="button">Download STL pieces (.zip)</button>
+      </div>
+      <div class="row">
+        <button id="bCoupon" type="button">Joint test pieces</button>
+        <button id="bSvg" type="button">Layout SVG 1:1</button>
+      </div>
+      <div class="row">
+        <button id="bSave" type="button">Save layout</button>
+        <button id="bLoad" type="button">Load layout</button>
+        <button id="bClear" type="button">Clear</button>
+        <input type="file" id="fLoad" accept=".json,application/json" hidden>
+      </div>
+      <div class="hint">Print the joint test first: three pairs at three clearances. Use the clearance of the pair that fits best.</div>
+    </section>
+  </aside>
+
+  <main>
+    <div class="viewbar">
+      <label><input type="checkbox" id="vFront" checked> Front silk</label>
+      <label><input type="checkbox" id="vBack"> Back silk</label>
+      <label><input type="checkbox" id="vCuts" checked> Print pieces</label>
+      <label><input type="checkbox" id="vGrid" checked> Grid</label>
+      <span class="example" id="exampleTag" hidden>Example layout. Change it as you like.</span>
+    </div>
+    <div class="stage"><svg id="panel" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="lists">
+      <section class="card">
+        <h2>Print pieces</h2>
+        <div id="pieceMsg"></div>
+        <div style="overflow-x:auto"><table id="pieceTable"></table></div>
+      </section>
+      <section class="card">
+        <h2>Checks</h2>
+        <div id="checks"></div>
+      </section>
+    </div>
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><h2>3D preview</h2><span class="hint">Drag to turn, wheel to zoom. Pieces are spread apart a little.</span></div>
+      <canvas id="view3d"></canvas>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*@GEOM@*/
+</script>
+<script>
+(function () {
+'use strict';
+const G = window.PlateGeom;
+const BOARDS = /*@BOARDS@*/null;
+const SVGNS = 'http://www.w3.org/2000/svg';
+const $ = id => document.getElementById(id);
+const KEY = 'module-plate-maker-v1';
+
+const PARAM_UI = [
+  ['Plate', [['plateT', 'Plate thickness', 'mm']]],
+  ['Pillars', [['shoulderH', 'Board height above plate top', 'mm'], ['shoulderD', 'Shoulder diameter (max 8)', 'mm'],
+    ['footFlare', 'Shoulder foot flare', 'mm'], ['pinD', 'Pin diameter (hole is 3.2)', 'mm'], ['pinH', 'Pin height above shoulder', 'mm']]],
+  ['Joints', [['clearance', 'Joint clearance (total gap)', 'mm'], ['tabDepth', 'Tab depth', 'mm'], ['tabNeck', 'Tab neck width', 'mm'],
+    ['tabHead', 'Tab head width', 'mm'], ['tabSpacing', 'Tab spacing', 'mm']]],
+  ['Printer', [['maxPiece', 'Max piece size', 'mm']]]
+];
+
+let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
+let nextId = 1;
+let derived = null;
+
+function boardIndex(name) { return BOARDS.findIndex(b => b.name === name); }
+
+function firstFree(bi, rot, insts, g) {
+  for (let cy = 0; cy < g.ny; cy++) for (let cx = 0; cx < g.nx; cx++) {
+    const inst = { b: bi, cx, cy, rot };
+    const v = G.validate(BOARDS, insts.concat([inst]), g, S.params);
+    if (!v.issues[v.issues.length - 1].length) return inst;
+  }
+  return null;
+}
+
+function exampleState() {
+  S = { depth: 'MAX', insts: [], params: Object.assign({}, G.DEFAULTS), sel: null, example: true };
+  const g = G.grid(G.depthMM(S.depth));
+  const order = ['EspMotherboard', 'muxboardv1', 'SatelliteBoard', 'HeadphoneBreakout', 'midi3', 'KeyswitchKeybed', 'SegmentBackpack',
+    'buttonpack3', 'FaderBoard', 'FaderBoard', 'FaderBoard', 'PotentiometerPack1', 'PotentiometerPack1', 'SwitchBoard', 'buttonpack2', 'PotentiometerBoard'];
+  for (const n of order) {
+    const bi = boardIndex(n); if (bi < 0) continue;
+    const inst = firstFree(bi, 0, S.insts, g);
+    if (inst) S.insts.push(Object.assign({ id: nextId++ }, inst));
+  }
+}
+
+function serial() {
+  return { app: 'module-plate-maker', version: 1, depth: S.depth, params: S.params,
+    boards: S.insts.map(i => ({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot })) };
+}
+function loadSerial(o) {
+  if (!o || o.app !== 'module-plate-maker') throw new Error('This file is not a Module Plate Maker layout.');
+  const missing = [];
+  const insts = [];
+  for (const x of o.boards || []) {
+    const bi = boardIndex(x.name);
+    if (bi < 0) { missing.push(x.name); continue; }
+    insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3 });
+  }
+  S = { depth: G.DEPTHS.some(d => d.key === o.depth) ? o.depth : 'MAX', insts,
+    params: Object.assign({}, G.DEFAULTS, o.params || {}), sel: null, example: false };
+  if (missing.length) toast('Not in this app: ' + missing.join(', '));
+}
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(serial())); } catch (e) { /* storage blocked: fine */ } }
+function restore() {
+  try { const t = localStorage.getItem(KEY); if (t) { loadSerial(JSON.parse(t)); return true; } } catch (e) { /* ignore */ }
+  return false;
+}
+
+/* ---------- derived geometry ---------- */
+function derive() {
+  const g = G.grid(G.depthMM(S.depth));
+  const v = G.validate(BOARDS, S.insts, g, S.params);
+  const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
+  const plan = G.planCuts(g.W, g.D, pillars, S.params);
+  const pieces = plan.error ? [] : G.buildPieces(plan, pillars, S.params);
+  const pErr = [];
+  const P = S.params;
+  if (P.shoulderD > 8) pErr.push('Shoulder diameter is over 8 mm: it is wider than the board corner around each hole.');
+  if (P.pinD >= 3.2) pErr.push('Pin diameter must be less than the 3.2 mm hole.');
+  if (P.tabHead <= P.tabNeck) pErr.push('Tab head must be wider than the tab neck, or the joint does not lock.');
+  if (P.clearance < 0) pErr.push('Clearance cannot be negative.');
+  pieces.forEach(pc => { if (pc.size[0] > P.maxPiece + 1e-6 || pc.size[1] > P.maxPiece + 1e-6) pErr.push('Piece ' + pc.id + ' is larger than the max piece size.'); });
+  derived = { g, v, pillars, plan, pieces, pErr,
+    bad: v.issues.some(x => x.length) || !!plan.error || pErr.length > 0 };
+}
+
+/* ---------- drawing ---------- */
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const boardEls = new Map();
+
+function drawPanel() {
+  const svg = $('panel'), { g, v, plan, pieces } = derived;
+  svg.setAttribute('viewBox', `-4 -4 ${g.W + 8} ${g.D + 12}`);
+  let base = svg.querySelector('#base'), cuts = svg.querySelector('#cuts'), bl = svg.querySelector('#boards');
+  if (!base) {
+    const defs = el('defs', {}, svg);
+    const pat = el('pattern', { id: 'hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 4, height: 4, fill: 'var(--plate)' }, pat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 4, stroke: 'var(--ear)', 'stroke-width': 1.6 }, pat);
+    base = el('g', { id: 'base' }, svg); bl = el('g', { id: 'boards' }, svg); cuts = el('g', { id: 'cuts' }, svg);
+  }
+  base.innerHTML = '';
+  el('rect', { class: 'plate', x: 0, y: 0, width: g.W, height: g.D }, base);
+  el('rect', { class: 'ear', x: 0, y: 0, width: g.ear, height: g.D }, base);
+  el('rect', { class: 'ear', x: g.W - g.ear, y: 0, width: g.ear, height: g.D }, base);
+  if ($('vGrid').checked) {
+    for (let i = 0; i <= g.nx; i++) el('line', { class: 'gl', x1: g.gx0 + i * 21, y1: g.gy0, x2: g.gx0 + i * 21, y2: g.gy0 + g.ny * 21 }, base);
+    for (let j = 0; j <= g.ny; j++) el('line', { class: 'gl', x1: g.gx0, y1: g.gy0 + j * 21, x2: g.gx0 + g.nx * 21, y2: g.gy0 + j * 21 }, base);
+  }
+  const t = el('text', { class: 'dim', x: g.W / 2, y: g.D + 7, 'text-anchor': 'middle' }, base);
+  t.textContent = `${g.W.toFixed(1)} × ${g.D.toFixed(2)} mm   ·   ears ${g.ear.toFixed(3)} mm   ·   grid ${g.nx} × ${g.ny} cells of 21 mm`;
+
+  // boards (kept, transforms updated)
+  const seen = new Set();
+  S.insts.forEach((inst, k) => {
+    const b = BOARDS[inst.b], q = v.placed[k];
+    let e = boardEls.get(inst.id);
+    if (!e || e.dataset.b != inst.b) {
+      if (e) e.remove();
+      e = el('g', { class: 'board', tabindex: 0, role: 'button', 'aria-label': b.name }, bl);
+      e.dataset.id = inst.id; e.dataset.b = inst.b;
+      el('path', { class: 'pcb', d: 'M' + b.poly.map(p => p.join(' ')).join('L') + 'Z' }, e);
+      el('image', { class: 'silkB', href: b.silkB, x: 0, y: 0, width: b.w, height: b.h, opacity: .45 }, e);
+      el('image', { class: 'silkF', href: b.silkF, x: 0, y: 0, width: b.w, height: b.h }, e);
+      b.holes.forEach(h => el('circle', { class: 'hole', cx: h[0], cy: h[1], r: h[2] / 2 }, e));
+      e.addEventListener('pointerdown', startDrag);
+      e.addEventListener('focus', () => select(inst.id, false));
+      boardEls.set(inst.id, e);
+    }
+    e.setAttribute('transform', 'matrix(' + q.matrix.join(' ') + ')');
+    e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
+    e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
+    e.classList.toggle('sel', S.sel === inst.id);
+    e.classList.toggle('bad', v.issues[k].length > 0);
+    seen.add(String(inst.id));
+  });
+  for (const [id, e] of boardEls) if (!seen.has(String(id))) { e.remove(); boardEls.delete(id); }
+
+  cuts.innerHTML = '';
+  if ($('vCuts').checked && !plan.error) {
+    const rf = S.params.shoulderD / 2 + S.params.footFlare;
+    derived.pillars.forEach(p => el('circle', { class: 'pillar', cx: p[0], cy: p[1], r: rf }, cuts));
+    pieces.forEach(pc => {
+      el('path', { class: 'cut', d: 'M' + pc.poly.map(p => p[0].toFixed(3) + ' ' + p[1].toFixed(3)).join('L') + 'Z' }, cuts);
+      const lb = el('text', { class: 'pcl', x: pc.rect[0] + 4, y: pc.rect[1] + (pc.r ? S.params.tabDepth : 0) + 9 }, cuts);
+      lb.textContent = pc.id;
+    });
+  }
+}
+
+function drawPalette() {
+  const pal = $('palette'); pal.innerHTML = '';
+  BOARDS.forEach((b, bi) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pal';
+    const s = Math.max(b.w, b.h);
+    btn.innerHTML = `<svg viewBox="${-(s - b.w) / 2} ${-(s - b.h) / 2} ${s} ${s}" aria-hidden="true"><path fill="var(--mask)" d="M${b.poly.map(p => p.join(' ')).join('L')}Z"/></svg>` +
+      `<span class="nm"></span><span class="cells"></span>`;
+    btn.querySelector('.nm').textContent = b.name;
+    const cx = Math.round((Math.max(...b.holes.map(h => h[0])) - Math.min(...b.holes.map(h => h[0])) + 8.5) / 21);
+    const cy = Math.round((Math.max(...b.holes.map(h => h[1])) - Math.min(...b.holes.map(h => h[1])) + 8.5) / 21);
+    btn.querySelector('.cells').textContent = cx + '×' + cy;
+    btn.title = `${b.name}: ${b.w} × ${b.h} mm`;
+    btn.addEventListener('click', () => addBoard(bi));
+    pal.appendChild(btn);
+  });
+}
+
+function drawDepths() {
+  const box = $('depths'); box.innerHTML = '';
+  G.DEPTHS.forEach(d => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = d.key;
+    btn.title = d.label + ': ' + d.mm.toFixed(2) + ' mm';
+    btn.setAttribute('aria-pressed', S.depth === d.key);
+    btn.addEventListener('click', () => { S.depth = d.key; changed(); });
+    box.appendChild(btn);
+  });
+}
+
+function drawParams() {
+  const box = $('params'); box.innerHTML = '';
+  for (const [grp, items] of PARAM_UI) {
+    const h = document.createElement('div'); h.className = 'grp'; h.textContent = grp; box.appendChild(h);
+    for (const [k, lab] of items) {
+      const l = document.createElement('label'); l.htmlFor = 'p_' + k; l.textContent = lab + ' (mm)';
+      const i = document.createElement('input'); i.type = 'number'; i.id = 'p_' + k; i.step = k === 'clearance' ? '0.01' : '0.1';
+      i.value = S.params[k];
+      i.addEventListener('change', () => { const x = parseFloat(i.value); if (isFinite(x)) { S.params[k] = x; changed(); } else i.value = S.params[k]; });
+      box.appendChild(l); box.appendChild(i);
+    }
+  }
+}
+
+function drawSide() {
+  const { g, v, plan, pieces, pErr } = derived;
+  const nBad = v.issues.filter(x => x.length).length;
+  const pills = $('pills'); pills.innerHTML = '';
+  const add = (txt, cls) => { const s = document.createElement('span'); s.className = 'pill ' + (cls || ''); s.textContent = txt; pills.appendChild(s); };
+  add(S.insts.length + ' boards'); add(pieces.length + ' pieces');
+  add(derived.bad ? 'needs fixing' : 'ready to print', derived.bad ? 'bad' : 'ok');
+
+  const tb = $('pieceTable');
+  tb.innerHTML = '<tr><th>Piece</th><th>Size (mm)</th><th>Pillars</th></tr>' + pieces.map(pc =>
+    `<tr><td>${pc.id}</td><td class="n">${pc.size[0].toFixed(1)} × ${pc.size[1].toFixed(1)}</td><td class="n">${pc.pillars.length}</td></tr>`).join('');
+  $('pieceMsg').innerHTML = plan.error ? '' : `<div class="hint">Rows A–${String.fromCharCode(64 + plan.ys.length - 1)} from the top edge, columns from the left. Every pillar is whole on one piece.</div>`;
+
+  const ck = $('checks'); ck.innerHTML = '';
+  const list = (items, cls) => { const u = document.createElement('ul'); u.className = 'issues ' + (cls || ''); items.forEach(t => { const li = document.createElement('li'); li.textContent = t; u.appendChild(li); }); ck.appendChild(u); };
+  const errs = [];
+  S.insts.forEach((inst, k) => v.issues[k].forEach(t => errs.push(BOARDS[inst.b].name + ' at cell ' + inst.cx + ',' + inst.cy + ': ' + t)));
+  if (plan.error) errs.push(plan.error);
+  errs.push(...pErr);
+  if (errs.length) list(errs);
+  if (plan.warn && plan.warn.length) list(plan.warn, 'warn');
+  if (!errs.length && !(plan.warn && plan.warn.length)) {
+    const d = document.createElement('div'); d.className = 'okline';
+    d.textContent = 'All boards are on the grid, out of the ear zones and apart. Every cut misses every pillar.';
+    ck.appendChild(d);
+  }
+  $('bStl').disabled = derived.bad || !pieces.length;
+  $('exampleTag').hidden = !S.example;
+
+  const si = $('selInfo'), k = S.insts.findIndex(i => i.id === S.sel);
+  ['bRot', 'bDup', 'bDel'].forEach(id => $(id).disabled = k < 0);
+  if (k < 0) si.textContent = 'No board selected.';
+  else {
+    const inst = S.insts[k], b = BOARDS[inst.b], q = v.placed[k];
+    si.innerHTML = `<b></b><div class="mono hint"></div>`;
+    si.querySelector('b').textContent = b.name;
+    si.querySelector('div').textContent = `${q.w.toFixed(1)} × ${q.h.toFixed(1)} mm · cell ${inst.cx},${inst.cy} · ${inst.rot * 90}°`;
+  }
+}
+
+let t3 = null;
+function changed(keepExample) {
+  if (!keepExample) S.example = false;
+  derive(); drawDepths(); drawPanel(); drawSide(); persist();
+  clearTimeout(t3); t3 = setTimeout(draw3d, 250);
+}
+
+/* ---------- editing ---------- */
+function addBoard(bi) {
+  const g = G.grid(G.depthMM(S.depth));
+  const inst = firstFree(bi, 0, S.insts, g) || firstFree(bi, 1, S.insts, g);
+  if (!inst) { toast('No free place for ' + BOARDS[bi].name + ' at this depth.'); return; }
+  const id = nextId++; S.insts.push(Object.assign({ id }, inst)); S.sel = id; changed();
+}
+function select(id, redraw) { if (S.sel === id) return; S.sel = id; if (redraw !== false) changed(true); else { drawPanel(); drawSide(); } }
+function selInst() { return S.insts.find(i => i.id === S.sel); }
+function rotateSel() {
+  const i = selInst(); if (!i) return;
+  const g = derived.g, b = BOARDS[i.b];
+  // keep the board's centre near where it was
+  const before = G.place(b, i, g), cx0 = (before.bbox[0] + before.bbox[2]) / 2, cy0 = (before.bbox[1] + before.bbox[3]) / 2;
+  i.rot = (i.rot + 1) & 3;
+  const after = G.place(b, i, g);
+  i.cx += Math.round((cx0 - (after.bbox[0] + after.bbox[2]) / 2) / 21); i.cy += Math.round((cy0 - (after.bbox[1] + after.bbox[3]) / 2) / 21);
+  changed();
+}
+function removeSel() { const k = S.insts.findIndex(i => i.id === S.sel); if (k < 0) return; S.insts.splice(k, 1); S.sel = null; changed(); }
+function dupSel() { const i = selInst(); if (!i) return; const n = firstFree(i.b, i.rot, S.insts, derived.g); if (!n) { toast('No free place for a copy.'); return; } const id = nextId++; S.insts.push(Object.assign({ id }, n)); S.sel = id; changed(); }
+
+let drag = null;
+function svgPoint(evt) {
+  const svg = $('panel'), pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function startDrag(evt) {
+  const id = +evt.currentTarget.dataset.id, inst = S.insts.find(i => i.id === id);
+  if (!inst) return;
+  evt.preventDefault();
+  S.sel = id;
+  const p = svgPoint(evt);
+  drag = { inst, x: p.x, y: p.y, cx: inst.cx, cy: inst.cy, el: evt.currentTarget, pid: evt.pointerId, moved: false };
+  evt.currentTarget.setPointerCapture(evt.pointerId);
+  evt.currentTarget.classList.add('drag');
+  drawPanel(); drawSide();
+}
+window.addEventListener('pointermove', evt => {
+  if (!drag || evt.pointerId !== drag.pid) return;
+  const p = svgPoint(evt);
+  const cx = drag.cx + Math.round((p.x - drag.x) / 21), cy = drag.cy + Math.round((p.y - drag.y) / 21);
+  if (cx !== drag.inst.cx || cy !== drag.inst.cy) { drag.inst.cx = cx; drag.inst.cy = cy; drag.moved = true; derive(); drawPanel(); drawSide(); }
+});
+window.addEventListener('pointerup', evt => {
+  if (!drag || evt.pointerId !== drag.pid) return;
+  drag.el.classList.remove('drag');
+  const moved = drag.moved; drag = null;
+  changed(!moved);
+});
+document.addEventListener('keydown', evt => {
+  if (evt.target.closest && evt.target.closest('input, select, textarea')) return;
+  const i = selInst(); if (!i) return;
+  const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[evt.key];
+  if (mv) { i.cx += mv[0]; i.cy += mv[1]; evt.preventDefault(); changed(); }
+  else if (evt.key === 'r' || evt.key === 'R') { rotateSel(); evt.preventDefault(); }
+  else if (evt.key === 'Delete' || evt.key === 'Backspace') { removeSel(); evt.preventDefault(); }
+  else if (evt.key === 'Escape') { S.sel = null; changed(true); }
+});
+$('panel').addEventListener('pointerdown', evt => { if (!evt.target.closest('.board') && S.sel !== null) { S.sel = null; changed(true); } });
+
+/* ---------- files ---------- */
+let dlNs = null;
+const dlReady = (window.claude && typeof window.claude.use === 'function')
+  ? window.claude.use('downloads').then(ns => { dlNs = ns; }, () => { dlNs = null; }) : Promise.resolve();
+async function saveFile(name, data) {
+  await dlReady;
+  if (dlNs) {
+    try { await dlNs.save({ filename: name, data: new Blob([data]) }); toast('Saved ' + name); }
+    catch (e) { toast(e && e.code === 'declined' ? 'Download cancelled.' : 'Could not save the file: ' + ((e && e.message) || 'unknown reason')); }
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([data]));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  toast('Saved ' + name);
+}
+function stamp() { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; }
+
+function readme(kind) {
+  const p = S.params, g = derived.g;
+  return [`Module Plate Maker -- ${kind}`, '',
+    `Panel ${g.W.toFixed(2)} x ${g.D.toFixed(2)} mm (${S.depth}), plate ${p.plateT} mm.`,
+    `Pillars: shoulder D ${p.shoulderD} mm, board ${p.shoulderH} mm above the plate top, pin D ${p.pinD} x ${p.pinH} mm.`,
+    `Joints: dovetail ${p.tabNeck}/${p.tabHead} x ${p.tabDepth} mm, clearance ${p.clearance} mm total.`, '',
+    'Print each STL flat as it lies (plate side down). No supports.',
+    'Pieces are named row letter (A = top edge of the panel) + column number (1 = left).',
+    'Assemble by lowering each piece onto its neighbour from above: the tabs drop into the sockets.',
+    'Keep the slicer\'s elephant-foot compensation on; it affects how the joints fit at the first layer.', ''].join('\n');
+}
+
+$('bStl').addEventListener('click', async () => {
+  if (derived.bad) return;
+  const files = derived.pieces.map(pc => ({ name: `plate_${S.depth}_${pc.id}.stl`, data: G.stl(G.pieceMesh(pc, derived.g.D, S.params), pc.id) }));
+  files.push({ name: 'layout.json', data: JSON.stringify(serial(), null, 1) });
+  files.push({ name: 'README.txt', data: readme('plate pieces') });
+  await saveFile(`module_plate_${S.depth}_${stamp()}.zip`, G.zip(files));
+});
+$('bCoupon').addEventListener('click', async () => {
+  const files = [];
+  G.coupons(S.params).forEach(c => c.pieces.forEach(pc => files.push({ name: `joint_test_c${c.clearance.toFixed(2)}_${pc.id === 'A1' ? 'tab' : 'socket'}.stl`, data: G.stl(pc.tri) })));
+  files.push({ name: 'README.txt', data: readme('joint test') + '\nThree pairs, one per clearance (in the file name). Print all six, try each pair, and enter the clearance of the best fit.\n' });
+  await saveFile(`joint_test_${stamp()}.zip`, G.zip(files));
+});
+$('bSvg').addEventListener('click', async () => {
+  const { g, v } = derived;
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${g.W}mm" height="${g.D}mm" viewBox="0 0 ${g.W} ${g.D}">`,
+    `<rect x="0" y="0" width="${g.W}" height="${g.D}" fill="none" stroke="#000" stroke-width="0.2"/>`,
+    `<g id="ear_zones" fill="none" stroke="#999" stroke-width="0.15"><rect x="0" y="0" width="${g.ear}" height="${g.D}"/><rect x="${g.W - g.ear}" y="0" width="${g.ear}" height="${g.D}"/></g>`];
+  S.insts.forEach((inst, k) => {
+    const b = BOARDS[inst.b], q = v.placed[k];
+    parts.push(`<g id="${b.name}_${inst.id}" transform="matrix(${q.matrix.join(' ')})"><path d="M${b.poly.map(p => p.join(' ')).join('L')}Z" fill="none" stroke="#000" stroke-width="0.15"/>` +
+      b.holes.map(h => `<circle cx="${h[0]}" cy="${h[1]}" r="${h[2] / 2}" fill="none" stroke="#000" stroke-width="0.15"/>`).join('') +
+      `<image href="${b.silkF}" x="0" y="0" width="${b.w}" height="${b.h}"/></g>`);
+  });
+  parts.push('</svg>');
+  await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
+});
+$('bSave').addEventListener('click', () => saveFile(`plate_layout_${stamp()}.json`, JSON.stringify(serial(), null, 1)));
+$('bLoad').addEventListener('click', () => $('fLoad').click());
+$('fLoad').addEventListener('change', async () => {
+  const f = $('fLoad').files[0]; if (!f) return;
+  try { loadSerial(JSON.parse(await f.text())); boardEls.forEach(e => e.remove()); boardEls.clear(); drawParams(); changed(true); toast('Loaded ' + f.name); }
+  catch (e) { toast(e.message || 'Could not read that file.'); }
+  $('fLoad').value = '';
+});
+let clearArmed = 0;
+$('bClear').addEventListener('click', () => {
+  if (Date.now() - clearArmed > 3000) { clearArmed = Date.now(); $('bClear').textContent = 'Click again to clear'; setTimeout(() => $('bClear').textContent = 'Clear', 3000); return; }
+  S.insts = []; S.sel = null; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
+});
+$('bRot').addEventListener('click', rotateSel); $('bDel').addEventListener('click', removeSel); $('bDup').addEventListener('click', dupSel);
+['vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
+
+let toastT = null;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+
+/* ---------- 3D preview ---------- */
+const V3 = { r: null, scene: null, cam: null, group: null, yaw: -0.5, pitch: 0.95, dist: 1, target: [0, 0, 0] };
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'; }
+function init3d() {
+  if (!window.THREE) return false;
+  const c = $('view3d');
+  try { V3.r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true }); } catch (e) { return false; }
+  V3.scene = new THREE.Scene();
+  V3.cam = new THREE.PerspectiveCamera(35, 2, 1, 5000);
+  V3.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.85));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.65); dl.position.set(-200, 300, 500); V3.scene.add(dl);
+  let d = null;
+  c.addEventListener('pointerdown', e => { d = { x: e.clientX, y: e.clientY, yaw: V3.yaw, pitch: V3.pitch }; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e => { if (!d) return; V3.yaw = d.yaw - (e.clientX - d.x) * 0.008; V3.pitch = Math.max(0.05, Math.min(1.5, d.pitch + (e.clientY - d.y) * 0.008)); render3d(); });
+  c.addEventListener('pointerup', () => d = null);
+  c.addEventListener('wheel', e => { e.preventDefault(); V3.dist = Math.max(0.3, Math.min(3, V3.dist * (e.deltaY > 0 ? 1.1 : 0.9))); render3d(); }, { passive: false });
+  new ResizeObserver(() => render3d()).observe(c);
+  return true;
+}
+function draw3d() {
+  if (!V3.r && !init3d()) return;
+  if (V3.group) { V3.scene.remove(V3.group); V3.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  V3.group = new THREE.Group();
+  const { g, pieces } = derived, gap = 4;
+  const cols = [css('--plate-edge'), css('--muted')];
+  pieces.forEach(pc => {
+    const tri = G.pieceMesh(pc, g.D, S.params);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(tri, 3)); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: new THREE.Color(cols[(pc.r + pc.c) % 2]), roughness: .75, metalness: 0, flatShading: true }));
+    m.position.set(pc.c * gap - g.W / 2, -pc.r * gap - g.D / 2, 0);
+    V3.group.add(m);
+  });
+  V3.scene.add(V3.group);
+  V3.span = Math.max(g.W, g.D);
+  render3d();
+}
+function render3d() {
+  if (!V3.r) return;
+  const c = $('view3d'), w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return;
+  V3.r.setPixelRatio(window.devicePixelRatio || 1); V3.r.setSize(w, h, false);
+  V3.cam.aspect = w / h; V3.cam.updateProjectionMatrix();
+  const R = (V3.span || 500) * 1.35 * V3.dist;
+  V3.cam.position.set(R * Math.sin(V3.yaw) * Math.cos(V3.pitch), -R * Math.cos(V3.yaw) * Math.cos(V3.pitch), R * Math.sin(V3.pitch));
+  V3.cam.up.set(0, 0, 1); V3.cam.lookAt(0, 0, 0);
+  V3.r.render(V3.scene, V3.cam);
+}
+
+/* ---------- start ---------- */
+if (!BOARDS || !BOARDS.length) { document.body.textContent = 'No board data in this build.'; return; }
+if (!window.earcut) toast('The triangulation library did not load; STL export needs a network connection.');
+if (!restore()) exampleState();
+nextId = Math.max(nextId, ...S.insts.map(i => i.id + 1));
+drawPalette(); drawParams();
+changed(true);
+window.__plate = { get S() { return S; }, get derived() { return derived; }, G, BOARDS };
+})();
+</script>
