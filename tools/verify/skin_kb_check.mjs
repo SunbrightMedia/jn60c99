@@ -26,6 +26,7 @@
 //   --tooth ccedge     the skin's CC assign search counts the right and bottom edges inside (must FAIL;
 //                      the search's ORDER is not observable on this panel -- docs/CC_MENU.md rule 4)
 //   --tooth ccmods     the skin's CC assign menu opens with Shift held (must FAIL)
+//   --tooth hostedit   the skin's host edits drained but never told or sent (the round trip lost, CLAIMS A42; must FAIL)
 //
 // Then the CC assign menu (CLAIMS A38; the exe's own is graded against the plugin's handler on
 // the plugin's tree by tools/verify/cc_menu_gate.py): per seed, the search at the edges of every
@@ -208,6 +209,8 @@ for (const seed of SEEDS) {
     if (t === "hold") { const p = skin.kbPress.bind(skin);   // the release of the other keys never sent
       skin.kbPress = (c, n, v, sh) => { const g = skin.E.keybedState; skin.E.keybedState = () => 0; p(c, n, v, sh); skin.E.keybedState = g; }; }
     if (t === "gap") { const h = skin.keyHit.bind(skin); skin.keyHit = (c, x, y) => { const a = h(c, x, y), b = h(c, x - 2, y); return b.n < a.n ? b : a; }; }
+    if (t === "hostedit")                          // the round trip lost: the host edits drained, never told or sent
+      skin.E.collectEdits = function () { this.fn.hostEdits(this.ctx, this.editIds, this.editVals, this.editKinds, 512); };
   }, TOOTH);
   const lines = script(seed, kb);
   let shift = false;

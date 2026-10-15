@@ -392,7 +392,7 @@ webapp: libjuno.so
 	env node tools/verify/verify_webapp.mjs
 	env node tools/verify/skin_check.mjs
 	env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe
-	for t in velocity hold gap ccedge ccmods; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
+	for t in velocity hold gap ccedge ccmods hostedit; do env node tools/verify/skin_kb_check.mjs --exe scratchpad/dist/JUNO-60.exe --seeds 1,2 --tooth $$t || exit 1; done
 	python3 tools/verify/skin_pm_check.py --seeds 9:40,1:200,2:200,3:200,4:200,5:200,6:200,7:200,100:200
 	python3 tools/verify/skin_pm_check.py --seeds 9:40 --tooth capture
 	for t in keys button; do python3 tools/verify/skin_pm_check.py --seeds 1:200 --tooth $$t || exit 1; done
