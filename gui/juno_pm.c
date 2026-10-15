@@ -565,9 +565,10 @@ int juno_pm_pick(juno_pm *pm, int idx)                    /* select, then load t
     cmd_load(pm, 1, -1);
     return 1;
 }
-/* THE PATCH NAME CONTROL'S CALLS (the main panel's patchName, its class's mouse JX rva 0x33E950, its value accessor's
- * step 0x33EBA0; EXECUTED, jx3p/tools/jx_panel_gate.py). The menu (JX rva 0x330CF0 then 0x334590): the bank and the
- * selection from the view, then two items per bank -- its name, then " " -- of 32 cells each (rva 0x335520: the
+/* THE PATCH NAME CONTROL'S CALLS (the main panel's patchName, its class's mouse rva 0x33EA70, its value accessor's
+ * step 0x33ECC0 -- the JX-3P's equal code, fw_map --pair, at the addresses jx3p/gui/win/jx3p_win.c cites; EXECUTED
+ * there, jx3p/tools/jx_panel_gate.py). The menu (rva 0x330E10 then 0x3346B0): the bank and the
+ * selection from the view, then two items per bank -- its name, then " " -- of 32 cells each (rva 0x335640: the
  * cell's text, patches 0-31 and 32-63), the current cell's path offered [bank x 2 + selection / 32, selection % 32];
  * a path chosen [t, s]: the bank t / 2, the selection (t % 2) x 32 + s. 1 when chosen (then the load, no push:
  * juno_pm_load_selection) */
@@ -604,12 +605,12 @@ int juno_pm_patch_menu(juno_pm *pm, int (*menu)(void *u, const char *const *top,
     free(top); free(cells); free(buf);
     return r;
 }
-void juno_pm_load_selection(juno_pm *pm)                  /* rva 0x337F70 (pm, view, list 0, push 0, -1) */
+void juno_pm_load_selection(juno_pm *pm)                  /* rva 0x338090 (pm, view, list 0, push 0, -1) */
 {
     if (pm) cmd_load(pm, 0, -1);
 }
-/* the accessor's step (rva 0x33EBA0): none for 0; else the bank and the selection from the view, the selection plus
- * the step kept in 0 .. 63 (rva 0x334D80), the load (no push) */
+/* the accessor's step (rva 0x33ECC0): none for 0; else the bank and the selection from the view, the selection plus
+ * the step kept in 0 .. 63 (rva 0x334EA0), the load (no push) */
 void juno_pm_step(juno_pm *pm, int n)
 {
     int v;

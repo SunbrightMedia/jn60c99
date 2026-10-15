@@ -95,7 +95,7 @@ int  juno_pm_select(juno_pm *pm, int idx);
 /* the JX-3P panel's patch blocks and patch select buttons (their JX addresses: jx3p/gui/win/jx3p_win.c): the
  * selection of the main list, then its load, pushed (rva 0x334E90 / 0x338090) */
 int  juno_pm_pick(juno_pm *pm, int idx);
-/* the main panel's patch name control (its own class: JX rva 0x33E950): the patch menu -- a menu of 2 x banks items
+/* the main panel's patch name control (its own class: rva 0x33EA70): the patch menu -- a menu of 2 x banks items
  * (a bank's name, then " ") of ncell (32) cells each, the current cell's path in path[0..1] and the chosen one out;
  * the app's menu returns 1 when chosen, 0 for none -- then, when chosen, the load of the selection (no push); its
  * value accessor's step n (the wheel, its keys): the selection plus n, in 0 .. 63, loaded */
