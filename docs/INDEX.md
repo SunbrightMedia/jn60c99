@@ -203,7 +203,8 @@ official steps), bom/ (master LCSC BOM v2 + builder + open checks), footprints/ 
 EasyEDA ground-truth JSONs), SwitchBoard/ + FaderBoard/ (ready KiCad projects), SegmentBackpack/ (7-seg HT16K33A backpack,
 address network, OPEN diode direction), user_boards/ (snapshots of the user's board files — the user's PC holds the current
 ones), outlines/ (edge, screw holes, silkscreen per fabbed board as SVG + JSON for the plate / case maker, made by
-tools/hardware/pcb_outline.py; its README holds the plate spec), AUDIT.md + tools/hardware/schem_audit.py (net-level audit law), BOARD.md / PCB_PLACEMENT.md / MOTHERBOARD_PINOUT.md /
+tools/hardware/pcb_outline.py; its README holds the plate spec; the web app that places them and exports the
+printed plate: tools/hardware/plate_maker/README.md), AUDIT.md + tools/hardware/schem_audit.py (net-level audit law), BOARD.md / PCB_PLACEMENT.md / MOTHERBOARD_PINOUT.md /
 BACKFEED.md / MasterAudio_reference.kicad_sch (the 2026-09 MasterAudio carrier era: REFERENCE, partly superseded by the
 board split).
 

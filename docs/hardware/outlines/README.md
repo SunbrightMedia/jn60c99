@@ -1,6 +1,7 @@
 # outlines — board edge, screw holes, silkscreen per fabbed board (LIVING, 2026-10-15)
 
-Input of the case / plate maker (the web app that places boards on a grid and exports STL).
+Input of the case / plate maker (the web app that places boards on a grid and exports STL):
+`tools/hardware/plate_maker/` (built 2026-10-15; its README says how it is proven).
 Made by `tools/hardware/pcb_outline.py` from the user's own `.kicad_pcb` files. KiCad does
 all the geometry: pcbnew's API (outline, holes), kicad-cli's SVG plot (silkscreen).
 
