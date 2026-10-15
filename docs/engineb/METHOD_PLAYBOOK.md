@@ -4601,3 +4601,14 @@ load kernel32.dll", exit 53) and strace (the same render under the lane's strace
 When a gate fails only under a new harness, diff the harness's environment against the old run's and reproduce with
 the harness's exact environment before suspecting the tracer, the disk or the program. A variable the harness sets
 for its own reasons reaches every program the section starts.
+
+## 270. A FILE BOTH PORTS BUILD CITES ONE PLUGIN'S ADDRESSES -- A SECOND PLUGIN'S NUMBER THERE IS MISREAD
+Paid 2026-10-15 (section 3i RED in the first lane run). Row 25 wrote seven JX-3P addresses into gui/juno_pm.c / .h,
+whose numbers are the JUNO-60's: cpu_census maps each to its JX twin (JX_TWINS) and refused the seven it could not
+map. The JUNO-60's census would have done worse -- read them as JUNO-60 functions, other code. Fixed: fw_map --pair
+proved each JX function's JUNO-60 twin (equal code), the shared comments cite those, the JX numbers stay in the
+JX-only file (jx3p_win.c), and `cpu_census --twins` added the three new rows. EXECUTED: --port-of jx 0, --port-of
+juno 0, --tooth-twins bites.
+### The rule
+In a file both ports build, cite only the first plugin's numbers; the second plugin's go in its own files. Before
+committing a shared file, run the census of BOTH ports.
