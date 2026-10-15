@@ -57,6 +57,8 @@ independent paths). `--tooth` shifts one by 0.01 mm: the run must then stop with
   The depth is selectable: rack sizes 1U .. 7U, or MAX = exactly 13 in. 1U = 1.75 in = 44.45 mm
   (7U = 311.15 mm nominal; a real EIA panel is N*44.45 - 0.79 mm). The 19 in width is the rack
   panel width incl. the ears (rail holes at 465.1 mm centres, ~450 mm clear between rails).
+  Boards stay OUT of the two rack-ear zones (the user, 2026-10-15): 15.875 mm each side
+  ((482.6 - 450.85) / 2; 450.85 mm = 17.75 in, the clear width between rails).
 - ONE plate for the WHOLE control surface (the user, 2026-10-15). The cuts exist ONLY because the
   bed is too small. NEVER one piece per board, NEVER a piece the size of a board's footprint (that
   is flimsy). Each piece carries as many boards as fit on it; the cut lines follow the bed limit,
