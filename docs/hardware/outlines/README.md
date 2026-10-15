@@ -45,3 +45,7 @@ independent paths). `--tooth` shifts one by 0.01 mm: the run must then stop with
 - The only holes on each board are the mounting holes.
 - Printer: Bambu Lab A1 mini, bed 180 x 180 mm -> the plate is cut into pieces that fit, with
   joints that fit together exactly.
+- ONE plate for the WHOLE control surface (the user, 2026-10-15). The cuts exist ONLY because the
+  bed is too small. NEVER one piece per board, NEVER a piece the size of a board's footprint (that
+  is flimsy). Each piece carries as many boards as fit on it; the cut lines follow the bed limit,
+  not the board edges.
