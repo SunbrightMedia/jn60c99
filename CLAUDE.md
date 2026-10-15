@@ -268,9 +268,13 @@ mine is a hypothesis (playbook 80).
   loads bank files), the editor's set and the host's round trip
   (performEdit; a load's performEdits too, playbook 210), and the editor's own
   logic (2026-10-11, S3_STATUS (13)): zoom, meters, the CC menu's model, the
-  record image, the patch window (gui/juno_pm.c on the JX bridge) -- every
-  SCOPE_AUDIT row closed but row 25 (opened 2026-10-13: the panel's other inputs -- the generic classes' mouse,
-  the wheel, the resize corner). Row 20, the drawn panel, CLOSED 2026-10-14: JX-3P.exe (the user's Script folder,
+  record image, the patch window (gui/juno_pm.c on the JX bridge). Row 25 CLOSED 2026-10-15 (S3_STATUS (23),
+  JX_PANEL.md): every input of JX-3P.exe -- the generic classes' mouse and wheel, the editor's timer, the keys, the
+  resize corner, the leave, the window's points, the patch window's buttons, the plugin's own option menu (its
+  SYSTEM-8 CC preset generated, jx_gen_cc_preset.py) -- graded through the plugin's own handlers. Row 26 OPEN, the
+  USER's call: the option menu's "Authentication..." (Roland Cloud login) and its five hidden developer items. The
+  verify runs in lanes (jx3p/tools/jx_lanes.py: a section re-runs only when its traced inputs change; playbook 264).
+  Row 20, the drawn panel, CLOSED 2026-10-14: JX-3P.exe (the user's Script folder,
   jx3p/truth/Script; jx3p/gui/win, make_native_jx.py; jx3p/docs/JX_PANEL.md) -- its five JX classes' mouse, the CC
   search and the bank name presses against the plugin's own dispatch and handlers on its own tree EQUAL
   (jx_panel_gate.py, S3_STATUS (20); fixed on the way: the press at the up, the slider whole, the dispatch's hover /

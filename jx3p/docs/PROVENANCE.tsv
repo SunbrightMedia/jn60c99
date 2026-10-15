@@ -10,6 +10,7 @@
 # file	role	made_by	proof
 jx3p/gui/jx_bridge.c	PORTED	by hand: the host layer, render driver, DAW state, editor logic (jx3p/docs/HOST_LAYER.md)	jx3p/tools/jx_product_gate.py + jx3p/tools/jx_state_gate.py + jx3p/tools/jx_patch_gate.py + jx3p/tools/jx_record_gate.py + jx3p/tools/jx_meter_gate.py + jx3p/tools/jx_zoom_fit_gate.py + jx3p/tools/jx_mutation_gate.py
 jx3p/gui/win/jx3p_win.c	PORTED	by hand: gui/win/juno60_win.c on the JX product path; the JX's five control classes READ, then graded event by event against the plugin's own panel dispatch on its own tree (jx3p/docs/JX_PANEL.md)	jx3p/tools/jx_exe_check.py + jx3p/tools/jx_panel_gate.py
+jx3p/gui/win/jx_bridge_exe.c	PORTED	by hand: the program's bridge unit (jx_bridge.c whole) plus the option menu's CC map preset apply and test (rva 0x31A3D0 / 0x31A2B0), graded through the plugin's own menu (jx3p/docs/JX_PANEL.md)	jx3p/tools/jx_panel_gate.py
 jx3p/gui/jx_pm_glue.c	PORTED	by hand: the patch manager's view calls on the bridge	jx3p/tools/jx_patch_manager_gate.py
 gui/juno_pm.c	SHARED	the JUNO-60's patch manager (CLAIMS A39), -DJPM_PRODUCT="PG-JX3P"	jx3p/tools/jx_patch_manager_gate.py
 src/juno_conv.c	SHARED	the JUNO-60's render object (CLAIMS A25); the JX's table and vectors equal	jx3p/tools/jx_conv_tables.py + jx3p/tools/jx_product_gate.py
@@ -26,6 +27,7 @@ jx3p/src/jx_master_render.c	TRANSCRIBED	jx3p/tools/translate_jx_master.py, the a
 jx3p/src/jx_ftz.c	RUNTIME	the FTZ / DAZ mode glue; the gates' oracle mode (DAZ on, FTZ off: playbook 220)	tools/verify/c99_gate.py + jx3p/tools/ab_render_c.py + jx3p/tools/jx_master_bisect.py
 jx3p/src/jx_midi_tables.h	GENERATED	jx3p/tools/jx_gen_midi_tables.py from the booted plugin	jx3p/tools/jx_gen_midi_tables.py
 jx3p/src/jx_state_tables.h	GENERATED	jx3p/tools/jx_gen_state_tables.py from the booted plugin	jx3p/tools/jx_gen_state_tables.py
+jx3p/gui/win/jx_cc_preset.h	GENERATED	jx3p/tools/jx_gen_cc_preset.py from the booted plugin (its preset and record names; checked against its own apply and test)	jx3p/tools/jx_gen_cc_preset.py + jx3p/tools/jx_panel_gate.py
 jx3p/src/jx_patch_tables.h	GENERATED	jx3p/tools/jx_gen_patch_tables.py from the plugin's own loads	jx3p/tools/jx_gen_patch_tables.py
 jx3p/src/jx_record_tables.h	GENERATED	jx3p/tools/jx_gen_record_tables.py from the plugin's serializer	jx3p/tools/jx_gen_record_tables.py
 jx3p/src/jx_srate.h	GENERATED	jx3p/tools/jx_conv_tables.py --emit from the booted plugin	jx3p/tools/jx_conv_tables.py

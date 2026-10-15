@@ -31,7 +31,9 @@ for the next block (kind, offset, id, value) and the host's edits (beginEdit / p
 the CC probes as cc_menu_gate.py's. REACH: each class pressed on its live controls with its value changed, both patch
 classes loading, a slider dragged, double clicks, the CC menu taken, a learn, a forget, the CC map moved.
 
-usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-tooth N | --pm-tooth N] [--keep LOG | --log LOG]
+usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-tooth N | --pm-tooth N | --bridge-tooth N]
+                        [--keep LOG | --log LOG]
+       jx_panel_gate.py --teeth exe3-20,exe22-31,pm21,cc1-7,bridge1 [--jobs N]   (every tooth, N runs at once)
   --quick        three panel configurations (QUICK: the teeth's run)
   --tooth N      builds JX-3P.exe with -DEXE_TOOTH=N (jx3p/gui/win/jx3p_win.c) and runs it: must FAIL --
                  3 a jx3pLatchButton flips its other bit, 4 a jx3pSlider's click does not turn at the ends,
@@ -44,7 +46,13 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
                  end, 14 it never takes the focus, 15 its edit's offer untrimmed, 16 a knob's travel 16 px a position,
                  17 an unlatchButton's function run at the press (the plugin: queued, the next idle), 18 the wheel's
                  Ctrl step not capped at 10, 19 the wheel's edit closed after 1000 ms (the plugin: 800), 20 a
-                 latchButton toggles at the down
+                 latchButton toggles at the down; the window and the menus: 22 a window point truncated (x 100 /
+                 zoom), 23 no leave, 24 a patch window button's function run at the up (the plugin: queued), 25 the
+                 leave's point not inside every open panel, 26 Up's key code read as Down's, 27 no resize corner,
+                 28 the option menu's "Clear" never greyed, 29 "Clear" applies the preset, 30 the wrong voice count
+                 checked, 31 no separator after the CPU item
+  --bridge-tooth N  builds it with -DJX_PRESET_TOOTH=N (jx3p/gui/win/jx_bridge_exe.c): 1 the preset test reads one entry of
+                 a record (the plugin reads them all)
   --pm-tooth N   builds it with -DPM_TOOTH=N (gui/juno_pm.c): 21 the patch menu's half ignored
   --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 1 a panel's controls searched first
                  to last -- the JX has three overlapping pairs, each in one panel --, 2 the right and bottom edges inside,
@@ -58,6 +66,7 @@ import collections
 import glob
 import multiprocessing as mp
 import os
+import math
 import random
 import re
 import shutil
@@ -80,6 +89,10 @@ DATA = 'C:\\ProgramData\\Roland Cloud\\JX-3P'
 # the JX twins of the JUNO's addresses (jx3p/tools/fw_map.py --pair: the code equal, JX = JUNO - 0x120 here; the
 # data by the twin instruction; the CC assign class by its attach in vt+0xB0)
 DISPATCH = 0x2AA9D0                            # a panel's message dispatch (JUNO 0x2AAAF0)
+WIN_TO_PANEL = 0x2ABFC0                        # a window point to the panel's: (v x 200 / zoom + 1) / 2 (READ)
+KEY_CODE = 0x43ABE0                            # a virtual key (a signed char) to the key message's code
+KEY_MSG = 0x436640                             # the key message: {type, code, mods} (WM_KEYDOWN 1, WM_KEYUP 2)
+LEAVE = -2147483647                            # WM_MOUSELEAVE's point (0x80000001, 0x80000001), rva 0x3104E4
 ROOT_MOUSE = 0x2AAD50                          # the root panel's own (its vt+0x48): the window's resize corner (rva
                                                # 0x2AAEF0: a press within 20 px of the bottom right corner less 20),
                                                # then the dispatch -- what the editor calls on a mouse message
@@ -88,6 +101,7 @@ HANDLER, SEARCH_RET = 0x31D300, 0x31D379       # the CC assign control's handler
 LEARN, FORGET = 0x31A920, 0x3191C0             # (0x31AA40, 0x3192E0)
 MAP_RECORD, MAP_ID = 0x3199F0, 0x319B30        # (0x319B10, 0x319C50)
 CCASSIGN_VT, CCA_ATTACH = 0x981498, 0x31D690   # (0x94A4C0, 0x31D7B0)
+OM_RET = 0x4155FE                              # the option menu's popup call returns here (rva 0x4147B0's)
 MENU_OVERRIDE = 0xCEA428                       # (0xCB21F8)
 SET, NOTIFY, COMMIT = 0x283C90, 0x2852A0, 0x283000          # (0x283DB0, 0x2853C0, 0x283120)
 # the editor's 50 ms timer (its window's WM_TIMER, rva 0x3103BE): the root panel's timer message (vt+0x60; the message
@@ -119,6 +133,15 @@ PN_TEXTS = (b'NEW NAME', b'', b'A', b'0123456789ABCDEF', b'0123456789ABCDEFGHIJK
             b'  two  spaces  ', b'Brass [Brs1]', None, None)
 SKIP_FN = ('Help', 'About', 'PlugOut')
 WHEELS = 24                                    # wheel sequences per configuration with presses
+LEAVES = 40                                    # moves then a leave (the hover flags compared)
+KEYS = 24                                      # key sequences on focused controls
+CORNERS = 16                                   # visits to the resize corner
+OMENUS = 24                                     # the option menu's random presses (half in a quick run)
+PWBTN = 16                                      # presses on the patch window's buttons (half in a quick run)
+PW_IDS = (0x0FFFC002, 0x0FFFC004, 0x0FFFC005, 0x0FFFC006, 0x0FFFC010, 0x0FFFC014)   # panelPatch, patchManager, the
+                                                # lists, bankId, patchId (gui/juno_pm.h)
+PW_BTN = {'dec': (304, 33, 324, 48), 'inc': (304, 48, 324, 65), 'load': (1511, 553, 1559, 571)}   # Script.xml, the
+                                                # plugin's own rectangles (its patch root's controls, EXECUTED)
 MODS = CG.MODS
 # the panel configurations: (vm.vs.mode, vm.vs.edit, TEMPO SYNC, DELAY TYPE, vm.vs.setup) -- every open condition of
 # jx3p/truth/Script.xml but the patch window's, the setup page's sub-panels and the activation's
@@ -192,7 +215,11 @@ class Plugin:
         self.allc = []                                  # every control: (panel, type, rectangle)
         self.pnames = []                                # the patch name controls (their text kept: refresh_names)
         self.pn_answers = []                            # the patch menu's scripted answers: (t, s) or None
+        self.om_answers = []                            # the option menu's scripted answers: an item's number or -1
         self._walk(self.root)
+        for c in self.info:                             # the menu buttons' own update (vt+0xB0, rva 0x325320): the
+            if self.info[c][0] == 'menuButton':         # core at +0x178, which the option menu reads its CC map by --
+                h.call(self.q(self.q(c) + 0xB0), rcx=c, count=500_000_000)   # the live editor's values notify it
         mp_ = h.core + 24
         vb, ve = self.q(mp_), self.q(mp_ + 8)
         self.rec_id = [h.call(IB + MAP_ID, rcx=mp_, rdx=k) & 0xFFFFFFFF for k in range((ve - vb) // 24)]
@@ -271,7 +298,19 @@ class Plugin:
             self._walk(q(pb + 8 * k), k_self)
 
     def _popup(self, uc, addr, size, ud):
+        from unicorn.x86_const import UC_X86_REG_RSP
         v = uc.reg_read(self.RDX)
+        if self.q(uc.reg_read(UC_X86_REG_RSP)) == self.IB + OM_RET:     # the option menu (the menuButton's up)
+            b, e = self.q(v), self.q(v + 8)
+            items = [(self.sstr(it), uc.mem_read(it + 0x28, 1)[0], uc.mem_read(it + 0x29, 1)[0])
+                     for it in (self.q(b + 8 * k) for k in range((e - b) // 8))]
+            real = [x for x in items if x[0]]          # the popup numbers only the items with a text (rva 0x4361E0)
+            ans = self.om_answers.pop(0) if self.om_answers else -1
+            if not 0 <= ans < len(real) or not real[ans][1]:
+                ans = -1                                # a greyed item is never the popup's answer
+            self.st.setdefault('pn', []).append(('om', tuple('|' if not x[0] else x for x in items), ans))
+            uc.reg_write(self.RAX, ans & 0xFFFFFFFFFFFFFFFF)
+            return
         b, e = self.q(v), self.q(v + 8)
         its = [self.q(b + 8 * k) for k in range((e - b) // 8)]
         if any(self.q(it + 0x20) for it in its):    # the patch name's menu (rva 0x334590): items with submenus, the
@@ -373,6 +412,53 @@ class Plugin:
                     count=500_000_000)
         return self.h.call(self.q(self.q(self.root) + 0x50), rcx=self.root, rdx=out, count=4_000_000_000) & 0xFF
 
+    def conv(self, size, x, y):
+        """a point of the panel window of that size converted as the plugin's mouse messages are (rva 0x2ABFC0: its
+        zoom by the getter, rva 0x2AA470)"""
+        pin, pout = self.msg + 0xC0, self.msg + 0xD0
+        self.uc.mem_write(pin, struct.pack('<ii', x, y))
+        self.h.call(self.IB + WIN_TO_PANEL, rcx=self.h.windows[size], rdx=pout, r8=pin, count=500_000_000)
+        return struct.unpack('<ii', bytes(self.uc.mem_read(pout, 8)))
+
+    def key(self, typ, vk, mods):
+        """a key into the root panel's own key (vt+0x58, rva 0x2AA960): the message as the editor builds it (rva
+        0x43AE20: its code by the plugin's table, rva 0x43ABE0); taken or not, and the code"""
+        self.write_opens()
+        self.refresh_names()
+        self.st = dict(choice=-1, items=None, calls=[], pick=None, pn=[])
+        self.taker = None
+        code = self.h.call(self.IB + KEY_CODE, rcx=(vk if vk < 128 else vk - 256) & 0xFFFFFFFF,
+                           count=10_000_000) & 0xFFFFFFFF
+        code = code - (1 << 32) if code >= 1 << 31 else code
+        self.h.call(self.IB + KEY_MSG, rcx=self.msg, rdx=typ, r8=code & 0xFFFFFFFF, r9=mods, count=10_000_000)
+        self.last_code = code
+        return self.h.call(self.q(self.q(self.root) + 0x58), rcx=self.root, rdx=self.msg, count=4_000_000_000) & 0xFF
+
+    def value(self, pid):
+        """a model value as its value object reads it (vt+0x80)"""
+        o = self.obj.get(pid)
+        if o is None:
+            return None
+        v = self.h.call(self.q(self.q(o) + 0x80), rcx=o, count=10_000_000) & 0xFFFFFFFF
+        return v - (1 << 32) if v >= 1 << 31 else v
+
+    def pw(self):
+        """the plugin's patch window when it is open: its own root panel (vt 0x97FE48), which the editor opened on
+        panelPatch 1 (its fit, rva 0x312750, names it) -- None when closed"""
+        w = getattr(self.h, 'windows', {}).get(panel_sizes()[1])
+        return w if w is not None and self.value(PW_IDS[0]) == 1 else None
+
+    def mouse_pw(self, w, typ, x, y, flags):
+        """a mouse message into the patch window's own root (its vt+0x48, rva 0x2AAD50)"""
+        self.st = dict(choice=-1, items=None, calls=[], pick=None, pn=[])
+        self.taker = None
+        self.uc.mem_write(self.msg, struct.pack('<iiii', typ, x, y, flags))
+        return self.h.call(self.q(self.q(w) + 0x48), rcx=w, rdx=self.msg, count=4_000_000_000) & 0xFF
+
+    def hover(self):
+        """each panel's hover flag (+0xDD: it was in the last message's way), in the tree's order"""
+        return ''.join('1' if self.uc.mem_read(p + 0xDD, 1)[0] else '0' for p in self.panels)
+
     def live(self, k):
         """panel k and every panel above it open"""
         while k >= 0:
@@ -432,14 +518,18 @@ def oracle(log):
     """the program's log played into the plugin (a worker: Unicorn only)"""
     import gc
     res = dict(fails=[], notes=[], opens=set(), order=set(), n=collections.Counter(), press=collections.Counter(),
-               changed=collections.Counter(), at=collections.Counter())
+               changed=collections.Counter(), at=collections.Counter(), zooms=set(), **{'om chosen': set()})
     g = h = None
     MAIN, PATCH = panel_sizes()
-    calls = ('model_set', 'commit', 'queue_record', 'pm_set', 'pm_commit', 'pm_notify', 'keybed', 'cc_learn', 'cc_forget')
+    calls = ('model_set', 'commit', 'queue_record', 'pm_set', 'pm_commit', 'pm_notify', 'keybed', 'cc_learn', 'cc_forget',
+             'cc_preset')
     i, tree_done, in_event = 0, False, False
     exe_edits, e0, q_blk = [], 0, 0
     last = (0, 0)                                  # the last down's point (an up without one goes there)
     down_ctl, state_before, await_state = None, None, None
+    last_kb, hover_before = None, None             # the last mouse event's kind; the hover flags last compared
+    last_zoom = None
+    hover_trace = []
     boot_map = None
     lines = log
 
@@ -457,7 +547,10 @@ def oracle(log):
         mine = [tuple(e) for e in h.edits[e0:] if e[0] in ('beginEdit', 'performEdit', 'endEdit')]
         e0 = len(h.edits)
         if mine != exe_edits:
-            fail('%s: host edits -- the plugin %s, the program %s' % (where(), mine[:6], exe_edits[:6]))
+            k = next((j for j in range(min(len(mine), len(exe_edits))) if mine[j] != exe_edits[j]),
+                     min(len(mine), len(exe_edits)))
+            fail('%s: host edits -- the plugin %d, the program %d; the first that differs, #%d: the plugin %s, the '
+                 'program %s' % (where(), len(mine), len(exe_edits), k, mine[k:k + 3], exe_edits[k:k + 3]))
         res['n']['edits'] += len(mine)
         res['n']['open edits'] += bool(mine) and any(e[0] == 'beginEdit' for e in mine) and mine[-1][0] != 'endEdit'
         exe_edits = []
@@ -466,19 +559,52 @@ def oracle(log):
         n = struct.unpack('>I', st[:4])[0] // 8
         return {k: v for k, v in (struct.unpack('>Ii', st[4 + 8 * j: 12 + 8 * j]) for j in range(n)) if k >= 0x10000000}
 
-    dlg = []                                       # the plugin's dialogs in the current event (the patch name's)
+    dlg = []                                       # the plugin's dialogs in the current event (the patch name's,
+    boxes = []                                     # the option menu) and its message boxes (code, then type)
 
     def run_event(fn, *a):
-        """a mouse or wheel message into the plugin: its dialogs kept for the program's '# pn' lines, then the
-        event's unused scripted answers dropped (as the program drops them)"""
-        nonlocal dlg
+        """a mouse or wheel message into the plugin: its dialogs and boxes kept for the program's '# pn' / '# om' /
+        '# box' lines, then the event's unused scripted answers dropped (as the program drops them)"""
+        nonlocal dlg, boxes
         if dlg:
             fail('%s: the plugin asked %d dialog(s) the program did not: %s' % (where(), len(dlg), dlg[0][:2]))
+        if boxes:
+            fail('%s: the plugin showed %s, the program no box' % (where(), boxes[:2]))
+        w0 = len(h.wlog)
         r = fn(*a)
         dlg = list(g.st.get('pn', []))
+        boxes = [e for e in h.wlog[w0:] if e[0] in ('message', 'box')]
         h.answers.clear()
         g.pn_answers.clear()
+        g.om_answers.clear()
         return r
+
+    def om_line(t):
+        """the program's option menu in its event ('# om FLAGS CHOICE N' then each item =HEX:EN:CK, a separator |):
+        the plugin's, its items with their enables and checks, the separators, the answer"""
+        nonlocal dlg
+        if not dlg or dlg[0][0] != 'om':
+            fail('%s: the program showed the option menu, the plugin %s' % (where(), dlg[0][:1] if dlg else 'none'))
+            return
+        d = dlg.pop(0)
+        mine = tuple('|' if w == '|' else (bytes.fromhex(w.split(':')[0][1:]).decode('latin1'), int(w.split(':')[1]),
+                                           int(w.split(':')[2])) for w in t[5:])
+        if d[1] != mine or d[2] != int(t[3]):
+            k = next((j for j in range(min(len(mine), len(d[1]))) if mine[j] != d[1][j]), min(len(mine), len(d[1])))
+            fail('%s: the option menu -- the plugin (%d items, answer %d, from #%d %s), the program (%d, %s, %s)'
+                 % (where(), len(d[1]), d[2], k, d[1][k:k + 2], len(mine), t[3], mine[k:k + 2]))
+        res['n']['om'] += 1
+        res['n']['om hidden'] += len(d[1]) > 15
+        if d[2] >= 0:
+            res['om chosen'].add(d[2])
+
+    def box_line(t):
+        nonlocal boxes
+        want = [('message', int(t[2])), ('box', int(t[3]))]
+        if boxes[:2] != want:
+            fail('%s: the message box -- the plugin %s, the program %s' % (where(), boxes[:2], want))
+        boxes = boxes[2:]
+        res['n']['boxes'] += 1
 
     def pn_line(t):
         """the program's patch name dialog in its event: the plugin's, in order"""
@@ -520,9 +646,18 @@ def oracle(log):
         if not t:
             continue
         if in_event and (t[0] in calls or t[0] == 'zoomfit' or ln.startswith('# hostedit') or ln.startswith('# pm ') or
-                         ln.startswith('# hit') or ln.startswith('# pn ')):
+                         ln.startswith('# hit') or ln.startswith('# pn ') or ln.startswith('# key code ') or
+                         ln.startswith('# om ') or ln.startswith('# box ')):
             if ln.startswith('# pn '):
                 pn_line(t)
+            elif ln.startswith('# om '):
+                om_line(t)
+            elif ln.startswith('# box '):
+                box_line(t)
+            elif ln.startswith('# key code '):    # the program's code for its key: the plugin's table's
+                if int(t[3]) != g.last_code:
+                    fail('%s: the key code -- the plugin %d, the program %s' % (where(), g.last_code, t[3]))
+                res['n']['key codes'] += 1
             elif ln.startswith('# hit'):          # the program's dispatch: the control its press went to
                 want = tuple([t[2]] + [int(v) for v in t[3:7]]) if len(t) >= 7 else None
                 got = g.info.get(g.taker) if g.taker is not None else None
@@ -543,12 +678,73 @@ def oracle(log):
                 h.answers.append(('text', None if t[3] == '-' else bytes.fromhex(t[3][1:])))
             elif t[2] == 'p':
                 g.pn_answers.append(None if int(t[3]) < 0 else (int(t[3]), int(t[4])))
+            elif t[2] == 'o':
+                g.om_answers.append(int(t[3]))
             continue
         if ln.startswith('# gtick '):          # the editor's 50 ms timer at the GUI's clock (ms)
             sync()
             g.gtick(int(t[2]))
             res['n']['gticks'] += 1
             in_event = True
+            continue
+        if ln.startswith('# wpt '):            # a main-window point's conversion: the plugin's own on its window
+            sync()
+            X, Y, PX, PY = (int(v) for v in t[2:6])
+            if MAIN not in getattr(h, 'windows', {}):
+                fail('%s: wpt -- the plugin has no main window open' % where())
+                continue
+            got = g.conv(MAIN, X, Y)
+            if got != (PX, PY):
+                fail('%s: the window point (%d, %d) -- the plugin %s, the program (%d, %d)' % (where(), X, Y, got, PX, PY))
+            z = h.window_conv(MAIN)
+            trunc = lambda v: int(v * 100 / z) if z else v          # x 100 / zoom, truncated (C's)
+            res['n']['wpt'] += 1
+            res['n']['wpt round'] += (trunc(X), trunc(Y)) != (PX, PY)
+            res['zooms'].add(z)
+            continue
+        if ln.startswith('# zoom '):           # the main window's zoom (its getter, rva 0x2AA470): the plugin's
+            sync()
+            z = h.window_conv(MAIN)
+            if z != int(t[2]):
+                fail('%s: the main window\'s zoom -- the plugin %d, the program %s' % (where(), z, t[2]))
+            res['n']['zooms'] += 1
+            res['n']['zoom changes'] += last_zoom is not None and z != last_zoom
+            last_zoom = z
+            continue
+        if ln.startswith('# kb key '):         # WM_KEYDOWN (1) / WM_KEYUP (2): the virtual key, Shift 1 / Ctrl 2 / Alt 8
+            sync()
+            typ, vk, mods = (int(v) for v in t[3:6])
+            before = h.get_state()
+            taken = run_event(g.key, typ, vk, mods)
+            res['n']['keys'] += 1
+            res['n']['keys taken'] += bool(taken)
+            if taken:                           # the focused control (+0x10 -> +0x10 -> +0x18): its class
+                foc = g.q(g.q(g.q(g.root + 0x10) + 0x10) + 0x18)
+                res['at'][g.info.get(foc, ('?',))[0] + ' key'] += 1
+            if taken and typ == 1 and h.get_state() != before:
+                res['n']['key steps'] += 1
+            in_event = True
+            continue
+        if ln.startswith('# pmv '):            # the patch window's values: the program's against the plugin's model
+            sync()
+            mine, got = [int(v) for v in t[2:8]], [g.value(k) for k in PW_IDS]
+            if mine != got:
+                fail('%s: the patch window\'s values (open, manager, lists, bankId, patchId) -- the plugin %s, the '
+                     'program %s' % (where(), got, mine))
+            res['n']['pmv'] += 1
+            continue
+        if ln.startswith('# hover '):          # each panel's hover flag (+0xDD) after the event
+            mine = g.hover()
+            if mine != t[2]:
+                fail('%s: hover flags -- the plugin %s, the program %s' % (where(), mine, t[2]))
+                if os.environ.get('JX_HOVER_TRACE') and not res.get('traced'):
+                    res['traced'] = True
+                    for e in hover_trace[-14:]:
+                        print('  hover trace: line %d %-28s plugin %s' % e)
+            res['n']['hover'] += 1
+            if last_kb == 'leave' and hover_before is not None and hover_before != mine:
+                res['n']['leave changed'] += 1
+            hover_before = mine
             continue
         if ln.startswith('# kb wheel '):       # WM_MOUSEWHEEL: x y delta MK_ keys
             sync()
@@ -564,9 +760,33 @@ def oracle(log):
         if ln.startswith('# kb '):
             sync()
             kind, a = t[2], [int(v) for v in t[3:]]
-            if kind == 'up':
+            last_kb = kind
+            w = g.pw() if kind in ('down', 'dbl', 'move', 'up') else None
+            if w is not None:                   # the patch window open: its own root takes the mouse -- the plugin's is
+                ox, oy = (MAIN[0] - PATCH[0]) // 2, (MAIN[1] - PATCH[1]) // 2   # its own window, the program's is drawn
+                if kind == 'up':                # centred in the main one (jx3p_win.c: g_patchwin)
+                    x, y = (a[0], a[1]) if a[0] >= 0 else last
+                    s = a[2] if len(a) > 2 else 0
+                else:
+                    x, y, s = a
+                    if kind != 'move':
+                        last = (x, y)
+                taken = run_event(g.mouse_pw, w, {'down': 0, 'dbl': 2, 'move': 3, 'up': 1}[kind], x - ox, y - oy, s)
+                res['n']['pw events'] += 1
+                if g.taker is not None:
+                    res['at']['pw ' + g.tname(g.taker)] += 1
+                in_event = True
+                continue
+            if kind == 'leave':                 # WM_MOUSELEAVE: a move to (0x80000001, 0x80000001), flags 0
+                taken = run_event(g.mouse, 3, LEAVE, LEAVE, 0)
+                res['n']['leaves'] += 1
+                if os.environ.get('JX_HOVER_TRACE'):
+                    hover_trace.append((i, 'leave', g.hover()))
+            elif kind == 'up':
                 x, y = (a[0], a[1]) if a[0] >= 0 else last
-                taken = run_event(g.mouse, 1, x, y, 0)
+                taken = run_event(g.mouse, 1, x, y, a[2] if len(a) > 2 else 0)
+                if os.environ.get('JX_HOVER_TRACE'):
+                    hover_trace.append((i, 'up %d %d' % (x, y), g.hover()))
                 await_state = down_ctl              # the next state line: the press's effect, for the reach
             else:
                 x, y, s = a                     # s: the plugin's flag bits (1 Shift, 2 Ctrl, 8 Alt)
@@ -583,6 +803,8 @@ def oracle(log):
                 elif down_ctl == 'jx3pSlider':
                     res['n']['slider moves'] += 1
                 taken = run_event(g.mouse, typ, x, y, s)
+                if os.environ.get('JX_HOVER_TRACE'):
+                    hover_trace.append((i, '%s %d %d' % (kind, x, y), g.hover()))
                 if kind in ('down', 'dbl') and g.taker is not None:      # a press its panel's hover let through
                     pl, pt, pr, pb = struct.unpack('<iiii', bytes(g.uc.mem_read(g.ctl_panel[g.taker] + 0x18, 16)))
                     res['n']['outside'] += not (pl <= x < pr and pt <= y < pb)
@@ -760,7 +982,8 @@ def oracle(log):
                 res['changed'][await_state] += 1    # the press (down ... up) changed the state
             await_state = None
             end = ccmap(st)
-            res['n']['moved'] = sum(1 for k in end if end[k] != boot_map.get(k))
+            res['n']['moved'] = max(res['n']['moved'], sum(1 for k in end if end[k] != boot_map.get(k)))   # at any state:
+                                                    # the option menu's mappings reset the map later
         else:
             fail('log: unknown call %r' % ln[:80])
     if h is not None:
@@ -810,6 +1033,7 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
             clock[0] += 50
             o.append('gtick %d' % clock[0])
         return o
+    last_gen = (None, {}, [])
     press_at, seen = set(), set()                  # the mouse in the first configuration of each layout and EDIT
     for ci, cfg in enumerate(configs):             # state, and in a quarter of the others
         if cfg[:2] not in seen or quick or rnd.random() < 0.25:
@@ -930,6 +1154,9 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
         for k, tn, l, t, r, b in allc:
             if tn in GENERIC and live(k) and r > l and b > t and (l, t, r, b) not in skip:
                 gen[tn].append((k, tn, l, t, r, b))
+        if not cfg[4]:                                 # the keys' controls (below): a configuration without the
+            last_gen = (cfg, gen, [c for c in jx if c[1] == 'jx3pSlider' and live(c[0])])   # SETUP page (modal: it
+                                                       # takes every press outside it); its JX switches
         livec = [(c[1], c[2], c[3], c[4]) for k, p in enumerate(tree) if live(k) for c in p[3] if c[3] > c[1] and c[4] > c[2]]
         after = ['opens', 'state', 'pending']
         for tn in GENERIC:
@@ -1032,6 +1259,124 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
                     after + ['wheel %d %d 120 8' % (px, py)] + after + ['wheel %d %d -120 0' % (px, py)] + after +
                     ticks(20) + after + ['block', 'state'])
         out += ['state', 'pending']
+    # ---- the window's points (every WM_ mouse message's conversion, rva 0x2ABFC0) at zooms below the screen's fit and
+    # above it (clamped), negative and off the panel too; and the mouse's leave (WM_MOUSELEAVE: a move to (0x80000001,
+    # 0x80000001)) after moves in and near panels -- each panel's hover flag compared before and after
+    zr = random.Random(seed * 7919 + 13)
+    for z in (25, 26, 30, 33, 37, 40, 41, 45, 50, 55, 57, 59, 60, 62, 67, 75, 100, 150, 200):
+        out += ['set %d vm.vs.mainZoom' % z]
+        out += ['wpt %d %d' % (zr.randrange(-40, 1760), zr.randrange(-40, 760)) for _ in range(6 if quick else 16)]
+        out += ['wpt %d %d' % (v, -v) for v in (-3, -1, 0, 1, 2, 3, 5)]
+    out += ['set 75 vm.vs.mainZoom']
+    # ---- the keys (WM_KEYDOWN / WM_KEYUP): every virtual key's code, then the arrows on a focused control -- a knob, a
+    # slider, a JX switch, the patch name (its menu answered: none) -- held through the repeats (200 ms, then every 50),
+    # Shift, let go (800 ms: the step 0), the focus's 3200 ms; keys with no focus
+    out += ['key %d %d %d' % (1 + (vk & 1), vk, 0) for vk in range(256)] + ['opens', 'state']   # (lines ending the event:
+                                                    # the sets below are not the key's -- playbook 265)
+    kr = random.Random(seed * 104729 + 7)
+    kcfg, gen_last, jxs_last = last_gen
+    if kcfg is not None:
+        out += config_lines(kcfg) + ['opens', 'state', 'pending']
+    keyctl = [c for tn in ('knob', 'slider', 'patchName') for c in gen_last.get(tn, [])] + list(jxs_last)
+    firsts_k = []
+    for tn in ('knob', 'slider', 'jx3pSlider', 'patchName'):
+        cs = [c for c in keyctl if c[1] == tn]
+        if cs:
+            firsts_k.append(kr.choice(cs))
+    ARROWS = (0x25, 0x26, 0x27, 0x28)
+    for ki in range(len(firsts_k) + (KEYS // 2 if quick else KEYS)):
+        if not keyctl:
+            break
+        k, tn, l, t, r, b = firsts_k[ki] if ki < len(firsts_k) else kr.choice(keyctl)
+        px, py = (l + r) // 2, (t + b) // 2
+        if tn == 'patchName':
+            px = min(l + 100, r - 1)
+        out.append('move %d %d 0' % (px, py))
+        if tn == 'patchName':
+            out.append('ans p -1')
+        out += ['down %d %d 0' % (px, py), 'up %d %d' % (px, py), 'state']
+        for _ in range(kr.randrange(1, 4)):
+            vk = kr.choice(ARROWS + ARROWS + (0x41, 0x20, 0x0D, 0x24))
+            mods = kr.choice((0, 0, 1, 2))
+            out += ['key 1 %d %d' % (vk, mods), 'opens', 'state', 'pending']
+            out += ticks(kr.randrange(0, 12)) + ['opens', 'state', 'pending']
+            out += ['key 2 %d %d' % (vk, mods), 'state'] + ticks(kr.randrange(0, 20)) + ['opens', 'state', 'pending']
+        if kr.random() < 0.3:                          # the focus's 3200 ms: let go, then a key does nothing
+            out += ticks(70) + ['key 1 38 0', 'opens', 'state', 'key 2 38 0', 'opens', 'state']
+    # ---- the resize corner (the root's own mouse, before its dispatch: rva 0x2AAEF0): a point in its 20 px circle and
+    # on its edge, a down there (a control focused by the wheel first, sometimes: the root takes the focus), drags out
+    # and back (the zoom), the up; the zoom, converted points, the hover flags and the state after them
+    if prects:
+        rl, rt, rr, rb = prects[0]
+        ccx, ccy = rr - 20, rb - 20
+        cr = random.Random(seed * 15485863 + 3)
+        knobs_c = gen_last.get('knob', [])
+        for _ in range(CORNERS // 2 if quick else CORNERS):
+            ang, rad = cr.uniform(0, 6.2832), cr.choice((0, 5, 14, 19, 20, 20, 21, 23))
+            px, py = ccx + int(rad * math.cos(ang)), ccy + int(rad * math.sin(ang))
+            if knobs_c and cr.random() < 0.3:
+                k, tn, l, t, r, b = cr.choice(knobs_c)
+                out += ['move %d %d 0' % ((l + r) // 2, (t + b) // 2), 'wheel %d %d 120 0' % ((l + r) // 2, (t + b) // 2),
+                        'state'] + ticks(cr.randrange(0, 3))
+            out += ['move %d %d 0' % (px, py), 'opens', 'hover', 'zoom']
+            if cr.random() < 0.75:
+                out += ['down %d %d 0' % (px, py), 'opens', 'state', 'zoom', 'hover']
+                qx, qy = px, py
+                for _ in range(cr.randrange(1, 6)):
+                    qx, qy = px + cr.randrange(-500, 300), py + cr.randrange(-300, 200)
+                    out += ['move %d %d 0' % (qx, qy), 'opens', 'zoom']
+                out += ['up %d %d' % (qx, qy), 'opens', 'zoom', 'hover', 'state', 'pending']
+                out += ['wpt %d %d' % (cr.randrange(-20, 1950), cr.randrange(-20, 720)) for _ in range(3)]
+            else:
+                out += ['move %d %d 0' % (ccx - 40, ccy - 40), 'opens', 'hover', 'zoom']
+        out += ['set 75 vm.vs.mainZoom', 'zoom']
+    for _ in range(LEAVES // 2 if quick else LEAVES):
+        l, t, r, b = zr.choice(rects)
+        x, y = zr.randrange(l - 3, r + 3), zr.randrange(t - 3, b + 3)
+        out += ['move %d %d 0' % (x, y), 'opens', 'hover', 'leave', 'opens', 'hover']
+        if zr.random() < 0.5:                          # back in at another point, then a press and its up there
+            l, t, r, b = zr.choice(rects)
+            x, y = zr.randrange(l - 3, r + 3), zr.randrange(t - 3, b + 3)
+            out += ['move %d %d 0' % (x, y), 'opens', 'hover']
+    # ---- the patch window's buttons (unlatchButtons: ManagePatchBank dec / inc, ManagePatch load): pressed at the down,
+    # the function QUEUED at the up when the up is on the button (rva 0x2CD7E0; the registry, rva 0x296120) and run at
+    # the next idle; an up off the button runs nothing. Each press into the plugin's own patch window (its root), at the
+    # program's point less the window's place; compared at the down, right after the up (nothing run yet) and after the
+    # editor's timer: the patch window's values, the state, the pending records
+    pr = random.Random(seed * 31337 + 5)
+    (mw_, mh_), (pw_, ph_) = panel_sizes()
+    pox, poy = (mw_ - pw_) // 2, (mh_ - ph_) // 2
+    out += ['set 1 vm.vs.panelPatch', 'opens', 'pmv', 'state', 'pending'] + ticks(2) + ['pmv', 'state', 'pending']
+    for j in range(PWBTN // 2 if quick else PWBTN):
+        l, t, r, b = PW_BTN[pr.choice(('dec', 'inc', 'load', 'load'))]
+        px, py = pox + (l + r) // 2, poy + (t + b) // 2
+        ux, uy = (px + 70, py - 30) if pr.random() < 0.25 else (px, py)
+        out += ['set 0 vm.vs.panelPatch', 'set 1 vm.vs.panelPatch', 'opens', 'pmv', 'state', 'pending']   # (a load
+        out += ['down %d %d 0' % (px, py), 'pmv', 'state', 'pending',                                  # closes it)
+                'up %d %d' % (ux, uy), 'pmv', 'state', 'pending']
+        out += ticks(pr.randrange(1, 3)) + ['pmv', 'state', 'pending']
+    out += ['set 0 vm.vs.panelPatch', 'opens', 'pmv', 'state', 'pending']
+    # ---- the option menu (the menuButton's up with its action, rva 0x3251C0 -> 0x4147B0): each choice the program
+    # takes -- the mappings (set, cleared, set again), the four voice counts, the CPU item both ways, the Roland Cloud
+    # box, the SYSTEM-8 layout (then the JX-3P's again: the panel's other controls are another layout's), none --
+    # then random ones; the up's flags 7 (the right button, Shift, Ctrl) show the developer items (none taken: not
+    # ported), 4 or 3 do not; a greyed answer is none. The items, enables, checks, separators and the answer compared,
+    # then the state, the pending records, the CC map (in the state)
+    mbs = [c for c in allc if c[1] == 'menuButton']
+    if mbs:
+        k, tn, l, t, r, b = mbs[0]
+        mx, my = (l + r) // 2, (t + b) // 2
+        orr = random.Random(seed * 7919 + 13)
+        plan = [3, 2, 3, 3, 2, 4, 5, 6, 7, 8, 8, 9, -1, 1]
+        plan += [orr.choice((-1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 1)) for _ in range(OMENUS // 2 if quick else OMENUS)]
+        for j, ch in enumerate(plan):
+            fl = 7 if j in (3, 12) else orr.choice((0, 0, 0, 7, 4, 3, 5))
+            out += ['move %d %d 0' % (mx, my), 'down %d %d %d' % (mx, my, fl), 'ans o %d' % ch,
+                    'up %d %d %d' % (mx, my, fl), 'opens', 'state', 'pending']
+            if ch == 1:                                  # the SYSTEM-8 layout: back to the JX-3P's at once
+                out += ['down %d %d 0' % (mx, my), 'ans o 0', 'up %d %d 0' % (mx, my), 'opens', 'state', 'pending']
+        out += ticks(3) + ['opens', 'state', 'pending']
+    out += ['state', 'pending']
     return out
 
 
@@ -1064,14 +1409,52 @@ def build_tooth(define):
     return out
 
 
+def teeth_main(spec, jobs):
+    """the teeth (--teeth exe3-20,pm21,cc1-7,bridge1 --jobs N): every program built first, one at a time (they share
+    one build folder), then N quick gate runs at once (the program under Wine one at a time: run_exe's lock). A tooth
+    BITES when its run fails on a compared line (a FAIL), not on reach alone; exit 1 unless every tooth bites"""
+    kinds = {'exe': ('EXE_TOOTH', '--tooth'), 'pm': ('PM_TOOTH', '--pm-tooth'), 'cc': ('CC_TOOTH', '--cc-tooth'),
+             'bridge': ('JX_PRESET_TOOTH', '--bridge-tooth')}
+    todo = []
+    for part in spec.split(','):
+        m = re.match(r'([a-z]+)(\d+)(?:-(\d+))?$', part.strip())
+        if not m or m.group(1) not in kinds:
+            raise SystemExit('--teeth: %r is not KIND N or KIND N-M (kinds: %s)' % (part, ', '.join(kinds)))
+        for n in range(int(m.group(2)), int(m.group(3) or m.group(2)) + 1):
+            todo.append((kinds[m.group(1)], n))
+    built = [(opt, n, build_tooth('%s=%d' % (macro, n))) for (macro, opt), n in todo]
+
+    def run(item):
+        opt, n, exe = item
+        r = subprocess.run([sys.executable, os.path.abspath(__file__), '--quick', opt, str(n), '--exe', exe],
+                           capture_output=True, text=True)
+        out = r.stdout.splitlines()
+        return opt, n, r.returncode, sum(1 for ln in out if ln.startswith('  FAIL ')), (out or ['(no output)'])[-1], r
+    import concurrent.futures
+    bad = 0
+    with concurrent.futures.ThreadPoolExecutor(jobs) as ex:
+        for opt, n, rc, nfail, last, r in ex.map(run, built):
+            ok = rc == 0 and nfail > 0
+            bad += not ok
+            print('%s %d: %d FAIL lines -- %s%s' % (opt, n, nfail, last, '' if ok else '  <-- DOES NOT BITE'), flush=True)
+            if not ok:
+                print(r.stdout[-4000:] + r.stderr[-2000:])
+    print('jx_panel_gate --teeth: %d of %d bite' % (len(built) - bad, len(built)))
+    return 1 if bad else 0
+
+
 def main():
     arg = lambda k, d: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d
+    if '--teeth' in sys.argv:
+        return teeth_main(arg('--teeth', ''), int(arg('--jobs', '3')))
     exe, seed, quick = arg('--exe', EXE), int(arg('--seed', '1')), '--quick' in sys.argv
     tooth, cctooth, pmtooth = int(arg('--tooth', '0')), int(arg('--cc-tooth', '0')), int(arg('--pm-tooth', '0'))
+    btooth = int(arg('--bridge-tooth', '0'))         # the option menu's preset test (JX_PRESET_TOOTH, jx_bridge_exe.c)
     import make_native_jx
     make_native_jx.verify_truth()               # Script.xml, the art, the binary: their pinned bytes
-    if (tooth or cctooth or pmtooth) and '--exe' not in sys.argv:
-        exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth if cctooth else 'PM_TOOTH=%d' % pmtooth)
+    if (tooth or cctooth or pmtooth or btooth) and '--exe' not in sys.argv:
+        exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth if cctooth else
+                          'PM_TOOTH=%d' % pmtooth if pmtooth else 'JX_PRESET_TOOTH=%d' % btooth)
     ctx = mp.get_context('spawn')
     with ctx.Pool(1) as pool:
         tree, parents, jx, mapped, prects, allc = pool.map(plugin_tree, [0])[0]
@@ -1115,6 +1498,18 @@ def main():
         'the wheel on knobs, sliders, the JX switches, the keyboard (taken), the editor\'s timer': all(
             res['at'][c + ' wheel'] > 0 for c in ('knob', 'slider', 'jx3pSlider', 'keyboardX')) and n['wheels taken'] > 0
         and n['gticks'] > 0,
+        'the resize corner: the zoom compared, changed by its drags': n['zooms'] > 0 and n['zoom changes'] > 0,
+        'every virtual key\'s code; arrows taken on a knob, a slider, a JX switch, the patch name, stepping':
+            n['key codes'] >= 256 and n['keys taken'] > 0 and n['key steps'] > 0
+            and all(res['at'][c + ' key'] > 0 for c in ('knob', 'slider', 'jx3pSlider', 'patchName')),
+        'the window\'s points converted at zooms (where a truncation would differ too), the leave changing a hover flag':
+            n['wpt'] > 0 and n['wpt round'] > 0 and len(res['zooms']) >= 4 and n['leaves'] > 0 and n['hover'] > 0
+            and n['leave changed'] > 0,
+        'the patch window\'s buttons pressed in the plugin\'s own patch window, its values compared':
+            n['pw events'] > 0 and res['at']['pw unlatchButton'] > 0 and n['pmv'] > 0,
+        'the option menu: its items compared (the developer items shown too), every choice the program takes chosen, '
+        'the Roland Cloud box': n['om'] > 0 and n['om hidden'] > 0 and n['boxes'] > 0
+            and {0, 1, 2, 3, 4, 5, 6, 7, 8, 9} <= res['om chosen'],
         'the patch name: its edit set and cancelled, its menu chosen and not, the wheel on it':
             n['pn text set'] > 0 and n['pn text'] > n['pn text set'] and n['pn chosen'] > 0
             and n['pn menu'] > n['pn chosen'] and res['at']['patchName wheel'] > 0,
@@ -1128,6 +1523,15 @@ def main():
           'classes %s' % (n['events'], n['taken'], dict(pr), dict(ch), dict(res['at'])))
     print('wheels %d (%d taken), editor timer ticks %d; the patch name: edits %d (%d set), menus %d (%d chosen)'
           % (n['wheels'], n['wheels taken'], n['gticks'], n['pn text'], n['pn text set'], n['pn menu'], n['pn chosen']))
+    print('zooms compared %d (%d changes)' % (n['zooms'], n['zoom changes']))
+    print('option menus %d (%d with the developer items), chosen %s, boxes %d' % (n['om'], n['om hidden'],
+                                                                              sorted(res['om chosen']), n['boxes']))
+    print('patch window events %d (on %s), its values compared %d' % (
+        n['pw events'], {k[3:]: v for k, v in res['at'].items() if k.startswith('pw ')}, n['pmv']))
+    print('keys %d (%d taken, %d stepping), codes compared %d; on %s' % (n['keys'], n['keys taken'], n['key steps'],
+          n['key codes'], {k: v for k, v in res['at'].items() if k.endswith(' key')}))
+    print('window points %d (%d where x 100 / zoom truncated differs) at zooms %s; leaves %d (%d changing a hover flag), '
+          'hover comparisons %d' % (n['wpt'], n['wpt round'], sorted(res['zooms']), n['leaves'], n['leave changed'], n['hover']))
     print('states %d, pending lists %d (%d records), host edits %d, blocks %d; CC probes %d (x2), right presses %d '
           '(%d taken, %d learns, %d forgets), %d CC map entries moved; %d panel configurations'
           % (n['state'], n['pending'], n['records'], n['edits'], n['blocks'], n['pick'], n['msg'], n['cc taken'],
@@ -1139,9 +1543,10 @@ def main():
         print('  FAIL ' + s)
     if res.get('nfail'):
         print('  %d failures in all' % res['nfail'])
-    if tooth or cctooth or pmtooth:
-        print('jx_panel_gate --%s %d: %s' % ('tooth' if tooth else 'cc-tooth' if cctooth else 'pm-tooth',
-                                             tooth or cctooth or pmtooth, 'BITES' if not ok else 'DID NOT BITE'))
+    if tooth or cctooth or pmtooth or btooth:
+        print('jx_panel_gate --%s %d: %s' % ('tooth' if tooth else 'cc-tooth' if cctooth else 'pm-tooth' if pmtooth
+                                             else 'bridge-tooth', tooth or cctooth or pmtooth or btooth,
+                                             'BITES' if not ok else 'DID NOT BITE'))
         return 0 if not ok else 1
     print('jx_panel_gate: %s (seed %d%s)' % ('GREEN' if ok else 'RED', seed, ', quick' if quick else ''))
     return 0 if ok else 1

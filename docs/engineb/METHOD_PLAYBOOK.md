@@ -4526,3 +4526,66 @@ build), so a second run waits instead of spoiling the first.
 ### The rule
 A "fresh start" that deletes shared state is a lock, whether the code says so or not. Before running a gate twice at
 once, find what each run empties or overwrites; lock it, or give each run its own copy.
+
+## 264. A VERIFY THAT RE-RUNS WHAT DID NOT CHANGE COSTS HOURS -- CARRY A SECTION ONLY ON A TRACE OF ITS INPUTS
+Paid 2026-10-15 (the user: "why does the full verify take 16 hours?"). make verify-jx3p ran every section in one shell,
+one after another, every time, though most sections' inputs had not changed since their GREEN run. jx3p/tools/
+jx_lanes.py runs each section in a lane of its own (a fresh worktree of one base snapshot, its content tree id checked;
+a private scratchpad, work folder and TMPDIR), up to N at once, under strace: a section's inputs are every path whose
+FIRST access was a read -- files (sha256), listed folders (git's view: tracked and non-ignored names -- a fresh lane
+has no ignored files, and the main tree's ignored ones must not decide), probes (present / absent), programs started
+-- plus the environment, the CPU and the kernel. A GREEN section is carried only when all are unchanged; never when it
+read a product it did not make, changed a tree file, or found absent a path an earlier section of the sequential
+order makes (a lane would hide that dependency: the producer becomes its prelude). One script all sections share
+(jx_verify.sh) counts per section: its prelude, its own block and the end, comments dropped. Two harness traps on
+the way: Wine reaches files through its z: drive's links inside the prefix (read every path by its real name), and a
+failed mkdir is a read of the path being there, not a write. Every rule seen to fail: the trace reader under 4
+planted defects; the check under an edited input, a new file in a listed folder, a changed environment, an earlier
+section's product; the slice under edits of a comment, another block, the prelude, the end. A tooth build now
+compiles only the units that name its macro: 5 s instead of the 73k-line lifted bridge again.
+### The rule
+Speed a proof by skipping only what its own trace shows unchanged. Trace every input (the system too), compare by the
+view a fresh run would have, never carry a run that leaned on another's product, and see each carrying rule fail.
+
+## 265. A LINE THE PROGRAM LOGS INSIDE ITS EVENT MUST NOT END THE EVENT IN THE REPLAY
+Paid 2026-10-15 (JX scope row 25: the keys). The panel gate replays the program's log into the plugin: inside a mouse
+or key event the program's own engine calls are compared, not played; any other line ends the event, and the calls
+after it are played as calls from outside. The program's key handler logged its key code ("# key code") before its
+patch load -- so the replay ended the event at that line and played the program's queue_record into the plugin: the
+plugin loaded the patch twice (126 host edits against 63). The plugin alone, probed, loads once. Fixed: the line is
+read inside the event, like "# hit".
+### The rule
+When a gate replays a log by event, every line the program can write inside an event is named in the replay's event
+grammar. A new log line is a new grammar rule -- add it on both sides at once, or the replay invents a call.
+
+## 266. A CONTROL THE ORACLE NEVER UPDATES READS WHAT ITS UPDATE WOULD HAVE SET -- RUN THE UPDATE, OR GRADE THE ZERO PAGE
+Paid 2026-10-15 (JX scope row 25: the option menu). The panel gate's plugin is a template with no live view: the
+values never notify the controls. The menuButton's menu (rva 0x4147B0) reads the CC map through a pointer (+0x178)
+that only the control's own update (vt+0xB0, rva 0x325320) sets. Under the oracle it was 0: the menu read its enables
+from the zero page ("Clear MIDI Control Mapping" greyed with 55 CCs mapped), and the first choice that used the map
+recursed until the stack ran out. The gate runs each menuButton's update once at the boot -- as the patch name's has
+run before each event since row 20. Seen to fail: the menu's items before the update against after it.
+### The rule
+When an oracle drives a GUI that has no live view, list what each control's own update sets and run the update before
+the control's handler reads it. A handler that reads an unset field grades the emulator's zero page, not the plugin.
+
+## 267. A SECTION'S SLICE HOLDS THE PRELUDE AND EVERY SECTION'S OPENING LINE -- A NEW SECTION OWES THEM ALL
+Paid 2026-10-15 (the drawn panel's split into five lanes, undone). jx_lanes.py runs a section as the script's prelude,
+every section's `if sec` line and its own block. Two traps on the way: a helper written between one section's `fi`
+and the next `if sec` belongs to the previous section's slice (the others would have called a function they never
+define); and the fix -- the helper in the prelude -- plus four new `if sec` lines changed EVERY section's slice, so
+every GREEN section of the running lane run would have been owed again (hours). Caught by slicing every section
+against the run's base before committing: 18 of 18 changed. Undone: one section 5c whose 37 teeth run three at a time
+inside it (jx_panel_gate.py --teeth); every other slice equal to the base's (checked).
+### The rule
+Before changing jx_verify.sh, slice every section against the last run's base: only the sections you mean to change
+may differ. Parallelism belongs inside a section; a new section or a prelude line re-owes every section.
+
+## 268. A SCRIPTED REPLACE THAT ANCHORS ON A NAME ALSO MATCHES ITS PROTOTYPE -- CHECK THE LINE COUNT
+Paid 2026-10-15 (the option menu's port). A replace from "the definition" to "the next function" took the next
+function's first occurrence -- its prototype, 900 lines BEFORE the definition: the slice ran backwards and the file
+gained ~1000 duplicated lines. Caught by the jump in line numbers; restored from the frozen snapshot the teeth job ran
+from, the edit redone with both anchors including the definition's brace and asserted unique.
+### The rule
+Anchor a scripted edit on text only the target has (a definition with its brace, not a bare name), assert each anchor
+is unique and that start < end, and compare the file's line count with the edit's size before building.

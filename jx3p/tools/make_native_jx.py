@@ -17,6 +17,7 @@ USAGE  python3 jx3p/tools/make_native_jx.py [--define NAME=V ...] [--out EXE] [-
 import gzip
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,7 +35,7 @@ EXE = os.path.join(OUT, 'JX-3P.exe')
 GUEST_GZ = os.path.join(REPO, 'jx3p', 'gen', 'jx_guest_96k.bin.gz')
 
 ID_XML, ID_BANKS, ID_FACTORY, ID_GUEST, ID_PNG0 = 100, 101, 102, 103, 200
-SRCS = ['jx3p/gui/win/jx3p_win.c', 'jx3p/gui/jx_bridge.c', 'jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c',
+SRCS = ['jx3p/gui/win/jx3p_win.c', 'jx3p/gui/win/jx_bridge_exe.c', 'jx3p/gui/jx_pm_glue.c', 'gui/juno_pm.c',
         'jx3p/src/jx_voice_render.c', 'jx3p/src/jx_voice_helpers.c', 'jx3p/src/jx_master_render.c',
         'jx3p/src/jx_ftz.c']
 DEFS = ['-DJX_MEMFS', '-DJPM_PRODUCT="PG-JX3P"']
@@ -116,13 +117,38 @@ def main():
                                                'jx3p/gui/jx_bridge.c')]
     shared += [os.path.join(REPO, 'src', f) for f in sorted(os.listdir(os.path.join(REPO, 'src'))) if f.startswith('juno_conv')]
 
+    def tu_files(path, seen):
+        """the files a translation unit reads: its source and every #include "..." it names, followed (the
+        includer's folder, then -I's)"""
+        if path in seen or not os.path.isfile(path):
+            return seen
+        seen.add(path)
+        for inc in re.findall(r'^\s*#\s*include\s*"([^"]+)"', open(path, errors='replace').read(), re.M):
+            for d in (os.path.dirname(path), BUILD, os.path.join(REPO, 'jx3p', 'src')):
+                if os.path.isfile(os.path.join(d, inc)):
+                    tu_files(os.path.normpath(os.path.join(d, inc)), seen)
+                    break
+        return seen
+    extra = defs[len(DEFS):]
+
+    def unit_defs(src):
+        """a test build's -D only where the unit names the macro: a unit whose text never names it compiles to the
+        same object without it, so a tooth recompiles its own file alone (the lifted bridge comes from the cache)"""
+        text = ''.join(open(f, errors='replace').read() for f in sorted(tu_files(os.path.join(REPO, src), set())))
+        return DEFS + [d for d in extra if re.search(r'\b%s\b' % re.escape(d[2:].split('=')[0]), text)]
+
     def compile_one(src):
-        h = hashlib.sha256((' '.join([cc] + M.CFLAGS + defs)).encode())
+        udefs = unit_defs(src)
+        h = hashlib.sha256((' '.join([cc] + M.CFLAGS + udefs)).encode())
         for f in [os.path.join(REPO, src), os.path.join(BUILD, 'assets.h')] + shared:
             h.update(open(f, 'rb').read())
+        for d in udefs:                                  # a define naming a file (a tooth's lifted source): its bytes
+            v = d.partition('=')[2].strip('"')
+            if v and os.path.isfile(v):
+                h.update(open(v, 'rb').read())
         obj = os.path.join(cache, '%s_%s.o' % (os.path.basename(src)[:-2], h.hexdigest()[:16]))
         if not os.path.exists(obj):
-            subprocess.check_call([cc] + M.CFLAGS + defs + ['-I', BUILD, '-I', os.path.join(REPO, 'jx3p', 'src'),
+            subprocess.check_call([cc] + M.CFLAGS + udefs + ['-I', BUILD, '-I', os.path.join(REPO, 'jx3p', 'src'),
                                                            '-c', '-o', obj + '.tmp', os.path.join(REPO, src)])
             os.replace(obj + '.tmp', obj)
         return obj

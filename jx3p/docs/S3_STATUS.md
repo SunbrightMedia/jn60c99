@@ -3,6 +3,29 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-15 (23) — ROW 25 CLOSED: EVERY INPUT OF THE PANEL; THE PLUGIN'S OWN OPTION MENU; THE VERIFY IN LANES (playbooks 264-268)
+
+- Row 25 (SCOPE_AUDIT): JX-3P.exe's keys, resize corner, leave, window points, patch window buttons and option menu
+  ported and graded through the plugin's own handlers (jx_panel_gate.py; JX_PANEL.md "The generic classes"). The
+  quick gate GREEN (job r25_q10): 322 keys with every virtual key's code, 46 zooms compared, 268 window points at 11
+  zooms, 20 leaves, 18 patch window events in the plugin's own patch window with 35 value comparisons, 27 option menus
+  (5 with the developer items) with every choice 0-9 taken and compared, 4 Roland Cloud boxes. Teeth 22, 23, 25, 26,
+  27 BITE, 20 FAIL lines each (job r25_teeth2); 24, 28-31 and the bridge's preset tooth run in section 5c.
+- The option menu is now the plugin's (rva 0x4147B0, EXECUTED item by item under the oracle): the program's own menu
+  (2-8 voices, four engine rates, zoom, latency) is gone -- zoom and latency moved to the window's system menu. The
+  SYSTEM-8 CC preset is generated from the plugin (jx_gen_cc_preset.py: 85 entries, 55 records; checked against the
+  plugin's own apply and test in three states -- the preset IS the boot's map, and "Set" stays enabled because one
+  record has two entries). Its code lives in jx3p/gui/win/jx_bridge_exe.c (the bridge unit plus the preset), so
+  jx_bridge.c -- which every product gate builds -- is unchanged.
+- The oracle's own defect (playbook 266): the template never runs the controls' updates, so the menu read the CC map
+  through a null pointer (the zero page). Each menuButton's update now runs once at the boot.
+- Row 26 OPENED for the user: "Authentication..." (the Roland Cloud login) and the five hidden developer items are
+  shown, not ported -- the user's call (recommendation: accept).
+- The verify (playbook 264): jx_lanes.py runs each section in a lane and carries a GREEN one only on a trace of its
+  inputs. The first lane run (jxlanes_6727) so far: 3h, 1, 3, 3e, 2, 3f GREEN. Section 5c (the panel) keeps one
+  section -- a new section line changes every section's slice (playbook 267) -- and runs its 37 teeth three at a time
+  (jx_panel_gate.py --teeth). Owed: 5c, 5b and the ledgers (6) on this commit.
+
 ## 2026-10-15 (22) — THE RAMP WALK'S RED: TWO NaNs IN ONE ADD (playbook 259)
 
 - jxverify_f7f6 (f7f6adc8, sections S 6 3i 3g 4 5 5b 5c): S and 6 GREEN; in 3i the CPU census GREEN with every tooth

@@ -86,6 +86,8 @@ int jx3p_cc_entry(uint32_t id);
 int jx3p_cc_of(uint32_t id);
 int jx3p_cc_learn(uint32_t id);
 int jx3p_cc_forget(uint32_t id);
+void jx3p_cc_preset(int k);
+int jx3p_cc_preset_is(int k);
 void jx_enable_hw_ftz(void);
 void jx_set_fp_oracle_mode(int on);
 int juno_gui_record(const void *c, unsigned char *out, int cap);              /* jx_pm_glue.c */
@@ -808,8 +810,11 @@ static Panel *build(const char *type, int ox, int oy)
                                              * end, 14 it never takes the focus, 15 its edit's offer untrimmed, 16 a
                                              * knob's travel 16 px a position, 17 an unlatchButton's function run at
                                              * the press, 18 the wheel's Ctrl step not capped at 10, 19 the wheel's
-                                             * edit closed after 1000 ms, 20 a latchButton toggles at the down
-                                             * (jx_panel_gate.py) */
+                                             * edit closed after 1000 ms, 20 a latchButton toggles at the down, 22
+                                             * a window point converted as x 100 / zoom (truncated), 23 the mouse's
+                                             * leave not sent, 24 a patch window button's function run at the up,
+                                             * not queued, 25 the leave's point outside the panels, 26 the
+                                             * Up key read as Down, 27 no resize corner (jx_panel_gate.py) */
 #endif
 static void *g_eng;
 static CRITICAL_SECTION g_lock;            /* every engine call */
@@ -2768,7 +2773,10 @@ static Ctl *dispatch_in(Panel *p, int x, int y, int type, Panel **modal)
     int i, in;
     Ctl *c;
     if (!panel_open(p)) return NULL;
-    in = panel_held(p) || !p->has_size || (x >= p->x && y >= p->y && x < p->x + p->w && y < p->y + p->h);
+    in = panel_held(p) || !p->has_size || (x >= p->x && y >= p->y && x < p->x + p->w && y < p->y + p->h) ||
+         (x == -2147483647 && y == -2147483647 && EXE_TOOTH != 25);   /* the leave's point (0x80000001, 0x80000001):
+                                                                         * inside every panel (rva 0x2AAA0F; TOOTH 25:
+                                                                         * outside) */
     if (!in && (!p->hover || EXE_TOOTH == 10)) return NULL;    /* TOOTH 10: no hover (a panel's rectangle alone) */
     p->hover = in;
     for (i = p->n - 1; i >= 0; --i)
@@ -2877,7 +2885,9 @@ static void kb_release(int vel)
     g_kb_key = -1;
 }
 
-static void option_menu(void);
+static void option_menu(int flags);
+static int g_upflags;                   /* the up's flags (rva 0x4481C0): 4 for the right button's (0x204-0x206),
+                                         * 1 MK_SHIFT, 2 MK_CONTROL, 8 Alt down (GetAsyncKeyState) */
 static void midi_menu(void);
 static void action(const char *fn, const char *args);
 
@@ -2972,6 +2982,59 @@ static void frame_tick(Ctl *c)
     }
     if (c->type != C_PATCHNAME) wheelop_tick(c);
 }
+/* A KEY (the editor's WM_KEYDOWN without its repeat bit, and WM_KEYUP: rva 0x310724). The key message (rva 0x43AE20:
+ * the virtual key as a signed char, its code by the table below, Shift 1 / Ctrl 2 / Alt 8 from GetKeyState) goes to
+ * the root panel's key (rva 0x2AA960): its listeners (none: nothing fills the list, EXECUTED), then the focused
+ * control's (vt+0x58) -- the frame's (rva 0x2D0610) and the editable patch name's (rva 0x2DE710, +0xA1) key operator
+ * (rva 0x2D5AE0; the layout mover before it, rva 0x2C4630, is off: EXECUTED): an arrow -- Up / Right +1, Down / Left
+ * -1 (its +0x10 would reverse them: no control's is set, EXECUTED) -- on a key down, the step at once (Shift: times
+ * min(positions / 2, 10)), state 1 and 200 ms (the tick repeats it); on a key up, state 3 and 800 ms (the tick's step
+ * 0). Any other key, any other control: nothing. Graded: kbscript "key" (jx_panel_gate.py) */
+static int key_code(int vk)                /* rva 0x43ABE0: a key's code -- vk 8 .. 0x7B by its table (0: the key) */
+{
+    static const short T[0x74] = {
+        0x10A, 0x10C, 0, 0, 0, 0x108, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0x109, 0, 0, 0, 0,
+        0, 0x106, 0x107, 0x105, 0x104, 0x102, 0x100, 0x103, 0x101, 0, 0, 0,
+        0, 0, 0x10B, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0x119, 0x11A, 0x11B, 0x11C, 0x11D, 0x11E, 0x11F, 0x120,
+        0x121, 0x122, 0x126, 0x124, 0, 0x125, 0x123, 0x127, 0x10D, 0x10E, 0x10F, 0x110,
+        0x111, 0x112, 0x113, 0x114, 0x115, 0x116, 0x117, 0x118
+    };
+    if (EXE_TOOTH == 26 && vk == 0x26) return 0x101;   /* TOOTH 26: Up read as Down */
+    return vk >= 8 && vk <= 0x7B && T[vk - 8] ? T[vk - 8] : vk;
+}
+static int ev_key(int type, int vk, int mods)       /* type 1 down, 2 up; mods: Shift 1, Ctrl 2, Alt 8 */
+{
+    int code = key_code((signed char)vk), dir;
+    Ctl *c = g_focus;
+    if (g_log) fprintf(g_log, "# key code %d\n", code);
+    if (!c || !op_class(c)) return 0;
+    if (code == 0x100 || code == 0x103) dir = 1;
+    else if (code == 0x101 || code == 0x102) dir = -1;
+    else return 0;
+    if (type == 1) {
+        if (mods & 1) {
+            int n = (c->type == C_PATCHNAME ? 64 : slider_n(c)) / 2;
+            dir *= n < 10 ? n : 10;
+        }
+        c->kstep = dir;
+        accessor_step(c, dir);
+        c->kstate = 1;
+        c->kt.period = 200;
+    } else if (type == 2) {
+        c->kstep = 0;
+        c->kstate = 3;
+        c->kt.period = 800;
+    } else return 0;
+    gt_start(&c->kt);
+    g_dirty = 1;
+    return 1;
+}
+
 /* the panels' tick (rva 0x2AB250): an open panel's controls, last to first, then its panels, last to first */
 static void panel_tick(Panel *p)
 {
@@ -3154,6 +3217,67 @@ static int pn_mouse(Ctl *c, int type, int x, int y)
 }
 
 static int g_mx, g_my;                     /* the last point of a down or a move: an up without one goes there */
+/* THE RESIZE CORNER (the root panel's own mouse, rva 0x2AAD50, before its dispatch: rva 0x2AAEF0; the main window
+ * has a zoom: +0x138 >= 0). While the root does not hold the mouse, a point within 20 px of (right - 20, bottom - 20)
+ * -- dx * dx + dy * dy <= 400 in 32-bit arithmetic -- is in the corner: entering it keeps the zoom then (+0x140, the
+ * value's own read) and shows the resize cursor, leaving it forgets the zoom. In the corner a down or a double click:
+ * the root takes the mouse (its +0x30 and the holder) and the focus (vt+0xB8: the focused control lets it go), the
+ * point kept (+0x150) -- taken. While the root holds the mouse: a move sets the zoom to the larger of x and y scaled,
+ * (2 v z0 + 1) / grab / 2 in C's division, kept in the zoom value's range, when it differs (the value's own set, then
+ * the window's layout, rva 0x312B50); an up lets go of the mouse and the focus, the grab (-1, -1) -- taken. Every
+ * other message goes on to the dispatch. (The cursor is drawn by Windows: not graded.) */
+static int g_corner_z;                     /* +0x140: the zoom when the point entered the corner (0: not in it) */
+static int g_root_cap;                     /* the root holds the mouse */
+static int g_grab_x = -1, g_grab_y = -1;   /* +0x150: the down's point */
+static int wrap32(long long v)             /* a value as the plugin's 32-bit registers hold it */
+{
+    unsigned long long u = (unsigned long long)v & 0xFFFFFFFFull;
+    return u > 0x7FFFFFFFull ? (int)((long long)u - 0x100000000LL) : (int)u;
+}
+static int corner(int type, int x, int y)
+{
+    const Leaf *Z = resolve("vm.vs.mainZoom");
+    if (!Z || EXE_TOOTH == 27) return 0;     /* TOOTH 27: no corner */
+    if (!g_root_cap) {
+        long long dx = wrap32((long long)x - (g_tree->x + g_tree->w) + 20), dy = wrap32((long long)y - (g_tree->y + g_tree->h) + 20);
+        int d2 = wrap32((long long)((unsigned long long)wrap32(dy * dy) + (unsigned long long)wrap32(dx * dx)));
+        if (d2 > 400) {
+            g_corner_z = 0;
+            return 0;
+        }
+        if (!g_corner_z) g_corner_z = val_get(Z);
+    }
+    if (type == 0 || type == 2) {
+        if (g_focus) focus_set(g_focus, 0);
+        g_root_cap = 1;
+        g_grab_x = x;
+        g_grab_y = y;
+        return 1;
+    }
+    if (!g_root_cap) return 0;
+    if (type == 1) {
+        g_root_cap = 0;
+        g_grab_x = g_grab_y = -1;
+        return 1;
+    }
+    if (type == 3) {
+        int zy = wrap32((long long)wrap32((long long)y * g_corner_z) * 2 + 1) / g_grab_y / 2;
+        int zx = wrap32((long long)wrap32((long long)x * g_corner_z) * 2 + 1) / g_grab_x / 2;
+        int z = zx >= zy ? zx : zy;
+        z = z < Z->min ? Z->min : z > Z->max ? Z->max : z;
+        if (z != g_corner_z) {
+            g_corner_z = z;
+            EnterCriticalSection(&g_lock);
+            if (jx3p_value_set(Z->id, z)) eng_refresh();
+            else local_put(Z->id, z);
+            LeaveCriticalSection(&g_lock);
+            zoom_apply();
+        }
+        return 1;
+    }
+    return 0;
+}
+
 static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's message flags (1 Shift, 2 Ctrl, 8 Alt;
                                                           * 4 a right-button press the CC menu did not take) */
 {
@@ -3162,6 +3286,11 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
     int shift = mods & 1;
     g_mx = x; g_my = y;
     if (get("vm.vs.panelPatch") == 1 && patch_down(x, y, dbl)) return;
+    if (corner(dbl ? 2 : 0, x, y)) {             /* the root's resize corner took it */
+        if (g_log) fprintf(g_log, "# hit -\n");
+        g_dirty = 1;
+        return;
+    }
     c = dispatch(x, y, dbl ? 2 : 0, &modal);
     if (c) {                                     /* it holds the mouse until the up (patchBlock, patchName: never) */
         g_cap = c->type == C_PATCHBLOCK || c->type == C_PATCHNAME ? NULL : c;
@@ -3269,7 +3398,10 @@ static void mouse_move(int x, int y, int mods)
     double fine = shift ? 0.1 : 1.0;
     Panel *m;
     g_mx = x; g_my = y;
-    if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 3, &m);    /* the panels' hover flags */
+    if (get("vm.vs.panelPatch") != 1) {
+        if (corner(3, x, y)) { g_dirty = 1; return; }          /* the root's resize corner (its drag) */
+        dispatch(x, y, 3, &m);                                 /* the panels' hover flags */
+    }
     if (!c) return;
     L = cleaf(c);
     (void)L; (void)fine;
@@ -3312,7 +3444,10 @@ static void mouse_move(int x, int y, int mods)
 static void mouse_up_at(int x, int y)
 {
     Panel *m;
-    if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 1, &m);    /* the panels' hover flags; the holder takes it */
+    if (get("vm.vs.panelPatch") != 1) {
+        if (corner(1, x, y)) { g_dirty = 1; return; }          /* the root's resize corner lets go */
+        dispatch(x, y, 1, &m);                                 /* the panels' hover flags; the holder takes it */
+    }
     if (g_drag && frame_class(g_drag) && g_cap == g_drag) keyop_mouse(g_drag, 1);
     if (g_drag && g_drag == g_cap && (g_drag->type == C_LATCH || g_drag->type == C_UNLATCH || g_drag->type == C_MENU ||
                                       g_drag->type == C_SETUP || g_drag->type == C_JXLATCH || g_drag->type == C_EXPRLATCH ||
@@ -3343,7 +3478,7 @@ static void mouse_up_at(int x, int y)
             else fn_queue(c->fn, c->args);     /* the registry (rva 0x296120, delay 0): the next idle runs it */
         } else if (in && c->type == C_MENU && c->action) {
             g_drag = NULL;
-            option_menu();
+            option_menu(g_upflags);
         } else if (in && c->type == C_SETUP) {
             g_drag = NULL;
             midi_menu();
@@ -3453,6 +3588,7 @@ static int pw_button(int r[4])             /* the bank name's button: its bitmap
     return 1;
 }
 static int g_pmcap;                        /* the list holds the mouse (a press on it) */
+static Ctl *g_pmbtn;                       /* the patch window's button that holds the mouse (its down to its up) */
 static void pm_after(void)
 {
     pm_status();
@@ -3474,8 +3610,9 @@ static int patch_down(int x, int y, int dbl)
         if (c->args && (!strcmp(c->args, "sendUser") || !strcmp(c->args, "getUser"))) continue;
         frame_size(c->bmp, &w, &h);
         if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h) {
-            press(c);
-            action(c->fn, c->args);
+            press(c);                          /* the latch family's down (rva 0x2CD350): pressed and captured; its press
+                                                * (unlatchButton's vt+0x120, rva 0x2CD7E0) comes with the up */
+            g_pmbtn = c;
             g_dirty = 1;
             return 1;
         }
@@ -3497,11 +3634,51 @@ static int pm_mouse_move(int x, int y)
 static int pm_mouse_up(int x, int y)
 {
     int r[4];
+    if (g_pmbtn) {                             /* a button's up: with the up on it and an action (+0x170), its function
+                                                * QUEUED to the next idle (the registry, rva 0x296120, delay 0) */
+        Ctl *c = g_pmbtn;
+        int w = 0, h = 0;
+        g_pmbtn = NULL;
+        if (c->bmp) frame_size(c->bmp, &w, &h);
+        if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h && c->action) {
+            if (EXE_TOOTH == 24) action(c->fn, c->args);   /* TOOTH 24: run at the up, not queued */
+            else fn_queue(c->fn, c->args);
+        }
+        g_dirty = 1;
+        return 1;
+    }
     if (!g_pmcap) return 0;
     g_pmcap = 0;
     if (pw_rect(C_PATCHLIST, r)) juno_pm_mouse(g_pm, 1, x, y, r);
     pm_after();
     return 1;
+}
+/* The mouse messages as the editor's window procedure passes them on (rva 0x31047C ..): ONE path for the window's
+ * messages and the script's (--kbscript), panel points. A down, or a double click (WM_LBUTTONDBLCLK: a down to the
+ * panels, then the frame's own); every move (WM_MOUSEMOVE: the panels' hover flags, then the holder; the patch
+ * window's list); the up; the leave -- WM_MOUSELEAVE is a move to (0x80000001, 0x80000001), not converted, flags 0
+ * (rva 0x3104E4; the window asks for it at every move: TrackMouseEvent TME_LEAVE, rva 0x3104C6) */
+static void ev_down(int x, int y, int mods, int dbl)
+{
+    mouse_down(x, y, mods, dbl);
+    if (dbl && !juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(x, y);
+}
+static void ev_move(int x, int y, int mods)
+{
+    mouse_move(x, y, mods);
+    pm_mouse_move(x, y);
+}
+static void ev_up(int x, int y, int flags)
+{
+    g_upflags = flags;
+    pm_mouse_up(x, y);
+    mouse_up_at(x, y);
+    g_upflags = 0;
+}
+static void ev_leave(void)
+{
+    if (EXE_TOOTH == 23) return;                 /* TOOTH 23: no leave */
+    mouse_move(-2147483647, -2147483647, 0);
 }
 /* the list's keys (rva 0x3278C0): letters as their capitals, Space, the arrows, Enter, Esc, Delete;
  * Shift bit 0, Ctrl bit 1 */
@@ -3540,8 +3717,9 @@ static void action(const char *fn, const char *args)
     } else if (!strcmp(fn, "Help"))
         MessageBoxA(g_wnd, "Knobs and sliders: drag up or down (Shift: fine), wheel: one step, double-click: default.\n"
                     "Switches: click. Keys: lower on a key = louder.\nThe patch row: a name loads its patch; the "
-                    "A-D buttons pick the group, 1-16 the patch.\nPATCH: the patch window. OPTION: panel, voices, "
-                    "engine rate, zoom, latency. SETTING: MIDI input.", "JX-3P", MB_OK);
+                    "A-D buttons pick the group, 1-16 the patch.\nPATCH: the patch window. OPTION: the plugin's menu "
+                    "(layout, CC mapping, voices, CPU). SETTING: MIDI input. The window menu (Alt+Space): zoom, "
+                    "audio latency.", "JX-3P", MB_OK);
     else if (!strcmp(fn, "About"))
         MessageBoxA(g_wnd, "JX-3P\n\nThe C99 port of the Roland Cloud JX-3P plugin (bit-exact in every test of "
                     "its repository), under the plugin's own panel: its Script.xml and sprite sheets.\n\nFor the "
@@ -3553,45 +3731,152 @@ static void action(const char *fn, const char *args)
     }
 }
 
-static void option_menu(void)
+/* THE OPTION MENU: the menuButton's up with its action (rva 0x3251C0) opens the plugin's menu (rva 0x4147B0) -- its
+ * items in its order with their enable and check (an item's +0x28 / +0x29, rva 0x433590): "JX-3P Layout" /
+ * "SYSTEM-8 Layout" (checked by vm.vs.mode 0 / 1), the CC mappings ("Set ... for SYSTEM-8" greyed when the map is the
+ * preset's, "Clear" when no CC drives a record: rva 0x31A2B0), "2 / 4 / 6 / 8 Voices" (the one vm.vs.voiceCount is,
+ * checked), "Optimize for Lower CPU Usage" (checked by vm.vs.sampleRate != 0), "Roland Cloud...", "Authentication...";
+ * the up's flags exactly 7 (the right button with Shift and Ctrl) add the developer items. Separators after the
+ * layouts, the mappings, the voices, the CPU item and the cloud items. The popup (rva 0x4361E0) numbers the items
+ * with a text from 1000, greys and checks them (MF_GRAYED, MF_CHECKED), at the cursor + (10, 5) -- a point off every
+ * monitor goes to the nearest one's work area across -- with TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON.
+ * The choices (rva 0x4155FA on), the item's number among those with a text: the layouts set vm.vs.mode (flag 1, the
+ * model's notifies and commit); the mappings apply the preset or clear the map (rva 0x31A3D0; nothing else); the
+ * voices set vm.vs.voiceCount; the CPU item sets vm.vs.sampleRate to 0 when checked, else 3; "Roland Cloud..." launches
+ * the plugin's string 40 (rva 0x292610) -- an empty one in the plugin's own environment, whose launch fails with its
+ * message 14 (a warning box, 0x30): this program has no Roland Cloud. EXECUTED: jx_panel_gate.py ("# om", "# box").
+ * Not ported (the user's call, JX_PANEL.md): "Authentication..." (the account's login panel) and the developer items
+ * (patch conversions, a dump, TSV banks). This program's own settings (zoom, audio latency) are in the window's
+ * system menu. */
+static const char *const OM_TEXT[16] = {
+    "JX-3P Layout", "SYSTEM-8 Layout", "Set MIDI Control Mapping for SYSTEM-8", "Clear MIDI Control Mapping",
+    "2 Voices", "4 Voices", "6 Voices", "8 Voices", "Optimize for Lower CPU Usage", "Roland Cloud...",
+    "Authentication...", "Convert20180620 Convert JX-03 Patch", "Convert20160712B AMP Level",
+    "Dump20161021 Dump Preset Patch for PLUG-OUT", "Import Bank TSV", "Export Bank TSV"};
+static int om_sep_after(int i, int n)       /* TOOTH 31: no separator after the CPU item */
+{ return i == 1 || i == 3 || i == 7 || (i == 8 && EXE_TOOTH != 31) || (i == 10 && n > 11); }
+static void om_box(int msg, unsigned type)
 {
-    HMENU m = CreatePopupMenu();
-    POINT pt;
-    int cmd, i, mode = get("vm.vs.mode"), vc = get("vm.vs.voiceCount"), sr = get("vm.vs.sampleRate"), z = get("vm.vs.mainZoom");
-    static const int Z[] = {50, 62, 75, 100, 125, 150, 200};
-    static const char *RATE[] = {"96 kHz", "88.2 kHz", "48 kHz", "44.1 kHz"};
-    static const int LAT[] = {0, 5, 8, 11, 16, 21, 32, 43};
+    if (g_log) fprintf(g_log, "# box %d %u\n", msg, type);
+    if (!g_scripted)
+        MessageBoxA(g_wnd, msg == 14 ? "Roland Cloud could not be started: this program has no Roland Cloud." : "?",
+                    "JX-3P", type);
+}
+static void option_menu(int flags)
+{
+    static const int VC[4] = {2, 4, 6, 8};
+    int mode = get("vm.vs.mode"), vc = get("vm.vs.voiceCount"), sr = get("vm.vs.sampleRate");
+    int n = flags == 7 ? 16 : 11, en[16], ck[16], i, cmd = -1;
+    for (i = 0; i < 16; ++i) { en[i] = 1; ck[i] = 0; }
+    ck[0] = mode == 0;
+    ck[1] = mode == 1;
+    EnterCriticalSection(&g_lock);
+    en[2] = !jx3p_cc_preset_is(0);
+    en[3] = !jx3p_cc_preset_is(-1);
+    LeaveCriticalSection(&g_lock);
+    if (EXE_TOOTH == 28) en[3] = 1;                         /* TOOTH 28: "Clear" never greyed */
+    for (i = 0; i < 4; ++i) ck[4 + i] = VC[i] == (EXE_TOOTH == 30 ? vc + 2 : vc);   /* TOOTH 30: the wrong one checked */
+    ck[8] = sr != 0;
+    if (g_scripted) {
+        const Ans *a = ans_take('o');
+        cmd = a ? a->num : -1;
+        if (cmd >= n || (cmd >= 0 && !en[cmd])) cmd = -1;  /* a greyed item is never the popup's answer */
+        if (g_log) {
+            fprintf(g_log, "# om %d %d %d", flags, cmd, n);
+            for (i = 0; i < n; ++i) {                   /* each item =TEXT:ENABLED:CHECKED, a separator | */
+                fputc(' ', g_log);
+                hexstr(g_log, OM_TEXT[i]);
+                fprintf(g_log, ":%d:%d%s", en[i], ck[i], om_sep_after(i, n) ? " |" : "");
+            }
+            fprintf(g_log, "\n");
+        }
+    } else {
+        HMENU m = CreatePopupMenu();
+        POINT pt;
+        HMONITOR mon;
+        if (!m) return;
+        for (i = 0; i < n; ++i) {
+            AppendMenuA(m, MF_STRING | (en[i] ? 0 : MF_GRAYED) | (ck[i] ? MF_CHECKED : 0), (UINT_PTR)(1000 + i), OM_TEXT[i]);
+            if (om_sep_after(i, n)) AppendMenuA(m, MF_SEPARATOR, 0, NULL);
+        }
+        GetCursorPos(&pt);
+        pt.x += 10;
+        pt.y += 5;
+        if (!MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) && (mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST))) {
+            MONITORINFO mi;
+            mi.cbSize = sizeof mi;
+            if (GetMonitorInfoA(mon, &mi)) {
+                if (pt.x < mi.rcWork.left) pt.x = mi.rcWork.left;
+                else if (pt.x > mi.rcWork.right) pt.x = mi.rcWork.right;
+            }
+        }
+        cmd = (int)TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, pt.x, pt.y, 0, g_wnd, NULL);
+        DestroyMenu(m);
+        cmd = cmd ? cmd - 1000 : -1;
+    }
+    if (cmd < 0) return;
+    if (cmd <= 1) set("vm.vs.mode", cmd);
+    else if (cmd <= 3) {
+        EnterCriticalSection(&g_lock);
+        if (g_log) fprintf(g_log, "cc_preset %d\n", cmd == 2 ? 0 : -1);
+        jx3p_cc_preset(EXE_TOOTH == 29 && cmd == 3 ? 0 : cmd == 2 ? 0 : -1);   /* TOOTH 29: "Clear" applies the preset */
+        eng_refresh();
+        LeaveCriticalSection(&g_lock);
+    } else if (cmd <= 7) set("vm.vs.voiceCount", VC[cmd - 4]);
+    else if (cmd == 8) set("vm.vs.sampleRate", ck[8] ? 0 : 3);
+    else if (cmd == 9) om_box(14, 0x30);
+    else status_set(cmd == 10 ? "Authentication (the Roland Cloud account): not part of this port"
+                              : "The plugin's developer items: not part of this port");
+    g_dirty = 1;
+}
+
+/* this program's own settings, in the window's system menu (Alt+Space): the window's zoom and the audio latency */
+#define SYS_ZOOM 0x1000u
+#define SYS_LAT 0x8000u
+static const int SYS_Z[] = {50, 62, 75, 100, 125, 150, 200};
+static const int SYS_L[] = {0, 5, 8, 11, 16, 21, 32, 43};
+static void sys_menu_init(HWND h)
+{
+    HMENU sm = GetSystemMenu(h, FALSE), zm = CreatePopupMenu(), lm = CreatePopupMenu();
     char s[64];
-    AppendMenuA(m, MF_STRING | (mode == 0 ? MF_CHECKED : 0), 100, "Panel: Original");
-    AppendMenuA(m, MF_STRING | (mode == 1 ? MF_CHECKED : 0), 101, "Panel: SYSTEM-8 layout");
-    AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    for (i = 2; i <= 8; ++i) { snprintf(s, sizeof s, "Voices: %d", i); AppendMenuA(m, MF_STRING | (vc == i ? MF_CHECKED : 0), 200 + i, s); }
-    AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    /* the engine-rate setting indexes the plugin's table (rva 0x94AB80) */
-    for (i = 0; i < 4; ++i) { snprintf(s, sizeof s, "Engine rate: %s", RATE[i]); AppendMenuA(m, MF_STRING | (sr == i ? MF_CHECKED : 0), 300 + i, s); }
-    AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    for (i = 0; i < 7; ++i) { snprintf(s, sizeof s, "Zoom: %d%%", Z[i]); AppendMenuA(m, MF_STRING | (z == Z[i] ? MF_CHECKED : 0), 400 + Z[i], s); }
-    AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    /* the audio output's queue (this program's, not the plugin's): lower plays
-     * faster, higher is safer against drop-outs on a busy computer */
+    int i;
+    if (!sm || !zm || !lm) return;
+    for (i = 0; i < 7; ++i) { snprintf(s, sizeof s, "%d%%", SYS_Z[i]); AppendMenuA(zm, MF_STRING, SYS_ZOOM + (UINT)i * 16, s); }
     for (i = 0; i < 8; ++i) {
-        if (LAT[i]) snprintf(s, sizeof s, "Audio latency: %d ms", LAT[i]);
-        else snprintf(s, sizeof s, "Audio latency: the lowest the device allows");
-        AppendMenuA(m, MF_STRING | (g_lat_ms == LAT[i] ? MF_CHECKED : 0), 700 + LAT[i], s);
+        if (SYS_L[i]) snprintf(s, sizeof s, "%d ms", SYS_L[i]);
+        else snprintf(s, sizeof s, "the lowest the device allows");
+        AppendMenuA(lm, MF_STRING, SYS_LAT + (UINT)i * 16, s);
     }
-    {
-        char d[192];
-        audio_desc_get(d, sizeof d);
-        AppendMenuA(m, MF_STRING | MF_GRAYED, 0, d);
+    AppendMenuA(sm, MF_SEPARATOR, 0, NULL);
+    AppendMenuA(sm, MF_POPUP, (UINT_PTR)zm, "Zoom");
+    AppendMenuA(sm, MF_POPUP, (UINT_PTR)lm, "Audio latency");
+}
+static int sys_menu_command(UINT id)
+{
+    id &= 0xFFF0u;                       /* WM_SYSCOMMAND: the low four bits are the system's */
+    if (id >= SYS_LAT && id < SYS_LAT + 8 * 16) {
+        int ms = SYS_L[(id - SYS_LAT) / 16];
+        InterlockedExchange(&g_lat_ms, ms);
+        InterlockedExchange(&g_reopen, 1);
+        ini_put("audio", "latency_ms", ms);
+        return 1;
     }
-    GetCursorPos(&pt);
-    cmd = TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, g_wnd, NULL);
-    DestroyMenu(m);
-    if (cmd == 100 || cmd == 101) set("vm.vs.mode", cmd - 100);
-    else if (cmd >= 202 && cmd <= 208) set("vm.vs.voiceCount", cmd - 200);
-    else if (cmd >= 300 && cmd <= 303) set("vm.vs.sampleRate", cmd - 300);
-    else if (cmd >= 700) { InterlockedExchange(&g_lat_ms, cmd - 700); InterlockedExchange(&g_reopen, 1); ini_put("audio", "latency_ms", cmd - 700); }
-    else if (cmd >= 400) { set("vm.vs.mainZoom", cmd - 400); ini_put("window", "zoom", cmd - 400); }
+    if (id >= SYS_ZOOM && id < SYS_ZOOM + 7 * 16) {
+        int z = SYS_Z[(id - SYS_ZOOM) / 16];
+        set("vm.vs.mainZoom", z);
+        ini_put("window", "zoom", z);
+        return 1;
+    }
+    return 0;
+}
+static void sys_menu_check(HWND h)
+{
+    HMENU sm = GetSystemMenu(h, FALSE);
+    int i, z = get("vm.vs.mainZoom");
+    if (!sm) return;
+    for (i = 0; i < 7; ++i) CheckMenuItem(sm, SYS_ZOOM + (UINT)i * 16, MF_BYCOMMAND | (z == SYS_Z[i] ? MF_CHECKED : MF_UNCHECKED));
+    for (i = 0; i < 8; ++i)
+        CheckMenuItem(sm, SYS_LAT + (UINT)i * 16, MF_BYCOMMAND | (g_lat_ms == SYS_L[i] ? MF_CHECKED : MF_UNCHECKED));
 }
 
 static void midi_menu(void)
@@ -3676,6 +3961,17 @@ static int zoom_conv(int win)
     return v;
 }
 
+/* A main-window point to the panel's (rva 0x2ABFC0; every mouse message's, rva 0x312600 / 0x312720): each
+ * coordinate (v x 200 / zoom + 1) / 2 in C's division (the plugin's idiv, then cdq / sub / sar), the zoom by the
+ * getter -- every conversion asks it (rva 0x2AA470). Graded at many points and zooms: kbscript "wpt" */
+static int win_to_panel(int v)
+{
+    int z = zoom_conv(0);
+    if (z <= 0) return v;
+    if (EXE_TOOTH == 22) return v * 100 / z;     /* TOOTH 22: the old conversion, truncated */
+    return (v * 200 / z + 1) / 2;
+}
+
 static void zoom_apply(void)
 {
     RECT r;
@@ -3712,42 +4008,59 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
     case WM_LBUTTONDOWN:
     case WM_LBUTTONDBLCLK:
         SetCapture(h);
-        mouse_down(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom,
-                   ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0), m == WM_LBUTTONDBLCLK);
-        if (m == WM_LBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL))   /* not through the patch window */
-            mouse_dbl(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
+        ev_down(win_to_panel(GET_X_LPARAM(lp)), win_to_panel(GET_Y_LPARAM(lp)),
+                ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0), m == WM_LBUTTONDBLCLK);
         InvalidateRect(h, NULL, FALSE);
         return 0;
-    case WM_MOUSEMOVE:
-        if (g_drag) { mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom,
-                                 ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0)); InvalidateRect(h, NULL, FALSE); }
-        else if (pm_mouse_move(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom)) InvalidateRect(h, NULL, FALSE);
+    case WM_MOUSEMOVE: {
+        TRACKMOUSEEVENT tme;
+        tme.cbSize = sizeof tme;
+        tme.dwFlags = TME_LEAVE;
+        tme.hwndTrack = h;
+        tme.dwHoverTime = 0;
+        TrackMouseEvent(&tme);
+        ev_move(win_to_panel(GET_X_LPARAM(lp)), win_to_panel(GET_Y_LPARAM(lp)),
+                ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0));
+        InvalidateRect(h, NULL, FALSE);
+        return 0;
+    }
+    case WM_MOUSELEAVE:
+        ev_leave();
+        InvalidateRect(h, NULL, FALSE);
         return 0;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
         ReleaseCapture();
-        pm_mouse_up(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
-        mouse_up_at(GET_X_LPARAM(lp) * 100 / g_zoom, GET_Y_LPARAM(lp) * 100 / g_zoom);
+        ev_up(win_to_panel(GET_X_LPARAM(lp)), win_to_panel(GET_Y_LPARAM(lp)), (m == WM_RBUTTONUP ? 4 : 0) |
+              ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetAsyncKeyState(VK_MENU) < 0 ? 8 : 0));
         InvalidateRect(h, NULL, FALSE);
         return 0;
-    case WM_KEYDOWN:                     /* the patch window's list takes the keys while it is open */
-        if (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL) && pm_key((int)wp, GetKeyState(VK_SHIFT) < 0, GetKeyState(VK_CONTROL) < 0)) {
+    case WM_KEYDOWN:                     /* the patch window's list takes the keys while it is open (in the plugin
+                                          * its own window: the main panel gets none then) */
+        if (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL)) {
+            if (pm_key((int)wp, GetKeyState(VK_SHIFT) < 0, GetKeyState(VK_CONTROL) < 0)) InvalidateRect(h, NULL, FALSE);
+            return 0;
+        }
+        /* fall through */
+    case WM_KEYUP:                       /* the panel's key (rva 0x310724): a key down's repeats (lParam bit 30) none */
+        if ((m == WM_KEYDOWN && (lp & 0x40000000)) || (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL))) break;
+        if (ev_key(m == WM_KEYDOWN ? 1 : 2, (int)wp, (GetKeyState(VK_SHIFT) < 0 ? 1 : 0) | (GetKeyState(VK_CONTROL) < 0 ? 2 : 0) |
+                   (GetKeyState(VK_MENU) < 0 ? 8 : 0))) {
             InvalidateRect(h, NULL, FALSE);
             return 0;
         }
         break;
     case WM_RBUTTONDOWN:
     case WM_RBUTTONDBLCLK: {
-        int x = GET_X_LPARAM(lp) * 100 / g_zoom, y = GET_Y_LPARAM(lp) * 100 / g_zoom;
+        int x = win_to_panel(GET_X_LPARAM(lp)), y = win_to_panel(GET_Y_LPARAM(lp));
         if (cc_press(x, y, ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0), -1)) {
             InvalidateRect(h, NULL, FALSE);
             return 0;
         }
         /* any other right press goes on to the controls, which do not test the button */
         SetCapture(h);
-        mouse_down(x, y, 4 | ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0),
-                   m == WM_RBUTTONDBLCLK);
-        if (m == WM_RBUTTONDBLCLK && !juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(x, y);
+        ev_down(x, y, 4 | ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetKeyState(VK_MENU) < 0 ? 8 : 0),
+                m == WM_RBUTTONDBLCLK);
         InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -3756,7 +4069,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         p.x = GET_X_LPARAM(lp);
         p.y = GET_Y_LPARAM(lp);
         ScreenToClient(h, &p);
-        wheel_event(p.x * 100 / g_zoom, p.y * 100 / g_zoom, GET_WHEEL_DELTA_WPARAM(wp), GET_KEYSTATE_WPARAM(wp));
+        wheel_event(win_to_panel(p.x), win_to_panel(p.y), GET_WHEEL_DELTA_WPARAM(wp), GET_KEYSTATE_WPARAM(wp));
         InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -3805,6 +4118,12 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         if (g_dirty) InvalidateRect(h, NULL, FALSE);
         return 0;
     }
+    case WM_SYSCOMMAND:
+        if (sys_menu_command((UINT)wp)) { g_dirty = 1; InvalidateRect(h, NULL, FALSE); return 0; }
+        break;
+    case WM_INITMENUPOPUP:
+        if (HIWORD(lp)) sys_menu_check(h);           /* the window menu opens: this program's settings checked */
+        break;
     case WM_DESTROY:
         RemovePropA(h, "jx3p.blocks");
         RemovePropA(h, "jx3p.dropouts");
@@ -3967,6 +4286,13 @@ static void log_opens(Panel *p, FILE *f)
     fputc(panel_open(p) ? '1' : '0', f);
     for (i = 0; i < p->n; ++i)
         if (p->items[i].p) log_opens(p->items[i].p, f);
+}
+static void log_hover(Panel *p, FILE *f)        /* each panel's hover flag (+0xDD), in cctree's order */
+{
+    int i;
+    fputc(p->hover ? '1' : '0', f);
+    for (i = 0; i < p->n; ++i)
+        if (p->items[i].p) log_hover(p->items[i].p, f);
 }
 static Ctl *find_ref(Panel *p, const char *ref)
 {
@@ -4330,7 +4656,13 @@ static int play_test(const char *path, int change_patch)
 }
 
 /* --kbscript: one panel event per line through the program's own handlers --
- *   down X Y SHIFT | move X Y SHIFT | up                    the mouse, panel pixels
+ *   down X Y SHIFT | move X Y SHIFT | up | leave            the mouse, panel pixels (the window's messages'
+ *                                                           path: ev_down / ev_move / ev_up / ev_leave)
+ *   key T VK MODS                                           a key: T 1 down, 2 up; its virtual key; Shift 1,
+ *                                                           Ctrl 2, Alt 8 (the code logged "# key code")
+ *   zoom                                                    the main window's zoom (its getter)
+ *   wpt X Y | hover                                         a main-window point's conversion (logged with the
+ *                                                           panel point) | each panel's hover flag
  *   wheel X Y DELTA KEYS | gtick T                          WM_MOUSEWHEEL (its delta, MK_ keys) | the editor's
  *                                                           50 ms timer with the GUI's clock at T ms
  *   set V REF                                               a panel control's edit
@@ -4390,25 +4722,47 @@ static int kb_script(const char *path)
         else if (!strncmp(line, "cctree", 6)) cc_tree(g_tree, g_log);
         else if (!strncmp(line, "state", 5)) log_state();
         else if (!strncmp(line, "pending", 7)) log_pending();
+        else if (!strncmp(line, "pmv", 3)) {          /* the patch window's values: open, patchManager, the lists, the
+                                                       * view's bankId and patchId */
+            int vb = 0, vp = 0, tk = 0;
+            juno_pm_view_values(g_pm, &vb, &vp, &tk);
+            fprintf(g_log, "# pmv %d %d %d %d %d %d\n", juno_pm_value(g_pm, JPM_ID_PANEL), juno_pm_value(g_pm, JPM_ID_MANAGER),
+                    juno_pm_value(g_pm, JPM_ID_LIST_MAIN), juno_pm_value(g_pm, JPM_ID_LIST_SUB), vb, vp);
+        }
         else if (!strncmp(line, "opens", 5)) { fprintf(g_log, "# opens "); log_opens(g_tree, g_log); fprintf(g_log, "\n"); }
         else if (sscanf(line, "cc %d %d", &a, &b) == 2) midi_in(0xB0u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
         else if (sscanf(line, "down %d %d %d", &a, &b, &c) == 3) {
             fprintf(g_log, "# kb down %d %d %d\n", a, b, c);
-            mouse_down(a, b, c, 0);
+            ev_down(a, b, c, 0);
         }
         else if (sscanf(line, "dbl %d %d %d", &a, &b, &c) == 3) {      /* WM_LBUTTONDBLCLK's path */
             fprintf(g_log, "# kb dbl %d %d %d\n", a, b, c);
-            mouse_down(a, b, c, 1);
-            if (!juno_pm_value(g_pm, JPM_ID_PANEL)) mouse_dbl(a, b);
+            ev_down(a, b, c, 1);
         }
         else if (sscanf(line, "move %d %d %d", &a, &b, &c) == 3) {
             fprintf(g_log, "# kb move %d %d %d\n", a, b, c);
-            mouse_move(a, b, c);
+            ev_move(a, b, c);
         }
+        else if (sscanf(line, "key %d %d %d", &a, &b, &c) == 3) {     /* WM_KEYDOWN (1) / WM_KEYUP (2): vk, mods */
+            fprintf(g_log, "# kb key %d %d %d\n", a, b, c);
+            ev_key(a, b, c);
+        }
+        else if (!strncmp(line, "leave", 5)) {                         /* WM_MOUSELEAVE */
+            fprintf(g_log, "# kb leave\n");
+            ev_leave();
+        }
+        else if (sscanf(line, "wpt %d %d", &a, &b) == 2) {             /* a window point's conversion alone */
+            c = win_to_panel(a);
+            d = win_to_panel(b);
+            fprintf(g_log, "# wpt %d %d %d %d\n", a, b, c, d);
+        }
+        else if (!strncmp(line, "hover", 5)) { fprintf(g_log, "# hover "); log_hover(g_tree, g_log); fprintf(g_log, "\n"); }
+        else if (!strncmp(line, "zoom", 4)) fprintf(g_log, "# zoom %d\n", zoom_conv(0));   /* the main window's zoom */
         else if (!strncmp(line, "up", 2)) {
-            if (sscanf(line, "up %d %d", &a, &b) != 2) { a = g_mx; b = g_my; }
-            fprintf(g_log, "# kb up %d %d\n", a, b);
-            mouse_up_at(a, b);
+            c = 0;
+            if (sscanf(line, "up %d %d %d", &a, &b, &c) < 2) { a = g_mx; b = g_my; }
+            fprintf(g_log, "# kb up %d %d %d\n", a, b, c);
+            ev_up(a, b, c);
         }
         else if (sscanf(line, "wheel %d %d %d %d", &a, &b, &c, &d) == 4) {     /* WM_MOUSEWHEEL: delta, MK_ keys */
             fprintf(g_log, "# kb wheel %d %d %d %d\n", a, b, c, d);
@@ -4432,7 +4786,8 @@ static int kb_script(const char *path)
             LeaveCriticalSection(&g_lock);
         }
         if (!strncmp(line, "down", 4) || !strncmp(line, "dbl", 3) || !strncmp(line, "move", 4) || !strncmp(line, "up", 2) ||
-            !strncmp(line, "wheel", 5) || !strncmp(line, "rdown", 5) || !strncmp(line, "ccmsg", 5))
+            !strncmp(line, "wheel", 5) || !strncmp(line, "rdown", 5) || !strncmp(line, "ccmsg", 5) || !strncmp(line, "leave", 5) ||
+            !strncmp(line, "key ", 4))
             g_nans = 0;                                   /* an event's unused answers go with it */
     }
     fclose(in);
@@ -4690,6 +5045,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
         g_wnd = CreateWindowA("JX3P", "JX-3P", st, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top,
                               NULL, NULL, inst, NULL);
         pm_status();
+        sys_menu_init(g_wnd);
         ShowWindow(g_wnd, show);
         SetTimer(g_wnd, 1, 50, NULL);
         {
