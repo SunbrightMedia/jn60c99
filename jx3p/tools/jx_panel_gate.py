@@ -1590,6 +1590,7 @@ def main():
         n['pw events'], {k[3:]: v for k, v in res['at'].items() if k.startswith('pw ')}, n['pmv']))
     print('keys %d (%d taken, %d stepping), codes compared %d; on %s' % (n['keys'], n['keys taken'], n['key steps'],
           n['key codes'], {k: v for k, v in res['at'].items() if k.endswith(' key')}))
+    print('key holders compared %d: %s' % (n['focus'], {k[6:]: v for k, v in sorted(n.items()) if k.startswith('focus ')}))
     print('window points %d (%d where x 100 / zoom truncated differs) at zooms %s; leaves %d (%d changing a hover flag), '
           'hover comparisons %d' % (n['wpt'], n['wpt round'], sorted(res['zooms']), n['leaves'], n['leave changed'], n['hover']))
     print('states %d, pending lists %d (%d records), host edits %d, blocks %d; CC probes %d (x2), right presses %d '
