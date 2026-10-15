@@ -94,18 +94,22 @@ movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 m
 - Fader caps 6 x 10 (half the first placeholder); saved layouts that still hold the old default follow
   the new one (`OLD_DEFAULTS` in app.html).
 
-## Lightening holes, organic (2026-10-15)
-The user asked for less filament, then for the "organic load-optimized" look. `lightenHoles` builds a
-load-path truss per piece: nodes = its pillars + points on its inner frame (inset `edgeMargin`, plus
-the socket depth on socket sides) + extra nodes wherever a Delaunay triangle spans more than
-`maxSpan`; every Delaunay triangle, inset by half a rib and with rounded corners (at least
-`minFillet`; around a pillar the fillet grows until the hole clears the foot by `pillarMargin`), is a
-hole. Holes that would break a margin are left solid. Floors: edgeMargin 2.5, rib 2, pillarMargin 1
-(at a 1 mm margin a mesh tore -- seen). Needs `delaunator@5.0.1` (CDN in the page, npm in tests).
-MAX example: 612 g -> 331 g of PLA; the page's own mass (from its export meshes) equals trimesh's.
-check_cases.py grades the holes from the section's interiors: >= edgeMargin from the outline,
->= foot + pillarMargin from every pillar, >= rib between holes. Teeth: `make_cases.js --tooth-holes`
-(holes cut at the floors while the manifest claims the defaults) -> 320 failures of all three kinds.
-Found on the way and fixed: a face's triangles must be flipped ONCE from earcut's total winding; a
-per-triangle test flipped zero-area slivers at random (collinear honeycomb edges) -> "winding
-inconsistent". The drawing overlays no longer take the mouse (a hole fill had stopped a board drag).
+## Lightening holes, organic (2026-10-15, second form)
+The user asked for less filament, then for the "organic load-optimized" look; the first form (one
+rounded triangle per Delaunay triangle) read as a mesh, not a part. `lightenHoles` now keeps material
+only where load runs: a solid frame (everything outside an inner rounded rectangle inset `edgeMargin`,
+plus the socket depth on socket sides), a solid ring round each pillar foot (`pillarMargin`), and ribs
+-- each board's pillars joined in a ring (its seat), each pillar joined to its nearest neighbours and to
+the frame (Gabriel graph: short, direct links), and extra nodes in open areas (empty circles wider than
+`maxSpan`). Ribs taper from `pillarRib` at a pillar to `ribWidth`. All shapes join through a polynomial
+smooth minimum of the two nearest (`blend`): fillets at every joint, no bulk elsewhere. Holes = the
+field's contours (marching squares, 0.5 mm grid, 0.25 mm into the void), slivers under 3 mm mean width
+dropped, every hole checked exactly against the margins. MAX example: 612 g -> 354 g, 43 % of the
+area removed. Needs `delaunator@5.0.1`.
+check_cases.py grades the holes from the mesh sections: >= edgeMargin from the outline, >= foot +
+pillarMargin from every pillar, >= ribWidth between holes. Teeth: `make_cases.js --tooth-holes`
+(holes at the floors while the manifest claims the defaults) -> failures of all three kinds.
+Found by the oracle and fixed: a rib that ended at a frame node in open space (the socket sides) left a
+2.7 mm tip between two holes; the frame is now solid up to the inner rectangle. Earlier: a face's
+triangles must be flipped ONCE from earcut's total winding (zero-area slivers had flipped at random);
+the drawing overlays no longer take the mouse.

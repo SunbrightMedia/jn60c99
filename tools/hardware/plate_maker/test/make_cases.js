@@ -28,10 +28,10 @@ const manifest = [];
 for (const [dk, rots] of cases) {
   const { g, insts } = autoPlace(dk, rots), p = Object.assign({}, G.DEFAULTS);
   const v = G.validate(boards, insts, g, p);
-  const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
+  const pillars = v.placed.flatMap((q, k) => q.holes.map(h => [h[0], h[1], k]));
   const plan = G.planCuts(g.W, g.D, pillars, p);
   if (plan.error) throw new Error(dk + ': ' + plan.error);
-  const pieces = G.buildPieces(plan, pillars, toothHoles ? Object.assign({}, p, { edgeMargin: 2.5, pillarMargin: 1, ribWidth: 2 }) : noHoles ? Object.assign({}, p, { lighten: 0 }) : p);
+  const pieces = G.buildPieces(plan, pillars, toothHoles ? Object.assign({}, p, { edgeMargin: 2.5, pillarMargin: 1, ribWidth: 2, pillarRib: 2 }) : noHoles ? Object.assign({}, p, { lighten: 0 }) : p);
   if (tooth) {   // sabotage: first piece built with zero clearance
     const p0 = Object.assign({}, p, { clearance: 0 });
     pieces[0] = G.buildPieces(plan, pillars, p0)[0];

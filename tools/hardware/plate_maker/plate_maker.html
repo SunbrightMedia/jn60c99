@@ -267,7 +267,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     capFaderL: 6.0, capFaderW: 10.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0,
     labelSize: 5.0,     // panel label font size (mm)
     // lightening holes (honeycomb) in the empty plate
-    lighten: 1, ribWidth: 3.5, edgeMargin: 5.0, pillarMargin: 2.0, frameStep: 30.0, maxSpan: 55.0, minFillet: 3.0
+    lighten: 1, ribWidth: 3.5, pillarRib: 5.0, blend: 8.0, edgeMargin: 5.0, pillarMargin: 2.0, frameStep: 30.0, maxSpan: 56.0
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -611,91 +611,174 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     return out;
   }
 
-  /* Lightening holes, organic (load-path truss). Nodes = the piece's pillars + points on its inner
-     frame (inset p.edgeMargin, plus the socket depth on the sides that carry sockets) + extra points
-     where a triangle spans more than p.maxSpan. Delaunay triangles between the nodes become the ribs'
-     pattern: each triangle, inset by half a rib, with its corners rounded (at least p.minFillet; around
-     a pillar the fillet grows until the hole clears the pillar foot by p.pillarMargin), is a hole.
-     So material runs straight from each pillar to its neighbours and to the frame. A hole that does
-     not fit, or comes nearer than the margins to an edge or a pillar, is left solid. Plate frame. */
+  /* Lightening holes, organic. The plate keeps material only where load runs:
+       - a solid frame along the piece's outline (p.edgeMargin wide: edges, tabs, sockets),
+       - a solid ring round every pillar foot (p.pillarMargin),
+       - ribs: each board's pillars joined in a ring (the board's seat), and every pillar joined to its
+         nearest neighbours and to the frame (the Gabriel graph of pillars + frame nodes: only short,
+         direct links), plus extra nodes where a gap spans more than p.maxSpan. A rib is p.pillarRib
+         wide at a pillar and tapers to p.ribWidth elsewhere.
+     All of it is merged with a smooth minimum of the two nearest shapes (blend radius p.blend): every
+     joint gets a fillet, nothing gets bulk elsewhere, and the holes come out as smooth, organic shapes. The holes are the contours of that field (marching
+     squares, 0.5 mm grid), pushed 0.25 mm into the void. Plate frame; each hole is a closed polygon.
+     pillars: [x, y, board index]. */
   function lightenHoles(pc, p) {
     if (!p.lighten || !Delaunator) return [];
-    // floors: below them a hole can come so near an edge that the mesh tears (seen at a 1 mm margin)
-    p = Object.assign({}, p, { edgeMargin: Math.max(2.5, p.edgeMargin), ribWidth: Math.max(2, p.ribWidth), pillarMargin: Math.max(1, p.pillarMargin) });
-    const [xl, yt, xr, yb] = pc.rect, d = p.ribWidth / 2, rf = p.shoulderD / 2 + p.footFlare, kp = rf + p.pillarMargin;
+    p = Object.assign({}, p, { edgeMargin: Math.max(2.5, p.edgeMargin), ribWidth: Math.max(2, p.ribWidth), pillarMargin: Math.max(1, p.pillarMargin), blend: Math.max(0.3, p.blend) });
+    const [xl, yt, xr, yb] = pc.rect, rf = p.shoulderD / 2 + p.footFlare, kp = rf + p.pillarMargin;
     const fx0 = xl + p.edgeMargin + (pc.c > 0 ? p.tabDepth : 0), fy0 = yt + p.edgeMargin + (pc.r > 0 ? p.tabDepth : 0);
     const fx1 = xr - p.edgeMargin, fy1 = yb - p.edgeMargin;
     if (fx1 - fx0 < 20 || fy1 - fy0 < 20) return [];
-    const pts = [], keep = [];
-    const add = (x, y, k) => { if (pts.every(q => Math.hypot(q[0] - x, q[1] - y) > 1)) { pts.push([x, y]); keep.push(k); } };
-    pc.pillars.forEach(q => add(q[0], q[1], kp));
+    // nodes: pillars (kind 1), frame (kind 0), extra (kind 2)
+    const N = [];
+    const add = (x, y, kind, board) => { if (N.every(q => Math.hypot(q.x - x, q.y - y) > 1.5)) N.push({ x, y, kind, board }); };
+    pc.pillars.forEach(q => add(q[0], q[1], 1, q[2]));
     const side = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(L / p.frameStep));
       for (let i = 0; i < n; i++) add(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 0); };
     side(fx0, fy0, fx1, fy0); side(fx1, fy0, fx1, fy1); side(fx1, fy1, fx0, fy1); side(fx0, fy1, fx0, fy0);
-    let tri = null;
-    for (let it = 0; it < 200; it++) {
-      const D = Delaunator.from(pts); tri = D.triangles;
-      let worst = -1, wl = p.maxSpan;
+    let tri;
+    // open areas = big empty circles (a Delaunay triangle's circumcircle holds no node): while one is
+    // wider than p.maxSpan, put a node at its centre (or the triangle's centroid if that is outside)
+    for (let it = 0; it < 150; it++) {
+      tri = Delaunator.from(N.map(q => [q.x, q.y])).triangles;
+      const cand = [];
       for (let t = 0; t < tri.length; t += 3) {
-        const A = pts[tri[t]], B = pts[tri[t + 1]], C = pts[tri[t + 2]];
-        const L = Math.max(Math.hypot(A[0] - B[0], A[1] - B[1]), Math.hypot(B[0] - C[0], B[1] - C[1]), Math.hypot(C[0] - A[0], C[1] - A[1]));
-        if (L > wl) { wl = L; worst = t; }
+        const A = N[tri[t]], B = N[tri[t + 1]], C = N[tri[t + 2]];
+        const dd = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)); if (Math.abs(dd) < 1e-9) continue;
+        const a2 = A.x * A.x + A.y * A.y, b2 = B.x * B.x + B.y * B.y, c2 = C.x * C.x + C.y * C.y;
+        const ux = (a2 * (B.y - C.y) + b2 * (C.y - A.y) + c2 * (A.y - B.y)) / dd, uy = (a2 * (C.x - B.x) + b2 * (A.x - C.x) + c2 * (B.x - A.x)) / dd;
+        const R = Math.hypot(A.x - ux, A.y - uy);
+        if (R > p.maxSpan / 2) cand.push([R, (ux > fx0 && ux < fx1 && uy > fy0 && uy < fy1) ? [ux, uy] : [(A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3]]);
       }
-      if (worst < 0) break;
-      const A = pts[tri[worst]], B = pts[tri[worst + 1]], C = pts[tri[worst + 2]], n0 = pts.length;
-      add((A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, 0);
-      if (pts.length === n0) break;
+      cand.sort((a, b) => b[0] - a[0]);
+      const n0 = N.length;
+      for (const c of cand) { add(c[1][0], c[1][1], 2); if (N.length > n0) break; }   // the widest circle that takes a node
+      if (N.length === n0) break;
     }
-    const poly = pc.poly, n = poly.length;
+    tri = Delaunator.from(N.map(q => [q.x, q.y])).triangles;
+    // ribs: Gabriel edges (no node inside the circle on the edge as diameter), never frame-to-frame
+    const ribs = new Map();
+    const addRib = (i, j) => { const k = i < j ? i + ',' + j : j + ',' + i; if (!ribs.has(k)) ribs.set(k, [Math.min(i, j), Math.max(i, j)]); };
+    for (let t = 0; t < tri.length; t += 3) for (let e = 0; e < 3; e++) {
+      const i = tri[t + e], j = tri[t + (e + 1) % 3], A = N[i], B = N[j];
+      if (A.kind === 0 && B.kind === 0) continue;
+      // an open-area node always keeps its links (they are what splits the open area)
+      if ((A.kind === 2 || B.kind === 2) && Math.hypot(A.x - B.x, A.y - B.y) <= p.maxSpan) { addRib(i, j); continue; }
+      const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, r2 = ((A.x - B.x) ** 2 + (A.y - B.y) ** 2) / 4;
+      if (N.every((q, k) => k === i || k === j || (q.x - mx) ** 2 + (q.y - my) ** 2 >= r2 - 1e-9)) addRib(i, j);
+    }
+    const boards = new Map();
+    N.forEach((q, i) => { if (q.kind === 1) boards.set(q.board, (boards.get(q.board) || []).concat([i])); });
+    for (const ids of boards.values()) {       // the board's seat: its pillars in a ring
+      if (ids.length < 2) continue;
+      const cx = ids.reduce((t, i) => t + N[i].x, 0) / ids.length, cy = ids.reduce((t, i) => t + N[i].y, 0) / ids.length;
+      const ring = ids.slice().sort((a, b) => Math.atan2(N[a].y - cy, N[a].x - cx) - Math.atan2(N[b].y - cy, N[b].x - cx));
+      for (let k = 0; k < ring.length; k++) if (ring.length > 2 || k === 0) addRib(ring[k], ring[(k + 1) % ring.length]);
+    }
+    const rOf = q => (q.kind === 1 ? p.pillarRib : p.ribWidth) / 2;
+    const caps = [...ribs.values()].map(([i, j]) => ({ a: N[i], b: N[j], ra: rOf(N[i]), rb: rOf(N[j]) }));
+    // field on a grid: the two smallest signed distances per cell, joined by a polynomial smooth min
+    const h = 0.5, k = p.blend, x0 = pc.bbox[0] - 1, y0 = pc.bbox[1] - 1;
+    const W = Math.ceil((pc.bbox[2] - x0 + 1) / h) + 1, H = Math.ceil((pc.bbox[3] - y0 + 1) / h) + 1;
+    const D1 = new Float64Array(W * H).fill(1e9), D2 = new Float64Array(W * H).fill(1e9), poly = pc.poly, np = poly.length;
+    const reach = k + 2;             // farther than this a shape cannot reach the surface (F = 0)
+    const put = (idx, d) => { if (d < D1[idx]) { D2[idx] = D1[idx]; D1[idx] = d; } else if (d < D2[idx]) D2[idx] = d; };
+    const splat = (bx0, by0, bx1, by1, dist) => {
+      const i0 = Math.max(0, Math.floor((bx0 - reach - x0) / h)), i1 = Math.min(W - 1, Math.ceil((bx1 + reach - x0) / h));
+      const j0 = Math.max(0, Math.floor((by0 - reach - y0) / h)), j1 = Math.min(H - 1, Math.ceil((by1 + reach - y0) / h));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const d = dist(x0 + i * h, y0 + j * h); if (d < reach) put(j * W + i, d);
+      }
+    };
+    for (const c of caps) {
+      const vx = c.b.x - c.a.x, vy = c.b.y - c.a.y, L2 = vx * vx + vy * vy;
+      splat(Math.min(c.a.x, c.b.x) - 4, Math.min(c.a.y, c.b.y) - 4, Math.max(c.a.x, c.b.x) + 4, Math.max(c.a.y, c.b.y) + 4, (x, y) => {
+        const t = Math.max(0, Math.min(1, ((x - c.a.x) * vx + (y - c.a.y) * vy) / L2));
+        return Math.hypot(x - c.a.x - t * vx, y - c.a.y - t * vy) - (c.ra + (c.rb - c.ra) * t);
+      });
+    }
+    for (const q of N) if (q.kind === 1) splat(q.x, q.y, q.x, q.y, (x, y) => Math.hypot(x - q.x, y - q.y) - kp);
+    const inside = (x, y) => { let c = false; for (let i = 0, j = np - 1; i < np; j = i++) {
+      const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+    const edgeDist = (x, y) => { let d = Infinity; for (let i = 0; i < np; i++) {
+      const a = poly[i], b = poly[(i + 1) % np], vx = b[0] - a[0], vy = b[1] - a[1], L = vx * vx + vy * vy;
+      const t = L ? Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L)) : 0;
+      d = Math.min(d, Math.hypot(x - a[0] - t * vx, y - a[1] - t * vy)); } return d; };
+    // the solid frame = everything outside the inner rounded rectangle (fx0..fx1, fy0..fy1): it holds the
+    // outline, the tabs, the sockets, and the frame nodes, so no rib ever ends in open space
+    // (a rib that did, on the socket sides, left a 2.7 mm tip between two holes -- seen, 2026-10-15)
+    const cxr = (fx0 + fx1) / 2, cyr = (fy0 + fy1) / 2, hx = (fx1 - fx0) / 2, hy = (fy1 - fy0) / 2, rr = Math.min(8, hx, hy);
+    const F = new Float64Array(W * H), iso = 0.25;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      const idx = j * W + i, x = x0 + i * h, y = y0 + j * h;
+      const qx = Math.abs(x - cxr) - (hx - rr), qy = Math.abs(y - cyr) - (hy - rr);
+      const sdBox = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rr;   // > 0 outside
+      if (sdBox >= 0) { F[idx] = -1; continue; }
+      if (-sdBox < reach) put(idx, -sdBox);
+      const a = D1[idx], b = D2[idx], m = Math.max(k - Math.abs(a - b), 0) / k;
+      F[idx] = Math.min(a, b) - m * m * k / 4 - iso;                  // > 0: void (a hole)
+    }
+    // drop slivers: mean width (2 x area / perimeter) under 3 mm
+    const perim = l => l.reduce((t, v, i) => t + Math.hypot(l[(i + 1) % l.length][0] - v[0], l[(i + 1) % l.length][1] - v[1]), 0);
+    const holes = marchingSquares(F, W, H, x0, y0, h).map(l => simplify(l, 0.04))
+      .filter(l => l.length >= 4 && Math.abs(area(l)) > 25 && 2 * Math.abs(area(l)) / perim(l) >= 3);
+    // the contour must keep every margin; any hole that does not is left solid
     const segDist = (x, y, a, b) => { const vx = b[0] - a[0], vy = b[1] - a[1], L = vx * vx + vy * vy;
       const t = L ? Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L)) : 0; return Math.hypot(x - a[0] - t * vx, y - a[1] - t * vy); };
-    const inside = (x, y) => { let c = false; for (let i = 0, j = n - 1; i < n; j = i++) {
-      const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
-    const out = [];
-    for (let t = 0; t < tri.length; t += 3) {
-      const ids = [tri[t], tri[t + 1], tri[t + 2]], V = ids.map(i => pts[i]);
-      const hole = roundedInset(V, ids.map(i => keep[i]), d, p.minFillet);
-      if (!hole) continue;
-      let ok = hole.every(([x, y]) => inside(x, y));
-      for (let i = 0; ok && i < n; i++) ok = hole.every(([x, y]) => segDist(x, y, poly[i], poly[(i + 1) % n]) >= p.edgeMargin - 1e-6);
-      if (ok) for (const q of pc.pillars) for (let i = 0; ok && i < hole.length; i++)
-        if (segDist(q[0], q[1], hole[i], hole[(i + 1) % hole.length]) < kp - 1e-6) ok = false;
-      if (ok && Math.abs(area(hole)) > 12) out.push(hole);
-    }
-    return out;
+    return holes.filter(hole => hole.every(([x, y]) => inside(x, y) && edgeDist(x, y) >= p.edgeMargin - 1e-6) &&
+      pc.pillars.every(q => hole.every((v, i) => segDist(q[0], q[1], v, hole[(i + 1) % hole.length]) >= kp - 1e-6)));
   }
 
-  // Triangle V inset by d, each corner rounded with radius >= rMin, large enough that the corner stays
-  // kr[i] from vertex i. null if it does not fit. Arcs sampled with an even count (the arc's middle,
-  // its nearest point to the vertex, is always a vertex of the polygon).
-  function roundedInset(V, kr, d, rMin) {
-    const ccw = ((V[1][0] - V[0][0]) * (V[2][1] - V[0][1]) - (V[1][1] - V[0][1]) * (V[2][0] - V[0][0])) > 0 ? 1 : -1;
-    if (ccw < 0) { V = [V[0], V[2], V[1]]; kr = [kr[0], kr[2], kr[1]]; }
-    const unit = (a, b) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
-    const C = [];
-    for (let i = 0; i < 3; i++) {
-      const P = V[i], u1 = unit(P, V[(i + 1) % 3]), u2 = unit(P, V[(i + 2) % 3]);
-      const th = Math.acos(Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1]))), sn = Math.sin(th / 2);
-      if (sn < 0.05) return null;
-      let r = rMin;
-      if (kr[i] > 0) r = Math.max(r, (kr[i] - d / sn) / (1 / sn - 1) + 1e-3);
-      const bis = unit([0, 0], [u1[0] + u2[0], u1[1] + u2[1]]), dc = (d + r) / sn;
-      C.push({ P, u1, u2, th, r, c: [P[0] + bis[0] * dc, P[1] + bis[1] * dc], tl: (d + r) / Math.tan(th / 2) });
+  // Closed contours of F > 0 (grid W x H, origin x0, y0, step h). Saddles split by the cell centre.
+  function marchingSquares(F, W, H, x0, y0, h) {
+    const val = (i, j) => F[j * W + i];
+    const pt = (key) => {
+      const [t, i, j] = key.split(':'); const a = +i, b = +j;
+      if (t === 'h') { const v0 = val(a, b), v1 = val(a + 1, b), u = v0 / (v0 - v1); return [x0 + (a + u) * h, y0 + b * h]; }
+      const v0 = val(a, b), v1 = val(a, b + 1), u = v0 / (v0 - v1); return [x0 + a * h, y0 + (b + u) * h];
+    };
+    const adj = new Map(), link = (p, q) => { (adj.get(p) || adj.set(p, []).get(p)).push(q); (adj.get(q) || adj.set(q, []).get(q)).push(p); };
+    for (let j = 0; j < H - 1; j++) for (let i = 0; i < W - 1; i++) {
+      const a = val(i, j) > 0, b = val(i + 1, j) > 0, c = val(i + 1, j + 1) > 0, d = val(i, j + 1) > 0;
+      const code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
+      if (code === 0 || code === 15) continue;
+      const T = 'h:' + i + ':' + j, B = 'h:' + i + ':' + (j + 1), L = 'v:' + i + ':' + j, R = 'v:' + (i + 1) + ':' + j;
+      const centre = (val(i, j) + val(i + 1, j) + val(i + 1, j + 1) + val(i, j + 1)) / 4 > 0;
+      switch (code) {
+        case 1: case 14: link(L, T); break;
+        case 2: case 13: link(T, R); break;
+        case 4: case 11: link(R, B); break;
+        case 8: case 7: link(B, L); break;
+        case 3: case 12: link(L, R); break;
+        case 6: case 9: link(T, B); break;
+        case 5: if (centre) { link(L, B); link(T, R); } else { link(L, T); link(R, B); } break;
+        case 10: if (centre) { link(L, T); link(R, B); } else { link(L, B); link(T, R); } break;
+      }
     }
-    for (let i = 0; i < 3; i++) {   // the two tangent points on each edge must not cross
-      const j = (i + 1) % 3, L = Math.hypot(V[j][0] - V[i][0], V[j][1] - V[i][1]);
-      if (C[i].tl + C[j].tl > L - 0.5) return null;
+    const seen = new Set(), loops = [];
+    for (const start of adj.keys()) {
+      if (seen.has(start)) continue;
+      const loop = []; let prev = null, cur = start;
+      while (cur && !seen.has(cur)) { seen.add(cur); loop.push(pt(cur)); const nx = adj.get(cur).find(q => q !== prev && !seen.has(q)); prev = cur; cur = nx; }
+      if (loop.length >= 3) loops.push(loop);
     }
-    const out = [], SEG = 8;
-    for (let i = 0; i < 3; i++) {
-      const k = C[i], nrm = (u) => [u[1] * -1, u[0]];   // left normal of an edge (interior side for CCW)
-      // tangent points: from the fillet centre, perpendicular to each edge (the edge itself sits d further out)
-      const n1 = nrm(k.u1), n2 = [-nrm(k.u2)[0], -nrm(k.u2)[1]];
-      const a1 = Math.atan2(-n2[1], -n2[0]), a2 = Math.atan2(-n1[1], -n1[0]);
-      let da = a2 - a1; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
-      for (let s = 0; s <= SEG; s++) { const a = a1 + da * s / SEG; out.push([k.c[0] + k.r * Math.cos(a), k.c[1] + k.r * Math.sin(a)]); }
-    }
-    return out;
+    return loops;
+  }
+
+  // Ramer-Douglas-Peucker on a closed loop.
+  function simplify(loop, tol) {
+    if (loop.length < 8) return loop;
+    const rdp = (pts) => {
+      if (pts.length < 3) return pts;
+      const a = pts[0], b = pts[pts.length - 1], vx = b[0] - a[0], vy = b[1] - a[1], L = Math.hypot(vx, vy) || 1;
+      let mi = 0, md = 0;
+      for (let i = 1; i < pts.length - 1; i++) { const d = Math.abs((pts[i][0] - a[0]) * vy - (pts[i][1] - a[1]) * vx) / L; if (d > md) { md = d; mi = i; } }
+      if (md <= tol) return [a, b];
+      const l = rdp(pts.slice(0, mi + 1)), r = rdp(pts.slice(mi));
+      return l.slice(0, -1).concat(r);
+    };
+    const half = loop.length >> 1;
+    return rdp(loop.slice(0, half + 1)).slice(0, -1).concat(rdp(loop.slice(half).concat([loop[0]])).slice(0, -1));
   }
 
   // Signed volume of a closed triangle mesh (mm^3).
@@ -817,7 +900,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     return out;
   }
 
-  const api = { meshVolume, lightenHoles, roundedInset, CUTOUTS, CAPS, capShapes, capBoxes, capOverlaps, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
+  const api = { meshVolume, lightenHoles, marchingSquares, CUTOUTS, CAPS, capShapes, capBoxes, capOverlaps, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
     validate, planCuts, buildPieces, pieceMesh, stl, coupons, zip, crc32, area, label };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PlateGeom = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -848,8 +931,9 @@ const PARAM_UI = [
   ['Caps (placeholders)', [['capFaderL', 'Fader cap length (along travel)', 'mm'], ['capFaderW', 'Fader cap width', 'mm'], ['capKnobD', 'Knob diameter', 'mm'],
     ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
   ['Labels', [['labelSize', 'Label text size', 'mm']]],
-  ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Rib width', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'],
-    ['pillarMargin', 'Solid ring around pillar feet', 'mm'], ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest hole span', 'mm'], ['minFillet', 'Smallest corner radius', 'mm']]]
+  ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Thinnest rib', 'mm'], ['pillarRib', 'Rib width at a pillar', 'mm'],
+    ['blend', 'Fillet softness', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'], ['pillarMargin', 'Solid ring around pillar feet', 'mm'],
+    ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest open span', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -884,7 +968,7 @@ function serial() {
     boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
 }
 // Defaults changed since a layout was saved: a saved value equal to the OLD default follows the new one.
-const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }];
+const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }, { maxSpan: 55.0 }];
 function migrateParams(o) {
   const p = Object.assign({}, G.DEFAULTS, o.params || {});
   for (const od of OLD_DEFAULTS) for (const k in od) if (o.params && o.params[k] === od[k]) p[k] = G.DEFAULTS[k];
@@ -914,7 +998,7 @@ function restore() {
 function derive() {
   const g = G.grid(G.depthMM(S.depth));
   const v = G.validate(BOARDS, S.insts, g, S.params);
-  const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
+  const pillars = v.placed.flatMap((q, k) => q.holes.map(h => [h[0], h[1], k]));
   const plan = G.planCuts(g.W, g.D, pillars, S.params);
   // while a drag runs, skip the lightening holes (about 70 ms); they come back when it ends
   const busy = (typeof drag !== 'undefined' && drag) || (typeof marquee !== 'undefined' && marquee);
