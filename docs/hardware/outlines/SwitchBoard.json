@@ -67,6 +67,17 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "switch",
+   "ref": "SW1",
+   "footprint": "SW_Slide_Daier_TS-22E01_TS-23E01_Universal_v4",
+   "x": 10.25,
+   "y": 31.25,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "arc",

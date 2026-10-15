@@ -36,6 +36,7 @@ def main():
             'name': j['name'], 'w': w, 'h': h,
             'holes': [[x['x'], x['y'], x['diameter']] for x in j['holes']],
             'poly': [[round(a, 3), round(b, 3)] for a, b in j['outline_polygon']],
+            'parts': [[q['kind'], q['x'], q['y'], q['angle']] for q in j.get('panel_parts', []) if not q['back']],
             'silkF': data_uri(layer(svg, 'silk_front', 'edge'), w, h),
             'silkB': data_uri(layer(svg, 'silk_back', 'silk_front'), w, h),
         })

@@ -67,6 +67,17 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "fader",
+   "ref": "RV1",
+   "footprint": "Fader_Slide_Dual_75mm_60mmTravel_B103",
+   "x": 10.25,
+   "y": 52.25,
+   "angle": 90.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "line",

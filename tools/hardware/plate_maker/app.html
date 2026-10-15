@@ -9,7 +9,7 @@
   --bg: #E7EBED; --surface: #F6F8F9; --ink: #172026; --muted: #57636B; --line: #C6CFD4;
   --plate: #D3DADE; --plate-edge: #9AA6AD; --ear: #B9C3C9; --gridline: rgba(23,32,38,.10);
   --accent: #B45F06; --accent-soft: rgba(180,95,6,.14); --bad: #C0322A; --ok: #2D7A4B;
-  --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF;
+  --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF; --hole: #1B2328; --hole-edge: #0B1013;
   --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -18,11 +18,13 @@
   --bg: #12171A; --surface: #1A2125; --ink: #E2E8EB; --muted: #8E9AA2; --line: #2D373D;
   --plate: #283137; --plate-edge: #4A565D; --ear: #343F46; --gridline: rgba(226,232,235,.08);
   --accent: #F2A33A; --accent-soft: rgba(242,163,58,.16); --bad: #FF6B5E; --ok: #5CC488; --sel: #6FA6FF;
+  --hole: #06090B; --hole-edge: #8E9AA2;
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #12171A; --surface: #1A2125; --ink: #E2E8EB; --muted: #8E9AA2; --line: #2D373D;
   --plate: #283137; --plate-edge: #4A565D; --ear: #343F46; --gridline: rgba(226,232,235,.08);
   --accent: #F2A33A; --accent-soft: rgba(242,163,58,.16); --bad: #FF6B5E; --ok: #5CC488; --sel: #6FA6FF;
+  --hole: #06090B; --hole-edge: #8E9AA2;
   color-scheme: dark }
 html, body { background: var(--bg); color: var(--ink); }
 body { font: 14px/1.45 var(--body); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 28px; }
@@ -75,6 +77,13 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel .board .hole { fill: var(--plate); stroke: #C9A44A; stroke-width: .7; }
 #panel .board.sel .pcb { stroke: var(--sel); stroke-width: 1.2; }
 #panel .board.bad .pcb { stroke: var(--bad); stroke-width: 1.4; }
+#panel .cutout { fill: var(--hole); stroke: var(--hole-edge); stroke-width: .25; }
+#panel .cutout.assumed { stroke: var(--accent); stroke-width: .45; stroke-dasharray: 1.2 .8; }
+#panel.noboards .board .pcb, #panel.noboards .board image, #panel.noboards .board .hole { display: none; }
+#panel.noboards .board .hitbox { fill: transparent; stroke: var(--line); stroke-width: .3; stroke-dasharray: 1 1; }
+#panel .board .hitbox { fill: none; stroke: none; }
+.srcs { margin: 0; padding-left: 18px; font-size: .82rem; color: var(--muted); }
+.srcs b { color: var(--ink); font-weight: 600; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
 #panel .dim { font: 5px var(--mono); fill: var(--muted); }
@@ -146,6 +155,8 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
 
   <main>
     <div class="viewbar">
+      <label><input type="checkbox" id="vBoards" checked> Boards</label>
+      <label><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
       <label><input type="checkbox" id="vFront" checked> Front silk</label>
       <label><input type="checkbox" id="vBack"> Back silk</label>
       <label><input type="checkbox" id="vCuts" checked> Print pieces</label>
@@ -192,7 +203,11 @@ const PARAM_UI = [
     ['footFlare', 'Shoulder foot flare', 'mm'], ['pinD', 'Pin diameter (hole is 3.2)', 'mm'], ['pinH', 'Pin height above shoulder', 'mm']]],
   ['Joints', [['clearance', 'Joint clearance (total gap)', 'mm'], ['tabDepth', 'Tab depth', 'mm'], ['tabNeck', 'Tab neck width', 'mm'],
     ['tabHead', 'Tab head width', 'mm'], ['tabSpacing', 'Tab spacing', 'mm']]],
-  ['Printer', [['maxPiece', 'Max piece size', 'mm']]]
+  ['Printer', [['maxPiece', 'Max piece size', 'mm']]],
+  ['Panel cutouts', [['cutKeyW', 'Keyswitch width', 'mm'], ['cutKeyH', 'Keyswitch height', 'mm'], ['cutPotD', 'Pot shaft hole diameter', 'mm'],
+    ['cutSwW', 'Slide switch slot width', 'mm'], ['cutSwL', 'Slide switch slot length', 'mm'], ['cutBtnW', 'PB86-A1 cutout width', 'mm'],
+    ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['cutFaderL', 'Fader slot length (assumed)', 'mm'], ['cutFaderW', 'Fader slot width (assumed)', 'mm'],
+    ['minWeb', 'Least metal between cutouts', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -264,6 +279,18 @@ function derive() {
 }
 
 /* ---------- drawing ---------- */
+// One part's cutout as SVG markup in the board frame (KiCad footprint angle is counter-clockwise on screen).
+function cutoutMarkup(part, P, attrs) {
+  const [kind, x, y, ang] = part, C = G.CUTOUTS[kind]; if (!C) return '';
+  const sh = C.shape(P), cls = 'cutout' + (C.status === 'ASSUMED' ? ' assumed' : '');
+  const t = `transform="translate(${x} ${y}) rotate(${-ang})"`;
+  const a = attrs || `class="${cls}"`;
+  if (sh.type === 'circle') return `<circle ${a} ${t} cx="0" cy="0" r="${sh.d / 2}"/>`;
+  if (sh.type === 'rect') return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}"/>`;
+  const r = Math.min(sh.w, sh.h) / 2;   // stadium: long axis = the larger of w (x) and h (y)
+  return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}" rx="${r}" ry="${r}"/>`;
+}
+
 function el(tag, attrs, parent) {
   const e = document.createElementNS(SVGNS, tag);
   for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -275,6 +302,7 @@ const boardEls = new Map();
 function drawPanel() {
   const svg = $('panel'), { g, v, plan, pieces } = derived;
   svg.setAttribute('viewBox', `-4 -4 ${g.W + 8} ${g.D + 12}`);
+  svg.classList.toggle('noboards', !$('vBoards').checked);
   let base = svg.querySelector('#base'), cuts = svg.querySelector('#cuts'), bl = svg.querySelector('#boards');
   if (!base) {
     const defs = el('defs', {}, svg);
@@ -307,11 +335,14 @@ function drawPanel() {
       el('image', { class: 'silkB', href: b.silkB, x: 0, y: 0, width: b.w, height: b.h, opacity: .45 }, e);
       el('image', { class: 'silkF', href: b.silkF, x: 0, y: 0, width: b.w, height: b.h }, e);
       b.holes.forEach(h => el('circle', { class: 'hole', cx: h[0], cy: h[1], r: h[2] / 2 }, e));
+      el('path', { class: 'hitbox', d: 'M' + b.poly.map(p => p.join(' ')).join('L') + 'Z' }, e);
+      el('g', { class: 'cutouts' }, e);
       e.addEventListener('pointerdown', startDrag);
       e.addEventListener('focus', () => select(inst.id, false));
       boardEls.set(inst.id, e);
     }
     e.setAttribute('transform', 'matrix(' + q.matrix.join(' ') + ')');
+    e.querySelector('.cutouts').innerHTML = $('vCutouts').checked ? (b.parts || []).map(pt => cutoutMarkup(pt, S.params)).join('') : '';
     e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
     e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
     e.classList.toggle('sel', S.sel === inst.id);
@@ -395,11 +426,24 @@ function drawSide() {
   errs.push(...pErr);
   if (errs.length) list(errs);
   if (plan.warn && plan.warn.length) list(plan.warn, 'warn');
+  const cb = G.cutoutBoxes(BOARDS, S.insts, g, S.params), webs = G.cutoutWebs(cb, S.params.minWeb);
+  if (webs.length) {
+    const groups = new Map();
+    webs.forEach(w => { const a = cb[w.i], b = cb[w.j]; const key = BOARDS[S.insts[a.inst].b].name + (a.inst === b.inst ? '' : ' / ' + BOARDS[S.insts[b.inst].b].name) + ' (' + G.CUTOUTS[a.kind].label + (a.kind === b.kind ? '' : ', ' + G.CUTOUTS[b.kind].label) + ')';
+      groups.set(key, Math.min(groups.has(key) ? groups.get(key) : 99, w.web)); });
+    list([...groups].map(([k, w]) => k + ': only ' + w.toFixed(2) + ' mm of metal between cutouts (need ' + S.params.minWeb + '). Use one long slot there, or a bigger pitch.'), 'warn');
+  }
+  const kinds = new Set(S.insts.flatMap(i => (BOARDS[i.b].parts || []).map(p => p[0])));
+  const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status === 'ASSUMED');
+  if (assumed.length) list(assumed.map(k => G.CUTOUTS[k].label + ' size is assumed (dashed outline). ' + G.CUTOUTS[k].source), 'warn');
   if (!errs.length && !(plan.warn && plan.warn.length)) {
     const d = document.createElement('div'); d.className = 'okline';
     d.textContent = 'All boards are on the grid, out of the ear zones and apart. Every cut misses every pillar.';
     ck.appendChild(d);
   }
+  const det = document.createElement('details'); det.innerHTML = '<summary>Where each cutout size comes from</summary><ul class="srcs"></ul>';
+  for (const k in G.CUTOUTS) { const li = document.createElement('li'); li.innerHTML = '<b></b> '; li.querySelector('b').textContent = G.CUTOUTS[k].label + ' (' + G.CUTOUTS[k].status + '):'; li.appendChild(document.createTextNode(G.CUTOUTS[k].source)); det.querySelector('ul').appendChild(li); }
+  ck.appendChild(det);
   $('bStl').disabled = derived.bad || !pieces.length;
   $('exampleTag').hidden = !S.example;
 
@@ -527,16 +571,22 @@ $('bCoupon').addEventListener('click', async () => {
 });
 $('bSvg').addEventListener('click', async () => {
   const { g, v } = derived;
-  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${g.W}mm" height="${g.D}mm" viewBox="0 0 ${g.W} ${g.D}">`,
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${g.W}mm" height="${g.D}mm" viewBox="0 0 ${g.W} ${g.D}">`,
     `<rect x="0" y="0" width="${g.W}" height="${g.D}" fill="none" stroke="#000" stroke-width="0.2"/>`,
     `<g id="ear_zones" fill="none" stroke="#999" stroke-width="0.15"><rect x="0" y="0" width="${g.ear}" height="${g.D}"/><rect x="${g.W - g.ear}" y="0" width="${g.ear}" height="${g.D}"/></g>`];
+  parts.push('<g id="boards" inkscape:groupmode="layer" inkscape:label="Boards">');
   S.insts.forEach((inst, k) => {
     const b = BOARDS[inst.b], q = v.placed[k];
     parts.push(`<g id="${b.name}_${inst.id}" transform="matrix(${q.matrix.join(' ')})"><path d="M${b.poly.map(p => p.join(' ')).join('L')}Z" fill="none" stroke="#000" stroke-width="0.15"/>` +
       b.holes.map(h => `<circle cx="${h[0]}" cy="${h[1]}" r="${h[2] / 2}" fill="none" stroke="#000" stroke-width="0.15"/>`).join('') +
       `<image href="${b.silkF}" x="0" y="0" width="${b.w}" height="${b.h}"/></g>`);
   });
-  parts.push('</svg>');
+  parts.push('</g>', '<g id="panel_cutouts" inkscape:groupmode="layer" inkscape:label="Panel cutouts" fill="none" stroke="#000" stroke-width="0.1">');
+  S.insts.forEach((inst, k) => {
+    const b = BOARDS[inst.b], q = v.placed[k];
+    if ((b.parts || []).length) parts.push(`<g transform="matrix(${v.placed[k].matrix.join(' ')})">` + b.parts.map(pt => cutoutMarkup(pt, S.params, `data-kind="${pt[0]}"`)).join('') + '</g>');
+  });
+  parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
 });
 $('bSave').addEventListener('click', () => saveFile(`plate_layout_${stamp()}.json`, JSON.stringify(serial(), null, 1)));
@@ -553,7 +603,7 @@ $('bClear').addEventListener('click', () => {
   S.insts = []; S.sel = null; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
 });
 $('bRot').addEventListener('click', rotateSel); $('bDel').addEventListener('click', removeSel); $('bDup').addEventListener('click', dupSel);
-['vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
+['vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
 
 let toastT = null;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
@@ -613,6 +663,6 @@ if (!restore()) exampleState();
 nextId = Math.max(nextId, ...S.insts.map(i => i.id + 1));
 drawPalette(); drawParams();
 changed(true);
-window.__plate = { get S() { return S; }, get derived() { return derived; }, G, BOARDS };
+window.__plate = { get S() { return S; }, get derived() { return derived; }, G, BOARDS, refresh: () => changed(true) };
 })();
 </script>

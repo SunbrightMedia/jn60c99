@@ -67,6 +67,35 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "pot",
+   "ref": "RV1",
+   "footprint": "RES-TH_RK09K1130A70",
+   "x": 10.25,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "pot",
+   "ref": "RV2",
+   "footprint": "RES-TH_RK09K1130A70",
+   "x": 31.25,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "pot",
+   "ref": "RV3",
+   "footprint": "RES-TH_RK09K1130A70",
+   "x": 52.25,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "line",
