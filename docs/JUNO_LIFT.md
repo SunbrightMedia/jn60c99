@@ -53,3 +53,17 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   0x5a0000000, and BUF 0x700000000 -- carried only if the lifted host reads them (the gate traps otherwise).
   NEXT L4: junoh.h + lift/jn_host.c (the lifted VST3 entries on jp8_cpu.h, host-object + import shims), then L5
   (the gate vs host_process_emu, EXACTLY 0).
+- 2026-10-15 L4 compiles: gcc -std=c99 -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -I jp8/src -c lift/jn_lift.c
+  -> jn_lift.o (5.6 MB, rc 0, no diagnostics): the 12.6 MB lift is valid C99 against the shared runtime header
+  jp8/src/jp8_cpu.h. (The earlier rc 127 was /usr/bin/time missing after a container restart, not a compile error.)
+- 2026-10-15 L4 template (facts+stubs): tools/lift/jn_host_ref.py (the proven jp8_host_ref.py pointed at the JUNO host
+  oracle host_process_emu.HostProcess, format "JNH1"). boot_host cut; 8 regions (page0, image, stack, heap-to-bump,
+  stub, com 0x5a0000000, buf, teb 0x580000000), 68 facts (audio, comp, core, ctrl, process_fn = *(*audio + 8*9),
+  patch_fn 0x335850, com_next, vt_events/pchanges/pqueue/stream, heap_ptr/limit, hc, mxcsr, rsp, ret, r0..r15,
+  x0..x15, eflags, lasterr, fake_heap), 837 stubs (addr -> name). 38 MB (gz 7 MB). SELF-CHECK byte-identical, facts and
+  stubs equal; the TOOTH bites (flip -> crc fail; re-seal -> region compare fail). Scope note: the JUNO oracle REPLACES
+  the engine render's thread transport (CWaveGen vt+56, 0x3C7400) with the e2e_emu composition over the plugin's OWN
+  voice (0x398F30) / master (0x398EC0); so the reach/lift cover the DSP, and jn_host.c must carry that render
+  composition as glue (graded against e2e_emu by L5), the JUNO twin of jp8_host.c's thread transport. The JUNO editor
+  is simpler than JP8's (no window-message model): createView + attached, a window found by its fit (0x312750), zoom
+  via 0x2AA590. NEXT L4: junoh.h + lift/jn_host.c (init via the live host setup + the render composition), then L5.
