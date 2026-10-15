@@ -256,7 +256,7 @@ const PARAM_UI = [
     ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
   ['Labels', [['labelSize', 'Label text size', 'mm']]],
   ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Thinnest rib', 'mm'], ['pillarRib', 'Rib width at a pillar', 'mm'],
-    ['blend', 'Fillet softness', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'], ['pillarMargin', 'Solid ring around pillar feet', 'mm'],
+    ['blend', 'Fillet softness', 'mm'], ['ribCurve', 'Rib curve (part of its length)', ''], ['edgeMargin', 'Solid margin at edges and joints', 'mm'], ['pillarMargin', 'Solid ring around pillar feet', 'mm'],
     ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest open span', 'mm']]]
 ];
 
@@ -292,7 +292,7 @@ function serial() {
     boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
 }
 // Defaults changed since a layout was saved: a saved value equal to the OLD default follows the new one.
-const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }, { maxSpan: 55.0 }];
+const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }, { maxSpan: 55.0 }, { blend: 8.0 }];
 function migrateParams(o) {
   const p = Object.assign({}, G.DEFAULTS, o.params || {});
   for (const od of OLD_DEFAULTS) for (const k in od) if (o.params && o.params[k] === od[k]) p[k] = G.DEFAULTS[k];

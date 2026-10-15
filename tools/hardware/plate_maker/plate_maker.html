@@ -267,7 +267,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     capFaderL: 6.0, capFaderW: 10.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0,
     labelSize: 5.0,     // panel label font size (mm)
     // lightening holes (honeycomb) in the empty plate
-    lighten: 1, ribWidth: 3.5, pillarRib: 5.0, blend: 8.0, edgeMargin: 5.0, pillarMargin: 2.0, frameStep: 30.0, maxSpan: 56.0
+    lighten: 1, ribWidth: 3.5, pillarRib: 5.0, blend: 6.0, ribCurve: 0.09, edgeMargin: 5.0, pillarMargin: 2.0, frameStep: 30.0, maxSpan: 56.0
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -632,7 +632,17 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     // nodes: pillars (kind 1), frame (kind 0), extra (kind 2)
     const N = [];
     const add = (x, y, kind, board) => { if (N.every(q => Math.hypot(q.x - x, q.y - y) > 1.5)) N.push({ x, y, kind, board }); };
-    pc.pillars.forEach(q => add(q[0], q[1], 1, q[2]));
+    // pillars closer than 12 mm (neighbouring boards' corners, 8.5 mm apart) are ONE node of the rib graph,
+    // so two boards share one rail instead of two parallel rails with a solid band between them
+    const cl = [];
+    for (const q of pc.pillars) {
+      const c = cl.find(c => c.pts.some(r => Math.hypot(r[0] - q[0], r[1] - q[1]) < 12));
+      if (c) c.pts.push(q); else cl.push({ pts: [q] });
+    }
+    for (const c of cl) {
+      const x = c.pts.reduce((t, q) => t + q[0], 0) / c.pts.length, y = c.pts.reduce((t, q) => t + q[1], 0) / c.pts.length;
+      N.push({ x, y, kind: 1, boards: [...new Set(c.pts.map(q => q[2]))] });
+    }
     const side = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(L / p.frameStep));
       for (let i = 0; i < n; i++) add(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 0); };
     side(fx0, fy0, fx1, fy0); side(fx1, fy0, fx1, fy1); side(fx1, fy1, fx0, fy1); side(fx0, fy1, fx0, fy0);
@@ -658,7 +668,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     tri = Delaunator.from(N.map(q => [q.x, q.y])).triangles;
     // ribs: Gabriel edges (no node inside the circle on the edge as diameter), never frame-to-frame
     const ribs = new Map();
-    const addRib = (i, j) => { const k = i < j ? i + ',' + j : j + ',' + i; if (!ribs.has(k)) ribs.set(k, [Math.min(i, j), Math.max(i, j)]); };
+    const addRib = (i, j, seat) => { const k = i < j ? i + ',' + j : j + ',' + i; if (!ribs.has(k) || seat) ribs.set(k, [Math.min(i, j), Math.max(i, j), !!seat]); };
     for (let t = 0; t < tri.length; t += 3) for (let e = 0; e < 3; e++) {
       const i = tri[t + e], j = tri[t + (e + 1) % 3], A = N[i], B = N[j];
       if (A.kind === 0 && B.kind === 0) continue;
@@ -668,15 +678,22 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
       if (N.every((q, k) => k === i || k === j || (q.x - mx) ** 2 + (q.y - my) ** 2 >= r2 - 1e-9)) addRib(i, j);
     }
     const boards = new Map();
-    N.forEach((q, i) => { if (q.kind === 1) boards.set(q.board, (boards.get(q.board) || []).concat([i])); });
+    N.forEach((q, i) => { if (q.kind === 1) for (const bd of q.boards) boards.set(bd, (boards.get(bd) || []).concat([i])); });
     for (const ids of boards.values()) {       // the board's seat: its pillars in a ring
       if (ids.length < 2) continue;
       const cx = ids.reduce((t, i) => t + N[i].x, 0) / ids.length, cy = ids.reduce((t, i) => t + N[i].y, 0) / ids.length;
       const ring = ids.slice().sort((a, b) => Math.atan2(N[a].y - cy, N[a].x - cx) - Math.atan2(N[b].y - cy, N[b].x - cx));
-      for (let k = 0; k < ring.length; k++) if (ring.length > 2 || k === 0) addRib(ring[k], ring[(k + 1) % ring.length]);
+      for (let k = 0; k < ring.length; k++) if (ring.length > 2 || k === 0) addRib(ring[k], ring[(k + 1) % ring.length], true);
     }
     const rOf = q => (q.kind === 1 ? p.pillarRib : p.ribWidth) / 2;
-    const caps = [...ribs.values()].map(([i, j]) => ({ a: N[i], b: N[j], ra: rOf(N[i]), rb: rOf(N[j]) }));
+    // every rib but a board's seat bows sideways by p.ribCurve of its length (a quadratic curve, side
+    // alternating), the way topology-optimised members run; drawn as 8 straight pieces
+    const caps = [...ribs.values()].map(([i, j, seat]) => {
+      const a = N[i], b = N[j], L = Math.hypot(b.x - a.x, b.y - a.y), bow = seat ? 0 : p.ribCurve * L * ((i * 7 + j * 3) % 2 ? 1 : -1);
+      const cx = (a.x + b.x) / 2 - (b.y - a.y) / L * bow, cy = (a.y + b.y) / 2 + (b.x - a.x) / L * bow;
+      const pts = []; for (let s = 0; s <= 8; s++) { const t = s / 8, u = 1 - t; pts.push([u * u * a.x + 2 * u * t * cx + t * t * b.x, u * u * a.y + 2 * u * t * cy + t * t * b.y, t]); }
+      return { pts, ra: rOf(a), rb: rOf(b) };
+    });
     // field on a grid: the two smallest signed distances per cell, joined by a polynomial smooth min
     const h = 0.5, k = p.blend, x0 = pc.bbox[0] - 1, y0 = pc.bbox[1] - 1;
     const W = Math.ceil((pc.bbox[2] - x0 + 1) / h) + 1, H = Math.ceil((pc.bbox[3] - y0 + 1) / h) + 1;
@@ -690,14 +707,29 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
         const d = dist(x0 + i * h, y0 + j * h); if (d < reach) put(j * W + i, d);
       }
     };
+    // one rib = ONE shape: the hard min over its 8 pieces (no bulk at their joints). Each piece fills a
+    // scratch grid over its own small box; the rib's box is then folded into the two-nearest arrays.
+    const R = new Float64Array(W * H).fill(Infinity);
     for (const c of caps) {
-      const vx = c.b.x - c.a.x, vy = c.b.y - c.a.y, L2 = vx * vx + vy * vy;
-      splat(Math.min(c.a.x, c.b.x) - 4, Math.min(c.a.y, c.b.y) - 4, Math.max(c.a.x, c.b.x) + 4, Math.max(c.a.y, c.b.y) + 4, (x, y) => {
-        const t = Math.max(0, Math.min(1, ((x - c.a.x) * vx + (y - c.a.y) * vy) / L2));
-        return Math.hypot(x - c.a.x - t * vx, y - c.a.y - t * vy) - (c.ra + (c.rb - c.ra) * t);
-      });
+      let bi0 = W, bi1 = 0, bj0 = H, bj1 = 0;
+      for (let s = 0; s < 8; s++) {
+        const A = c.pts[s], B = c.pts[s + 1], vx = B[0] - A[0], vy = B[1] - A[1], L2 = vx * vx + vy * vy;
+        const rr = Math.max(c.ra, c.rb) + reach;
+        const i0 = Math.max(0, Math.floor((Math.min(A[0], B[0]) - rr - x0) / h)), i1 = Math.min(W - 1, Math.ceil((Math.max(A[0], B[0]) + rr - x0) / h));
+        const j0 = Math.max(0, Math.floor((Math.min(A[1], B[1]) - rr - y0) / h)), j1 = Math.min(H - 1, Math.ceil((Math.max(A[1], B[1]) + rr - y0) / h));
+        bi0 = Math.min(bi0, i0); bi1 = Math.max(bi1, i1); bj0 = Math.min(bj0, j0); bj1 = Math.max(bj1, j1);
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const x = x0 + i * h, y = y0 + j * h;
+          const u = L2 ? Math.max(0, Math.min(1, ((x - A[0]) * vx + (y - A[1]) * vy) / L2)) : 0, t = A[2] + (B[2] - A[2]) * u;
+          const d = Math.hypot(x - A[0] - u * vx, y - A[1] - u * vy) - (c.ra + (c.rb - c.ra) * t), idx = j * W + i;
+          if (d < R[idx]) R[idx] = d;
+        }
+      }
+      for (let j = bj0; j <= bj1; j++) for (let i = bi0; i <= bi1; i++) {
+        const idx = j * W + i; if (R[idx] < reach) put(idx, R[idx]); R[idx] = Infinity;
+      }
     }
-    for (const q of N) if (q.kind === 1) splat(q.x, q.y, q.x, q.y, (x, y) => Math.hypot(x - q.x, y - q.y) - kp);
+    for (const q of pc.pillars) splat(q[0], q[1], q[0], q[1], (x, y) => Math.hypot(x - q[0], y - q[1]) - kp);
     const inside = (x, y) => { let c = false; for (let i = 0, j = np - 1; i < np; j = i++) {
       const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
     const edgeDist = (x, y) => { let d = Infinity; for (let i = 0; i < np; i++) {
@@ -932,7 +964,7 @@ const PARAM_UI = [
     ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
   ['Labels', [['labelSize', 'Label text size', 'mm']]],
   ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Thinnest rib', 'mm'], ['pillarRib', 'Rib width at a pillar', 'mm'],
-    ['blend', 'Fillet softness', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'], ['pillarMargin', 'Solid ring around pillar feet', 'mm'],
+    ['blend', 'Fillet softness', 'mm'], ['ribCurve', 'Rib curve (part of its length)', ''], ['edgeMargin', 'Solid margin at edges and joints', 'mm'], ['pillarMargin', 'Solid ring around pillar feet', 'mm'],
     ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest open span', 'mm']]]
 ];
 
@@ -968,7 +1000,7 @@ function serial() {
     boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
 }
 // Defaults changed since a layout was saved: a saved value equal to the OLD default follows the new one.
-const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }, { maxSpan: 55.0 }];
+const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }, { maxSpan: 55.0 }, { blend: 8.0 }];
 function migrateParams(o) {
   const p = Object.assign({}, G.DEFAULTS, o.params || {});
   for (const od of OLD_DEFAULTS) for (const k in od) if (o.params && o.params[k] === od[k]) p[k] = G.DEFAULTS[k];

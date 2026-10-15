@@ -104,8 +104,14 @@ the frame (Gabriel graph: short, direct links), and extra nodes in open areas (e
 `maxSpan`). Ribs taper from `pillarRib` at a pillar to `ribWidth`. All shapes join through a polynomial
 smooth minimum of the two nearest (`blend`): fillets at every joint, no bulk elsewhere. Holes = the
 field's contours (marching squares, 0.5 mm grid, 0.25 mm into the void), slivers under 3 mm mean width
-dropped, every hole checked exactly against the margins. MAX example: 612 g -> 354 g, 43 % of the
-area removed. Needs `delaunator@5.0.1`.
+dropped, every hole checked exactly against the margins. Needs `delaunator@5.0.1`.
+Third pass (the user: "massive planes where there are clearly no pillars"): the planes were NOT dropped
+holes (the checks drop only slivers) but rib crowding -- neighbouring boards' pillars (8.5 mm apart)
+each had a seat ring, so two parallel rails with a solid band between, and an 8 mm blend filled the
+wedges. Now pillars closer than 12 mm are ONE graph node (boards share a rail; every pillar keeps its
+own ring), blend 6, and every non-seat rib bows by `ribCurve` (9 % of its length, quadratic, side
+alternating) -- organic without bulk. One rib = one shape (hard min over its 8 pieces). MAX example:
+612 g -> 337 g (-45 %), 46 % of the area removed; ~0.7 s for the plate (skipped during drags).
 check_cases.py grades the holes from the mesh sections: >= edgeMargin from the outline, >= foot +
 pillarMargin from every pillar, >= ribWidth between holes. Teeth: `make_cases.js --tooth-holes`
 (holes at the floors while the manifest claims the defaults) -> failures of all three kinds.
