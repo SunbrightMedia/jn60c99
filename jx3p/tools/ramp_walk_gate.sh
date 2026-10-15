@@ -13,8 +13,13 @@
 # SEEN TO FAIL, twice, before it was believed:
 #   * without FTZ/DAZ on the port side: 110/200 cases (the real defect it found)
 #   * with the retire-path cursor advanced: fails immediately
+# and a third time (2026-10-15, playbook 259): two NaNs meeting in one add -- the plugin's addss keeps the FIRST
+# operand's (READ: movss xmm0, [step]; addss xmm0, [acc]), GCC had swapped the port's operands: seed 5, case 110;
+# --tooth-nan (the plain add back) must diverge. The oracle is Unicorn, whose two-NaN rule is x87's (the larger
+# significand), not the CPU's (the first operand): it grades such a meeting only where both rules agree -- NaNs with
+# random payloads in every case made ~6 % of the cases differ on the ORACLE side (row 24's class, playbook 259).
 #
-# usage: sh ramp_walk_gate.sh [--tooth] [n_cases=400] [seeds="1 2 3 4 5"]
+# usage: sh ramp_walk_gate.sh [--tooth | --tooth-nan] [n_cases=400] [seeds="1 2 3 4 5"]
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -22,6 +27,8 @@ WORK=${JX_WALK_WORK:-$(mktemp -d)}
 mkdir -p "$WORK"
 TOOTH=
 if [ "${1:-}" = "--tooth" ]; then TOOTH=-DJX_RAMP_TOOTH=1; shift; fi   # the product's sweep with its cursor defect
+NANT=
+if [ "${1:-}" = "--tooth-nan" ]; then NANT=1; TOOTH=-DJX_RAMP_TOOTH=2; shift; fi   # the adds in the compiler's order
 N=${1:-400}
 SEEDS=${2:-"1 2 3 4 5"}
 
@@ -44,6 +51,10 @@ for s in $SEEDS; do
   rm -f "$WORK/c$s.pkl"
 done
 
+if [ -n "$NANT" ]; then           # the NaN tooth: some seed must diverge (two NaNs meet in some cases, not all)
+  if [ "$fails" -gt 0 ]; then echo "[ramp walk gate] --tooth-nan: BITES ($fails seed(s))"; exit 0; fi
+  echo "[ramp walk gate] --tooth-nan: DID NOT BITE"; exit 1
+fi
 if [ -n "$TOOTH" ]; then          # the tooth: every seed must diverge
   n=$(echo $SEEDS | wc -w)
   if [ "$fails" -eq "$n" ]; then echo "[ramp walk gate] --tooth: BITES ($fails of $n seeds)"; exit 0; fi

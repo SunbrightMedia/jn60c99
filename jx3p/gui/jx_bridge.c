@@ -473,6 +473,19 @@ void jx3p_note_off(int note)
 #ifndef JX_RAMP_TOOTH
 #define JX_RAMP_TOOTH 0
 #endif
+/* addss a, b where BOTH may be NaN: x86 returns the FIRST source operand's NaN, quieted (SDM Table 4-7); C leaves
+ * the choice to the compiler, and GCC orders a commutative add by its own numbering -- the ramp walk's seed 5 met a
+ * NaN step with a NaN accumulator and the port kept the accumulator's (playbook 259). The JUNO-60's juno_add_first:
+ * a NaN a comes back as addss returns it (a + 0.0 quiets a signalling one). */
+static inline float jxg_add_first(float a, float b)
+{
+    float r = a + b;
+#if JX_RAMP_TOOTH != 2      /* TOOTH 2 (ramp_walk_gate.sh --tooth-nan): the plain add, the compiler's order */
+    if (a != a)
+        r = a + 0.0f;
+#endif
+    return r;
+}
 /* 0x3F4A40 -- one ramp slot's tick: 1 while it stays active */
 static int jxg_ramp_tick(uint8_t *s)
 {
@@ -485,11 +498,11 @@ static int jxg_ramp_tick(uint8_t *s)
     period = gi(s + 0x20);
     if (counter < period) return 1;             /* jl */
     sign = gf(s + 8);
-    a = sign + gf(s + 0xC);
+    a = jxg_add_first(sign, gf(s + 0xC));      /* movss xmm0, [rcx+8]; addss xmm0, [rcx+0xC] */
     t = JXG_H(gq(s));
     si32(s + 0x24, 0);
     sf32(s + 0xC, a);
-    sf32(t, a + gf(s + 0x10));
+    sf32(t, jxg_add_first(a, gf(s + 0x10)));   /* addss xmm0, [rcx+0x10] */
     cur = gf(t); lim = gf(s + 0x14);
     if (!(0.0f >= sign)) {                      /* comiss 0, sign; jae */
         if (!(cur >= lim)) return 1;            /* rising, below the limit */
@@ -515,7 +528,7 @@ static void jxg_ramp_sweep(uint8_t *st)
             uint64_t e = gq(st + 0x78);
             memmove(JXG_H(b), JXG_H(b + 4), (size_t)(e - (b + 4)));
             sq64(st + 0x78, e - 4);
-#if JX_RAMP_TOOTH   /* TOOTH (ramp_walk_gate.sh --tooth): the cursor also advances past a retired id -- the walk
+#if JX_RAMP_TOOTH == 1   /* TOOTH (ramp_walk_gate.sh --tooth): the cursor also advances past a retired id -- the walk
                      * skips the id compacted into its place */
             if (b != gq(st + 0x78)) b += 4;
 #endif

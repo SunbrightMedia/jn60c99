@@ -3,6 +3,20 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-15 (22) — THE RAMP WALK'S RED: TWO NaNs IN ONE ADD (playbook 259)
+
+- jxverify_f7f6 (f7f6adc8, sections S 6 3i 3g 4 5 5b 5c): S and 6 GREEN; in 3i the CPU census GREEN with every tooth
+  biting (playbook 258's fix proven in the run), then EXIT 2 at the ramp walk: seed 5, case 110, one ramp slot's
+  accumulator -- the step 0x7FD2DEB9 and the accumulator 0x7FC00000, both NaN; the plugin's addss keeps the first
+  operand's (the step's, READ at rva 0x3F4A40), GCC had put the port's accumulator first. Fixed in jx_bridge.c: both
+  adds of the tick through jxg_add_first (the JUNO-60's juno_add_first). EXECUTED: the ramp walk GREEN (400 cases x 5
+  seeds, EXACTLY 0), --tooth-nan BITES (seed 5, case 110), --tooth BITES. NaNs with payloads in every case were tried
+  and dropped: Unicorn's two-NaN rule is x87's (the larger significand), not the CPU's -- about 6 % of those cases
+  differed on the oracle's side (row 24's class). Carried over: 0-3f and 3h -- the changed adds differ from the old
+  only when both operands are different NaNs; those sections feed no NaN into a ramp (bank patches, legal values;
+  the meter gate's NaNs reach only the meter code), and 3e's lift gate does not build jx_bridge.c. Owed: S, 6, 3i,
+  3g, 4, 5, 5b, 5c on the new commit.
+
 ## 2026-10-14 (21) — THE FULL VERIFY'S RED: A STALE TOOTH SEED, AND A REAL DEFECT THE SWEEP FOUND (playbook 256)
 
 - jxverify_144e (144eb88a) EXIT 2 after 15.7 h, in section 3h: the patch window's tooth 5 did not bite on seed 1.

@@ -428,6 +428,7 @@ python3 "$REPO/tools/verify/cpu_census.py" --port-of jx --tooth-dead
 # the product's ramp sweep and slot tick (jx_bridge.c) on random list shapes; the tooth advances the retire cursor
 sh "$HERE/ramp_walk_gate.sh" 400 "1 2 3 4 5"
 sh "$HERE/ramp_walk_gate.sh" --tooth 200 "1 2"
+sh "$HERE/ramp_walk_gate.sh" --tooth-nan 111 "5"     # the adds in the compiler's order: seed 5, case 110 (playbook 259)
 # the engine-rate setting table: the committed header == the booted plugin's; the render object's tables == the
 # JUNO-60's (src/juno_conv.c), its tooth one coefficient bit
 python3 "$HERE/jx_conv_tables.py" --check

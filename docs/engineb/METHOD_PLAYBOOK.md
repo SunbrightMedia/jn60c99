@@ -4458,3 +4458,19 @@ code, the table JX_TWINS, `--twins` makes it again); a cited number with no row 
 --tooth-twins). Every read is accounted for: owned by the code that flows to it, or proven DEAD, else the census
 fails (tooth --tooth-dead: a DEAD read made reachable by flow alone must be graded). An over-wide reach fails loudly
 and costs a verify; a narrow one passes silently -- check both.
+
+## 259. A COMMUTATIVE ADD IS NOT COMMUTATIVE FOR TWO NaNs -- AND THE EMULATOR'S RULE IS NOT THE CPU'S
+Paid 2026-10-15 (jxverify_f7f6, EXIT 2 after 1.7 hours, section 3i: the ramp walk, seed 5, case 110). A ramp slot's
+step was a NaN (payload 0x7FD2DEB9), its accumulator another (0x7FC00000). The plugin's tick (rva 0x3F4A40) does
+`movss xmm0, [step]; addss xmm0, [acc]` -- addss returns the FIRST source operand's NaN (SDM Table 4-7); the port's
+`step + acc` came out of GCC as an add with the accumulator first, and kept its NaN. Fixed with the first-operand
+helper (the JUNO-60's juno_add_first) at both adds of the tick; --tooth-nan (the plain add) diverges on that case;
+the five seeds 400/400. Grading the class on purpose (NaNs with payloads in every case) made about 6 % of the cases
+differ -- on the ORACLE side: Unicorn returns the NaN with the larger significand (x87's rule, playbook 226), the CPU
+the first operand. The bridge change can only differ where both operands are different NaNs: no other section feeds
+a NaN into a ramp, and the lift gate (3e) does not build the bridge -- their GREEN results stand.
+### The rule
+Where two NaNs can meet in an add or a multiply, the C states the plugin's operand order -- `a + b` is not
+commutative there, and GCC picks the order. A Unicorn oracle grades such a meeting only where its x87 rule and the
+CPU's first-operand rule agree; the rest needs the plugin run natively (row 24).
+
