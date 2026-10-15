@@ -16,12 +16,24 @@ import argparse, json, math, os, re, subprocess, sys, tempfile, zipfile
 import pcbnew
 
 GRID = 21.0          # the user's grid pitch (42 = 2 cells)
+HOLE_INSET = 4.25    # measured 2026-10-15 on all 15 fabbed boards: hole centre to its grid-cell corner
 HOLE_MIN_MM = 2.0    # a hole this big or larger in a MountingHole footprint is a screw hole
 NM = 1e6
 
 
 def mm(v):
     return round(v / NM, 6)
+
+
+def quiet(fn, *a):
+    """Run fn with fd 2 sent to /dev/null (pcbnew prints wx debug noise on every load)."""
+    sys.stderr.flush()
+    keep, null = os.dup(2), os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null, 2)
+    try:
+        return fn(*a)
+    finally:
+        os.dup2(keep, 2); os.close(keep); os.close(null)
 
 
 def find_boards(inputs, tmp):
@@ -103,6 +115,23 @@ def svg_path_box(svg):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else None
 
 
+def hole_grid(holes, notes):
+    """Placement by the HOLES: cells spanned and the board's offset from its grid-cell corner.
+    Rule (all 15 boards): hole spacing = cells*GRID - 2*HOLE_INSET. A board whose edge is off the
+    grid (KeyswitchKeybed) still has its holes on it, so the plate maker places boards by this."""
+    out = {}
+    for ax in ('x', 'y'):
+        v = sorted(hh[ax] for hh in holes)
+        if not v:
+            return None
+        span = v[-1] - v[0] + 2 * HOLE_INSET
+        n = round(span / GRID)
+        if abs(span - n * GRID) > 0.01:
+            notes.append('holes are OFF the grid in %s: spacing %.3f is not n*%g-%.2f' % (ax, v[-1] - v[0], GRID, 2 * HOLE_INSET))
+        out[ax] = {'cells': n, 'board_origin_in_cell_mm': round(HOLE_INSET - v[0], 4)}
+    return out
+
+
 def grid_fit(size):
     n = max(1, round(size / GRID))
     return {'cells': n, 'cell_mm': n * GRID, 'margin_per_side_mm': round((n * GRID - size) / 2, 4)}
@@ -110,7 +139,7 @@ def grid_fit(size):
 
 def process(pcb, outdir, tmp, tooth):
     name = os.path.splitext(os.path.basename(pcb))[0]
-    board = pcbnew.LoadBoard(pcb)
+    board = quiet(pcbnew.LoadBoard, pcb)
     if board is None:
         sys.exit('pcbnew could not load %s (KiCad version too old for the file?)' % pcb)
     ps = pcbnew.SHAPE_POLY_SET()
@@ -161,6 +190,7 @@ def process(pcb, outdir, tmp, tooth):
             'frame': 'mm; origin = board bbox top-left; +x right, +y down; seen from the front',
             'kicad_origin_mm': [x0, y0], 'width': w, 'height': h,
             'grid': {'pitch_mm': GRID, 'x': grid_fit(w), 'y': grid_fit(h)},
+            'hole_grid': hole_grid(holes, notes),
             'thickness': mm(board.GetDesignSettings().GetBoardThickness()),
             'holes': holes, 'edge_primitives': prims, 'outline_polygon': poly, 'notes': notes}
 
@@ -203,7 +233,7 @@ def main():
         index = []
         for pcb in boards:
             i = process(pcb, a.outdir, tmp, a.tooth)
-            index.append({k: i[k] for k in ('name', 'width', 'height', 'grid', 'notes')} |
+            index.append({k: i[k] for k in ('name', 'width', 'height', 'grid', 'hole_grid', 'notes')} |
                          {'holes': [[hh['x'], hh['y'], hh['diameter']] for hh in i['holes']]})
             print('%-28s %7.3f x %7.3f mm  grid %dx%d  margin x %.3f y %.3f  holes %d %s' % (
                 i['name'], i['width'], i['height'], i['grid']['x']['cells'], i['grid']['y']['cells'],

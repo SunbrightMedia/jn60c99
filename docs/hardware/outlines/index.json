@@ -1,0 +1,767 @@
+[
+ {
+  "name": "EspMotherboard",
+  "width": 83.5,
+  "height": 83.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 4,
+    "cell_mm": 84.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 4,
+    "cell_mm": 84.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 4,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 4,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    79.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    79.5,
+    3.2
+   ],
+   [
+    79.5,
+    79.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "FaderBoard",
+  "width": 20.5,
+  "height": 104.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 1,
+    "cell_mm": 21.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 5,
+    "cell_mm": 105.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 1,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 5,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    16.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    100.5,
+    3.2
+   ],
+   [
+    16.5,
+    100.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "HeadphoneBreakout",
+  "width": 41.5,
+  "height": 62.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    37.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    58.5,
+    3.2
+   ],
+   [
+    37.5,
+    58.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "KeyswitchBoard",
+  "width": 62.5,
+  "height": 20.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 1,
+    "cell_mm": 21.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 1,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    58.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    16.5,
+    3.2
+   ],
+   [
+    58.5,
+    16.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "KeyswitchKeybed",
+  "width": 112.0,
+  "height": 62.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 5,
+    "cell_mm": 105.0,
+    "margin_per_side_mm": -3.5
+   },
+   "y": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 5,
+    "board_origin_in_cell_mm": -3.38
+   },
+   "y": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    7.63,
+    4.0,
+    3.2
+   ],
+   [
+    104.13,
+    4.0,
+    3.2
+   ],
+   [
+    7.63,
+    58.5,
+    3.2
+   ],
+   [
+    104.13,
+    58.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "PotentiometerBoard",
+  "width": 20.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 1,
+    "cell_mm": 21.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 1,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    16.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    16.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "PotentiometerPack1",
+  "width": 62.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    58.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    58.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "SatelliteBoard",
+  "width": 83.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 4,
+    "cell_mm": 84.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 4,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    79.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    79.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "SegmentBackpack",
+  "width": 104.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 5,
+    "cell_mm": 105.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 5,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    100.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    100.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "SwitchBoard",
+  "width": 20.5,
+  "height": 62.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 1,
+    "cell_mm": 21.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 1,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    16.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    58.5,
+    3.2
+   ],
+   [
+    16.5,
+    58.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "buttonpack1",
+  "width": 41.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    37.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    37.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "buttonpack2",
+  "width": 62.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 3,
+    "cell_mm": 63.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 3,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    58.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    58.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "buttonpack3",
+  "width": 104.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 5,
+    "cell_mm": 105.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 5,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    100.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    100.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "midi3",
+  "width": 83.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 4,
+    "cell_mm": 84.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 4,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    79.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    79.5,
+    37.5,
+    3.2
+   ]
+  ]
+ },
+ {
+  "name": "muxboardv1",
+  "width": 167.5,
+  "height": 41.5,
+  "grid": {
+   "pitch_mm": 21.0,
+   "x": {
+    "cells": 8,
+    "cell_mm": 168.0,
+    "margin_per_side_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "cell_mm": 42.0,
+    "margin_per_side_mm": 0.25
+   }
+  },
+  "hole_grid": {
+   "x": {
+    "cells": 8,
+    "board_origin_in_cell_mm": 0.25
+   },
+   "y": {
+    "cells": 2,
+    "board_origin_in_cell_mm": 0.25
+   }
+  },
+  "notes": [],
+  "holes": [
+   [
+    4.0,
+    4.0,
+    3.2
+   ],
+   [
+    163.5,
+    4.0,
+    3.2
+   ],
+   [
+    4.0,
+    37.5,
+    3.2
+   ],
+   [
+    163.5,
+    37.5,
+    3.2
+   ]
+  ]
+ }
+]
