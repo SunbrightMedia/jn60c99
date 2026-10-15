@@ -18,6 +18,7 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
     page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     page.on('pageerror', e => errs.push(String(e)));
     await page.route('https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js', r => r.fulfill({ path: nm('earcut/dist/earcut.min.js'), contentType: 'text/javascript' }));
+    await page.route('https://cdn.jsdelivr.net/npm/delaunator@5.0.1/delaunator.min.js', r => r.fulfill({ path: nm('delaunator/delaunator.min.js'), contentType: 'text/javascript' }));
     await page.route('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', r => r.fulfill({ path: nm('three/build/three.min.js'), contentType: 'text/javascript' }));
     await page.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '', contentType: 'text/css' }));
     await page.goto('file://' + file); await page.waitForTimeout(800);
@@ -27,6 +28,9 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   const st = () => page.evaluate(() => ({ n: __plate.S.insts.length, pieces: __plate.derived.pieces.length, bad: __plate.derived.bad,
     insts: __plate.S.insts.map(i => [__plate.BOARDS[i.b].name, i.cx, i.cy, i.rot]) }));
   let s0 = await st(); console.log('start', s0.n, 'boards', s0.pieces, 'pieces', 'bad', s0.bad);
+  await page.waitForTimeout(800);
+  const mass = await page.evaluate(() => ({ total: document.getElementById('massTotal').textContent, holes: __plate.derived.pieces.reduce((t, p) => t + p.holes.length, 0), cells: [...document.querySelectorAll('#pieceTable [data-mass]')].map(e => e.textContent) }));
+  console.log('lightening holes', mass.holes, '| PLA per piece', mass.cells.join(','), 'g | total', mass.total, 'g', mass.holes > 0 && +mass.total > 0 && mass.cells.every(c => +c > 0) ? 'OK' : 'FAIL');
   await page.screenshot({ path: path.join(out, 'desktop_light.png'), fullPage: true });
   // drag the first board two cells right and one down
   const g = page.locator('#panel .board').first();

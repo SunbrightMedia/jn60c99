@@ -119,6 +119,8 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel.panelview.noedges .board .hitbox { stroke: none; }
 #panel .lbl { font: 700 5px Helvetica, "Helvetica Neue", Arial, sans-serif; letter-spacing: .12px; fill: #F2F2EE; pointer-events: none; }
 #panel .marquee { fill: var(--accent-soft); stroke: var(--sel); stroke-width: .4; stroke-dasharray: 2 1; pointer-events: none; }
+#panel #cuts, #panel #labels { pointer-events: none; }   /* overlays never take the mouse from the boards */
+#panel .lh { fill: var(--bg); fill-opacity: .55; stroke: var(--accent); stroke-width: .25; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
 #panel .dim { font: 5px var(--mono); fill: var(--muted); }
@@ -223,6 +225,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.1/delaunator.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /*@GEOM@*/
@@ -235,6 +238,7 @@ const BOARDS = /*@BOARDS@*/null;
 const SVGNS = 'http://www.w3.org/2000/svg';
 const $ = id => document.getElementById(id);
 const KEY = 'module-plate-maker-v1';
+const PLA = 1.24e-3;   // g per mm^3
 
 const PARAM_UI = [
   ['Plate', [['plateT', 'Plate thickness', 'mm']]],
@@ -250,7 +254,9 @@ const PARAM_UI = [
     ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]],
   ['Caps (placeholders)', [['capFaderL', 'Fader cap length (along travel)', 'mm'], ['capFaderW', 'Fader cap width', 'mm'], ['capKnobD', 'Knob diameter', 'mm'],
     ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
-  ['Labels', [['labelSize', 'Label text size', 'mm']]]
+  ['Labels', [['labelSize', 'Label text size', 'mm']]],
+  ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Rib width', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'],
+    ['pillarMargin', 'Solid ring around pillar feet', 'mm'], ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest hole span', 'mm'], ['minFillet', 'Smallest corner radius', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -317,7 +323,9 @@ function derive() {
   const v = G.validate(BOARDS, S.insts, g, S.params);
   const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
   const plan = G.planCuts(g.W, g.D, pillars, S.params);
-  const pieces = plan.error ? [] : G.buildPieces(plan, pillars, S.params);
+  // while a drag runs, skip the lightening holes (about 70 ms); they come back when it ends
+  const busy = (typeof drag !== 'undefined' && drag) || (typeof marquee !== 'undefined' && marquee);
+  const pieces = plan.error ? [] : G.buildPieces(plan, pillars, busy ? Object.assign({}, S.params, { lighten: 0 }) : S.params);
   const pErr = [];
   const P = S.params;
   if (P.shoulderD > 8) pErr.push('Shoulder diameter is over 8 mm: it is wider than the board corner around each hole.');
@@ -480,6 +488,7 @@ function drawPanel() {
     derived.pillars.forEach(p => el('circle', { class: 'pillar', cx: p[0], cy: p[1], r: rf }, cuts));
     pieces.forEach(pc => {
       el('path', { class: 'cut', d: 'M' + pc.poly.map(p => p[0].toFixed(3) + ' ' + p[1].toFixed(3)).join('L') + 'Z' }, cuts);
+      if ((pc.holes || []).length) el('path', { class: 'lh', d: pc.holes.map(h => 'M' + h.map(p => p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join('L') + 'Z').join('') }, cuts);
       const lb = el('text', { class: 'pcl', x: pc.rect[0] + 4, y: pc.rect[1] + (pc.r ? S.params.tabDepth : 0) + 9 }, cuts);
       lb.textContent = pc.id;
     });
@@ -537,9 +546,12 @@ function drawSide() {
   add(derived.bad ? 'needs fixing' : 'ready to print', derived.bad ? 'bad' : 'ok');
 
   const tb = $('pieceTable');
-  tb.innerHTML = '<tr><th>Piece</th><th>Size (mm)</th><th>Pillars</th></tr>' + pieces.map(pc =>
-    `<tr><td>${pc.id}</td><td class="n">${pc.size[0].toFixed(1)} × ${pc.size[1].toFixed(1)}</td><td class="n">${pc.pillars.length}</td></tr>`).join('');
-  $('pieceMsg').innerHTML = plan.error ? '' : `<div class="hint">Rows A–${String.fromCharCode(64 + plan.ys.length - 1)} from the top edge, columns from the left. Every pillar is whole on one piece.</div>`;
+  tb.innerHTML = '<tr><th>Piece</th><th>Size (mm)</th><th>Pillars</th><th>PLA (g)</th></tr>' + pieces.map(pc =>
+    `<tr><td>${pc.id}</td><td class="n">${pc.size[0].toFixed(1)} × ${pc.size[1].toFixed(1)}</td><td class="n">${pc.pillars.length}</td><td class="n" data-mass="${pc.id}">…</td></tr>`).join('') +
+    (pieces.length ? `<tr><td><b>Total</b></td><td></td><td class="n">${derived.pillars.length}</td><td class="n" id="massTotal">…</td></tr>` : '');
+  const holeArea = pieces.reduce((t, pc) => t + (pc.holes || []).reduce((u, h) => u + Math.abs(G.area(h)), 0), 0);
+  $('pieceMsg').innerHTML = plan.error ? '' : `<div class="hint">Rows A–${String.fromCharCode(64 + plan.ys.length - 1)} from the top edge, columns from the left. Every pillar is whole on one piece.` +
+    (holeArea ? ` The lightening holes remove ${(holeArea / 100).toFixed(0)} cm² of plate, about ${(holeArea * S.params.plateT * PLA).toFixed(0)} g of PLA.` : '') + `</div>`;
 
   const ck = $('checks'); ck.innerHTML = '';
   const list = (items, cls) => { const u = document.createElement('ul'); u.className = 'issues ' + (cls || ''); items.forEach(t => { const li = document.createElement('li'); li.textContent = t; u.appendChild(li); }); ck.appendChild(u); };
@@ -878,14 +890,22 @@ function init3d() {
   new ResizeObserver(() => render3d()).observe(c);
   return true;
 }
+function fillMasses(meshes) {   // grams per piece from the very meshes that are exported
+  let total = 0;
+  derived.pieces.forEach((pc, k) => { const gr = G.meshVolume(meshes[k]) * PLA; total += gr;
+    const cell = document.querySelector(`#pieceTable [data-mass="${pc.id}"]`); if (cell) cell.textContent = gr.toFixed(0); });
+  if ($('massTotal')) $('massTotal').textContent = total.toFixed(0);
+}
 function draw3d() {
+  const meshes = derived.pieces.map(pc => G.pieceMesh(pc, derived.g.D, S.params));
+  fillMasses(meshes);
   if (!V3.r && !init3d()) return;
   if (V3.group) { V3.scene.remove(V3.group); V3.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   V3.group = new THREE.Group();
   const { g, pieces } = derived, gap = 4;
   const cols = [css('--plate-edge'), css('--muted')];
-  pieces.forEach(pc => {
-    const tri = G.pieceMesh(pc, g.D, S.params);
+  pieces.forEach((pc, k) => {
+    const tri = meshes[k];
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(tri, 3)); geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: new THREE.Color(cols[(pc.r + pc.c) % 2]), roughness: .75, metalness: 0, flatShading: true }));
     m.position.set(pc.c * gap - g.W / 2, -pc.r * gap - g.D / 2, 0);

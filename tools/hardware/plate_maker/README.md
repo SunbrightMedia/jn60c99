@@ -93,3 +93,19 @@ movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 m
   wrong board edge: 12 of 12 wrong).
 - Fader caps 6 x 10 (half the first placeholder); saved layouts that still hold the old default follow
   the new one (`OLD_DEFAULTS` in app.html).
+
+## Lightening holes, organic (2026-10-15)
+The user asked for less filament, then for the "organic load-optimized" look. `lightenHoles` builds a
+load-path truss per piece: nodes = its pillars + points on its inner frame (inset `edgeMargin`, plus
+the socket depth on socket sides) + extra nodes wherever a Delaunay triangle spans more than
+`maxSpan`; every Delaunay triangle, inset by half a rib and with rounded corners (at least
+`minFillet`; around a pillar the fillet grows until the hole clears the foot by `pillarMargin`), is a
+hole. Holes that would break a margin are left solid. Floors: edgeMargin 2.5, rib 2, pillarMargin 1
+(at a 1 mm margin a mesh tore -- seen). Needs `delaunator@5.0.1` (CDN in the page, npm in tests).
+MAX example: 612 g -> 331 g of PLA; the page's own mass (from its export meshes) equals trimesh's.
+check_cases.py grades the holes from the section's interiors: >= edgeMargin from the outline,
+>= foot + pillarMargin from every pillar, >= rib between holes. Teeth: `make_cases.js --tooth-holes`
+(holes cut at the floors while the manifest claims the defaults) -> 320 failures of all three kinds.
+Found on the way and fixed: a face's triangles must be flipped ONCE from earcut's total winding; a
+per-triangle test flipped zero-area slivers at random (collinear honeycomb edges) -> "winding
+inconsistent". The drawing overlays no longer take the mouse (a hole fill had stopped a board drag).
