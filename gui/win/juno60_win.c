@@ -64,6 +64,8 @@ typedef struct { uint32_t id; int offset; double value; } juno_host_param;
 void *juno_gui_create(float sample_rate, int chorus_mode);
 int juno_gui_plugin_init(void *c);
 int juno_gui_model_set(void *c, uint32_t id, int32_t v);
+int juno_gui_model_set_flag(void *c, uint32_t id, int32_t v, int final);
+int juno_gui_host_edits(void *c, uint32_t *ids, double *vals, int *kinds, int cap);
 int juno_gui_state_save(const void *c, unsigned char *out, int cap);
 int juno_gui_queue_patch(void *c, const unsigned char *bank, int len, int idx);
 int juno_gui_queue_record(void *c, const unsigned char *body, int len);
@@ -738,10 +740,35 @@ static void led_shows(void);
 static FILE *g_log;
 static uint32_t fbits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 static unsigned long long dbits(double d) { unsigned long long u; memcpy(&u, &d, 8); return u; }
+/* THE HOST'S ROUND TRIP (CLAIMS A42, docs/EDITOR_SET.md): the editor's set of one of the 79 parameters a host
+ * automates makes no engine record -- the plugin calls performEdit and the HOST sends the value back through
+ * process(); a load's sets do the same (performEdit alone). This program is that host: every performEdit since the
+ * last block becomes a parameter point of the next block (one queue per parameter, in the order first seen, its last
+ * value; process() takes each queue's last point), ahead of the MIDI mapping's. Under g_lock. */
+static struct { uint32_t id; double v; } g_rt[512];
+static int g_nrt;
+static void collect_edits(void)
+{
+    uint32_t ids[512];
+    double vals[512];
+    int kinds[512];
+    int n = juno_gui_host_edits(g_eng, ids, vals, kinds, 512), i, k;
+    for (i = 0; i < n; ++i) {
+        if (g_log)                         /* each performEdit as the host sees it (tools/dist/native_check.py) */
+            fprintf(g_log, "# hostedit %u %d %016llx\n", (unsigned)ids[i], kinds[i], dbits(vals[i]));
+        for (k = 0; k < g_nrt && g_rt[k].id != ids[i]; ++k) ;
+        if (k == g_nrt) { if (g_nrt == 512) continue; ++g_nrt; }
+        g_rt[k].id = ids[i];
+        g_rt[k].v = vals[i];
+    }
+}
 static int E_model_set(uint32_t id, int32_t v)
 {
+    int r;
     if (g_log) fprintf(g_log, "model_set %u %d\n", (unsigned)id, (int)v);
-    return juno_gui_model_set(g_eng, id, v);
+    r = juno_gui_model_set_flag(g_eng, id, v, 1);  /* the editor's set (rva 0x283DB0), final */
+    collect_edits();
+    return r;
 }
 static int E_keybed_write(int key, int value)
 {
@@ -772,18 +799,24 @@ static void E_ui_tick(void)
     if (g_log) fprintf(g_log, "ui_tick\n");
     juno_gui_ui_tick(g_eng);
 }
+/* one host block through process(): the events, then the parameter queues -- the round trip's, then the MIDI
+ * mapping's -- and the host's tempo (valid) */
 static void E_process(const juno_host_note *ev, int nev, const juno_host_param *par, int npar, double tempo,
                       float *L, float *R, int n)
 {
-    int i;
+    static juno_host_param all[512 + 256];
+    int i, na = 0;
+    for (i = 0; i < g_nrt; ++i) { all[na].id = g_rt[i].id; all[na].offset = 0; all[na].value = g_rt[i].v; ++na; }
+    g_nrt = 0;
+    for (i = 0; i < npar && na < 512 + 256; ++i) all[na++] = par[i];
     if (g_log) {
-        fprintf(g_log, "process %d %016llx %d %d\n", n, dbits(tempo), nev, npar);
+        fprintf(g_log, "process %d %016llx %d %d\n", n, dbits(tempo), nev, na);
         for (i = 0; i < nev; ++i)
             fprintf(g_log, "ev %d %d %d %d %08x\n", ev[i].offset, ev[i].type, ev[i].channel, ev[i].pitch, (unsigned)fbits(ev[i].velocity));
-        for (i = 0; i < npar; ++i)
-            fprintf(g_log, "par %u %d %016llx\n", (unsigned)par[i].id, par[i].offset, dbits(par[i].value));
+        for (i = 0; i < na; ++i)
+            fprintf(g_log, "par %u %d %016llx\n", (unsigned)all[i].id, all[i].offset, dbits(all[i].value));
     }
-    juno_gui_process_ex(g_eng, ev, nev, par, npar, 1, tempo, L, R, n);
+    juno_gui_process_ex(g_eng, ev, nev, all, na, 1, tempo, L, R, n);
 }
 static uint32_t g_eid[256];
 static int32_t g_ev[256];
@@ -1294,6 +1327,7 @@ static void land_patch(void)            /* the audio thread, between two blocks 
     if (InterlockedExchange(&g_preq, -1) < 0) return;
     EnterCriticalSection(&g_lock);
     juno_gui_queue_record(g_eng, g_pend, JPM_BODY);
+    collect_edits();                        /* the load's performEdits: the host's next block */
     LeaveCriticalSection(&g_lock);
     SetEvent(g_landev);
 }
@@ -1339,6 +1373,7 @@ static int pm_load(void *u, const unsigned char *body, int len)
         if (WaitForSingleObject(g_landev, 2000) != WAIT_OBJECT_0 && InterlockedExchange(&g_preq, -1) >= 0) {
             EnterCriticalSection(&g_lock);                  /* the audio thread stopped: land it here */
             juno_gui_queue_record(g_eng, g_pend, JPM_BODY);
+            collect_edits();
             LeaveCriticalSection(&g_lock);
         }
     } else {
@@ -1350,6 +1385,7 @@ static int pm_load(void *u, const unsigned char *body, int len)
             fprintf(g_log, "\n");
         }
         juno_gui_queue_record(g_eng, body, len);            /* the patch browser's load, at the next block */
+        collect_edits();
         LeaveCriticalSection(&g_lock);
     }
     EnterCriticalSection(&g_lock);
@@ -1367,7 +1403,9 @@ static int pm_model(void *u, int op, unsigned int id, int v, int flag)
     else if (op == JPM_SET) {                               /* rva 0x283DB0 */
         if (g_log) fprintf(g_log, "pm_set %u %d %d\n", id, v, flag);
         if (g_scripted && g_pmlog) fprintf(g_pmlog, "call set %u %d %d\n", id, v, flag);
-        if ((r = juno_gui_model_set(g_eng, id, v))) eng_refresh();
+        r = juno_gui_model_set_flag(g_eng, id, v, flag);    /* the model's set: a host parameter's round trip */
+        collect_edits();
+        if (r) eng_refresh();
     } else if (op == JPM_NOTIFY) {                          /* rva 0x2853C0 */
         if (g_log) fprintf(g_log, "pm_notify\n");
         if (g_scripted && g_pmlog) fprintf(g_pmlog, "call notify\n");

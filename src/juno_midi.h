@@ -41,6 +41,9 @@ int32_t juno_midi_record_value(int entry, float v);
 int   juno_midi_entry(uint32_t id);
 /* The default CC assignment (rva 0x319A60): the entry CC `cc` drives, -1 none. */
 int   juno_midi_cc_entry(int cc);
+/* The range of entry `entry` (JUNO_MIDI_PARAM: min, max) -- the editor's performEdit law
+ * (gui/juno_bridge.c juno_gui_model_set_flag) normalizes by it. */
+void  juno_midi_range(int entry, int32_t *min, int32_t *max);
 /* The port's host index of entry `entry` (JUNO_STATE_ENT: >= 0, or one of
  * JUNO_SE_NONE / _VOICES / _SRATE) and its id. */
 int   juno_midi_entry_host(int entry);

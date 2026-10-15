@@ -27,7 +27,8 @@ ENTRIES = [
     ('boot_ramps', ['src/boot_ramps.h'], ['tools/verify/gen_boot_ramps.py > src/boot_ramps.h']),
     ('state_tables', ['src/juno_state_tables.h'], [
         'probes/b6/state_load_census.py', 'probes/b6/state_mask_census.py', 'probes/b6/patch_load_census.py',
-        'probes/b6/patch_load_census.py --craft', 'probes/b6/pid_host_map.py', 'tools/verify/gen_state_tables.py']),
+        'probes/b6/patch_load_census.py --craft', 'probes/b6/pid_host_map.py', 'tools/verify/juno_model_census.py',
+        'tools/verify/gen_state_tables.py']),
     ('host_ramps', ['src/ramp_cells.h', 'src/host_ramp_table.h'], [
         'probes/host/ramp_records_units.py', 'probes/host/host_census_v2.py', 'probes/host/host_census_v3.py',
         'probes/host/host_census_flags.py', 'probes/host/host_census_h.py', 'probes/host/host_census_mt.py',

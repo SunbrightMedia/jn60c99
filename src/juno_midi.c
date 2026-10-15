@@ -56,6 +56,12 @@ float juno_midi_cc_value(int entry, int cc)
     return (float)(int64_t)(uint32_t)q / (float)(int64_t)range;
 }
 
+void juno_midi_range(int entry, int32_t *min, int32_t *max)
+{
+    *min = JUNO_MIDI_PARAM[entry].min;
+    *max = JUNO_MIDI_PARAM[entry].max;
+}
+
 int32_t juno_midi_record_value(int entry, float v)
 {
     const juno_midi_param *p = &JUNO_MIDI_PARAM[entry];

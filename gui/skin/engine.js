@@ -75,6 +75,8 @@ export class WasmEngine {
       create: f("juno_gui_create", "number", ["number", "number"]),
       pluginInit: f("juno_gui_plugin_init", "number", ["number"]),
       modelSet: f("juno_gui_model_set", "number", ["number", "number", "number"]),
+      modelSetFlag: f("juno_gui_model_set_flag", "number", ["number", "number", "number", "number"]),
+      hostEdits: f("juno_gui_host_edits", "number", ["number", "number", "number", "number", "number"]),
       stateSave: f("juno_gui_state_save", "number", ["number", "number", "number"]),
       loadPatch: f("juno_gui_load_patch", "number", ["number", "number", "number", "number"]),
       noteOn: f("juno_gui_midi_note_on", null, ["number", "number", "number"]),
@@ -117,7 +119,34 @@ export class WasmEngine {
     this.rectPtr = M._malloc(4 * (8 + 7 * this.BLITS));   // rect[4], fill[4], blits[7 x BLITS]
     this.zfit = M._malloc(8);                    // each window's kept fit (main, patch)
     M.HEAP32.set([0, 0], this.zfit >> 2);
+    this.editIds = M._malloc(4 * 512);           // the host edits the model made (juno_gui_host_edits)
+    this.editVals = M._malloc(8 * 512);
+    this.editKinds = M._malloc(4 * 512);
+    this.rt = new Map();                         // the round trip's points for the next block
     return this;
+  }
+
+  // THE HOST'S ROUND TRIP (CLAIMS A42, docs/EDITOR_SET.md): the editor's set of one of the 79
+  // parameters a host automates makes no engine record -- the plugin calls performEdit and the
+  // HOST sends the value back through process(); a load's sets do the same. This page is that
+  // host: every performEdit since the last block becomes a parameter point of the next block
+  // (one per parameter, in the order first seen, its last value), as JUNO-60.exe sends them.
+  collectEdits() {
+    const M = this.M;
+    const n = this.fn.hostEdits(this.ctx, this.editIds, this.editVals, this.editKinds, 512);
+    if (n <= 0) return;
+    const ids = new Uint32Array(M.HEAPU8.buffer, this.editIds, n);
+    const vals = new Float64Array(M.HEAPU8.buffer, this.editVals, n);
+    const kinds = new Int32Array(M.HEAPU8.buffer, this.editKinds, n);
+    for (let i = 0; i < n; i++) {
+      if (this.onHostEdit) this.onHostEdit(ids[i], kinds[i], vals[i]);
+      this.rt.set(ids[i], vals[i]);              // a Map keeps the first-seen order, the last value
+    }
+  }
+  // the next block's points, before its render (process()'s parameter queues: juno_gui_process_ex)
+  sendEdits() {
+    for (const [id, v] of this.rt) this.fn.hostParam(this.ctx, id, 0, v);
+    this.rt.clear();
   }
 
   zoomGet(win, value, cx, cy, w, h) {
@@ -136,8 +165,10 @@ export class WasmEngine {
     return out;
   }
 
-  set(id, v) {
-    return this.fn.modelSet(this.ctx, id >>> 0, v | 0) !== 0;
+  set(id, v) {                                   // the editor's set (rva 0x283DB0), final
+    const r = this.fn.modelSetFlag(this.ctx, id >>> 0, v | 0, 1) !== 0;
+    this.collectEdits();
+    return r;
   }
 
   loadPatch(bank, idx) {
@@ -149,7 +180,9 @@ export class WasmEngine {
       this.bankLen = bank.length;
       this.bankKey = bank;
     }
-    return this.fn.loadPatch(this.ctx, this.bankPtr, this.bankLen, idx);
+    const r = this.fn.loadPatch(this.ctx, this.bankPtr, this.bankLen, idx);
+    this.collectEdits();                         // the load's performEdits: the next block's points
+    return r;
   }
 
   noteOn(n, vel) { this.fn.noteOn(this.ctx, n, vel); }
@@ -198,6 +231,7 @@ export class WasmEngine {
     node.onaudioprocess = e => {
       const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
       const n = L.length;
+      this.sendEdits();
       this.fn.render(this.ctx, buf, n);
       const s = new Float32Array(M.HEAPF32.buffer, buf, n * 2);
       let pl = this.peak[0], pr = this.peak[1];
@@ -341,6 +375,7 @@ export class PatchManager {
       cb((u, body, n) => {                                       // load (rva 0x335850)
         if (io.onCall) io.onCall("load", M.HEAPU8.slice(body, body + n));
         E.fn.queueRecord(E.ctx, body, n);
+        E.collectEdits();
         return 1;
       }, "iiii"),
       cb((u, op, id, v, flag) => {                               // model: get, set, notify, commit
@@ -348,7 +383,9 @@ export class PatchManager {
         if (op === 0) return E.fn.modelGet(E.ctx, id);
         if (op === 1) {
           if (io.onCall) io.onCall("set", id, v, flag);
-          return E.fn.modelSet(E.ctx, id, v);
+          const r = E.fn.modelSetFlag(E.ctx, id, v, flag);
+          E.collectEdits();
+          return r;
         }
         if (op === 2) { if (io.onCall) io.onCall("notify"); return 0; }
         if (io.onCall) io.onCall("commit");

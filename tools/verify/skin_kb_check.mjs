@@ -15,7 +15,8 @@
 // come only from the script, and its audio output is not opened (rendering
 // changes none of the logged calls). The exe runs the script with --kbscript
 // under Wine (or on Windows) and logs its engine calls. Compared: keybed writes,
-// commits, model sets, patch loads (the index), drains.
+// commits, model sets, patch loads (the index), drains, and the host edits each makes
+// (the round trip's performEdits, CLAIMS A42: id, how the editor framed it, the value's bits).
 //
 // usage: node tools/verify/skin_kb_check.mjs --exe PATH [--seeds 1,2,...] [--events N]
 //                                            [--tooth NAME]
@@ -92,10 +93,14 @@ function exeCalls(log) {
     else if (t[0] === "queue_record" || t[0] === "pm_set" || t[0] === "zoomfit" || t[0] === "ledshow") out.push(ln);
     else if (t[0] === "cc_learn" || t[0] === "cc_forget") out.push(`${t[0]} ${t[1]}`);
     else if (t[0] === "state") out.push(ln);
-    else if (ln.startsWith("# ccpick ") || ln.startsWith("# ccmenu ")) out.push(ln.slice(2));
+    else if (ln.startsWith("# ccpick ") || ln.startsWith("# ccmenu ") || ln.startsWith("# hostedit ")) out.push(ln.slice(2));
   }
   return out;
 }
+
+// a host edit as the exe logs it: "hostedit ID KIND VALUE" (the double's 16 hex digits)
+const HOSTEDIT = `(id, k, v) => { const d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, v, true);
+  return "hostedit " + (id >>> 0) + " " + k + " " + d.getBigUint64(0, true).toString(16).padStart(16, "0"); }`;
 
 // a seeded CC assign script over the skin's own controls: c = [{x, y, w, h, cc, drag}] (cc: the
 // search stops there; drag: a slider or knob, which a press with modifiers may take)
@@ -171,13 +176,15 @@ for (const seed of SEEDS) {
   await page.waitForFunction(() => window.__skin && window.__skin.skin, null, { timeout: 60000 });
   // plumbing only: the calls logged as the exe logs them, the page's own UI timer held,
   // no audio device; the product code is not changed
-  const kb = await page.evaluate(() => {
+  const kb = await page.evaluate(hostedit => {
     const { E, skin } = window.__skin;
     const log = window.__kblog = [];
     const wrap = (name, fmt) => { const f = E[name].bind(E); E[name] = (...a) => { log.push(fmt(...a)); return f(...a); }; };
     wrap("keybedWrite", (k, v) => `keybed ${k} ${v}`);
     wrap("commit", () => "commit");
     wrap("set", (id, v) => `model_set ${id >>> 0} ${v | 0}`);
+    const he = eval(hostedit);                     // the round trip's performEdits (CLAIMS A42)
+    E.onHostEdit = (id, k, v) => log.push(he(id, k, v));
     skin.trace = log;                              // the page's own: zoomfit, ledshow, the patch manager's calls
     const tick = E.uiTick.bind(E);
     window.__kbAllow = false;
@@ -194,7 +201,7 @@ for (const seed of SEEDS) {
     const k = skin.visible(skin.tree).find(x => x.type === "keyboardX");
     const r = skin.cv.getBoundingClientRect();
     return { x: k.x, y: k.y, w: k.w, h: k.h, left: r.left, top: r.top, sx: r.width / skin.cv.width, sy: r.height / skin.cv.height };
-  });
+  }, HOSTEDIT);
   if (TOOTH) await page.evaluate(t => {
     const { skin } = window.__skin;
     if (t === "velocity") { const f = skin.keyVelocity.bind(skin); skin.keyVelocity = (k, y) => Math.min(127, f(k, y) + 1); }
@@ -243,13 +250,15 @@ for (const seed of SEEDS) {
   await page.addInitScript(setting);
   await page.goto(`http://127.0.0.1:${port}${PAGE}`);
   await page.waitForFunction(() => window.__skin && window.__skin.skin, null, { timeout: 60000 });
-  const geo = await page.evaluate(dump => {
+  const geo = await page.evaluate(({ dump, hostedit }) => {
     const { E, skin } = window.__skin;
     const log = window.__kblog = [];
     const wrap = (name, fmt) => { const f = E[name].bind(E); E[name] = (...a) => { log.push(fmt(...a)); return f(...a); }; };
     wrap("keybedWrite", (k, v) => `keybed ${k} ${v}`);
     wrap("commit", () => "commit");
     wrap("set", (id, v) => `model_set ${id >>> 0} ${v | 0}`);
+    const he = eval(hostedit);
+    E.onHostEdit = (id, k, v) => log.push(he(id, k, v));
     skin.trace = log;
     wrap("ccLearn", id => `cc_learn ${id >>> 0}`);
     wrap("ccForget", id => `cc_forget ${id >>> 0}`);
@@ -292,7 +301,7 @@ for (const seed of SEEDS) {
     }
     const r = skin.cv.getBoundingClientRect();
     return { ctl, W: skin.cv.width, H: skin.cv.height, left: r.left, top: r.top, sx: r.width / skin.cv.width, sy: r.height / skin.cv.height };
-  }, !!DUMP);
+  }, { dump: !!DUMP, hostedit: HOSTEDIT });
   if (TOOTH === "ccedge") await page.evaluate(() => {
     const { skin } = window.__skin;              // the right and bottom edges inside the rectangle
     skin.ccTarget = function (x, y, node = this.tree) {

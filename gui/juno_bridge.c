@@ -276,6 +276,12 @@ typedef struct {
     struct { float last, sum; int32_t period, since, nread, nacc, toggle; } dm;
     float pk_hold[2];
     struct { int n, i, gend; float m[2], q[2][3]; } pk;
+
+    /* THE EDITOR'S HOST EDITS (juno_gui_model_set_flag, juno_gui_host_edits): what the plugin's controller told
+     * the host since the host last took them -- performEdit's id and value, and how the begin / end framed it --
+     * and the controller's one open edit (a drag's steps keep it open) */
+    struct { uint32_t id; double v; int kind; } edit[512];
+    int   nedit, edit_open;
 } juno_ctx;
 
 /* FX power-on default for the UNAPPLIED sound.
@@ -1732,6 +1738,21 @@ int juno_gui_queue_peek(const juno_ctx *c, int *kinds, unsigned char *midi, int 
     return c->drv_nq;
 }
 
+/* The same records for the gates with their parameter: kinds[i], the port's host index (a preset path's value; -1
+ * for the others), the value (a preset path's) and the record's id (a parameter record's). Returns how many wait. */
+int juno_gui_queue_records(const juno_ctx *c, int *kinds, int *hosts, int32_t *vals, uint32_t *ids, int max)
+{
+    int i;
+    if (!c) return 0;
+    for (i = 0; i < c->drv_nq && i < max; ++i) {
+        kinds[i] = c->drv_q[i].kind;
+        hosts[i] = c->drv_q[i].kind == 2 ? c->drv_q[i].host : -1;
+        vals[i] = c->drv_q[i].v;
+        ids[i] = c->drv_q[i].id;
+    }
+    return c->drv_nq;
+}
+
 /* the note value's state of `key` (what the panel keyboard draws: down above 0) */
 int juno_gui_keybed_state(const juno_ctx *c, int key)
 {
@@ -2513,11 +2534,16 @@ void juno_gui_host_set(juno_ctx *c, int i, int v)
 static int ro_switch(juno_ctx *c);
 
 /* vm.vs.sampleRate (id 0x0FFFC015, in the DAW state, value & 0x7F): the core's
- * listener (rva 0x3222F0) sets the engine rate the next block switches to: the
- * value indexes the table at rva 0x94AB80 (0..4: 96000, 88200, 48000, 44100,
- * 32000; 6..127: the bytes that follow it -- EXECUTED, 6 -> 0, 127 ->
- * 1634624882: no render object, silence); 5 is automatic, the engine's
- * current rate (rva 0x34B260). Script.xml's range 0..3 is not applied. */
+ * listener (rva 0x321B30 -> 0x3222F0: READ) sets the engine rate the next block
+ * switches to (core +588; the automatic flag +592): the value indexes the table
+ * at rva 0x94AB80 (0..4: 96000, 88200, 48000, 44100, 32000; 6..127: the bytes
+ * that follow it -- EXECUTED, 6 -> 0, 127 -> 1634624882: no render object,
+ * silence); 5 is automatic, the engine's current rate (rva 0x34B260). Script.xml's
+ * range 0..3 is not applied. ONLY the request: the switch is the next block's
+ * (drv_block, rva 0x320BA2), to the last request -- sets back to the engine's
+ * rate inside one block switch nothing (EXECUTED: tools/verify/editor_gate.py
+ * chain census, the setting at 14 values in one block; the port had switched at
+ * each set, the engine re-initialized 13 times -- playbook 275). */
 void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
 {
     double r;
@@ -2529,7 +2555,9 @@ void juno_gui_set_engine_rate_setting(juno_ctx *c, int value)
     cur = !(r >= -2147483647.0) ? (int)0x80000001u : (r > 2147483647.0 ? 0x7FFFFFFF : (int)r);
     c->eng_req = juno_ro_setting_rate(value, cur, &c->eng_auto);
     store_set(c, state_k(0x0FFFC015u), value);       /* the model's value (getState) */
-    ro_switch(c);              /* a fresh start switches at once; else the next block */
+#if defined(JUNO_EDSET_TOOTH) && JUNO_EDSET_TOOTH == 4
+    ro_switch(c);        /* MUTANT (tools/verify/editor_gate.py): the switch at each set, the port before 2026-10-15 */
+#endif
 }
 
 /* --- The plugin's own preset paths (CLAIMS B6, src/juno_state_tables.h) -------
@@ -2738,6 +2766,7 @@ static uint32_t be_at(const unsigned char *p, uint32_t len, uint32_t off, uint32
  * entry of zeros (past the stream's end) is one. A last entry the count cuts
  * short is read past the plugin's vector (undefined there) and skipped here.
  * Returns the number of parameter entries applied, -1 for kResultFalse. */
+static int edit_push(juno_ctx *c, uint32_t id, int32_t st, int kind);   /* the editor's host edits (below) */
 int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
 {
     uint32_t hw, n, avail, off, w;
@@ -2762,6 +2791,7 @@ int juno_gui_state_load(juno_ctx *c, const unsigned char *data, int len)
         store_set(c, k, v);
         if (id == KEY_HOLD_ID && v == 0) ks_release(c);   /* each entry its own set (EXECUTED) */
         apply_event(c, JUNO_STATE_ENT[k].host, v);
+        if (JUNO_STATE_EDIT_HOST[k]) edit_push(c, id, c->store[k], 1);   /* the host told (performEdit alone) */
         ++applied;
     }
     ks_commit(c);                             /* setState commits the model (EXECUTED) */
@@ -2852,6 +2882,9 @@ static int load_rec(juno_ctx *c, const unsigned char *hdr, const unsigned char *
 #endif
         if (sk >= 0) store_put(c, sk, v, 0);         /* the set from bytes: as decoded */
         apply_event(c, JUNO_PATCH_EV[k].host, v);
+        if (sk >= 0 && JUNO_STATE_EDIT_HOST[sk])     /* and the host told: performEdit alone, the editor's law on
+                                                      * the stored value (tools/verify/editor_gate.py) */
+            edit_push(c, JUNO_PATCH_EV[k].id, c->store[sk], 1);
     }
 #if KS_TOOTH == 4
     if (hold == 0) ks_release(c);             /* TOOTH 4: the release after the load's records */
@@ -2906,7 +2939,87 @@ int juno_gui_model_set(juno_ctx *c, uint32_t id, int32_t v)
     c->drv_queue_mode = 1;
     apply_event(c, JUNO_STATE_ENT[k].host, v);
     c->drv_queue_mode = 0;
+    if (JUNO_STATE_ENT[k].host == JUNO_SE_SRATE && c->drv_nq < DRV_QMAX) {
+        /* the engine-rate setting: the core's listener ran at once (apply_event), and the model queues its record
+         * as for any entry (tools/verify/editor_gate.py census) -- the engine's host entry ignores it */
+        struct drv_rec *r = &c->drv_q[c->drv_nq++];
+        memset(r, 0, sizeof *r);
+        r->kind = 2; r->host = JUNO_SE_SRATE; r->v = v;
+    }
     return 1;
+}
+
+/* ---- THE EDITOR'S SET: a panel control's value through the plugin's model (rva 0x283DB0), EXECUTED on every
+ * record at 14 values (tools/verify/juno_model_census.py; src/juno_state_tables.h JUNO_STATE_EDIT_HOST): the model
+ * keeps the value at its storage law (getState; LFO RATE and VCF CUTOFF set their floats too), KEY HOLD at 0
+ * releases the keys; then, for the 79 entries a host automates, the HOST's round trip -- beginEdit,
+ * performEdit(id, (float)(stored - min) / (float)(max - min), both unsigned 32-bit, the range of the plugin's MIDI
+ * table), endEdit -- and no engine record: the host sends the value back through process() (juno_gui_process_ex);
+ * for the other 16 one engine record (id, the stored value) for the next block, as juno_gui_model_set queues it.
+ * The JX-3P's code is the twin (jx3p/tools/fw_map.py --pair 0x283DB0 0x283C90; jx3p/docs/HOST_LAYER.md 3n).
+ * THE EDIT GESTURE (EXECUTED: tools/verify/editor_gate.py chain 'gesture'; the JX's twin, jx3p/docs/JX_PANEL.md;
+ * the set's flag, r9): 1 a final set, 0 a step of a drag. The controller keeps ONE open edit: a host parameter's set sends beginEdit only
+ * while none is open, then performEdit, and when final endEdit; a step leaves it open; a set no host sees leaves
+ * it as it is. Kinds (juno_gui_host_edits): 0 beginEdit / performEdit / endEdit, 2 beginEdit / performEdit, 3
+ * performEdit, 4 performEdit / endEdit. ---- */
+#ifndef JUNO_EDSET_TOOTH /* MUTANT (tools/verify/editor_gate.py): 1 performEdit's value is stored / max, 2 every
+                          * entry queues a record (the old model), 3 one open edit per parameter, 4 the
+                          * engine-rate setting switches at each set (juno_gui_set_engine_rate_setting) */
+#define JUNO_EDSET_TOOTH 0
+#endif
+static int edit_push(juno_ctx *c, uint32_t id, int32_t st, int kind)
+{
+    int e = juno_midi_entry(id);
+    int32_t mn, mx;
+    float f;
+    if (e < 0 || c->nedit >= (int)(sizeof c->edit / sizeof c->edit[0])) return 0;
+    juno_midi_range(e, &mn, &mx);
+#if JUNO_EDSET_TOOTH == 1
+    f = (float)st / (float)mx;
+#else
+    f = (float)(int64_t)(uint32_t)(st - mn) / (float)(int64_t)(uint32_t)(mx - mn);
+#endif
+    c->edit[c->nedit].id = id; c->edit[c->nedit].v = (double)f; c->edit[c->nedit].kind = kind; ++c->nedit;
+    return 1;
+}
+#if JUNO_EDSET_TOOTH == 3
+static uint32_t edit_open_id;
+#endif
+int juno_gui_model_set_flag(juno_ctx *c, uint32_t id, int32_t v, int final)
+{
+    int k = c ? state_k(id) : -1, open;
+    int32_t st;
+    if (k < 0) return 0;
+#if JUNO_EDSET_TOOTH == 2
+    return juno_gui_model_set(c, id, v);
+#endif
+    if (!JUNO_STATE_EDIT_HOST[k]) return juno_gui_model_set(c, id, v);
+    store_set(c, k, v);
+    st = JUNO_STATE_ENT[k].mask ? (int32_t)((uint32_t)v & JUNO_STATE_ENT[k].mask) : v;
+    if (id == KEY_HOLD_ID && st == 0) ks_release(c);
+    if (juno_midi_entry(id) < 0) return 0;
+#if JUNO_EDSET_TOOTH == 3
+    open = c->edit_open && edit_open_id == id;
+    edit_open_id = id;
+#else
+    open = c->edit_open;
+#endif
+    c->edit_open = !final;
+    return edit_push(c, id, st, open ? (final ? 4 : 3) : (final ? 0 : 2));
+}
+/* the host edits the plugin made since the last call, in order: performEdit's id and value, and (kinds, may be
+ * NULL) how the editor framed it (above). The count; the rest past cap is dropped. */
+int juno_gui_host_edits(juno_ctx *c, uint32_t *ids, double *vals, int *kinds, int cap)
+{
+    int n, i;
+    if (!c) return 0;
+    n = c->nedit < cap ? c->nedit : cap;
+    for (i = 0; i < n; ++i) {
+        ids[i] = c->edit[i].id; vals[i] = c->edit[i].v;
+        if (kinds) kinds[i] = c->edit[i].kind;
+    }
+    c->nedit = 0;
+    return n;
 }
 
 void juno_gui_queue_host(juno_ctx *c, int host, int v)

@@ -4659,3 +4659,30 @@ lane, as it links node_modules (playbook 178). EXECUTED: the next lane run (jxla
 ### The rule
 List what the tree finds OUTSIDE itself (../emsdk, node_modules up the folders, the user's input folders) and give
 every lane the same surroundings, wherever its root is.
+
+## 274. A TOOTH MACRO'S NAME IS A GLOBAL -- A NAME TWO GATES SHARE MAKES EACH MUTANT CARRY TWO DEFECTS
+Paid 2026-10-15 (the JUNO editor's set, CLAIMS A42). The new gate's mutants were builds with -DJUNO_EDIT_TOOTH=1..3;
+gui/juno_bridge.c already tested JUNO_EDIT_TOOTH for the A35 edit-cover gate (`#if defined(JUNO_EDIT_TOOTH)`: the
+cover without range k). Each mutant of the new gate therefore ALSO dropped a cover range, and each edit-cover tooth
+1..3 also carried an editor mutant: all three "BITES" lines were true and none was evidence (a bite for the wrong
+reason). EXECUTED: the rename to JUNO_EDSET_TOOTH and the three mutants re-run alone -- all three bite on their own.
+### The rule
+Before a tooth macro is named, grep its name over the sources the gate builds; one name, one gate, one meaning.
+A tooth is evidence only when the build differs from the green one by exactly its own mutation.
+
+## 275. A GATE THAT GRADES THE MODEL BUT NOT THE SOUND MISSES WHAT THE MODEL'S LISTENERS DO -- COMPARE THE BLOCK TOO
+Paid 2026-10-15 (the JUNO editor's set, CLAIMS A42). The new gate compared the host calls, the queued records and
+getState after every set -- GREEN. Then a held key and both channels of every block were added to the comparison
+(the round trip's effect on the engine), and the census chain went RED at the block after the engine-rate setting's
+14 sets (0x0FFFC015 at 0, 1, 2, 5, 127, ... -2^31, all in one block). The port's set called ro_switch at once:
+each set that asked another rate re-initialized the engine (setSampleRate in place, A30), 13 times; the plugin's
+listener (rva 0x321B30 -> 0x3222F0, READ) only stores the request, and the next block switches once, to the last
+one -- here the engine's own rate: no switch at all. CLAIMS A30 already said "the render driver's next block";
+the port had added a switch at the set that no gate drove (every rate gate runs a block right after one set).
+EXECUTED: the deferred switch GREEN (1773 steps, 259 blocks), the nine gates that drive the setting GREEN on it, and
+JUNO_EDSET_TOOTH 4 (the old switch at the set) RED. INFERRED: the earlier records of the chain (the voice count's 14
+values, the last 0) are what made the extra re-inits audible -- 11 probe chains of the setting alone on a quiet
+engine were EQUAL even with the old switch.
+### The rule
+Where the plugin's value goes through a listener, compare what the engine renders after it, not only the model's
+own state; and drive a setting several times inside one block -- "at once" and "at the next block" differ only there.

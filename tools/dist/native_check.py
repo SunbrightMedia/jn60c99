@@ -16,7 +16,11 @@ engine call. This checker:
            since the block before, in the DAW's own mapping (note on/off ->
            note events, velocity v / 127; CC n -> MIDI-mapping parameter base +
            n, value d / 127; aftertouch -> base + 128; pitch bend -> base +
-           129, value (lsb | msb << 7) / 16383)
+           129, value (lsb | msb << 7) / 16383), behind the host's round trip:
+           every performEdit the build makes for the same calls (an editor's set
+           of a host parameter, a load's; CLAIMS A42) -- each equal to the
+           program's own (its '# hostedit' lines) -- one point per parameter, its
+           last value, in the order first seen
   ticks    requires every LED / meter / bar tick of the program's UI timer (CLAIMS A37)
            equal to the build's for the same calls at the same points
   state    requires the program's state at the end (getState's bytes: the 95 values and
@@ -29,6 +33,7 @@ usage: python3 tools/dist/native_check.py [--exe PATH] [--tooth NAME]
   --tooth glue     the expected velocity is v / 128: must FAIL
   --tooth tick     the replay misses one LED read of the UI timer (CLAIMS A37): must FAIL
   --tooth cc       the replay loses the CC assign menu's learn: must FAIL
+  --tooth rt       the expected round trip drops its first point: must FAIL
 Wine: $WINE (default /usr/lib/wine/wine64) with $WINEPREFIX.
 """
 import ctypes
@@ -85,6 +90,9 @@ def load_lib():
                     ('juno_gui_queue_patch', [V, ctypes.c_char_p, ctypes.c_int, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_queue_record', [V, ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
                     ('juno_gui_model_set', [V, ctypes.c_uint32, ctypes.c_int32], ctypes.c_int),
+                    ('juno_gui_model_set_flag', [V, ctypes.c_uint32, ctypes.c_int32, ctypes.c_int], ctypes.c_int),
+                    ('juno_gui_host_edits', [V, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_double),
+                                             ctypes.POINTER(ctypes.c_int), ctypes.c_int], ctypes.c_int),
                     ('juno_gui_ui_tick', [V], None),
                     ('juno_gui_commit', [V], None),
                     ('juno_gui_keybed_write', [V, ctypes.c_int, ctypes.c_int], ctypes.c_int),
@@ -135,11 +143,23 @@ def replay(lib, log, tooth):
     skipped_led = dropped_cc = False
     states = 0
     blits = (ctypes.c_int * (7 * 64))()
-    lines = [ln.split() for ln in log.splitlines() if ln and not ln.startswith('#')]
+    lines = [ln.split() for ln in log.splitlines() if ln and (not ln.startswith('#') or ln.startswith('# hostedit '))]
+    eid, eval_, ekind = (ctypes.c_uint32 * 512)(), (ctypes.c_double * 512)(), (ctypes.c_int * 512)()
+    mine, rt, cut_rt = [], {}, tooth == 'rt'      # the build's performEdits (to meet the program's), the next block's points
     i = 0
     while i < len(lines):
+        if c:                                     # the host edits the last call made: the round trip's points
+            for k in range(lib.juno_gui_host_edits(c, eid, eval_, ekind, 512)):
+                mine.append((eid[k], ekind[k], struct.unpack('<Q', struct.pack('<d', eval_[k]))[0]))
+                rt[eid[k]] = eval_[k]                     # a dict keeps the first-seen order, the last value
         t = lines[i]
         i += 1
+        if t[0] == '#':                                   # the program's performEdit (its '# hostedit' line)
+            want = (int(t[2]), int(t[3]), int(t[4], 16))
+            got = mine.pop(0) if mine else None
+            if got != want:
+                errs.append('hostedit: the build %s, the program %s' % (got, want))
+            continue
         if t[0] == 'ledshow':                             # an LED shown runs its update: the read, the frame
             got, want = lib.juno_gui_lfo_led_frame(c, int(t[1])), int(t[2])
             if got != want:
@@ -173,8 +193,8 @@ def replay(lib, log, tooth):
         elif t[0] == 'queue_record':                      # the patch manager's load of a record body
             b = bytes.fromhex(t[1])
             lib.juno_gui_queue_record(c, b, len(b))
-        elif t[0] == 'pm_set':                            # the patch window's model sets (CLAIMS A39)
-            lib.juno_gui_model_set(c, int(t[1]), int(t[2]))
+        elif t[0] == 'pm_set':                            # the patch window's model sets (CLAIMS A39), with the flag
+            lib.juno_gui_model_set_flag(c, int(t[1]), int(t[2]), int(t[3]))
         elif t[0] == 'pm_commit':
             lib.juno_gui_commit(c)
         elif t[0] == 'pm_notify':
@@ -187,7 +207,7 @@ def replay(lib, log, tooth):
             if tooth == 'replay' and blk > 0 and not dropped:
                 dropped = True                            # TOOTH: the first panel edit is lost
                 continue
-            lib.juno_gui_model_set(c, int(t[1]), int(t[2]))
+            lib.juno_gui_model_set_flag(c, int(t[1]), int(t[2]), int(t[3]) if len(t) > 3 else 1)   # the editor's set
         elif t[0] == 'ui_tick':
             lib.juno_gui_ui_tick(c)
         elif t[0] == 'commit':
@@ -225,6 +245,11 @@ def replay(lib, log, tooth):
                 got_par.append((int(p[1]), int(p[2]), f64(p[3])))
             i += npar
             want_ev, want_par = expected(pending, base, tooth)
+            points = [(pid, 0, v) for pid, v in rt.items()]
+            if cut_rt and points:
+                points, cut_rt = points[1:], False        # TOOTH: the round trip loses a point
+            want_par = points + want_par
+            rt = {}
             if got_ev != want_ev or got_par != want_par:
                 errs.append('block %d: events %s params %s, expected %s %s' % (blk, got_ev, got_par, want_ev, want_par))
             pending = []
@@ -240,6 +265,8 @@ def replay(lib, log, tooth):
             raise SystemExit('log line %d: unknown call %r' % (i, t))
     if states != 1:
         errs.append('the program logged %d end states (1 expected)' % states)
+    if mine:
+        errs.append('the build made %d host edits the program did not log, the first %s' % (len(mine), mine[0]))
     if c and hasattr(lib, 'juno_gui_free'):
         lib.juno_gui_free(c)
     return np.concatenate(out), errs

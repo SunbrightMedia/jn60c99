@@ -269,6 +269,10 @@ verify-recipe:
 	fresh $(SCRATCH)/zoom_fit_ref.pkl || python3 tools/verify/zoom_fit_gate.py --ref || FAIL=1; \
 	python3 tools/verify/zoom_fit_gate.py --port || FAIL=1; \
 	python3 tools/verify/zoom_fit_gate.py --port-tooth || FAIL=1; \
+	echo "=== THE EDITOR'S SET (CLAIMS A42): a panel control's value through the plugin's model -- the host's round trip (79 parameters) or an engine record (16), the host calls, the pending records, getState after every step; 3 teeth ==="; \
+	fresh $(SCRATCH)/editor_ref.pkl || python3 tools/verify/editor_gate.py --ref || FAIL=1; \
+	python3 tools/verify/editor_gate.py --port || FAIL=1; \
+	python3 tools/verify/editor_gate.py --mutants || FAIL=1; \
 	echo "=== REINIT == CREATE: juno_gui_reinit leaves a fresh context (state save, CCs, a learn, the keyboard note value, a render) ==="; \
 	python3 tools/verify/reinit_check.py || FAIL=1; \
 	echo "=== VOICE COUNT (CLAIMS B10): the shipped 6 voices, counts 1..9 changed while notes sound, audio + rendered state incl. stopped units ==="; \
@@ -366,7 +370,7 @@ completeness:
 native: libjuno.so
 	python3 tools/dist/make_native.py
 	python3 tools/dist/native_check.py
-	for t in replay glue tick cc; do if python3 tools/dist/native_check.py --tooth $$t; then echo "native_check tooth $$t DID NOT BITE"; exit 1; fi; done
+	for t in replay glue tick cc rt; do if python3 tools/dist/native_check.py --tooth $$t; then echo "native_check tooth $$t DID NOT BITE"; exit 1; fi; done
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5,6,7,8
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,3,4,5 --tooth
 	python3 tools/dist/exe_oracle_check.py --exe scratchpad/dist/JUNO-60.exe --seeds 1,2,4 --tooth cc

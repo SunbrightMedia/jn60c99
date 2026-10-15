@@ -14,6 +14,11 @@
  *   JUNO_DEFAULT_REC  the model at boot as the plugin serializes it (rva
  *                   0x335990), behind a 16-byte name: the record whose values
  *                   the engine has never been sent beyond the defaults.
+ *   JUNO_STATE_EDIT_HOST  the editor's set of each entry (the model's set, rva
+ *                   0x283DB0, as a panel control makes it; tools/verify/
+ *                   juno_model_census.py): 1 the host's automation round trip --
+ *                   beginEdit, performEdit(id, (float)(stored - min) / (float)(max
+ *                   - min)), endEdit, no engine record --, 0 one engine record.
  */
 #ifndef JUNO_STATE_TABLES_H
 #define JUNO_STATE_TABLES_H
@@ -210,6 +215,12 @@ static const juno_patch_ev JUNO_PATCH_EV[JUNO_PATCH_EV_N] = {
     { 0x00A07002u, 76, 3949u, JUNO_DEC_INT1X7 },
     { 0x00A07003u, 77, 3950u, JUNO_DEC_INT1X7 },
     { 0x00A07004u, 78, 3951u, JUNO_DEC_INT2X4 },
+};
+static const uint8_t JUNO_STATE_EDIT_HOST[JUNO_STATE_N] = {   /* the editor's set: 1 the host round trip */
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 static const unsigned char JUNO_DEFAULT_REC[JUNO_REC_BYTES] = {
     45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,1,10,6,4,0,0,8,0,
