@@ -3,6 +3,33 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-15 (24) — ROW 23 CLOSED: EVERY SECTION OF THE VERIFY GREEN ON 0f0d6948; THE KEY HOLDER; THE PATCH WINDOW'S OWN TIMER (playbooks 269-273)
+
+- Section 5c's first full run went RED after row 25 was closed on the quick run alone (playbook 271): Up / Down
+  loaded patches in the program only. A focus trace on both sides gave the plugin's key holder (READ + EXECUTED): one
+  holder for the editor (root +0x10 -> +0x10 -> +0x18); knobs, sliders, jx3pSliders and the patch name take the keys
+  through their key operator, the patch window's list through its own (rva 0x3276F0: the action 0x3277A0; an arrow
+  repeats after 200 ms, then every 50 ms, from the list's tick 0x3280E0, which also takes the focus back); every other
+  class takes the focus and does nothing with a key. The holder moves at a CC assign press (rva 0x31D384 takes it and
+  lets it go), a patch block's down (0x351C90), the latch family's down and up, the resize corner (the root), the
+  patch window's opening (its list) and its end. The patch window has its OWN 50 ms timer (SetTimer at rva 0x311491,
+  WM_TIMER 0x31167C: the root's tick only), which the oracle never fired. Fixed in JX-3P.exe (jx3p_win.c), in the
+  oracle (its timer tick fires the patch window's timer too) and in the gate: a "focus" line compares the holder, a
+  focus section makes each move, teeth 32-35.
+- The full panel gate on 0f0d6948 (seed 1) GREEN: 10986 mouse events, 1496 wheels, 448 keys (every code compared), 125
+  key holders compared (none 65, a knob 18, the patch window's list 42), 47 patch window events, 40 option menus, 473
+  window points at 13 zooms, 18819 states, 166705 host edits; teeth 3-20, 22-35, pm21, cc1-7, bridge1 BITE.
+- On the way: this Wine build aborts ("free(): invalid pointer") whenever TMPDIR is set, and the lanes set it -- the
+  Wine callers pass none (playbook 269); gui/juno_pm.c / .h cite only the JUNO-60's addresses, the census twins
+  regenerated (playbook 270); the lanes' trace follows bind (Chromium's SingletonSocket is made, not read), the folder
+  a lane sits in is not an input (playbook 272), and the emsdk is linked beside every lane (playbook 273); run_job.sh
+  refuses `sh -c` (playbook 118 paid again: a build step ran as a bare python3 and a quick run graded the old program).
+- THE VERIFY on 0f0d6948 (content tree e9e4af78ca): all 18 sections GREEN, each in a lane of its own (jx_lanes.py, playbook
+  264): 3i, 5b, 5c, 6 and S in jxlanes_r23a, 5 in jxlanes_r23b, 3h in jxlanes_3h; 0, 1, 2, 3, 3b, 3c, 3d, 3e, 3f, 3g and 4
+  in jxlanes_6727 on an older tree -- carried: every input each one's trace read is unchanged. `jx_lanes.py check`: 18
+  carried, 0 owed. The long sections: 3d 489 min, 3b 340 min, 3e 144 min, 3i 112 min, 3h 85 min.
+- ROW 23 CLOSED. Open: row 26 (the user's call); one gate class of row 21 waits on the user's JX-3P banks.
+
 ## 2026-10-15 (23) — ROW 25 CLOSED: EVERY INPUT OF THE PANEL; THE PLUGIN'S OWN OPTION MENU; THE VERIFY IN LANES (playbooks 264-268)
 
 - Row 25 (SCOPE_AUDIT): JX-3P.exe's keys, resize corner, leave, window points, patch window buttons and option menu

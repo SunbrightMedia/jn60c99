@@ -285,9 +285,9 @@ mine is a hypothesis (playbook 80).
   (tools/verify/c99_gate.py, both ports); every JX file's role and proof in
   jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Row 23 (NaN parity, the JUNO's
   A41 classes: 53 + 37 equalities, 3 helpers, 12 sign folds, the page's
-  conversions) fixed 2026-10-11, S3_STATUS (16); its full verify (jxverify_c0c8)
-  went RED on an illegal voice-count edit the oracle cannot follow (playbook 231,
-  fixed; S3_STATUS (18)): full verify-jx3p owed on the newest commit. Row 24
+  conversions) CLOSED 2026-10-15: every section of make verify-jx3p GREEN on
+  0f0d6948, in lanes (S3_STATUS (24); 5c's full run had found the key holder and the
+  patch window's own timer, fixed: playbook 271). Row 24
   (two different NaNs meeting) ACCEPTED by the user 2026-10-12 until the lifter
   is fast (then a lifted render closes it by construction).
 - **JUPITER-8**: jp8/docs/S3_STATUS.md rules (read its RESUME HERE block).
