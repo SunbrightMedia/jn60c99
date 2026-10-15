@@ -429,6 +429,15 @@ class Lifter:
             if m == "pshufd":
                 return "t1=%s; XU(%d,0)=t1.u[%d]; XU(%d,1)=t1.u[%d]; XU(%d,2)=t1.u[%d]; XU(%d,3)=t1.u[%d];" % (s, d, imm & 3, d, (imm >> 2) & 3, d, (imm >> 4) & 3, d, (imm >> 6) & 3)
             return "t0=c->x[%d]; t1=%s; XQ(%d,0)=t0.q[%d]; XQ(%d,1)=t1.q[%d];" % (d, s, d, imm & 1, d, (imm >> 1) & 1)
+        if m in ("pshuflw", "pshufhw"):                 # shuffle the low (lw) or high (hw) four 16-bit words; the other qword copied
+            d = reg(ins, op[0].reg)[0]; s = xsrc(ins, op[1], "X"); imm = op[2].imm & 0xFF
+            if m == "pshuflw":
+                lo = ["c->x[%d].w[%d]=t1.w[%d];" % (d, i, (imm >> (2 * i)) & 3) for i in range(4)]
+                hi = ["c->x[%d].w[%d]=t1.w[%d];" % (d, 4 + i, 4 + i) for i in range(4)]
+            else:
+                lo = ["c->x[%d].w[%d]=t1.w[%d];" % (d, i, i) for i in range(4)]
+                hi = ["c->x[%d].w[%d]=t1.w[%d];" % (d, 4 + i, 4 + ((imm >> (2 * i)) & 3)) for i in range(4)]
+            return "t1=%s; %s" % (s, " ".join(lo + hi))
         if m == "movmskps":
             s = reg(ins, op[1].reg)[0]; return wr_int(ins, op[0], "((XU(%d,0)>>31)|((XU(%d,1)>>31)<<1)|((XU(%d,2)>>31)<<2)|((XU(%d,3)>>31)<<3))" % (s, s, s, s), 32)
         if m == "movmskpd":

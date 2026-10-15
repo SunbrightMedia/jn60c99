@@ -19,7 +19,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 LIFT = os.path.join(REPO, 'lift', 'jn_lift.c')
 EXE = os.path.join(REPO, 'scratchpad', 'lift', 'juno_executed.json')
-TRAP = re.compile(r'jp8_trap\(c,\s*(0x[0-9a-f]+)')
+# A WHOLE-INSTRUCTION trap (the form is unsupported) is emitted as the only statement of the instruction:
+#   /*<rva> <mnemonic>*/ jp8_trap(c, 0x<rva>, "...");
+# A GUARD trap (div by zero, a bounds check) sits INSIDE a supported instruction's body, after other code
+# (e.g. idiv: "{ ... if(!d) jp8_trap(c,0x..,\"div0\"); ... }"). Only the first blocks L2 completeness.
+TRAP = re.compile(r'\*/\s*jp8_trap\(c,\s*(0x[0-9a-f]+)')
 
 
 def trap_rvas(text):

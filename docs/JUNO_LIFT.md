@@ -41,3 +41,9 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   1,883 functions, 157,724 instructions. 634 traps, 501 of them int3 (padding after no-return calls), the rest AVX /
   FMA in CRT branches the oracle (SSE) does not take. tools/lift/check_reached.py is the L2 gate: no trap on a
   reached rva (pending the executed-set re-run).
+- 2026-10-15 L2 reach-complete: the one reached unsupported form (pshuflw xmm1,xmm0,0 at 0x6af7bb) added to the
+  shared lifter (jp8/tools/jp8_lift.py pshuflw/pshufhw, pshufd's style); re-lift -> tools/lift/check_reached.py
+  PASS: 0 reached traps of 570 (the rest int3 padding + AVX/FMA/SSE4 in CRT branches the SSE oracle never takes).
+  check_reached counts only WHOLE-instruction traps, not div0 guards. EVERY executed product instruction is now
+  C99. Not yet compiled or run -- that is L4 (template + build) and L5 (the gate EXACTLY 0).
+
