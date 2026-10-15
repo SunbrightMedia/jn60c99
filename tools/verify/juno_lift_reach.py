@@ -62,8 +62,8 @@ def main():
         sys.stderr.flush()
 
     h = H.HostProcess()
-    h.start(48000.0, 512, log=lambda s: None)
-    uc = h.uc
+    h.boot_host(log=lambda s: None)       # the template cut is post-boot_host; setup() runs UNDER the hook below, so
+    uc = h.uc                             # setupProcessing / setActive are censused and lifted (junoh_init calls them)
     q = lambda a: struct.unpack('<Q', uc.mem_read(a, 8))[0]
     STUB_LO = H.E.STUB_BASE
     STUB_HI = STUB_LO + 0x10000
@@ -115,6 +115,8 @@ def main():
             prev_ind[0] = rva
 
     uc.hook_add(UC_HOOK_BLOCK, block)
+    h.setup(48000.0, 512)                 # setupProcessing + setActive(1) + the blocks' host objects: the lifted
+    #                                       junoh_init re-runs exactly this, so its code must be in the census
 
     # the composite drive: every product surface
     bank = open(truth.BANK, 'rb').read()
