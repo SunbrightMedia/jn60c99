@@ -11,7 +11,8 @@ THE RUN. One BASE snapshot of the working tree (tools/snap_tree.sh: HEAD + every
 for each section a LANE of its own: a fresh worktree of the base's content (its content tree id must equal the
 base's), a scratchpad of its own (a plain snapshot shares the main one, where the program, its references and the
 tooth builds go: two runs at once must not share them, playbook 263) with the user's input folders linked in, its
-work folder (JX_VERIFY_WORK) and TMPDIR inside that scratchpad. A lane runs one section,
+work folder (JX_VERIFY_WORK) and TMPDIR inside that scratchpad; node_modules in it and the emsdk beside it, where
+the main tree finds them. A lane runs one section,
 JX_VERIFY_ONLY=<section> sh jx3p/tools/jx_verify.sh, under strace -f (seccomp: the file and process calls, and bind), and is
 removed after it; up to N lanes run at once.
 
@@ -596,6 +597,12 @@ def make_lane(base, d):
                 os.symlink(os.path.join(p, 'node_modules'), os.path.join(d, 'node_modules'))
             break
         p = os.path.dirname(p)
+    sdk = os.path.join(os.path.dirname(REPO), 'emsdk')    # the SDK beside the checkout (wasm_fptoint_check.py's last
+    if os.path.isdir(sdk):                                # place): beside the lane too -- a lane in another root REFUSED
+        try:                                              # section 5 for want of it (playbook 273)
+            os.symlink(sdk, os.path.join(os.path.dirname(d), 'emsdk'))
+        except FileExistsError:
+            pass
     return d
 
 

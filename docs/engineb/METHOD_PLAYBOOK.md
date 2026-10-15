@@ -4644,3 +4644,14 @@ fails and Chromium dies with SIGTRAP before its first page -- keep JX_LANES_ROOT
 ### The rule
 Trace every call that can make a path (open with O_CREAT, mkdir, rename, link, symlink, mknod -- and bind, for a Unix
 socket); a tracer's "anomaly" is first a question about the tracer. Keep the lane's own location out of its stamp.
+
+## 273. A LANE IS THE CHECKOUT IN ANOTHER PLACE -- WHAT THE TREE FINDS BESIDE ITSELF MUST BE BESIDE THE LANE
+Paid 2026-10-15 (jxlanes_r23a): section 5 RED in 10 minutes, "REFUSE: no emcc". wasm_fptoint_check.py looks for emcc
+on the PATH, in $EMSDK, then in ../emsdk beside the checkout (docs/REPRODUCE.md's install). The first lane run's lanes
+sat in /home/user, beside /home/user/emsdk; this run's sat in /home/user/lanes6 (JX_LANES_ROOT moved so two lane jobs
+could run at once), beside nothing. The stamps were right (the probe of ../emsdk is an input: a GREEN from one root
+is not carried to the other), but the section failed. Fixed: make_lane links the main tree's sibling emsdk beside the
+lane, as it links node_modules (playbook 178). EXECUTED: the next lane run (jxlanes_r23b) made the link.
+### The rule
+List what the tree finds OUTSIDE itself (../emsdk, node_modules up the folders, the user's input folders) and give
+every lane the same surroundings, wherever its root is.
