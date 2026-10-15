@@ -210,6 +210,10 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(out, open(OUT + '.partial', 'w'))
     os.replace(OUT + '.partial', OUT)
+    # the executed instruction rvas themselves (L2's check: no lifted trap may sit on a reached rva; L6 reuse)
+    EXE = os.path.join(os.path.dirname(OUT), 'juno_executed.json')
+    json.dump(sorted(executed), open(EXE + '.partial', 'w'))
+    os.replace(EXE + '.partial', EXE)
     print('L1 reach: %d functions reached, %d distinct instructions executed, %d instructions in those functions '
           '(%d forms); %d stubs; wrote %s (%.0fs)'
           % (len(funcs), len(executed), out['func_total'], len(forms), len(stubs), OUT, time.time() - t0))

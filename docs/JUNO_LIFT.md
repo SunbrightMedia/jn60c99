@@ -33,3 +33,11 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
 ## Log
 
 - 2026-10-15: plan written; JX-3P work stopped (the user); the hand-port verify jobs stopped. Progress 0%.
+- 2026-10-15 L1 DONE: tools/verify/juno_lift_reach.py booted the JUNO host oracle and a composite product drive
+  (64 patches, MIDI, host automation, setState/getState, UI timer, MIDI learn, the editor's model set / commit, the
+  editor attached + window zoom, voice-count / engine-rate settings). REACHED 873 functions, 76,457 instructions in
+  them, 64,354 distinct instructions executed, 177 instruction forms (scratchpad/lift/juno_reach.json; the executed
+  rva set juno_executed.json). L2: tools/lift/gen_juno_lift.sh ran the image-generic lifter -> lift/jn_lift.c:
+  1,883 functions, 157,724 instructions. 634 traps, 501 of them int3 (padding after no-return calls), the rest AVX /
+  FMA in CRT branches the oracle (SSE) does not take. tools/lift/check_reached.py is the L2 gate: no trap on a
+  reached rva (pending the executed-set re-run).

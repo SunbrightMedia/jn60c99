@@ -96,3 +96,4 @@ tests/test_multi_instance
 # the JX-3P guest images ride as .gz only (jx3p/tools/jx_guest.py inflates them; an export leaves the raw .bin)
 jx3p/gen/*_96k.bin
 jx3p/gen/jx_guest_44k.bin
+lift/jn_lift.c
