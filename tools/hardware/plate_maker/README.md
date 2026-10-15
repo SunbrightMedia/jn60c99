@@ -62,3 +62,14 @@ no metal; the page warns below `minWeb` (1.0 mm). The user's call (2026-10-15): 
 `mergeSlots` (default on) joins same-kind cutouts on one board closer than `minWeb` into their bounding box.
 Oracle teeth for this step, seen to fail: merge off on a merged drawing; fader travel 58 instead of 60. Seen to fail: 13.0 -> 0.00, 12.0 -> 0.50, 11.0 -> clean.
 The cutout oracle was seen to fail on a stale drawing (boards turned without a recompute).
+
+## Panel view and caps (2026-10-15)
+"Panel" (view switch above the drawing) shows only the front panel: grey plate, black cutouts, the
+boards' edges as faint thin white lines, and the caps. Caps are PLACEHOLDERS (sizes in the page,
+`plate_geom.js` `CAPS` / `capShapes`), translucent, and move with the mouse per placed board:
+fader caps slide over the travel, knobs turn over 280 degrees (Alps RK09K) and stop at their ends,
+keycaps and PB86-A1 caps press, switch levers click through 3 positions. Positions are saved in the
+layout (`boards[].caps`). Browser checks: caps at rest sit on their (oracle-checked) cutouts to
+0.01 mm, a fader cap's two ends are exactly the travel apart, a knob turned past its stop stays at
+it, press / release, switch cycle, caps saved. The page warns when caps overlap over their whole
+movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 mm pitch) overlap.

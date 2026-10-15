@@ -72,6 +72,61 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   await page.locator('#vBoards').click(); await page.waitForTimeout(200);
   await page.locator('#panel').screenshot({ path: path.join(out, 'cutouts_only.png') });
   await page.locator('#vBoards').click();
+  // ---- caps, in the Panel view, on a fresh example layout ----
+  await page.evaluate(() => { localStorage.clear(); }); await page.reload(); await page.waitForTimeout(800);
+  await page.click('#mPanel'); await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(out, 'panel_view.png'), fullPage: false });
+  const panelPt = (sel, n) => page.evaluate(([sel, n]) => {     // centre of the n-th element, in panel mm
+    const svg = document.getElementById('panel'), inv = svg.getScreenCTM().inverse();
+    const e = svg.querySelectorAll(sel)[n]; if (!e) return null;
+    const b = e.getBBox(), m = inv.multiply(e.getScreenCTM());
+    const x = b.x + b.width / 2, y = b.y + b.height / 2;
+    return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f];
+  }, [sel, n]);
+  const scr = (sel, n) => page.evaluate(([sel, n]) => { const r = document.querySelectorAll(sel)[n].getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, [sel, n]);
+  // centres at rest = cutout centres (cutouts are oracle-checked)
+  let restOk = true;
+  for (const kind of ['fader', 'knob', 'key']) {
+    const n = await page.evaluate(k => document.querySelectorAll('#panel .cap-' + k).length, kind);
+    for (let i = 0; i < n; i++) {
+      const c = await panelPt('#panel .cap-' + kind + ' .body', i);
+      const holes = await page.evaluate(() => { const svg = document.getElementById('panel'), inv = svg.getScreenCTM().inverse(); return [...svg.querySelectorAll('.cutout')].map(e => { const b = e.getBBox(), m = inv.multiply(e.getScreenCTM()), x = b.x + b.width / 2, y = b.y + b.height / 2; return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; }); });
+      if (!holes.some(h => Math.hypot(h[0] - c[0], h[1] - c[1]) < 0.01)) { restOk = false; console.log('cap off its cutout', kind, i, c); }
+    }
+  }
+  console.log('caps at rest on their cutouts', restOk ? 'OK' : 'FAIL');
+  // fader: drag past both ends -> exactly the travel apart
+  const f0 = await scr('#panel .cap-fader', 0);
+  await page.mouse.move(f0[0], f0[1]); await page.mouse.down(); await page.mouse.move(f0[0], f0[1] - 400, { steps: 6 }); await page.mouse.up();
+  const pA = await panelPt('#panel .cap-fader .body', 0);
+  const f1 = await scr('#panel .cap-fader', 0);
+  await page.mouse.move(f1[0], f1[1]); await page.mouse.down(); await page.mouse.move(f1[0], f1[1] + 800, { steps: 10 }); await page.mouse.up();
+  const pB = await panelPt('#panel .cap-fader .body', 0);
+  const travel = Math.hypot(pA[0] - pB[0], pA[1] - pB[1]);
+  console.log('fader end to end', travel.toFixed(4), Math.abs(travel - 60) < 0.01 ? 'OK' : 'FAIL');
+  // knob: drag round past the stop -> clamped to 0 or 1
+  const k0 = await scr('#panel .cap-knob', 0);
+  await page.mouse.move(k0[0], k0[1]); await page.mouse.down();
+  for (const [dx, dy] of [[0, -30], [30, 0], [0, 30], [-5, 30]]) await page.mouse.move(k0[0] + dx, k0[1] + dy, { steps: 4 });
+  await page.mouse.up();
+  const kv = await page.evaluate(() => { const i = __plate.S.insts.find(i => __plate.BOARDS[i.b].parts.some(p => p[0] === 'pot')); return i.caps; });
+  const kval = Object.values(kv)[0];
+  console.log('knob turned clockwise past its stop ->', kval, kval === 1 ? 'OK' : 'FAIL');
+  // key: pressed while held
+  const kk = await scr('#panel .cap-key', 0);
+  await page.mouse.move(kk[0], kk[1]); await page.mouse.down();
+  const held = await page.evaluate(() => document.querySelectorAll('#panel .cap-key.pressed').length);
+  await page.mouse.up();
+  const released = await page.evaluate(() => document.querySelectorAll('#panel .cap-key.pressed').length);
+  console.log('key press', held === 1 && released === 0 ? 'OK' : 'FAIL');
+  // switch: click cycles 0 -> 1 -> -1
+  const sw = await scr('#panel .cap-lever', 0);
+  const vals = [];
+  for (let i = 0; i < 2; i++) { const p = await scr('#panel .cap-lever', 0); await page.mouse.click(p[0], p[1]); vals.push(await page.evaluate(() => { const i = __plate.S.insts.find(i => __plate.BOARDS[i.b].parts.some(p => p[0] === 'switch')); return Object.values(i.caps)[0]; })); }
+  console.log('switch positions', vals.join(','), vals.join(',') === '1,-1' ? 'OK' : 'FAIL');
+  await page.screenshot({ path: path.join(out, 'panel_view_moved.png'), fullPage: false });
+  const capsSaved = await page.evaluate(() => JSON.parse(localStorage.getItem('module-plate-maker-v1')).boards.filter(b => b.caps).length);
+  console.log('caps saved in layout', capsSaved > 0 ? 'OK' : 'FAIL');
   const d = await open({ viewport: { width: 1400, height: 1100 }, colorScheme: 'dark' });
   await d.page.screenshot({ path: path.join(out, 'desktop_dark.png'), fullPage: true });
   const ph = await open({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2 });

@@ -10,6 +10,7 @@
   --plate: #D3DADE; --plate-edge: #9AA6AD; --ear: #B9C3C9; --gridline: rgba(23,32,38,.10);
   --accent: #B45F06; --accent-soft: rgba(180,95,6,.14); --bad: #C0322A; --ok: #2D7A4B;
   --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF; --hole: #1B2328; --hole-edge: #0B1013;
+  --alu: #979EA3; --edge-faint: rgba(255,255,255,.45);
   --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -84,6 +85,27 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel .board .hitbox { fill: none; stroke: none; }
 .srcs { margin: 0; padding-left: 18px; font-size: .82rem; color: var(--muted); }
 .srcs b { color: var(--ink); font-weight: 600; }
+#panel.panelview .plate { fill: var(--alu); stroke: none; }
+#panel.panelview .ear, #panel.panelview .gl, #panel.panelview #cuts, #panel.panelview .dim { display: none; }
+#panel.panelview .board .pcb, #panel.panelview .board image, #panel.panelview .board .hole { display: none; }
+#panel.panelview .board .hitbox { fill: none; stroke: var(--edge-faint); stroke-width: .2; stroke-dasharray: none; }
+#panel.panelview .board.sel .hitbox { stroke: var(--sel); stroke-width: .45; }
+#panel.panelview .board.bad .hitbox { stroke: var(--bad); stroke-width: .45; }
+#panel.panelview .cutout, #panel.panelview .cutout.assumed { fill: #000; stroke: none; }
+#panel .cap { cursor: pointer; }
+#panel .cap .body { stroke-width: .3; }
+#panel .cap-fader .body { fill: rgba(236,239,241,.55); stroke: rgba(255,255,255,.9); }
+#panel .cap-fader .mark { stroke: rgba(20,24,27,.75); stroke-width: .6; }
+#panel .cap-knob .body { fill: rgba(28,32,35,.6); stroke: rgba(255,255,255,.75); }
+#panel .cap-knob .mark { stroke: rgba(255,255,255,.95); stroke-width: .7; stroke-linecap: round; }
+#panel .cap-key .body { fill: rgba(240,240,234,.5); stroke: rgba(255,255,255,.85); }
+#panel .cap-key .top { fill: rgba(255,255,255,.28); stroke: rgba(255,255,255,.55); stroke-width: .2; }
+#panel .cap-button .body { fill: rgba(214,96,52,.5); stroke: rgba(255,226,210,.9); }
+#panel .cap-lever .body { fill: rgba(250,250,250,.85); stroke: rgba(0,0,0,.5); }
+#panel .cap.pressed .body { fill-opacity: .9; filter: brightness(.7); }
+#panel .cap.grab { cursor: grabbing; }
+.viewbar .seg button { padding: 3px 10px; }
+.viewbar.panelmode .wbonly { display: none; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
 #panel .dim { font: 5px var(--mono); fill: var(--muted); }
@@ -154,13 +176,15 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
   </aside>
 
   <main>
-    <div class="viewbar">
-      <label><input type="checkbox" id="vBoards" checked> Boards</label>
-      <label><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
-      <label><input type="checkbox" id="vFront" checked> Front silk</label>
-      <label><input type="checkbox" id="vBack"> Back silk</label>
-      <label><input type="checkbox" id="vCuts" checked> Print pieces</label>
-      <label><input type="checkbox" id="vGrid" checked> Grid</label>
+    <div class="viewbar" id="viewbar">
+      <div class="seg" role="group" aria-label="View"><button type="button" id="mWork" aria-pressed="true">Workbench</button><button type="button" id="mPanel" aria-pressed="false">Panel</button></div>
+      <label><input type="checkbox" id="vCaps" checked> Caps</label>
+      <label class="wbonly"><input type="checkbox" id="vBoards" checked> Boards</label>
+      <label class="wbonly"><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
+      <label class="wbonly"><input type="checkbox" id="vFront" checked> Front silk</label>
+      <label class="wbonly"><input type="checkbox" id="vBack"> Back silk</label>
+      <label class="wbonly"><input type="checkbox" id="vCuts" checked> Print pieces</label>
+      <label class="wbonly"><input type="checkbox" id="vGrid" checked> Grid</label>
       <span class="example" id="exampleTag" hidden>Example layout. Change it as you like.</span>
     </div>
     <div class="stage"><svg id="panel" xmlns="http://www.w3.org/2000/svg"></svg></div>
@@ -218,7 +242,9 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     // front-panel cutouts (see CUTOUTS for the source of each number)
     cutKeyW: 14.0, cutKeyH: 14.0, cutPotD: 7.0, cutSwW: 5.0, cutSwL: 15.0,
     cutBtnW: 13.0, cutBtnL: 17.6, faderTravel: 60.0, faderLeverL: 4.0, faderLeverW: 1.2, faderClear: 0.4,
-    minWeb: 1.0, mergeSlots: 1
+    minWeb: 1.0, mergeSlots: 1,
+    // cap placeholders
+    capFaderL: 12.0, capFaderW: 20.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -344,6 +370,67 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
       }
     });
     return out;
+  }
+
+  /* ---------- caps (placeholders; positions from the parts, sizes from params) ----------
+     KiCad's footprint angle turns counter-clockwise on screen (y down): the part's own x axis is
+     u = (cos a, -sin a), its y axis v = (sin a, cos a). Values per part index k in inst.caps:
+     fader 0..1 along the travel, knob 0..1 over 280 degrees (Alps RK09K), switch -1 / 0 / 1. */
+  const CAPS = {
+    fader: { label: 'Fader cap', source: 'placeholder 12 x 20 for a 4 x 1.2 lever; moves over the travel' },
+    pot: { label: 'Knob', source: 'placeholder dia 15 on the 6 mm shaft; 280 degrees (Alps RK09K)' },
+    keyswitch: { label: 'Keycap', source: 'MX 1u keycap, 18 x 18 at the base' },
+    button: { label: 'PB86-A1 cap', source: 'the part\'s own cap, 12.4 x 17.0 (FVWIN)' },
+    switch: { label: 'Switch lever', source: 'lever dia 4 (footprint F.Fab), positions 5 mm apart' }
+  };
+  function capShapes(b, caps, p) {
+    caps = caps || {};
+    return (b.parts || []).map(([kind, x, y, ang], k) => {
+      const a = ang * Math.PI / 180, u = [Math.cos(a), -Math.sin(a)], v = [Math.sin(a), Math.cos(a)];
+      const val = caps[k];
+      if (kind === 'fader') {
+        const t = val === undefined ? 0.5 : Math.min(1, Math.max(0, val)), d = (t - 0.5) * p.faderTravel;
+        return { k, kind, type: 'rect', cx: x + d * u[0], cy: y + d * u[1], w: p.capFaderL, h: p.capFaderW, ang, value: t,
+          sweep: { cx: x, cy: y, w: p.faderTravel + p.capFaderL, h: p.capFaderW, ang } };
+      }
+      if (kind === 'pot') {
+        const t = val === undefined ? 0.5 : Math.min(1, Math.max(0, val));
+        return { k, kind, type: 'knob', cx: x, cy: y, w: p.capKnobD, h: p.capKnobD, ang, value: t, turn: (t - 0.5) * 280 };
+      }
+      if (kind === 'keyswitch') return { k, kind, type: 'key', cx: x, cy: y, w: p.capKey, h: p.capKey, ang, value: 0 };
+      if (kind === 'button') return { k, kind, type: 'rect', cx: x, cy: y, w: p.capBtnW, h: p.capBtnL, ang, value: 0 };
+      if (kind === 'switch') {
+        const t = val === undefined ? 0 : Math.max(-1, Math.min(1, Math.round(val)));
+        return { k, kind, type: 'lever', cx: x + 5 * t * v[0], cy: y + 5 * t * v[1], w: p.capLeverD, h: p.capLeverD, ang, value: t };
+      }
+      return null;
+    }).filter(Boolean);
+  }
+  // Plate-frame boxes of every cap over its whole movement (faders: the full sweep), for overlap checks.
+  function capBoxes(boards, insts, g, p) {
+    const out = [];
+    insts.forEach((inst, i) => {
+      const m = place(boards[inst.b], inst, g).matrix;
+      for (const c of capShapes(boards[inst.b], inst.caps, p)) {
+        if (c.kind === 'switch') continue;
+        const s = c.sweep || c, a = s.ang * Math.PI / 180, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+        const ex = s.w * ca + s.h * sa, ey = s.w * sa + s.h * ca;
+        const px = m[0] * s.cx + m[2] * s.cy + m[4], py = m[1] * s.cx + m[3] * s.cy + m[5];
+        const tx = Math.abs(m[0]) * ex + Math.abs(m[2]) * ey, ty = Math.abs(m[1]) * ex + Math.abs(m[3]) * ey;
+        out.push({ inst: i, k: c.k, kind: c.kind, round: c.type === 'knob', box: [px - tx / 2, py - ty / 2, px + tx / 2, py + ty / 2] });
+      }
+    });
+    return out;
+  }
+  function capOverlaps(boxes) {
+    const bad = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j], A = a.box, B = b.box;
+      let hit = A[0] < B[2] && B[0] < A[2] && A[1] < B[3] && B[1] < A[3];
+      if (hit && a.round && b.round) hit = Math.hypot((A[0] + A[2] - B[0] - B[2]) / 2, (A[1] + A[3] - B[1] - B[3]) / 2) < (A[2] - A[0] + B[2] - B[0]) / 2;
+      if (hit) bad.push([i, j]);
+    }
+    return bad;
   }
 
   // Pairs of cutouts with less metal between them than minWeb (mm).
@@ -604,7 +691,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     return out;
   }
 
-  const api = { CUTOUTS, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
+  const api = { CUTOUTS, CAPS, capShapes, capBoxes, capOverlaps, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
     validate, planCuts, buildPieces, pieceMesh, stl, coupons, zip, crc32, area, label };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PlateGeom = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -630,7 +717,9 @@ const PARAM_UI = [
     ['cutSwW', 'Slide switch slot width', 'mm'], ['cutSwL', 'Slide switch slot length', 'mm'], ['cutBtnW', 'PB86-A1 cutout width', 'mm'],
     ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['faderTravel', 'Fader travel', 'mm'], ['faderLeverL', 'Fader lever length (along travel)', 'mm'],
     ['faderLeverW', 'Fader lever thickness', 'mm'], ['faderClear', 'Fader slot clearance per side', 'mm'],
-    ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]]
+    ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]],
+  ['Caps (placeholders)', [['capFaderL', 'Fader cap length (along travel)', 'mm'], ['capFaderW', 'Fader cap width', 'mm'], ['capKnobD', 'Knob diameter', 'mm'],
+    ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -662,7 +751,7 @@ function exampleState() {
 
 function serial() {
   return { app: 'module-plate-maker', version: 1, depth: S.depth, params: S.params,
-    boards: S.insts.map(i => ({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot })) };
+    boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
 }
 function loadSerial(o) {
   if (!o || o.app !== 'module-plate-maker') throw new Error('This file is not a Module Plate Maker layout.');
@@ -671,7 +760,8 @@ function loadSerial(o) {
   for (const x of o.boards || []) {
     const bi = boardIndex(x.name);
     if (bi < 0) { missing.push(x.name); continue; }
-    insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3 });
+    const caps = {}; for (const k in (x.caps || {})) if (isFinite(+x.caps[k])) caps[k] = +x.caps[k];
+    insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3, caps });
   }
   S = { depth: G.DEPTHS.some(d => d.key === o.depth) ? o.depth : 'MAX', insts,
     params: Object.assign({}, G.DEFAULTS, o.params || {}), sel: null, example: false };
@@ -713,6 +803,21 @@ function cutoutMarkup(b, P, attrsOf) {
   }).join('');
 }
 
+// Caps of one placed board, in the board frame (shapes from G.capShapes).
+const pressedCaps = new Set();
+function capsMarkup(b, inst) {
+  return G.capShapes(b, inst.caps, S.params).map(c => {
+    const pr = pressedCaps.has(inst.id + ':' + c.k) ? ' pressed' : '';
+    const T = (rot) => `transform="translate(${c.cx.toFixed(3)} ${c.cy.toFixed(3)}) rotate(${rot.toFixed(2)})"`;
+    const w = c.w, h = c.h;
+    if (c.type === 'knob') return `<g class="cap cap-knob${pr}" data-k="${c.k}" ${T(-c.ang + c.turn)}><circle class="body" r="${w / 2}"/><line class="mark" x1="0" y1="${-w / 2 + 1.2}" x2="0" y2="${-w / 5}"/></g>`;
+    if (c.type === 'lever') return `<g class="cap cap-lever${pr}" data-k="${c.k}" ${T(0)}><circle class="body" r="${w / 2}"/></g>`;
+    if (c.type === 'key') { const t = Math.max(1, w - 5.4); return `<g class="cap cap-key${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.2"/><rect class="top" x="${-t / 2}" y="${-t / 2 - 0.8}" width="${t}" height="${t}" rx="1.5"/></g>`; }
+    if (c.kind === 'fader') return `<g class="cap cap-fader${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5"/><line class="mark" x1="0" y1="${-h / 2 + 1}" x2="0" y2="${h / 2 - 1}"/></g>`;
+    return `<g class="cap cap-button${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1"/></g>`;
+  }).join('');
+}
+
 function el(tag, attrs, parent) {
   const e = document.createElementNS(SVGNS, tag);
   for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -724,7 +829,8 @@ const boardEls = new Map();
 function drawPanel() {
   const svg = $('panel'), { g, v, plan, pieces } = derived;
   svg.setAttribute('viewBox', `-4 -4 ${g.W + 8} ${g.D + 12}`);
-  svg.classList.toggle('noboards', !$('vBoards').checked);
+  svg.classList.toggle('noboards', !$('vBoards').checked && viewMode !== 'panel');
+  svg.classList.toggle('panelview', viewMode === 'panel');
   let base = svg.querySelector('#base'), cuts = svg.querySelector('#cuts'), bl = svg.querySelector('#boards');
   if (!base) {
     const defs = el('defs', {}, svg);
@@ -759,12 +865,14 @@ function drawPanel() {
       b.holes.forEach(h => el('circle', { class: 'hole', cx: h[0], cy: h[1], r: h[2] / 2 }, e));
       el('path', { class: 'hitbox', d: 'M' + b.poly.map(p => p.join(' ')).join('L') + 'Z' }, e);
       el('g', { class: 'cutouts' }, e);
+      el('g', { class: 'caps' }, e).addEventListener('pointerdown', startCap);
       e.addEventListener('pointerdown', startDrag);
       e.addEventListener('focus', () => select(inst.id, false));
       boardEls.set(inst.id, e);
     }
     e.setAttribute('transform', 'matrix(' + q.matrix.join(' ') + ')');
-    e.querySelector('.cutouts').innerHTML = $('vCutouts').checked ? cutoutMarkup(b, S.params) : '';
+    e.querySelector('.cutouts').innerHTML = ($('vCutouts').checked || viewMode === 'panel') ? cutoutMarkup(b, S.params) : '';
+    e.querySelector('.caps').innerHTML = $('vCaps').checked ? capsMarkup(b, inst) : '';
     e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
     e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
     e.classList.toggle('sel', S.sel === inst.id);
@@ -854,6 +962,13 @@ function drawSide() {
     webs.forEach(w => { const a = cb[w.i], b = cb[w.j]; const key = BOARDS[S.insts[a.inst].b].name + (a.inst === b.inst ? '' : ' / ' + BOARDS[S.insts[b.inst].b].name) + ' (' + G.CUTOUTS[a.kind].label + (a.kind === b.kind ? '' : ', ' + G.CUTOUTS[b.kind].label) + ')';
       groups.set(key, Math.min(groups.has(key) ? groups.get(key) : 99, w.web)); });
     list([...groups].map(([k, w]) => k + ': only ' + w.toFixed(2) + ' mm of metal between cutouts (need ' + S.params.minWeb + '). Use one long slot there, or a bigger pitch.'), 'warn');
+  }
+  const capB = G.capBoxes(BOARDS, S.insts, g, S.params), capO = G.capOverlaps(capB);
+  if (capO.length) {
+    const groups = new Map();
+    capO.forEach(([i, j]) => { const a = capB[i], b = capB[j]; const key = BOARDS[S.insts[a.inst].b].name + (a.inst === b.inst ? '' : ' / ' + BOARDS[S.insts[b.inst].b].name) + ': ' + G.CAPS[a.kind].label + (a.kind === b.kind ? 's' : ' and ' + G.CAPS[b.kind].label);
+      groups.set(key, (groups.get(key) || 0) + 1); });
+    list([...groups].map(([k, n]) => k + ' overlap (' + n + (n > 1 ? ' pairs' : ' pair') + '). Use smaller caps or move the boards apart.'), 'warn');
   }
   const kinds = new Set(S.insts.flatMap(i => (BOARDS[i.b].parts || []).map(p => p[0])));
   const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status !== 'READ');
@@ -948,6 +1063,59 @@ document.addEventListener('keydown', evt => {
   else if (evt.key === 'Delete' || evt.key === 'Backspace') { removeSel(); evt.preventDefault(); }
   else if (evt.key === 'Escape') { S.sel = null; changed(true); }
 });
+/* ---------- caps: move them with the mouse ---------- */
+let capDrag = null;
+function boardLocal(evt, bEl) {
+  const svg = $('panel'), pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(bEl.getScreenCTM().inverse());
+}
+function redrawCaps(inst) {
+  const e = boardEls.get(inst.id); if (e) e.querySelector('.caps').innerHTML = capsMarkup(BOARDS[inst.b], inst);
+}
+function startCap(evt) {
+  const capEl = evt.target.closest('.cap'); if (!capEl) return;
+  evt.stopPropagation(); evt.preventDefault();
+  const bEl = capEl.closest('.board'), inst = S.insts.find(i => i.id === +bEl.dataset.id); if (!inst) return;
+  const k = +capEl.dataset.k, part = BOARDS[inst.b].parts[k], kind = part[0];
+  inst.caps = inst.caps || {};
+  if (kind === 'switch') { const v = inst.caps[k] === undefined ? 0 : inst.caps[k]; inst.caps[k] = v >= 1 ? -1 : v + 1; redrawCaps(inst); persist(); return; }
+  if (kind === 'keyswitch' || kind === 'button') { pressedCaps.add(inst.id + ':' + k); redrawCaps(inst); }
+  capDrag = { inst, k, part, bEl, pid: evt.pointerId };
+  moveCap(evt);
+}
+function moveCap(evt) {
+  if (!capDrag || evt.pointerId !== capDrag.pid) return;
+  const { inst, k, part, bEl } = capDrag, [kind, x, y, ang] = part, p = boardLocal(evt, bEl), a = ang * Math.PI / 180;
+  if (kind === 'fader') {
+    const u = [Math.cos(a), -Math.sin(a)];
+    inst.caps[k] = Math.min(1, Math.max(0, ((p.x - x) * u[0] + (p.y - y) * u[1]) / S.params.faderTravel + 0.5));
+  } else if (kind === 'pot') {
+    let turn = Math.atan2(p.x - x, -(p.y - y)) * 180 / Math.PI + ang;
+    turn = ((turn + 540) % 360) - 180;
+    const nv = Math.min(1, Math.max(0, turn / 280 + 0.5)), pv = inst.caps[k] === undefined ? 0.5 : inst.caps[k];
+    if (Math.abs(nv - pv) < 0.5) inst.caps[k] = nv;   // no jump across the dead zone: the knob stays at its stop
+  } else return;
+  redrawCaps(inst);
+}
+window.addEventListener('pointermove', moveCap);
+window.addEventListener('pointerup', evt => {
+  if (!capDrag || evt.pointerId !== capDrag.pid) return;
+  const { inst, k } = capDrag; capDrag = null;
+  if (pressedCaps.delete(inst.id + ':' + k)) redrawCaps(inst);
+  persist();
+});
+
+let viewMode = 'work';
+try { if (localStorage.getItem(KEY + '-view') === 'panel') viewMode = 'panel'; } catch (e) { /* ignore */ }
+function setView(m) {
+  viewMode = m; try { localStorage.setItem(KEY + '-view', m); } catch (e) { /* ignore */ }
+  $('mWork').setAttribute('aria-pressed', m === 'work'); $('mPanel').setAttribute('aria-pressed', m === 'panel');
+  $('viewbar').classList.toggle('panelmode', m === 'panel');
+  drawPanel();
+}
+$('mWork').addEventListener('click', () => setView('work'));
+$('mPanel').addEventListener('click', () => setView('panel'));
+
 $('panel').addEventListener('pointerdown', evt => { if (!evt.target.closest('.board') && S.sel !== null) { S.sel = null; changed(true); } });
 
 /* ---------- files ---------- */
@@ -1027,7 +1195,7 @@ $('bClear').addEventListener('click', () => {
   S.insts = []; S.sel = null; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
 });
 $('bRot').addEventListener('click', rotateSel); $('bDel').addEventListener('click', removeSel); $('bDup').addEventListener('click', dupSel);
-['vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
+['vCaps', 'vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
 
 let toastT = null;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
@@ -1087,6 +1255,7 @@ if (!restore()) exampleState();
 nextId = Math.max(nextId, ...S.insts.map(i => i.id + 1));
 drawPalette(); drawParams();
 changed(true);
+setView(viewMode);
 window.__plate = { get S() { return S; }, get derived() { return derived; }, G, BOARDS, refresh: () => changed(true) };
 })();
 </script>

@@ -30,7 +30,9 @@
     // front-panel cutouts (see CUTOUTS for the source of each number)
     cutKeyW: 14.0, cutKeyH: 14.0, cutPotD: 7.0, cutSwW: 5.0, cutSwL: 15.0,
     cutBtnW: 13.0, cutBtnL: 17.6, faderTravel: 60.0, faderLeverL: 4.0, faderLeverW: 1.2, faderClear: 0.4,
-    minWeb: 1.0, mergeSlots: 1
+    minWeb: 1.0, mergeSlots: 1,
+    // cap placeholders
+    capFaderL: 12.0, capFaderW: 20.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -156,6 +158,67 @@
       }
     });
     return out;
+  }
+
+  /* ---------- caps (placeholders; positions from the parts, sizes from params) ----------
+     KiCad's footprint angle turns counter-clockwise on screen (y down): the part's own x axis is
+     u = (cos a, -sin a), its y axis v = (sin a, cos a). Values per part index k in inst.caps:
+     fader 0..1 along the travel, knob 0..1 over 280 degrees (Alps RK09K), switch -1 / 0 / 1. */
+  const CAPS = {
+    fader: { label: 'Fader cap', source: 'placeholder 12 x 20 for a 4 x 1.2 lever; moves over the travel' },
+    pot: { label: 'Knob', source: 'placeholder dia 15 on the 6 mm shaft; 280 degrees (Alps RK09K)' },
+    keyswitch: { label: 'Keycap', source: 'MX 1u keycap, 18 x 18 at the base' },
+    button: { label: 'PB86-A1 cap', source: 'the part\'s own cap, 12.4 x 17.0 (FVWIN)' },
+    switch: { label: 'Switch lever', source: 'lever dia 4 (footprint F.Fab), positions 5 mm apart' }
+  };
+  function capShapes(b, caps, p) {
+    caps = caps || {};
+    return (b.parts || []).map(([kind, x, y, ang], k) => {
+      const a = ang * Math.PI / 180, u = [Math.cos(a), -Math.sin(a)], v = [Math.sin(a), Math.cos(a)];
+      const val = caps[k];
+      if (kind === 'fader') {
+        const t = val === undefined ? 0.5 : Math.min(1, Math.max(0, val)), d = (t - 0.5) * p.faderTravel;
+        return { k, kind, type: 'rect', cx: x + d * u[0], cy: y + d * u[1], w: p.capFaderL, h: p.capFaderW, ang, value: t,
+          sweep: { cx: x, cy: y, w: p.faderTravel + p.capFaderL, h: p.capFaderW, ang } };
+      }
+      if (kind === 'pot') {
+        const t = val === undefined ? 0.5 : Math.min(1, Math.max(0, val));
+        return { k, kind, type: 'knob', cx: x, cy: y, w: p.capKnobD, h: p.capKnobD, ang, value: t, turn: (t - 0.5) * 280 };
+      }
+      if (kind === 'keyswitch') return { k, kind, type: 'key', cx: x, cy: y, w: p.capKey, h: p.capKey, ang, value: 0 };
+      if (kind === 'button') return { k, kind, type: 'rect', cx: x, cy: y, w: p.capBtnW, h: p.capBtnL, ang, value: 0 };
+      if (kind === 'switch') {
+        const t = val === undefined ? 0 : Math.max(-1, Math.min(1, Math.round(val)));
+        return { k, kind, type: 'lever', cx: x + 5 * t * v[0], cy: y + 5 * t * v[1], w: p.capLeverD, h: p.capLeverD, ang, value: t };
+      }
+      return null;
+    }).filter(Boolean);
+  }
+  // Plate-frame boxes of every cap over its whole movement (faders: the full sweep), for overlap checks.
+  function capBoxes(boards, insts, g, p) {
+    const out = [];
+    insts.forEach((inst, i) => {
+      const m = place(boards[inst.b], inst, g).matrix;
+      for (const c of capShapes(boards[inst.b], inst.caps, p)) {
+        if (c.kind === 'switch') continue;
+        const s = c.sweep || c, a = s.ang * Math.PI / 180, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+        const ex = s.w * ca + s.h * sa, ey = s.w * sa + s.h * ca;
+        const px = m[0] * s.cx + m[2] * s.cy + m[4], py = m[1] * s.cx + m[3] * s.cy + m[5];
+        const tx = Math.abs(m[0]) * ex + Math.abs(m[2]) * ey, ty = Math.abs(m[1]) * ex + Math.abs(m[3]) * ey;
+        out.push({ inst: i, k: c.k, kind: c.kind, round: c.type === 'knob', box: [px - tx / 2, py - ty / 2, px + tx / 2, py + ty / 2] });
+      }
+    });
+    return out;
+  }
+  function capOverlaps(boxes) {
+    const bad = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j], A = a.box, B = b.box;
+      let hit = A[0] < B[2] && B[0] < A[2] && A[1] < B[3] && B[1] < A[3];
+      if (hit && a.round && b.round) hit = Math.hypot((A[0] + A[2] - B[0] - B[2]) / 2, (A[1] + A[3] - B[1] - B[3]) / 2) < (A[2] - A[0] + B[2] - B[0]) / 2;
+      if (hit) bad.push([i, j]);
+    }
+    return bad;
   }
 
   // Pairs of cutouts with less metal between them than minWeb (mm).
@@ -416,7 +479,7 @@
     return out;
   }
 
-  const api = { CUTOUTS, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
+  const api = { CUTOUTS, CAPS, capShapes, capBoxes, capOverlaps, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
     validate, planCuts, buildPieces, pieceMesh, stl, coupons, zip, crc32, area, label };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PlateGeom = api;
 })(typeof window !== 'undefined' ? window : globalThis);
