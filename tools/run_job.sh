@@ -73,6 +73,13 @@ if [ "${1:-}" = "--list" ]; then
 fi
 
 NAME=$1; shift
+# `( $* )` below loses quotes, so `sh -c '<a> && <b>'` runs a bare `<a>`'s first word: refuse it (playbook
+# 118; paid again 2026-10-15: a build step ran as a bare python3, and the gate after it graded an old program)
+case "$(basename "${1:-}") ${2:-}" in
+  sh\ -c|bash\ -c|dash\ -c|sh\ -[!-]*c*|bash\ -[!-]*c*|dash\ -[!-]*c*)
+    echo "refusing: '$1 $2' loses its quotes here (playbook 118); put the command in a script file and run that"
+    exit 2 ;;
+esac
 D="$JOBS/$NAME"
 if [ -d "$D" ] && [ ! -f "$D/EXIT" ]; then
   pid=$(cat "$D/pid" 2>/dev/null)

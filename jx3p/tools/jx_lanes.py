@@ -12,7 +12,7 @@ for each section a LANE of its own: a fresh worktree of the base's content (its 
 base's), a scratchpad of its own (a plain snapshot shares the main one, where the program, its references and the
 tooth builds go: two runs at once must not share them, playbook 263) with the user's input folders linked in, its
 work folder (JX_VERIFY_WORK) and TMPDIR inside that scratchpad. A lane runs one section,
-JX_VERIFY_ONLY=<section> sh jx3p/tools/jx_verify.sh, under strace -f (seccomp: the file and process calls), and is
+JX_VERIFY_ONLY=<section> sh jx3p/tools/jx_verify.sh, under strace -f (seccomp: the file and process calls, and bind), and is
 removed after it; up to N lanes run at once.
 
 THE INPUTS of a section: every path whose FIRST access was a read -- a file opened to read or a program started
@@ -191,6 +191,10 @@ def read_trace(path, cwd0=None):
         if not sm:
             continue
         p = unescape(sm[0].group(1))
+        if name == 'bind':                     # a Unix socket's file is made by its bind (Chromium's SingletonSocket);
+            if ok and 'sa_family=AF_UNIX' in args and 'sun_path=@' not in args:   # an abstract or internet one: none
+                at(pid, p, 'write')
+            continue
         if name in ('chdir',):
             if ok:
                 if p.startswith('/'):
@@ -397,6 +401,11 @@ def make_stamp(sec, trace, lane, base, verdict, minutes, log, sysrec, base_view)
         f2.setdefault(rp(p), kind)
     first, writes = f2, {rp(w) for w in writes}
     roots = [lane, base, REPO]
+    above = set()                                      # the folders the lane sits in: there by construction, and
+    d = os.path.dirname(lane)                          # JX_LANES_ROOT moves between runs (a stamp named lanes4 was
+    while d not in above:                              # never carried in a lanes6 run)
+        above.add(d)
+        d = os.path.dirname(d)
     inputs, absent_keys, write_keys, anomalies, main_reads, changed_tree = {}, set(), set(), [], [], []
     for w in writes:
         k = key_of(w, roots)
@@ -410,6 +419,8 @@ def make_stamp(sec, trace, lane, base, verdict, minutes, log, sysrec, base_view)
             continue
         if p in writes and kind == 'absent':
             continue                                   # asked about, then made: its own product
+        if p in above and kind == 'present':
+            continue
         if derived(k):
             rel = k[2:]
             if kind == 'absent':
@@ -622,7 +633,7 @@ def run_section(sec, base, logdir, lock, sysrec, base_view):
                TMPDIR=os.path.join(lane, 'scratchpad', 'tmp'))
     with open(log, 'w') as lf:
         rc = subprocess.run(['strace', '-f', '--seccomp-bpf', '-qq', '-y', '-s', '4096',
-                             '-e', 'trace=%file,%process,fchdir', '-o', trace, 'sh', '-c', cmd],
+                             '-e', 'trace=%file,%process,fchdir,bind', '-o', trace, 'sh', '-c', cmd],
                             cwd=lane, env=env, stdout=lf, stderr=subprocess.STDOUT).returncode
     minutes = (time.time() - t0) / 60
     text = open(log, errors='replace').read()
@@ -735,7 +746,8 @@ def self_test():
     """the trace reader on a planted trace, each case a line: a started program, an open to read, a relative stat
     under a known folder, an absent probe, a listed folder, a write then a read of the same file (made, not an input),
     a read then a write (an input), a rename, a chdir, a child's relative open through its parent's folder printed
-    before the parent's clone line, an fchdir, a symlink (only the link made), a failed program start (absent)"""
+    before the parent's clone line, an fchdir, a symlink (only the link made), a failed program start (absent), a Unix
+    socket's bind then a stat of it (made; an abstract or an internet bind: no path)"""
     t = tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False)
     t.write('\n'.join([
         '10  execve("/usr/bin/python3", ["python3"], 0x0 /* 1 vars */) = 0',
@@ -758,6 +770,10 @@ def self_test():
         '10  symlink("/elsewhere/target", "lnk") = 0',
         '10  execve("/usr/local/bin/cat", ["cat"], 0x0 /* 1 vars */) = -1 ENOENT (No such file or directory)',
         '10  mkdir("/home/user", 0777) = -1 EEXIST (File exists)',
+        '10  bind(16<socket:[7]>, {sa_family=AF_UNIX, sun_path="/r/s/Sock"}, 110) = 0',
+        '10  newfstatat(15</r/s>, "Sock", {st_mode=S_IFSOCK|0755, st_size=0, ...}, AT_SYMLINK_NOFOLLOW) = 0',
+        '10  bind(17<socket:[8]>, {sa_family=AF_UNIX, sun_path=@"abstract"}, 12) = 0',
+        '10  bind(18<socket:[9]>, {sa_family=AF_INET, sin_port=htons(1), sin_addr=inet_addr("0.0.0.0")}, 16) = 0',
     ]) + '\n')
     t.close()
     first, wr, unres = read_trace(t.name, cwd0='/r')
@@ -765,10 +781,14 @@ def self_test():
     want = {'/usr/bin/python3': 'file', '/r/a.c': 'file', '/r/sub/b.h': 'present', '/r/nope.h': 'absent',
             '/r/dir': 'dir', '/r/out.pkl': 'write', '/r/cfg.txt': 'file', '/r/sub/c.txt': 'file',
             '/r/sub/rel.txt': 'absent', '/r/dir/in_dir.txt': 'present', '/r/dir/lnk': 'write',
-            '/usr/local/bin/cat': 'absent', '/home/user': 'present'}
+            '/usr/local/bin/cat': 'absent', '/home/user': 'present', '/r/s/Sock': 'write'}
     bad = {k: first.get(k) for k, v in want.items() if first.get(k) != v}
-    need_w = {'/r/out.pkl', '/r/cfg.txt', '/r/x.partial', '/r/x.pkl', '/r/dir/lnk'}
+    need_w = {'/r/out.pkl', '/r/cfg.txt', '/r/x.partial', '/r/x.pkl', '/r/dir/lnk', '/r/s/Sock'}
     ok = not bad and need_w <= wr and '/elsewhere/target' not in first and not unres and '/home/user' not in wr
+    stray = [k for k in first if k.endswith(('abstract', '0.0.0.0'))]
+    ok = ok and not stray
+    if stray:
+        print('jx_lanes --self-test: a bind with no path seen as one: %s' % stray)
     print('jx_lanes --self-test: %s%s%s%s' % ('ok' if ok else 'FAILED', (' wrong: %s' % bad) if bad else '',
           (' writes missing: %s' % sorted(need_w - wr)) if not need_w <= wr else '', (' unresolved: %s' % unres) if unres else ''))
     return 0 if ok else 1

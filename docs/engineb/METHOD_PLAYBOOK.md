@@ -2392,6 +2392,10 @@ before it wrote a log, another ran plain `make` (the wrong target) and failed la
 rule caught both in minutes.
 ### The rule
 A compound job command goes in a script file (scratchpad/job_*.sh), never in `sh -c '...'`.
+Paid again 2026-10-15 (JX r25_focusq): `sh -c 'build > /dev/null && gate'` ran a bare `python3` (it
+read an empty stdin and exited 0), so the gate graded the OLD JX-3P.exe and its new reach item read
+"not reached". A rule a person must remember is not a rule: run_job.sh now REFUSES `sh|bash|dash -c`
+(seen to refuse both forms, and to run a plain command).
 
 ## 119. A GREEN GATE YOU DID NOT RUN IS NOT GREEN -- RUN THE CHEAP ONES ON EVERY COMMIT
 Paid 2026-10-05 (JUNO). Three commits in one day each ran the gates of their own change and turned
@@ -4625,3 +4629,18 @@ program, the oracle and the gate (a "focus" line, a section, teeth 32-35).
 Run the full gate before closing a row: a quick run is the teeth's script, not the reach. When a GUI has two windows,
 census every SetTimer site and fire every live window's timer in the oracle; compare the state the next input reads
 (here the key holder) directly, not only through its later effects.
+
+## 272. A TRACER THAT MISSES A CALL WHICH MAKES A FILE CALLS THAT FILE AN INPUT -- AND A STAMP MUST NOT NAME ITS LANE'S FOLDER
+Paid 2026-10-15 (jx_lanes, the first full lane run). Section 5 ran GREEN but could never be carried: three "read ...
+it did not make" anomalies, each a headless Chromium's SingletonSocket. The tracer followed the file and process
+calls; Chromium makes that file with bind() on a Unix socket (a network call), so the first access the trace saw was
+a later stat. EXECUTED: strace of the page check's own launch shows the bind, then the stat. And section 5b's stamp
+named /home/user/lanes4 -- the folder its lane sat in (a process asked whether it was there): a run from any other
+folder owed 5b for that alone. Fixed in jx_lanes.py: the trace takes bind (a Unix socket's path is MADE; an abstract
+or an internet bind names no file), and the presence of a folder the lane sits in is not an input. The self-test
+plants the binds; each tooth (the bind case removed; an abstract name taken as a path) fails it.
+Seen on the way: a Unix socket's path holds 107 bytes. Under a long TMPDIR (the session's scratchpad) Chromium's bind
+fails and Chromium dies with SIGTRAP before its first page -- keep JX_LANES_ROOT short.
+### The rule
+Trace every call that can make a path (open with O_CREAT, mkdir, rename, link, symlink, mknod -- and bind, for a Unix
+socket); a tracer's "anomaly" is first a question about the tracer. Keep the lane's own location out of its stamp.
