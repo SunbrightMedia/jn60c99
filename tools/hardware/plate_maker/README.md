@@ -55,8 +55,10 @@ sources live in `plate_geom.js` `CUTOUTS` and are editable in the page.
 | pot (Alps RK09K1130A70) | dia 7.0 on the legs' line | READ | Alps RK09K catalogue, drawing 7 (LCSC C351173): knurled shaft dia 6 |
 | slide switch (Daier TS-22E01 / TS-23E01) | 5 x 15 stadium | READ | footprint F.Fab lever slot (EasyEDA ground truth) |
 | PB86-A1 | 13.0 x 17.6 | READ | FVWIN: cap 12.4 x 17.0 (= footprint silk 12.35 x 17.0) + 0.3 per side |
-| fader 75 mm / 60 mm travel | 62 x 2.5 stadium | ASSUMED | no drawing: MEASURE the lever (width, end positions) |
+| fader 75 mm B103 dual (Taiss and others) | (60 + 4.0 + 2 x 0.4) x (1.2 + 2 x 0.4) = 64.8 x 2.0 stadium | INFERRED | sellers of this exact part: stroke 60, "4x15 mm shaft"; lever 4.0 x 1.2 as on the Bourns PTA drawing (the PTA pinout does NOT match this footprint, so it is not a PTA clone); centred on the body -- check the lever stops 30 mm each side of the body centre |
 
 Found on the way: the PB86-A1 packs put caps 12.4 wide at a 12.5 mm pitch, so separate holes leave
-no metal; the page warns below `minWeb` (1.0 mm). Seen to fail: 13.0 -> 0.00, 12.0 -> 0.50, 11.0 -> clean.
+no metal; the page warns below `minWeb` (1.0 mm). The user's call (2026-10-15): one long slot there --
+`mergeSlots` (default on) joins same-kind cutouts on one board closer than `minWeb` into their bounding box.
+Oracle teeth for this step, seen to fail: merge off on a merged drawing; fader travel 58 instead of 60. Seen to fail: 13.0 -> 0.00, 12.0 -> 0.50, 11.0 -> clean.
 The cutout oracle was seen to fail on a stale drawing (boards turned without a recompute).

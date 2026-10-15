@@ -29,7 +29,8 @@
     segs: 48,           // facets per circle
     // front-panel cutouts (see CUTOUTS for the source of each number)
     cutKeyW: 14.0, cutKeyH: 14.0, cutPotD: 7.0, cutSwW: 5.0, cutSwL: 15.0,
-    cutBtnW: 13.0, cutBtnL: 17.6, cutFaderL: 62.0, cutFaderW: 2.5, minWeb: 1.0
+    cutBtnW: 13.0, cutBtnL: 17.6, faderTravel: 60.0, faderLeverL: 4.0, faderLeverW: 1.2, faderClear: 0.4,
+    minWeb: 1.0, mergeSlots: 1
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -44,8 +45,9 @@
       source: 'Footprint F.Fab lever slot 5 x 15 (EasyEDA ground truth TS-23E01AT15), lever dia 4' },
     button: { label: 'PB86-A1 cap', status: 'READ', shape: p => ({ type: 'rect', w: p.cutBtnW, h: p.cutBtnL }),
       source: 'FVWIN PB86-A1 cap 12.4 x 17.0 (footprint silk 12.35 x 17.0) + 0.3 per side' },
-    fader: { label: 'Fader slot', status: 'ASSUMED', shape: p => ({ type: 'stadium', w: p.cutFaderL, h: p.cutFaderW }),
-      source: 'No drawing: 60 mm travel (part name) + lever, centred on the body. Measure the lever width and its end positions.' }
+    fader: { label: 'Fader slot', status: 'INFERRED',
+      shape: p => ({ type: 'stadium', w: p.faderTravel + p.faderLeverL + 2 * p.faderClear, h: p.faderLeverW + 2 * p.faderClear }),
+      source: 'Travel 60 (sellers of this exact 75 mm B103 dual: "stroke 60 mm", "4x15 mm shaft"); lever 4.0 x 1.2 (the same lever on the Bourns PTA drawing); slot = travel + lever + clearance each side. Centred on the body: no drawing gives the lever position, so check that the lever stops 30 mm each side of the body centre.' }
   };
 
   /* ---------- placement ---------- */
@@ -116,19 +118,41 @@
     return { placed: P, issues };
   }
 
-  // Every panel cutout as an axis-aligned box in the plate frame (parts turn in 90 degree steps).
+  // A board's cutouts in its own frame, axis-aligned (parts turn in 90 degree steps).
+  // With p.mergeSlots, cutouts of one kind that would leave less than p.minWeb of metal between
+  // them become ONE slot (their bounding box): e.g. the PB86-A1 packs at a 12.5 mm pitch.
+  function boardCutouts(b, p) {
+    const sh = [];
+    for (const [kind, x, y, ang] of (b.parts || [])) {
+      const C = CUTOUTS[kind]; if (!C) continue;
+      const s = C.shape(p), w = s.type === 'circle' ? s.d : s.w, h = s.type === 'circle' ? s.d : s.h;
+      const turned = Math.round(((ang % 180) + 180) % 180) === 90;
+      const ex = turned ? h : w, ey = turned ? w : h;
+      sh.push({ kind, type: s.type, status: C.status, n: 1, box: [x - ex / 2, y - ey / 2, x + ex / 2, y + ey / 2] });
+    }
+    if (!p.mergeSlots) return sh;
+    const par = sh.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i]));
+    for (let i = 0; i < sh.length; i++) for (let j = i + 1; j < sh.length; j++)
+      if (sh[i].kind === sh[j].kind && gap(sh[i].box, sh[j].box) < p.minWeb) par[f(i)] = f(j);
+    const groups = new Map();
+    sh.forEach((c, i) => { const r = f(i); groups.set(r, (groups.get(r) || []).concat([c])); });
+    return [...groups.values()].map(gr => gr.length === 1 ? gr[0] : {
+      kind: gr[0].kind, type: 'rect', status: gr[0].status, n: gr.length,
+      box: [Math.min(...gr.map(c => c.box[0])), Math.min(...gr.map(c => c.box[1])), Math.max(...gr.map(c => c.box[2])), Math.max(...gr.map(c => c.box[3]))] });
+  }
+  function gap(a, b) {      // metal between two boxes (0 when they touch or overlap)
+    const dx = Math.max(a[0] - b[2], b[0] - a[2], 0), dy = Math.max(a[1] - b[3], b[1] - a[3], 0);
+    return (dx > 0 && dy > 0) ? Math.hypot(dx, dy) : Math.max(dx, dy);
+  }
+
+  // Every panel cutout as an axis-aligned box in the plate frame.
   function cutoutBoxes(boards, insts, g, p) {
     const out = [];
     insts.forEach((inst, k) => {
-      const b = boards[inst.b], q = place(b, inst, g), m = q.matrix;
-      for (const [kind, x, y, ang] of (b.parts || [])) {
-        const C = CUTOUTS[kind]; if (!C) continue;
-        const sh = C.shape(p), w = sh.type === 'circle' ? sh.d : sh.w, h = sh.type === 'circle' ? sh.d : sh.h;
-        const turned = Math.round(((ang % 180) + 180) % 180) === 90;
-        let ex = turned ? h : w, ey = turned ? w : h;
-        if (inst.rot & 1) { const t = ex; ex = ey; ey = t; }
-        const cx = m[0] * x + m[2] * y + m[4], cy = m[1] * x + m[3] * y + m[5];
-        out.push({ inst: k, kind, circle: sh.type === 'circle', box: [cx - ex / 2, cy - ey / 2, cx + ex / 2, cy + ey / 2] });
+      const m = place(boards[inst.b], inst, g).matrix;
+      for (const c of boardCutouts(boards[inst.b], p)) {
+        const q = [[c.box[0], c.box[1]], [c.box[2], c.box[3]]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+        out.push(Object.assign({}, c, { inst: k, box: [Math.min(q[0][0], q[1][0]), Math.min(q[0][1], q[1][1]), Math.max(q[0][0], q[1][0]), Math.max(q[0][1], q[1][1])] }));
       }
     });
     return out;
@@ -138,9 +162,7 @@
   function cutoutWebs(boxes, minWeb) {
     const bad = [];
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i].box, b = boxes[j].box;
-      const dx = Math.max(a[0] - b[2], b[0] - a[2], 0), dy = Math.max(a[1] - b[3], b[1] - a[3], 0);
-      const web = (dx > 0 && dy > 0) ? Math.hypot(dx, dy) : Math.max(dx, dy);
+      const a = boxes[i].box, b = boxes[j].box, web = gap(a, b);
       const overlap = a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
       if (overlap || web < minWeb) bad.push({ i, j, web: overlap ? 0 : web });
     }
@@ -394,7 +416,7 @@
     return out;
   }
 
-  const api = { CUTOUTS, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
+  const api = { CUTOUTS, boardCutouts, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
     validate, planCuts, buildPieces, pieceMesh, stl, coupons, zip, crc32, area, label };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PlateGeom = api;
 })(typeof window !== 'undefined' ? window : globalThis);

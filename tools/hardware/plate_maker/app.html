@@ -206,8 +206,9 @@ const PARAM_UI = [
   ['Printer', [['maxPiece', 'Max piece size', 'mm']]],
   ['Panel cutouts', [['cutKeyW', 'Keyswitch width', 'mm'], ['cutKeyH', 'Keyswitch height', 'mm'], ['cutPotD', 'Pot shaft hole diameter', 'mm'],
     ['cutSwW', 'Slide switch slot width', 'mm'], ['cutSwL', 'Slide switch slot length', 'mm'], ['cutBtnW', 'PB86-A1 cutout width', 'mm'],
-    ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['cutFaderL', 'Fader slot length (assumed)', 'mm'], ['cutFaderW', 'Fader slot width (assumed)', 'mm'],
-    ['minWeb', 'Least metal between cutouts', 'mm']]]
+    ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['faderTravel', 'Fader travel', 'mm'], ['faderLeverL', 'Fader lever length (along travel)', 'mm'],
+    ['faderLeverW', 'Fader lever thickness', 'mm'], ['faderClear', 'Fader slot clearance per side', 'mm'],
+    ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -279,16 +280,15 @@ function derive() {
 }
 
 /* ---------- drawing ---------- */
-// One part's cutout as SVG markup in the board frame (KiCad footprint angle is counter-clockwise on screen).
-function cutoutMarkup(part, P, attrs) {
-  const [kind, x, y, ang] = part, C = G.CUTOUTS[kind]; if (!C) return '';
-  const sh = C.shape(P), cls = 'cutout' + (C.status === 'ASSUMED' ? ' assumed' : '');
-  const t = `transform="translate(${x} ${y}) rotate(${-ang})"`;
-  const a = attrs || `class="${cls}"`;
-  if (sh.type === 'circle') return `<circle ${a} ${t} cx="0" cy="0" r="${sh.d / 2}"/>`;
-  if (sh.type === 'rect') return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}"/>`;
-  const r = Math.min(sh.w, sh.h) / 2;   // stadium: long axis = the larger of w (x) and h (y)
-  return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}" rx="${r}" ry="${r}"/>`;
+// A board's cutouts as SVG markup in the board frame (shapes from G.boardCutouts, merged slots included).
+function cutoutMarkup(b, P, attrsOf) {
+  return G.boardCutouts(b, P).map(c => {
+    const [x0, y0, x1, y1] = c.box, w = x1 - x0, h = y1 - y0;
+    const a = attrsOf ? attrsOf(c) : `class="cutout${c.status === 'READ' ? '' : ' assumed'}"`;
+    if (c.type === 'circle') return `<circle ${a} cx="${(x0 + x1) / 2}" cy="${(y0 + y1) / 2}" r="${w / 2}"/>`;
+    const r = c.type === 'stadium' ? Math.min(w, h) / 2 : 0;
+    return `<rect ${a} x="${x0}" y="${y0}" width="${w}" height="${h}"${r ? ` rx="${r}" ry="${r}"` : ''}/>`;
+  }).join('');
 }
 
 function el(tag, attrs, parent) {
@@ -342,7 +342,7 @@ function drawPanel() {
       boardEls.set(inst.id, e);
     }
     e.setAttribute('transform', 'matrix(' + q.matrix.join(' ') + ')');
-    e.querySelector('.cutouts').innerHTML = $('vCutouts').checked ? (b.parts || []).map(pt => cutoutMarkup(pt, S.params)).join('') : '';
+    e.querySelector('.cutouts').innerHTML = $('vCutouts').checked ? cutoutMarkup(b, S.params) : '';
     e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
     e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
     e.classList.toggle('sel', S.sel === inst.id);
@@ -396,7 +396,7 @@ function drawParams() {
   for (const [grp, items] of PARAM_UI) {
     const h = document.createElement('div'); h.className = 'grp'; h.textContent = grp; box.appendChild(h);
     for (const [k, lab] of items) {
-      const l = document.createElement('label'); l.htmlFor = 'p_' + k; l.textContent = lab + ' (mm)';
+      const l = document.createElement('label'); l.htmlFor = 'p_' + k; l.textContent = lab + (items.find(x => x[0] === k)[2] ? ' (mm)' : '');
       const i = document.createElement('input'); i.type = 'number'; i.id = 'p_' + k; i.step = k === 'clearance' ? '0.01' : '0.1';
       i.value = S.params[k];
       i.addEventListener('change', () => { const x = parseFloat(i.value); if (isFinite(x)) { S.params[k] = x; changed(); } else i.value = S.params[k]; });
@@ -434,8 +434,10 @@ function drawSide() {
     list([...groups].map(([k, w]) => k + ': only ' + w.toFixed(2) + ' mm of metal between cutouts (need ' + S.params.minWeb + '). Use one long slot there, or a bigger pitch.'), 'warn');
   }
   const kinds = new Set(S.insts.flatMap(i => (BOARDS[i.b].parts || []).map(p => p[0])));
-  const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status === 'ASSUMED');
-  if (assumed.length) list(assumed.map(k => G.CUTOUTS[k].label + ' size is assumed (dashed outline). ' + G.CUTOUTS[k].source), 'warn');
+  const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status !== 'READ');
+  if (assumed.length) list(assumed.map(k => G.CUTOUTS[k].label + ' (dashed outline) is not from a drawing of this part. ' + G.CUTOUTS[k].source), 'warn');
+  const merged = [...new Set(S.insts.flatMap(i => G.boardCutouts(BOARDS[i.b], S.params).filter(c => c.n > 1).map(c => BOARDS[i.b].name + ': ' + c.n + ' ' + G.CUTOUTS[c.kind].label + ' cutouts as one slot')))];
+  if (merged.length) { const d = document.createElement('div'); d.className = 'hint'; d.textContent = 'Merged: ' + merged.join('; ') + '.'; ck.appendChild(d); }
   if (!errs.length && !(plan.warn && plan.warn.length)) {
     const d = document.createElement('div'); d.className = 'okline';
     d.textContent = 'All boards are on the grid, out of the ear zones and apart. Every cut misses every pillar.';
@@ -584,7 +586,7 @@ $('bSvg').addEventListener('click', async () => {
   parts.push('</g>', '<g id="panel_cutouts" inkscape:groupmode="layer" inkscape:label="Panel cutouts" fill="none" stroke="#000" stroke-width="0.1">');
   S.insts.forEach((inst, k) => {
     const b = BOARDS[inst.b], q = v.placed[k];
-    if ((b.parts || []).length) parts.push(`<g transform="matrix(${v.placed[k].matrix.join(' ')})">` + b.parts.map(pt => cutoutMarkup(pt, S.params, `data-kind="${pt[0]}"`)).join('') + '</g>');
+    if ((b.parts || []).length) parts.push(`<g transform="matrix(${q.matrix.join(' ')})">` + cutoutMarkup(b, S.params, c => `data-kind="${c.kind}" data-parts="${c.n}"`) + '</g>');
   });
   parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
