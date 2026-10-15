@@ -68,7 +68,9 @@ The cutout oracle was seen to fail on a stale drawing (boards turned without a r
 boards' edges as faint thin white lines, and the caps. Caps are PLACEHOLDERS (sizes in the page,
 `plate_geom.js` `CAPS` / `capShapes`), translucent, and move with the mouse per placed board:
 fader caps slide over the travel, knobs turn over 280 degrees (Alps RK09K) and stop at their ends,
-keycaps and PB86-A1 caps press, switch levers click through 3 positions. Positions are saved in the
+keycaps and PB86-A1 caps press (the PB86-A1 cap is drawn from the Adafruit / Hongju PB-86 photos:
+LED shelf with the 3 mm LED at the footprint's -y end, step, flat face, side bevels, front chamfer; its LED
+lights while pressed), switch levers click through 3 positions. Positions are saved in the
 layout (`boards[].caps`). Browser checks: caps at rest sit on their (oracle-checked) cutouts to
 0.01 mm, a fader cap's two ends are exactly the travel apart, a knob turned past its stop stays at
 it, press / release, switch cycle, caps saved. The page warns when caps overlap over their whole

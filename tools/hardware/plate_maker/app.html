@@ -10,7 +10,7 @@
   --plate: #D3DADE; --plate-edge: #9AA6AD; --ear: #B9C3C9; --gridline: rgba(23,32,38,.10);
   --accent: #B45F06; --accent-soft: rgba(180,95,6,.14); --bad: #C0322A; --ok: #2D7A4B;
   --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF; --hole: #1B2328; --hole-edge: #0B1013;
-  --alu: #979EA3; --edge-faint: rgba(255,255,255,.45);
+  --alu: #5D6468; --edge-faint: rgba(255,255,255,.45);
   --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -101,6 +101,16 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel .cap-key .body { fill: rgba(240,240,234,.5); stroke: rgba(255,255,255,.85); }
 #panel .cap-key .top { fill: rgba(255,255,255,.28); stroke: rgba(255,255,255,.55); stroke-width: .2; }
 #panel .cap-button .body { fill: rgba(214,96,52,.5); stroke: rgba(255,226,210,.9); }
+#panel .cap-button .shelf { fill: rgba(0,0,0,.22); }
+#panel .cap-button .step { stroke: rgba(0,0,0,.45); stroke-width: .25; }
+#panel .cap-button .bev-l { fill: rgba(255,255,255,.30); }
+#panel .cap-button .bev-r { fill: rgba(0,0,0,.28); }
+#panel .cap-button .bev-f { fill: rgba(0,0,0,.18); }
+#panel .cap-button .face { fill: rgba(255,255,255,.06); stroke: rgba(255,255,255,.35); stroke-width: .12; }
+#panel .cap-button .led { fill: url(#ledOff); stroke: rgba(60,0,0,.6); stroke-width: .15; }
+#panel .cap-button.pressed .led { fill: url(#ledOn); }
+#panel .cap-button.pressed .glow { opacity: 1; }
+#panel .cap-button .glow { fill: url(#ledGlow); opacity: 0; pointer-events: none; }
 #panel .cap-lever .body { fill: rgba(250,250,250,.85); stroke: rgba(0,0,0,.5); }
 #panel .cap.pressed .body { fill-opacity: .9; filter: brightness(.7); }
 #panel .cap.grab { cursor: grabbing; }
@@ -329,7 +339,21 @@ function capsMarkup(b, inst) {
     if (c.type === 'lever') return `<g class="cap cap-lever${pr}" data-k="${c.k}" ${T(0)}><circle class="body" r="${w / 2}"/></g>`;
     if (c.type === 'key') { const t = Math.max(1, w - 5.4); return `<g class="cap cap-key${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.2"/><rect class="top" x="${-t / 2}" y="${-t / 2 - 0.8}" width="${t}" height="${t}" rx="1.5"/></g>`; }
     if (c.kind === 'fader') return `<g class="cap cap-fader${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5"/><line class="mark" x1="0" y1="${-h / 2 + 1}" x2="0" y2="${h / 2 - 1}"/></g>`;
-    return `<g class="cap cap-button${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1"/></g>`;
+    // PB86-A1 cap, top view (Adafruit / Hongju PB-86 photos; LED end = the footprint's -y, pins 5 and 6):
+    // a low shelf with the 3 mm LED, a step, then the main block: flat face, thin side bevels, front chamfer.
+    const sx = w / 12.4, sy = h / 17, X = v => (v * sx).toFixed(3), Y = v => (v * sy).toFixed(3);
+    const y0 = -8.5, yStep = -3.3, yCh = 5.2, y1 = 8.5, x1 = 6.2, xi = 5.4;
+    const poly = (cls, pts) => `<polygon class="${cls}" points="${pts.map(([a, b]) => X(a) + ',' + Y(b)).join(' ')}"/>`;
+    return `<g class="cap cap-button${pr}" data-k="${c.k}" ${T(-c.ang)}>` +
+      `<rect class="body" x="${X(-x1)}" y="${Y(y0)}" width="${X(2 * x1)}" height="${Y(y1 - y0)}" rx=".8"/>` +
+      `<rect class="shelf" x="${X(-x1)}" y="${Y(y0)}" width="${X(2 * x1)}" height="${Y(yStep - y0)}" rx=".8"/>` +
+      poly('bev-l', [[-x1, yStep], [-xi, yStep], [-xi, yCh], [-x1, y1]]) +
+      poly('bev-r', [[x1, yStep], [xi, yStep], [xi, yCh], [x1, y1]]) +
+      poly('bev-f', [[-x1, y1], [-xi, yCh], [xi, yCh], [x1, y1]]) +
+      poly('face', [[-xi, yStep], [xi, yStep], [xi, yCh], [-xi, yCh]]) +
+      `<line class="step" x1="${X(-x1)}" y1="${Y(yStep)}" x2="${X(x1)}" y2="${Y(yStep)}"/>` +
+      `<circle class="glow" cx="0" cy="${Y(-5.6)}" r="${(4.5 * Math.min(sx, sy)).toFixed(3)}"/>` +
+      `<circle class="led" cx="0" cy="${Y(-5.6)}" r="${(1.5 * Math.min(sx, sy)).toFixed(3)}"/></g>`;
   }).join('');
 }
 
@@ -352,6 +376,11 @@ function drawPanel() {
     const pat = el('pattern', { id: 'hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
     el('rect', { width: 4, height: 4, fill: 'var(--plate)' }, pat);
     el('line', { x1: 0, y1: 0, x2: 0, y2: 4, stroke: 'var(--ear)', 'stroke-width': 1.6 }, pat);
+    const grad = (id, stops) => { const gr = el('radialGradient', { id, cx: '40%', cy: '35%', r: '65%' }, defs);
+      stops.forEach(([o, c, a]) => el('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, gr)); };
+    grad('ledOff', [['0', '#ff8a7a', 1], ['.45', '#b3121b', 1], ['1', '#5a0508', 1]]);
+    grad('ledOn', [['0', '#fff2e0', 1], ['.35', '#ff3b2f', 1], ['1', '#a3060d', 1]]);
+    defs.insertAdjacentHTML('beforeend', '<radialGradient id="ledGlow"><stop offset="0" stop-color="#ff3020" stop-opacity=".7"/><stop offset="1" stop-color="#ff3020" stop-opacity="0"/></radialGradient>');
     base = el('g', { id: 'base' }, svg); bl = el('g', { id: 'boards' }, svg); cuts = el('g', { id: 'cuts' }, svg);
   }
   base.innerHTML = '';
