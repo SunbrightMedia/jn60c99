@@ -49,7 +49,7 @@ for case in man:
     p, D, W = case['params'], case['D'], case['W']
     zt = p['plateT'] + p['shoulderH'] + p['pinH']
     exp = expected_holes(case)
-    secs, tops = {}, []
+    secs, tops, holes_by_piece, hole_area = {}, [], {}, [0.0]
     for f in case['files']:
         m = trimesh.load(os.path.join(D_, f['file']), process=True)
         tag = '%s %s' % (case['depth'], f['id'])
@@ -65,7 +65,19 @@ for case in man:
         polys = sec.to_2D()[0].polygons_full if sec is not None else []
         T = sec.to_2D()[1] if sec is not None else None
         # back to world xy
+        holes_w = [[Polygon([tuple((T @ [x, y, 0, 1])[:2]) for x, y in r.coords]) for r in pg.interiors] for pg in polys]
         polys = [Polygon([tuple((T @ [x, y, 0, 1])[:2]) for x, y in pg.exterior.coords]) for pg in polys]
+        # lightening holes (the section's interiors): margins from the outline, the pillars, each other
+        hl = holes_w[0] if holes_w else []
+        if hl:
+            ext = polys[0].exterior
+            em, rib = p.get('edgeMargin', 0), p.get('ribWidth', 0)
+            worst_e = min(h.distance(ext) for h in hl)
+            if worst_e < em - 0.02: bad('%s: a hole is %.3f mm from the piece edge (margin %.2f)' % (tag, worst_e, em))
+            worst_r = min((hl[i].distance(hl[j]) for i in range(len(hl)) for j in range(i + 1, len(hl))), default=99)
+            if worst_r < rib - 0.02: bad('%s: two holes only %.3f mm apart (rib %.2f)' % (tag, worst_r, rib))
+            holes_by_piece[f['id']] = hl
+            hole_area[0] += sum(h.area for h in hl)
         if len(polys) != 1: bad(tag + ': plate section has %d parts' % len(polys))
         secs[f['id']] = polys[0] if polys else Polygon()
         v = m.vertices[np.isclose(m.vertices[:, 2], zt, atol=1e-4)]
@@ -85,6 +97,10 @@ for case in man:
     if len(tops) != len(exp): bad('%s: %d pillars for %d holes' % (case['depth'], len(tops), len(exp)))
     rf = p['shoulderD'] / 2 + p['footFlare']
     for t in tops:
+        for h in holes_by_piece.get(t[2], []):
+            dd = h.exterior.distance(Point(t[0], t[1]))
+            if h.contains(Point(t[0], t[1])) or dd < rf + p.get('pillarMargin', 0) - 0.02:
+                bad('%s %s: a hole is %.3f mm from the pillar at %.1f,%.1f (need %.2f)' % (case['depth'], t[2], dd, t[0], t[1], rf + p.get('pillarMargin', 0)))
         s = secs[t[2]]
         if s.exterior.distance(Point(t[0], t[1])) < rf + 0.5: bad('%s %s: pillar foot at %.1f,%.1f too near a cut' % (case['depth'], t[2], t[0], t[1]))
     # joints: no overlap, gap = clearance on every shared cut, nothing missing
@@ -106,6 +122,8 @@ for case in man:
     out_ = unary_union(list(secs.values())).difference(plate).area
     if out_ > 0.01: bad('%s: pieces reach outside the plate by %.4f mm^2' % (case['depth'], out_))
     print('  outside-plate area %.6f mm^2 (float32 rounding of the STL)' % out_)
+    vol = sum(trimesh.load(os.path.join(D_, f['file'])).volume for f in case['files'])
+    print('  holes: %.0f mm^2 of plate removed; total %.0f g PLA (1.24 g/cm^3)' % (hole_area[0], vol * 1.24e-3))
     print('%-4s %d pieces, %d joints, %d pillars checked, max %.1f mm' % (case['depth'], len(ids), adj, len(tops),
           max(max(f['size']) if f['size'] else 0 for f in case['files'])))
 

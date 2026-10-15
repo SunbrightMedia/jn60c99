@@ -4,6 +4,8 @@
 const fs = require('fs'), path = require('path');
 const G = require('../plate_geom.js');
 const out = process.argv[2], tooth = process.argv.includes('--tooth');
+// --tooth-holes: holes cut with smaller margins and ribs than the manifest claims; the checker must fail
+const toothHoles = process.argv.includes('--tooth-holes'), noHoles = process.argv.includes('--no-holes');
 const dir = path.join(__dirname, '../../../../docs/hardware/outlines');
 const boards = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'))).map(e => {
   const j = JSON.parse(fs.readFileSync(path.join(dir, e.name + '.json')));
@@ -29,7 +31,7 @@ for (const [dk, rots] of cases) {
   const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
   const plan = G.planCuts(g.W, g.D, pillars, p);
   if (plan.error) throw new Error(dk + ': ' + plan.error);
-  const pieces = G.buildPieces(plan, pillars, p);
+  const pieces = G.buildPieces(plan, pillars, toothHoles ? Object.assign({}, p, { edgeMargin: 2.5, pillarMargin: 1, ribWidth: 2 }) : noHoles ? Object.assign({}, p, { lighten: 0 }) : p);
   if (tooth) {   // sabotage: first piece built with zero clearance
     const p0 = Object.assign({}, p, { clearance: 0 });
     pieces[0] = G.buildPieces(plan, pillars, p0)[0];

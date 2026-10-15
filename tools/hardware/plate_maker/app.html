@@ -10,6 +10,7 @@
   --plate: #D3DADE; --plate-edge: #9AA6AD; --ear: #B9C3C9; --gridline: rgba(23,32,38,.10);
   --accent: #B45F06; --accent-soft: rgba(180,95,6,.14); --bad: #C0322A; --ok: #2D7A4B;
   --mask: #1E6646; --mask-edge: #0F3F2A; --silk: #F3F1E8; --sel: #1F5FBF; --hole: #1B2328; --hole-edge: #0B1013;
+  --alu: #5D6468; --edge-faint: rgba(255,255,255,.45);
   --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -84,6 +85,42 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel .board .hitbox { fill: none; stroke: none; }
 .srcs { margin: 0; padding-left: 18px; font-size: .82rem; color: var(--muted); }
 .srcs b { color: var(--ink); font-weight: 600; }
+#panel.panelview .plate { fill: var(--alu); stroke: none; }
+#panel.panelview .ear, #panel.panelview .gl, #panel.panelview #cuts, #panel.panelview .dim { display: none; }
+#panel.panelview .board .pcb, #panel.panelview .board image, #panel.panelview .board .hole { display: none; }
+#panel.panelview .board .hitbox { fill: none; stroke: var(--edge-faint); stroke-width: .2; stroke-dasharray: none; }
+#panel.panelview .board.sel .hitbox { stroke: var(--sel); stroke-width: .45; }
+#panel.panelview .board.bad .hitbox { stroke: var(--bad); stroke-width: .45; }
+#panel.panelview .cutout, #panel.panelview .cutout.assumed { fill: #000; stroke: none; }
+#panel .cap { cursor: pointer; }
+#panel .cap .body { stroke-width: .3; }
+#panel .cap-fader .body { fill: rgba(236,239,241,.55); stroke: rgba(255,255,255,.9); }
+#panel .cap-fader .mark { stroke: rgba(20,24,27,.75); stroke-width: .6; }
+#panel .cap-knob .body { fill: rgba(28,32,35,.6); stroke: rgba(255,255,255,.75); }
+#panel .cap-knob .mark { stroke: rgba(255,255,255,.95); stroke-width: .7; stroke-linecap: round; }
+#panel .cap-key .body { fill: rgba(240,240,234,.5); stroke: rgba(255,255,255,.85); }
+#panel .cap-key .top { fill: rgba(255,255,255,.28); stroke: rgba(255,255,255,.55); stroke-width: .2; }
+#panel .cap-button .body { fill: rgba(214,96,52,.5); stroke: rgba(255,226,210,.9); }
+#panel .cap-button .shelf { fill: rgba(0,0,0,.22); }
+#panel .cap-button .step { stroke: rgba(0,0,0,.45); stroke-width: .25; }
+#panel .cap-button .bev-l { fill: rgba(255,255,255,.30); }
+#panel .cap-button .bev-r { fill: rgba(0,0,0,.28); }
+#panel .cap-button .bev-f { fill: rgba(0,0,0,.18); }
+#panel .cap-button .face { fill: rgba(255,255,255,.06); stroke: rgba(255,255,255,.35); stroke-width: .12; }
+#panel .cap-button .led { fill: url(#ledOff); stroke: rgba(60,0,0,.6); stroke-width: .15; }
+#panel .cap-button.pressed .led { fill: url(#ledOn); }
+#panel .cap-button.pressed .glow { opacity: 1; }
+#panel .cap-button .glow { fill: url(#ledGlow); opacity: 0; pointer-events: none; }
+#panel .cap-lever .body { fill: rgba(250,250,250,.85); stroke: rgba(0,0,0,.5); }
+#panel .cap.pressed .body { fill-opacity: .9; filter: brightness(.7); }
+#panel .cap.grab { cursor: grabbing; }
+.viewbar .seg button { padding: 3px 10px; }
+.viewbar.panelmode .wbonly, .viewbar:not(.panelmode) .panelonly { display: none; }
+#panel.panelview.noedges .board .hitbox { stroke: none; }
+#panel .lbl { font: 700 5px Helvetica, "Helvetica Neue", Arial, sans-serif; letter-spacing: .12px; fill: #F2F2EE; pointer-events: none; }
+#panel .marquee { fill: var(--accent-soft); stroke: var(--sel); stroke-width: .4; stroke-dasharray: 2 1; pointer-events: none; }
+#panel #cuts, #panel #labels { pointer-events: none; }   /* overlays never take the mouse from the boards */
+#panel .lh { fill: var(--bg); fill-opacity: .55; stroke: var(--accent); stroke-width: .25; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
 #panel .dim { font: 5px var(--mono); fill: var(--muted); }
@@ -154,13 +191,17 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
   </aside>
 
   <main>
-    <div class="viewbar">
-      <label><input type="checkbox" id="vBoards" checked> Boards</label>
-      <label><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
-      <label><input type="checkbox" id="vFront" checked> Front silk</label>
-      <label><input type="checkbox" id="vBack"> Back silk</label>
-      <label><input type="checkbox" id="vCuts" checked> Print pieces</label>
-      <label><input type="checkbox" id="vGrid" checked> Grid</label>
+    <div class="viewbar" id="viewbar">
+      <div class="seg" role="group" aria-label="View"><button type="button" id="mWork" aria-pressed="true">Workbench</button><button type="button" id="mPanel" aria-pressed="false">Panel</button></div>
+      <label><input type="checkbox" id="vCaps" checked> Caps</label>
+      <label class="panelonly"><input type="checkbox" id="vEdges" checked> Board edges</label>
+      <label class="panelonly"><input type="checkbox" id="vLabels" checked> Labels</label>
+      <label class="wbonly"><input type="checkbox" id="vBoards" checked> Boards</label>
+      <label class="wbonly"><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
+      <label class="wbonly"><input type="checkbox" id="vFront" checked> Front silk</label>
+      <label class="wbonly"><input type="checkbox" id="vBack"> Back silk</label>
+      <label class="wbonly"><input type="checkbox" id="vCuts" checked> Print pieces</label>
+      <label class="wbonly"><input type="checkbox" id="vGrid" checked> Grid</label>
       <span class="example" id="exampleTag" hidden>Example layout. Change it as you like.</span>
     </div>
     <div class="stage"><svg id="panel" xmlns="http://www.w3.org/2000/svg"></svg></div>
@@ -184,6 +225,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.1/delaunator.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /*@GEOM@*/
@@ -196,6 +238,7 @@ const BOARDS = /*@BOARDS@*/null;
 const SVGNS = 'http://www.w3.org/2000/svg';
 const $ = id => document.getElementById(id);
 const KEY = 'module-plate-maker-v1';
+const PLA = 1.24e-3;   // g per mm^3
 
 const PARAM_UI = [
   ['Plate', [['plateT', 'Plate thickness', 'mm']]],
@@ -206,8 +249,14 @@ const PARAM_UI = [
   ['Printer', [['maxPiece', 'Max piece size', 'mm']]],
   ['Panel cutouts', [['cutKeyW', 'Keyswitch width', 'mm'], ['cutKeyH', 'Keyswitch height', 'mm'], ['cutPotD', 'Pot shaft hole diameter', 'mm'],
     ['cutSwW', 'Slide switch slot width', 'mm'], ['cutSwL', 'Slide switch slot length', 'mm'], ['cutBtnW', 'PB86-A1 cutout width', 'mm'],
-    ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['cutFaderL', 'Fader slot length (assumed)', 'mm'], ['cutFaderW', 'Fader slot width (assumed)', 'mm'],
-    ['minWeb', 'Least metal between cutouts', 'mm']]]
+    ['cutBtnL', 'PB86-A1 cutout length', 'mm'], ['faderTravel', 'Fader travel', 'mm'], ['faderLeverL', 'Fader lever length (along travel)', 'mm'],
+    ['faderLeverW', 'Fader lever thickness', 'mm'], ['faderClear', 'Fader slot clearance per side', 'mm'],
+    ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]],
+  ['Caps (placeholders)', [['capFaderL', 'Fader cap length (along travel)', 'mm'], ['capFaderW', 'Fader cap width', 'mm'], ['capKnobD', 'Knob diameter', 'mm'],
+    ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
+  ['Labels', [['labelSize', 'Label text size', 'mm']]],
+  ['Lightening holes', [['lighten', 'Holes in the plate (1 = yes, 0 = no)', ''], ['ribWidth', 'Rib width', 'mm'], ['edgeMargin', 'Solid margin at edges and joints', 'mm'],
+    ['pillarMargin', 'Solid ring around pillar feet', 'mm'], ['frameStep', 'Frame node spacing', 'mm'], ['maxSpan', 'Largest hole span', 'mm'], ['minFillet', 'Smallest corner radius', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -226,7 +275,7 @@ function firstFree(bi, rot, insts, g) {
 }
 
 function exampleState() {
-  S = { depth: 'MAX', insts: [], params: Object.assign({}, G.DEFAULTS), sel: null, example: true };
+  S = { depth: 'MAX', insts: [], params: Object.assign({}, G.DEFAULTS), sel: [], example: true };
   const g = G.grid(G.depthMM(S.depth));
   const order = ['EspMotherboard', 'muxboardv1', 'SatelliteBoard', 'HeadphoneBreakout', 'midi3', 'KeyswitchKeybed', 'SegmentBackpack',
     'buttonpack3', 'FaderBoard', 'FaderBoard', 'FaderBoard', 'PotentiometerPack1', 'PotentiometerPack1', 'SwitchBoard', 'buttonpack2', 'PotentiometerBoard'];
@@ -239,7 +288,14 @@ function exampleState() {
 
 function serial() {
   return { app: 'module-plate-maker', version: 1, depth: S.depth, params: S.params,
-    boards: S.insts.map(i => ({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot })) };
+    boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
+}
+// Defaults changed since a layout was saved: a saved value equal to the OLD default follows the new one.
+const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }];
+function migrateParams(o) {
+  const p = Object.assign({}, G.DEFAULTS, o.params || {});
+  for (const od of OLD_DEFAULTS) for (const k in od) if (o.params && o.params[k] === od[k]) p[k] = G.DEFAULTS[k];
+  return p;
 }
 function loadSerial(o) {
   if (!o || o.app !== 'module-plate-maker') throw new Error('This file is not a Module Plate Maker layout.');
@@ -248,10 +304,11 @@ function loadSerial(o) {
   for (const x of o.boards || []) {
     const bi = boardIndex(x.name);
     if (bi < 0) { missing.push(x.name); continue; }
-    insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3 });
+    const caps = {}; for (const k in (x.caps || {})) if (isFinite(+x.caps[k])) caps[k] = +x.caps[k];
+    insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3, caps });
   }
   S = { depth: G.DEPTHS.some(d => d.key === o.depth) ? o.depth : 'MAX', insts,
-    params: Object.assign({}, G.DEFAULTS, o.params || {}), sel: null, example: false };
+    params: migrateParams(o), sel: [], example: false };
   if (missing.length) toast('Not in this app: ' + missing.join(', '));
 }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(serial())); } catch (e) { /* storage blocked: fine */ } }
@@ -266,7 +323,9 @@ function derive() {
   const v = G.validate(BOARDS, S.insts, g, S.params);
   const pillars = v.placed.flatMap(q => q.holes.map(h => [h[0], h[1]]));
   const plan = G.planCuts(g.W, g.D, pillars, S.params);
-  const pieces = plan.error ? [] : G.buildPieces(plan, pillars, S.params);
+  // while a drag runs, skip the lightening holes (about 70 ms); they come back when it ends
+  const busy = (typeof drag !== 'undefined' && drag) || (typeof marquee !== 'undefined' && marquee);
+  const pieces = plan.error ? [] : G.buildPieces(plan, pillars, busy ? Object.assign({}, S.params, { lighten: 0 }) : S.params);
   const pErr = [];
   const P = S.params;
   if (P.shoulderD > 8) pErr.push('Shoulder diameter is over 8 mm: it is wider than the board corner around each hole.');
@@ -279,16 +338,76 @@ function derive() {
 }
 
 /* ---------- drawing ---------- */
-// One part's cutout as SVG markup in the board frame (KiCad footprint angle is counter-clockwise on screen).
-function cutoutMarkup(part, P, attrs) {
-  const [kind, x, y, ang] = part, C = G.CUTOUTS[kind]; if (!C) return '';
-  const sh = C.shape(P), cls = 'cutout' + (C.status === 'ASSUMED' ? ' assumed' : '');
-  const t = `transform="translate(${x} ${y}) rotate(${-ang})"`;
-  const a = attrs || `class="${cls}"`;
-  if (sh.type === 'circle') return `<circle ${a} ${t} cx="0" cy="0" r="${sh.d / 2}"/>`;
-  if (sh.type === 'rect') return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}"/>`;
-  const r = Math.min(sh.w, sh.h) / 2;   // stadium: long axis = the larger of w (x) and h (y)
-  return `<rect ${a} ${t} x="${-sh.w / 2}" y="${-sh.h / 2}" width="${sh.w}" height="${sh.h}" rx="${r}" ry="${r}"/>`;
+// A board's cutouts as SVG markup in the board frame (shapes from G.boardCutouts, merged slots included).
+function cutoutMarkup(b, P, attrsOf) {
+  return G.boardCutouts(b, P).map(c => {
+    const [x0, y0, x1, y1] = c.box, w = x1 - x0, h = y1 - y0;
+    const a = attrsOf ? attrsOf(c) : `class="cutout${c.status === 'READ' ? '' : ' assumed'}"`;
+    if (c.type === 'circle') return `<circle ${a} cx="${(x0 + x1) / 2}" cy="${(y0 + y1) / 2}" r="${w / 2}"/>`;
+    const r = c.type === 'stadium' ? Math.min(w, h) / 2 : 0;
+    return `<rect ${a} x="${x0}" y="${y0}" width="${w}" height="${h}"${r ? ` rx="${r}" ry="${r}"` : ''}/>`;
+  }).join('');
+}
+
+// Panel labels, in the plate frame (always upright). Each text is centred halfway between an edge of
+// its board and the part: "CNTRL" between the board's TOP edge and the top of the fader slot, the
+// knob, the switch slot, or a button pack's row of caps (one per pack); the button numbers 1..n
+// between the bottom of each cap and the board's BOTTOM edge. Baseline = middle + half the cap
+// height (Helvetica 0.717 em).
+const LABEL_TEXT = 'CNTRL', CAP_HEIGHT = 0.717;
+function labelSpots() {
+  const g = derived.g, P = S.params, out = [];
+  const bb = S.insts.map((i, k) => derived.v.placed[k].bbox);
+  const spot = (inst, x, partEdge, top, text) => {
+    const mid = top ? (bb[inst][1] + partEdge) / 2 : (bb[inst][3] + partEdge) / 2;
+    out.push({ inst, x, mid, top, text, baseline: mid + CAP_HEIGHT * P.labelSize / 2 });
+  };
+  G.cutoutBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'fader' || c.kind === 'switch')
+    .forEach(c => spot(c.inst, (c.box[0] + c.box[2]) / 2, c.box[1], true, LABEL_TEXT));
+  const caps = G.capBoxes(BOARDS, S.insts, g, P);
+  caps.filter(c => c.kind === 'pot').forEach(c => spot(c.inst, (c.box[0] + c.box[2]) / 2, c.box[1], true, LABEL_TEXT));
+  const packs = new Map();
+  caps.filter(c => c.kind === 'button').forEach(c => packs.set(c.inst, (packs.get(c.inst) || []).concat([c])));
+  for (const [inst, list] of packs) {
+    const x0 = Math.min(...list.map(c => c.box[0])), x1 = Math.max(...list.map(c => c.box[2]));
+    spot(inst, (x0 + x1) / 2, Math.min(...list.map(c => c.box[1])), true, LABEL_TEXT);
+    const wide = x1 - x0 >= Math.max(...list.map(c => c.box[3])) - Math.min(...list.map(c => c.box[1]));
+    list.slice().sort((a, b) => wide ? a.box[0] - b.box[0] : a.box[1] - b.box[1])
+      .forEach((c, n) => spot(inst, (c.box[0] + c.box[2]) / 2, c.box[3], false, String(n + 1)));
+  }
+  return out;
+}
+function labelsMarkup() {
+  return labelSpots().map(o => `<text class="lbl" x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" text-anchor="middle" style="font-size:${S.params.labelSize}px">${o.text}</text>`).join('');
+}
+
+// Caps of one placed board, in the board frame (shapes from G.capShapes).
+const pressedCaps = new Set();
+function capsMarkup(b, inst) {
+  return G.capShapes(b, inst.caps, S.params).map(c => {
+    const pr = pressedCaps.has(inst.id + ':' + c.k) ? ' pressed' : '';
+    const T = (rot) => `transform="translate(${c.cx.toFixed(3)} ${c.cy.toFixed(3)}) rotate(${rot.toFixed(2)})"`;
+    const w = c.w, h = c.h;
+    if (c.type === 'knob') return `<g class="cap cap-knob${pr}" data-k="${c.k}" ${T(-c.ang + c.turn)}><circle class="body" r="${w / 2}"/><line class="mark" x1="0" y1="${-w / 2 + 1.2}" x2="0" y2="${-w / 5}"/></g>`;
+    if (c.type === 'lever') return `<g class="cap cap-lever${pr}" data-k="${c.k}" ${T(0)}><circle class="body" r="${w / 2}"/></g>`;
+    if (c.type === 'key') { const t = Math.max(1, w - 5.4); return `<g class="cap cap-key${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.2"/><rect class="top" x="${-t / 2}" y="${-t / 2 - 0.8}" width="${t}" height="${t}" rx="1.5"/></g>`; }
+    if (c.kind === 'fader') return `<g class="cap cap-fader${pr}" data-k="${c.k}" ${T(-c.ang)}><rect class="body" x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5"/><line class="mark" x1="0" y1="${-h / 2 + 1}" x2="0" y2="${h / 2 - 1}"/></g>`;
+    // PB86-A1 cap, top view (Adafruit / Hongju PB-86 photos; LED end = the footprint's -y, pins 5 and 6):
+    // a low shelf with the 3 mm LED, a step, then the main block: flat face, thin side bevels, front chamfer.
+    const sx = w / 12.4, sy = h / 17, X = v => (v * sx).toFixed(3), Y = v => (v * sy).toFixed(3);
+    const y0 = -8.5, yStep = -3.3, yCh = 5.2, y1 = 8.5, x1 = 6.2, xi = 5.4;
+    const poly = (cls, pts) => `<polygon class="${cls}" points="${pts.map(([a, b]) => X(a) + ',' + Y(b)).join(' ')}"/>`;
+    return `<g class="cap cap-button${pr}" data-k="${c.k}" ${T(-c.ang)}>` +
+      `<rect class="body" x="${X(-x1)}" y="${Y(y0)}" width="${X(2 * x1)}" height="${Y(y1 - y0)}" rx=".8"/>` +
+      `<rect class="shelf" x="${X(-x1)}" y="${Y(y0)}" width="${X(2 * x1)}" height="${Y(yStep - y0)}" rx=".8"/>` +
+      poly('bev-l', [[-x1, yStep], [-xi, yStep], [-xi, yCh], [-x1, y1]]) +
+      poly('bev-r', [[x1, yStep], [xi, yStep], [xi, yCh], [x1, y1]]) +
+      poly('bev-f', [[-x1, y1], [-xi, yCh], [xi, yCh], [x1, y1]]) +
+      poly('face', [[-xi, yStep], [xi, yStep], [xi, yCh], [-xi, yCh]]) +
+      `<line class="step" x1="${X(-x1)}" y1="${Y(yStep)}" x2="${X(x1)}" y2="${Y(yStep)}"/>` +
+      `<circle class="glow" cx="0" cy="${Y(-5.6)}" r="${(4.5 * Math.min(sx, sy)).toFixed(3)}"/>` +
+      `<circle class="led" cx="0" cy="${Y(-5.6)}" r="${(1.5 * Math.min(sx, sy)).toFixed(3)}"/></g>`;
+  }).join('');
 }
 
 function el(tag, attrs, parent) {
@@ -302,13 +421,20 @@ const boardEls = new Map();
 function drawPanel() {
   const svg = $('panel'), { g, v, plan, pieces } = derived;
   svg.setAttribute('viewBox', `-4 -4 ${g.W + 8} ${g.D + 12}`);
-  svg.classList.toggle('noboards', !$('vBoards').checked);
+  svg.classList.toggle('noboards', !$('vBoards').checked && viewMode !== 'panel');
+  svg.classList.toggle('panelview', viewMode === 'panel');
+  svg.classList.toggle('noedges', !$('vEdges').checked);
   let base = svg.querySelector('#base'), cuts = svg.querySelector('#cuts'), bl = svg.querySelector('#boards');
   if (!base) {
     const defs = el('defs', {}, svg);
     const pat = el('pattern', { id: 'hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
     el('rect', { width: 4, height: 4, fill: 'var(--plate)' }, pat);
     el('line', { x1: 0, y1: 0, x2: 0, y2: 4, stroke: 'var(--ear)', 'stroke-width': 1.6 }, pat);
+    const grad = (id, stops) => { const gr = el('radialGradient', { id, cx: '40%', cy: '35%', r: '65%' }, defs);
+      stops.forEach(([o, c, a]) => el('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, gr)); };
+    grad('ledOff', [['0', '#ff8a7a', 1], ['.45', '#b3121b', 1], ['1', '#5a0508', 1]]);
+    grad('ledOn', [['0', '#fff2e0', 1], ['.35', '#ff3b2f', 1], ['1', '#a3060d', 1]]);
+    defs.insertAdjacentHTML('beforeend', '<radialGradient id="ledGlow"><stop offset="0" stop-color="#ff3020" stop-opacity=".7"/><stop offset="1" stop-color="#ff3020" stop-opacity="0"/></radialGradient>');
     base = el('g', { id: 'base' }, svg); bl = el('g', { id: 'boards' }, svg); cuts = el('g', { id: 'cuts' }, svg);
   }
   base.innerHTML = '';
@@ -337,26 +463,32 @@ function drawPanel() {
       b.holes.forEach(h => el('circle', { class: 'hole', cx: h[0], cy: h[1], r: h[2] / 2 }, e));
       el('path', { class: 'hitbox', d: 'M' + b.poly.map(p => p.join(' ')).join('L') + 'Z' }, e);
       el('g', { class: 'cutouts' }, e);
+      el('g', { class: 'caps' }, e).addEventListener('pointerdown', startCap);
       e.addEventListener('pointerdown', startDrag);
       e.addEventListener('focus', () => select(inst.id, false));
       boardEls.set(inst.id, e);
     }
     e.setAttribute('transform', 'matrix(' + q.matrix.join(' ') + ')');
-    e.querySelector('.cutouts').innerHTML = $('vCutouts').checked ? (b.parts || []).map(pt => cutoutMarkup(pt, S.params)).join('') : '';
+    e.querySelector('.cutouts').innerHTML = ($('vCutouts').checked || viewMode === 'panel') ? cutoutMarkup(b, S.params) : '';
+    e.querySelector('.caps').innerHTML = $('vCaps').checked ? capsMarkup(b, inst) : '';
     e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
     e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
-    e.classList.toggle('sel', S.sel === inst.id);
+    e.classList.toggle('sel', isSel(inst.id));
     e.classList.toggle('bad', v.issues[k].length > 0);
     seen.add(String(inst.id));
   });
   for (const [id, e] of boardEls) if (!seen.has(String(id))) { e.remove(); boardEls.delete(id); }
 
+  let lbls = svg.querySelector('#labels');
+  if (!lbls) lbls = el('g', { id: 'labels' }, svg);
+  lbls.innerHTML = (viewMode === 'panel' && $('vLabels').checked) ? labelsMarkup() : '';
   cuts.innerHTML = '';
   if ($('vCuts').checked && !plan.error) {
     const rf = S.params.shoulderD / 2 + S.params.footFlare;
     derived.pillars.forEach(p => el('circle', { class: 'pillar', cx: p[0], cy: p[1], r: rf }, cuts));
     pieces.forEach(pc => {
       el('path', { class: 'cut', d: 'M' + pc.poly.map(p => p[0].toFixed(3) + ' ' + p[1].toFixed(3)).join('L') + 'Z' }, cuts);
+      if ((pc.holes || []).length) el('path', { class: 'lh', d: pc.holes.map(h => 'M' + h.map(p => p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join('L') + 'Z').join('') }, cuts);
       const lb = el('text', { class: 'pcl', x: pc.rect[0] + 4, y: pc.rect[1] + (pc.r ? S.params.tabDepth : 0) + 9 }, cuts);
       lb.textContent = pc.id;
     });
@@ -396,7 +528,7 @@ function drawParams() {
   for (const [grp, items] of PARAM_UI) {
     const h = document.createElement('div'); h.className = 'grp'; h.textContent = grp; box.appendChild(h);
     for (const [k, lab] of items) {
-      const l = document.createElement('label'); l.htmlFor = 'p_' + k; l.textContent = lab + ' (mm)';
+      const l = document.createElement('label'); l.htmlFor = 'p_' + k; l.textContent = lab + (items.find(x => x[0] === k)[2] ? ' (mm)' : '');
       const i = document.createElement('input'); i.type = 'number'; i.id = 'p_' + k; i.step = k === 'clearance' ? '0.01' : '0.1';
       i.value = S.params[k];
       i.addEventListener('change', () => { const x = parseFloat(i.value); if (isFinite(x)) { S.params[k] = x; changed(); } else i.value = S.params[k]; });
@@ -414,9 +546,12 @@ function drawSide() {
   add(derived.bad ? 'needs fixing' : 'ready to print', derived.bad ? 'bad' : 'ok');
 
   const tb = $('pieceTable');
-  tb.innerHTML = '<tr><th>Piece</th><th>Size (mm)</th><th>Pillars</th></tr>' + pieces.map(pc =>
-    `<tr><td>${pc.id}</td><td class="n">${pc.size[0].toFixed(1)} × ${pc.size[1].toFixed(1)}</td><td class="n">${pc.pillars.length}</td></tr>`).join('');
-  $('pieceMsg').innerHTML = plan.error ? '' : `<div class="hint">Rows A–${String.fromCharCode(64 + plan.ys.length - 1)} from the top edge, columns from the left. Every pillar is whole on one piece.</div>`;
+  tb.innerHTML = '<tr><th>Piece</th><th>Size (mm)</th><th>Pillars</th><th>PLA (g)</th></tr>' + pieces.map(pc =>
+    `<tr><td>${pc.id}</td><td class="n">${pc.size[0].toFixed(1)} × ${pc.size[1].toFixed(1)}</td><td class="n">${pc.pillars.length}</td><td class="n" data-mass="${pc.id}">…</td></tr>`).join('') +
+    (pieces.length ? `<tr><td><b>Total</b></td><td></td><td class="n">${derived.pillars.length}</td><td class="n" id="massTotal">…</td></tr>` : '');
+  const holeArea = pieces.reduce((t, pc) => t + (pc.holes || []).reduce((u, h) => u + Math.abs(G.area(h)), 0), 0);
+  $('pieceMsg').innerHTML = plan.error ? '' : `<div class="hint">Rows A–${String.fromCharCode(64 + plan.ys.length - 1)} from the top edge, columns from the left. Every pillar is whole on one piece.` +
+    (holeArea ? ` The lightening holes remove ${(holeArea / 100).toFixed(0)} cm² of plate, about ${(holeArea * S.params.plateT * PLA).toFixed(0)} g of PLA.` : '') + `</div>`;
 
   const ck = $('checks'); ck.innerHTML = '';
   const list = (items, cls) => { const u = document.createElement('ul'); u.className = 'issues ' + (cls || ''); items.forEach(t => { const li = document.createElement('li'); li.textContent = t; u.appendChild(li); }); ck.appendChild(u); };
@@ -433,9 +568,18 @@ function drawSide() {
       groups.set(key, Math.min(groups.has(key) ? groups.get(key) : 99, w.web)); });
     list([...groups].map(([k, w]) => k + ': only ' + w.toFixed(2) + ' mm of metal between cutouts (need ' + S.params.minWeb + '). Use one long slot there, or a bigger pitch.'), 'warn');
   }
+  const capB = G.capBoxes(BOARDS, S.insts, g, S.params), capO = G.capOverlaps(capB);
+  if (capO.length) {
+    const groups = new Map();
+    capO.forEach(([i, j]) => { const a = capB[i], b = capB[j]; const key = BOARDS[S.insts[a.inst].b].name + (a.inst === b.inst ? '' : ' / ' + BOARDS[S.insts[b.inst].b].name) + ': ' + G.CAPS[a.kind].label + (a.kind === b.kind ? 's' : ' and ' + G.CAPS[b.kind].label);
+      groups.set(key, (groups.get(key) || 0) + 1); });
+    list([...groups].map(([k, n]) => k + ' overlap (' + n + (n > 1 ? ' pairs' : ' pair') + '). Use smaller caps or move the boards apart.'), 'warn');
+  }
   const kinds = new Set(S.insts.flatMap(i => (BOARDS[i.b].parts || []).map(p => p[0])));
-  const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status === 'ASSUMED');
-  if (assumed.length) list(assumed.map(k => G.CUTOUTS[k].label + ' size is assumed (dashed outline). ' + G.CUTOUTS[k].source), 'warn');
+  const assumed = [...kinds].filter(k => G.CUTOUTS[k] && G.CUTOUTS[k].status !== 'READ');
+  if (assumed.length) list(assumed.map(k => G.CUTOUTS[k].label + ' (dashed outline) is not from a drawing of this part. ' + G.CUTOUTS[k].source), 'warn');
+  const merged = [...new Set(S.insts.flatMap(i => G.boardCutouts(BOARDS[i.b], S.params).filter(c => c.n > 1).map(c => BOARDS[i.b].name + ': ' + c.n + ' ' + G.CUTOUTS[c.kind].label + ' cutouts as one slot')))];
+  if (merged.length) { const d = document.createElement('div'); d.className = 'hint'; d.textContent = 'Merged: ' + merged.join('; ') + '.'; ck.appendChild(d); }
   if (!errs.length && !(plan.warn && plan.warn.length)) {
     const d = document.createElement('div'); d.className = 'okline';
     d.textContent = 'All boards are on the grid, out of the ear zones and apart. Every cut misses every pillar.';
@@ -447,9 +591,10 @@ function drawSide() {
   $('bStl').disabled = derived.bad || !pieces.length;
   $('exampleTag').hidden = !S.example;
 
-  const si = $('selInfo'), k = S.insts.findIndex(i => i.id === S.sel);
-  ['bRot', 'bDup', 'bDel'].forEach(id => $(id).disabled = k < 0);
-  if (k < 0) si.textContent = 'No board selected.';
+  const si = $('selInfo'), k = S.sel.length === 1 ? S.insts.findIndex(i => i.id === S.sel[0]) : -1;
+  ['bRot', 'bDup', 'bDel'].forEach(id => $(id).disabled = !S.sel.length);
+  if (!S.sel.length) si.textContent = 'No board selected. Drag on an empty part of the panel to select several.';
+  else if (k < 0) si.textContent = S.sel.length + ' boards selected. Drag one to move them all; R turns them as a group.';
   else {
     const inst = S.insts[k], b = BOARDS[inst.b], q = v.placed[k];
     si.innerHTML = `<b></b><div class="mono hint"></div>`;
@@ -470,24 +615,62 @@ function addBoard(bi) {
   const g = G.grid(G.depthMM(S.depth));
   const inst = firstFree(bi, 0, S.insts, g) || firstFree(bi, 1, S.insts, g);
   if (!inst) { toast('No free place for ' + BOARDS[bi].name + ' at this depth.'); return; }
-  const id = nextId++; S.insts.push(Object.assign({ id }, inst)); S.sel = id; changed();
+  const id = nextId++; S.insts.push(Object.assign({ id }, inst)); S.sel = [id]; changed();
 }
-function select(id, redraw) { if (S.sel === id) return; S.sel = id; if (redraw !== false) changed(true); else { drawPanel(); drawSide(); } }
-function selInst() { return S.insts.find(i => i.id === S.sel); }
+function isSel(id) { return S.sel.includes(id); }
+function select(id, redraw) { if (S.sel.length === 1 && S.sel[0] === id) return; S.sel = [id]; if (redraw !== false) changed(true); else { drawPanel(); drawSide(); } }
+function selInsts() { return S.insts.filter(i => isSel(i.id)); }
+function selInst() { const l = selInsts(); return l.length === 1 ? l[0] : null; }
+function cellsOf(i) { const q = G.place(BOARDS[i.b], i, derived.g); return [q.cellsX, q.cellsY]; }
+// Move every board in `list` by the same cell delta, clamped so that every hole stays on the grid
+// (a board can never be pushed off the panel and lost).
+function moveGroup(list, start, dx, dy) {
+  const g = derived.g;
+  let lo = [-Infinity, -Infinity], hi = [Infinity, Infinity];
+  list.forEach((i, k) => { const [w, h] = cellsOf(i);
+    lo = [Math.max(lo[0], -start[k][0]), Math.max(lo[1], -start[k][1])];
+    hi = [Math.min(hi[0], g.nx - w - start[k][0]), Math.min(hi[1], Math.max(0, g.ny - h) - start[k][1])]; });
+  dx = Math.max(lo[0], Math.min(hi[0], dx)); dy = Math.max(lo[1], Math.min(hi[1], dy));
+  if (!isFinite(dx)) dx = 0; if (!isFinite(dy)) dy = 0;
+  list.forEach((i, k) => {
+    const nx = start[k][0] + dx, ny = start[k][1] + dy;
+    if (nx !== i.cx || ny !== i.cy) { i.cx = nx; i.cy = ny; delete i.rc; rotMemo = null; }
+  });
+}
+function clampInst(i) { const g = derived.g, [w, h] = cellsOf(i);
+  i.cx = Math.max(0, Math.min(Math.max(0, g.nx - w), i.cx)); i.cy = Math.max(0, Math.min(Math.max(0, g.ny - h), i.cy)); }
+// Rotate the selection 90 degrees clockwise about its centre. The exact (unrounded) centres are
+// remembered between turns, so four turns land exactly where the board started: no drift.
+let rotMemo = null;
+function bboxCentre(i) { const q = G.place(BOARDS[i.b], i, derived.g); return [(q.bbox[0] + q.bbox[2]) / 2, (q.bbox[1] + q.bbox[3]) / 2]; }
 function rotateSel() {
-  const i = selInst(); if (!i) return;
-  const g = derived.g, b = BOARDS[i.b];
-  // keep the board's centre near where it was
-  const before = G.place(b, i, g), cx0 = (before.bbox[0] + before.bbox[2]) / 2, cy0 = (before.bbox[1] + before.bbox[3]) / 2;
-  i.rot = (i.rot + 1) & 3;
-  const after = G.place(b, i, g);
-  i.cx += Math.round((cx0 - (after.bbox[0] + after.bbox[2]) / 2) / 21); i.cy += Math.round((cy0 - (after.bbox[1] + after.bbox[3]) / 2) / 21);
+  const list = selInsts(); if (!list.length) return;
+  const key = list.map(i => i.id).sort().join(',');
+  const cs = list.map(i => i.rc || bboxCentre(i));
+  let gc;
+  if (rotMemo && rotMemo.key === key) gc = rotMemo.gc;
+  else { const bb = list.map(i => G.place(BOARDS[i.b], i, derived.g).bbox);
+    gc = [(Math.min(...bb.map(q => q[0])) + Math.max(...bb.map(q => q[2]))) / 2, (Math.min(...bb.map(q => q[1])) + Math.max(...bb.map(q => q[3]))) / 2]; }
+  list.forEach((i, k) => {
+    const c = [gc[0] - (cs[k][1] - gc[1]), gc[1] + (cs[k][0] - gc[0])];   // (dx, dy) -> (-dy, dx): clockwise, y down
+    i.rot = (i.rot + 1) & 3;
+    const at0 = G.place(BOARDS[i.b], Object.assign({}, i, { cx: 0, cy: 0 }), derived.g);
+    i.cx = Math.round((c[0] - (at0.bbox[0] + at0.bbox[2]) / 2) / 21); i.cy = Math.round((c[1] - (at0.bbox[1] + at0.bbox[3]) / 2) / 21);
+    clampInst(i);
+    i.rc = c;
+  });
+  rotMemo = { key, gc };
   changed();
 }
-function removeSel() { const k = S.insts.findIndex(i => i.id === S.sel); if (k < 0) return; S.insts.splice(k, 1); S.sel = null; changed(); }
-function dupSel() { const i = selInst(); if (!i) return; const n = firstFree(i.b, i.rot, S.insts, derived.g); if (!n) { toast('No free place for a copy.'); return; } const id = nextId++; S.insts.push(Object.assign({ id }, n)); S.sel = id; changed(); }
+function removeSel() { if (!S.sel.length) return; S.insts = S.insts.filter(i => !isSel(i.id)); S.sel = []; changed(); }
+function dupSel() {
+  const ids = [];
+  for (const i of selInsts()) { const n = firstFree(i.b, i.rot, S.insts, derived.g); if (!n) { toast('No free place for a copy of ' + BOARDS[i.b].name + '.'); continue; }
+    const id = nextId++; S.insts.push(Object.assign({ id, caps: Object.assign({}, i.caps || {}) }, n)); ids.push(id); }
+  if (ids.length) { S.sel = ids; changed(); }
+}
 
-let drag = null;
+let drag = null, marquee = null;
 function svgPoint(evt) {
   const svg = $('panel'), pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
   return pt.matrixTransform(svg.getScreenCTM().inverse());
@@ -495,36 +678,114 @@ function svgPoint(evt) {
 function startDrag(evt) {
   const id = +evt.currentTarget.dataset.id, inst = S.insts.find(i => i.id === id);
   if (!inst) return;
-  evt.preventDefault();
-  S.sel = id;
-  const p = svgPoint(evt);
-  drag = { inst, x: p.x, y: p.y, cx: inst.cx, cy: inst.cy, el: evt.currentTarget, pid: evt.pointerId, moved: false };
+  evt.preventDefault(); evt.stopPropagation();
+  if (evt.shiftKey) { S.sel = isSel(id) ? S.sel.filter(x => x !== id) : S.sel.concat([id]); drawPanel(); drawSide(); return; }
+  if (!isSel(id)) S.sel = [id];
+  const p = svgPoint(evt), list = selInsts();
+  drag = { list, start: list.map(i => [i.cx, i.cy]), x: p.x, y: p.y, el: evt.currentTarget, pid: evt.pointerId, moved: false };
   evt.currentTarget.setPointerCapture(evt.pointerId);
   evt.currentTarget.classList.add('drag');
   drawPanel(); drawSide();
 }
-window.addEventListener('pointermove', evt => {
-  if (!drag || evt.pointerId !== drag.pid) return;
+function startMarquee(evt) {
+  if (evt.target.closest('.board') || evt.button > 0) return;
   const p = svgPoint(evt);
-  const cx = drag.cx + Math.round((p.x - drag.x) / 21), cy = drag.cy + Math.round((p.y - drag.y) / 21);
-  if (cx !== drag.inst.cx || cy !== drag.inst.cy) { drag.inst.cx = cx; drag.inst.cy = cy; drag.moved = true; derive(); drawPanel(); drawSide(); }
+  marquee = { x: p.x, y: p.y, pid: evt.pointerId, add: evt.shiftKey, base: evt.shiftKey ? S.sel.slice() : [], el: null };
+  $('panel').setPointerCapture(evt.pointerId);
+}
+window.addEventListener('pointermove', evt => {
+  if (drag && evt.pointerId === drag.pid) {
+    const p = svgPoint(evt), dx = Math.round((p.x - drag.x) / 21), dy = Math.round((p.y - drag.y) / 21);
+    const cur = drag.list.map(i => [i.cx, i.cy]);
+    moveGroup(drag.list, drag.start, dx, dy);
+    if (drag.list.some((i, k) => i.cx !== cur[k][0] || i.cy !== cur[k][1])) { drag.moved = true; derive(); drawPanel(); drawSide(); }
+    return;
+  }
+  if (marquee && evt.pointerId === marquee.pid) {
+    const p = svgPoint(evt), r = [Math.min(marquee.x, p.x), Math.min(marquee.y, p.y), Math.max(marquee.x, p.x), Math.max(marquee.y, p.y)];
+    if (!marquee.el) marquee.el = el('rect', { class: 'marquee' }, $('panel'));
+    marquee.el.setAttribute('x', r[0]); marquee.el.setAttribute('y', r[1]);
+    marquee.el.setAttribute('width', r[2] - r[0]); marquee.el.setAttribute('height', r[3] - r[1]);
+    const hit = S.insts.filter((i, k) => { const q = derived.v.placed[k].bbox; return q[0] < r[2] && r[0] < q[2] && q[1] < r[3] && r[1] < q[3]; }).map(i => i.id);
+    S.sel = [...new Set(marquee.base.concat(hit))];
+    drawPanel(); drawSide();
+  }
 });
 window.addEventListener('pointerup', evt => {
-  if (!drag || evt.pointerId !== drag.pid) return;
-  drag.el.classList.remove('drag');
-  const moved = drag.moved; drag = null;
-  changed(!moved);
+  if (drag && evt.pointerId === drag.pid) {
+    drag.el.classList.remove('drag');
+    const moved = drag.moved; drag = null;
+    changed(!moved);
+    return;
+  }
+  if (marquee && evt.pointerId === marquee.pid) {
+    if (marquee.el) marquee.el.remove(); else if (!marquee.add) S.sel = [];   // a plain click on empty panel clears
+    marquee = null; changed(true);
+  }
 });
 document.addEventListener('keydown', evt => {
   if (evt.target.closest && evt.target.closest('input, select, textarea')) return;
-  const i = selInst(); if (!i) return;
+  const list = selInsts(); if (!list.length) return;
   const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[evt.key];
-  if (mv) { i.cx += mv[0]; i.cy += mv[1]; evt.preventDefault(); changed(); }
+  if (mv) { moveGroup(list, list.map(i => [i.cx, i.cy]), mv[0], mv[1]); evt.preventDefault(); changed(); }
   else if (evt.key === 'r' || evt.key === 'R') { rotateSel(); evt.preventDefault(); }
   else if (evt.key === 'Delete' || evt.key === 'Backspace') { removeSel(); evt.preventDefault(); }
-  else if (evt.key === 'Escape') { S.sel = null; changed(true); }
+  else if (evt.key === 'Escape') { S.sel = []; changed(true); }
 });
-$('panel').addEventListener('pointerdown', evt => { if (!evt.target.closest('.board') && S.sel !== null) { S.sel = null; changed(true); } });
+/* ---------- caps: move them with the mouse ---------- */
+let capDrag = null;
+function boardLocal(evt, bEl) {
+  const svg = $('panel'), pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(bEl.getScreenCTM().inverse());
+}
+function redrawCaps(inst) {
+  const e = boardEls.get(inst.id); if (e) e.querySelector('.caps').innerHTML = capsMarkup(BOARDS[inst.b], inst);
+}
+function startCap(evt) {
+  const capEl = evt.target.closest('.cap'); if (!capEl) return;
+  evt.stopPropagation(); evt.preventDefault();
+  const bEl = capEl.closest('.board'), inst = S.insts.find(i => i.id === +bEl.dataset.id); if (!inst) return;
+  const k = +capEl.dataset.k, part = BOARDS[inst.b].parts[k], kind = part[0];
+  inst.caps = inst.caps || {};
+  if (kind === 'switch') { const v = inst.caps[k] === undefined ? 0 : inst.caps[k]; inst.caps[k] = v >= 1 ? -1 : v + 1; redrawCaps(inst); persist(); return; }
+  if (kind === 'keyswitch' || kind === 'button') { pressedCaps.add(inst.id + ':' + k); redrawCaps(inst); }
+  capDrag = { inst, k, part, bEl, pid: evt.pointerId };
+  moveCap(evt);
+}
+function moveCap(evt) {
+  if (!capDrag || evt.pointerId !== capDrag.pid) return;
+  const { inst, k, part, bEl } = capDrag, [kind, x, y, ang] = part, p = boardLocal(evt, bEl), a = ang * Math.PI / 180;
+  if (kind === 'fader') {
+    const u = [Math.cos(a), -Math.sin(a)];
+    inst.caps[k] = Math.min(1, Math.max(0, ((p.x - x) * u[0] + (p.y - y) * u[1]) / S.params.faderTravel + 0.5));
+  } else if (kind === 'pot') {
+    let turn = Math.atan2(p.x - x, -(p.y - y)) * 180 / Math.PI + ang;
+    turn = ((turn + 540) % 360) - 180;
+    const nv = Math.min(1, Math.max(0, turn / 280 + 0.5)), pv = inst.caps[k] === undefined ? 0.5 : inst.caps[k];
+    if (Math.abs(nv - pv) < 0.5) inst.caps[k] = nv;   // no jump across the dead zone: the knob stays at its stop
+  } else return;
+  redrawCaps(inst);
+}
+window.addEventListener('pointermove', moveCap);
+window.addEventListener('pointerup', evt => {
+  if (!capDrag || evt.pointerId !== capDrag.pid) return;
+  const { inst, k } = capDrag; capDrag = null;
+  if (pressedCaps.delete(inst.id + ':' + k)) redrawCaps(inst);
+  persist();
+});
+
+let viewMode = 'work';
+try { if (localStorage.getItem(KEY + '-view') === 'panel') viewMode = 'panel'; } catch (e) { /* ignore */ }
+function setView(m) {
+  viewMode = m; try { localStorage.setItem(KEY + '-view', m); } catch (e) { /* ignore */ }
+  $('mWork').setAttribute('aria-pressed', m === 'work'); $('mPanel').setAttribute('aria-pressed', m === 'panel');
+  $('viewbar').classList.toggle('panelmode', m === 'panel');
+  drawPanel();
+}
+$('mWork').addEventListener('click', () => setView('work'));
+$('mPanel').addEventListener('click', () => setView('panel'));
+
+$('panel').addEventListener('pointerdown', startMarquee);
 
 /* ---------- files ---------- */
 let dlNs = null;
@@ -584,8 +845,10 @@ $('bSvg').addEventListener('click', async () => {
   parts.push('</g>', '<g id="panel_cutouts" inkscape:groupmode="layer" inkscape:label="Panel cutouts" fill="none" stroke="#000" stroke-width="0.1">');
   S.insts.forEach((inst, k) => {
     const b = BOARDS[inst.b], q = v.placed[k];
-    if ((b.parts || []).length) parts.push(`<g transform="matrix(${v.placed[k].matrix.join(' ')})">` + b.parts.map(pt => cutoutMarkup(pt, S.params, `data-kind="${pt[0]}"`)).join('') + '</g>');
+    if ((b.parts || []).length) parts.push(`<g transform="matrix(${q.matrix.join(' ')})">` + cutoutMarkup(b, S.params, c => `data-kind="${c.kind}" data-parts="${c.n}"`) + '</g>');
   });
+  parts.push('</g>', '<g id="labels" inkscape:groupmode="layer" inkscape:label="Labels" font-family="Helvetica, Arial, sans-serif" font-weight="700" text-anchor="middle" fill="#000">');
+  labelSpots().forEach(o => parts.push(`<text x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" font-size="${S.params.labelSize}">${o.text}</text>`));
   parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
 });
@@ -600,10 +863,10 @@ $('fLoad').addEventListener('change', async () => {
 let clearArmed = 0;
 $('bClear').addEventListener('click', () => {
   if (Date.now() - clearArmed > 3000) { clearArmed = Date.now(); $('bClear').textContent = 'Click again to clear'; setTimeout(() => $('bClear').textContent = 'Clear', 3000); return; }
-  S.insts = []; S.sel = null; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
+  S.insts = []; S.sel = []; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
 });
 $('bRot').addEventListener('click', rotateSel); $('bDel').addEventListener('click', removeSel); $('bDup').addEventListener('click', dupSel);
-['vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
+['vEdges', 'vLabels', 'vCaps', 'vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
 
 let toastT = null;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
@@ -627,14 +890,22 @@ function init3d() {
   new ResizeObserver(() => render3d()).observe(c);
   return true;
 }
+function fillMasses(meshes) {   // grams per piece from the very meshes that are exported
+  let total = 0;
+  derived.pieces.forEach((pc, k) => { const gr = G.meshVolume(meshes[k]) * PLA; total += gr;
+    const cell = document.querySelector(`#pieceTable [data-mass="${pc.id}"]`); if (cell) cell.textContent = gr.toFixed(0); });
+  if ($('massTotal')) $('massTotal').textContent = total.toFixed(0);
+}
 function draw3d() {
+  const meshes = derived.pieces.map(pc => G.pieceMesh(pc, derived.g.D, S.params));
+  fillMasses(meshes);
   if (!V3.r && !init3d()) return;
   if (V3.group) { V3.scene.remove(V3.group); V3.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   V3.group = new THREE.Group();
   const { g, pieces } = derived, gap = 4;
   const cols = [css('--plate-edge'), css('--muted')];
-  pieces.forEach(pc => {
-    const tri = G.pieceMesh(pc, g.D, S.params);
+  pieces.forEach((pc, k) => {
+    const tri = meshes[k];
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(tri, 3)); geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: new THREE.Color(cols[(pc.r + pc.c) % 2]), roughness: .75, metalness: 0, flatShading: true }));
     m.position.set(pc.c * gap - g.W / 2, -pc.r * gap - g.D / 2, 0);
@@ -663,6 +934,7 @@ if (!restore()) exampleState();
 nextId = Math.max(nextId, ...S.insts.map(i => i.id + 1));
 drawPalette(); drawParams();
 changed(true);
+setView(viewMode);
 window.__plate = { get S() { return S; }, get derived() { return derived; }, G, BOARDS, refresh: () => changed(true) };
 })();
 </script>

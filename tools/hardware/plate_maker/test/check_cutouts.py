@@ -14,7 +14,8 @@ usable = W - 2 * ear; nx = int(usable // 21 + 1e-9); ny = int(D // 21 + 1e-9)
 gx0, gy0 = ear + (usable - nx * 21) / 2, (D - ny * 21) / 2
 # size (along footprint x, along footprint y) per kind, from the page's own parameters
 SIZE = {'keyswitch': (P['cutKeyW'], P['cutKeyH']), 'pot': (P['cutPotD'], P['cutPotD']), 'switch': (P['cutSwW'], P['cutSwL']),
-        'button': (P['cutBtnW'], P['cutBtnL']), 'fader': (P['cutFaderL'], P['cutFaderW'])}
+        'button': (P['cutBtnW'], P['cutBtnL']),
+        'fader': (P['faderTravel'] + P['faderLeverL'] + 2 * P['faderClear'], P['faderLeverW'] + 2 * P['faderClear'])}
 cache = {}
 def parts_of(name):
     if name in cache: return cache[name]
@@ -46,6 +47,23 @@ for i in lay['boards']:
         hs, (px, py) = pts[:-1], pts[-1]
         ox = gx0 + i['cx'] * 21 + 4.25 - min(p[0] for p in hs); oy = gy0 + i['cy'] * 21 + 4.25 - min(p[1] for p in hs)
         exp.append((i['id'], k, px + ox, py + oy, sx, sy))
+# merge rule (the user's call, 2026-10-15): same kind, same board, less than minWeb of metal -> one slot
+def gap(a, b):
+    dx = max(a[0] - b[2], b[0] - a[2], 0); dy = max(a[1] - b[3], b[1] - a[3], 0)
+    return math.hypot(dx, dy) if dx > 0 and dy > 0 else max(dx, dy)
+if P.get('mergeSlots', 1):
+    boxes = [[e[0], e[1], [e[2] - e[4] / 2, e[3] - e[5] / 2, e[2] + e[4] / 2, e[3] + e[5] / 2]] for e in exp]
+    changed = True
+    while changed:
+        changed = False
+        for a in range(len(boxes)):
+            for b in range(a + 1, len(boxes)):
+                A, B = boxes[a], boxes[b]
+                if A[0] == B[0] and A[1] == B[1] and gap(A[2], B[2]) < P['minWeb']:
+                    A[2] = [min(A[2][0], B[2][0]), min(A[2][1], B[2][1]), max(A[2][2], B[2][2]), max(A[2][3], B[2][3])]
+                    del boxes[b]; changed = True; break
+            if changed: break
+    exp = [(i, k, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, b[2] - b[0], b[3] - b[1]) for i, k, b in boxes]
 got = d['cutouts']; fails = 0
 for e in exp:
     m = [g for g in got if g['inst'] == e[0] and math.hypot(g['x'] - e[2], g['y'] - e[3]) < 0.01]
