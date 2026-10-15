@@ -142,36 +142,53 @@ def main():
         h.process(128, ctx=T)
         if idx % 16 == 15:
             log('patches through %d; functions %d' % (idx, len({func_of(a) for a in executed} - {None})))
-    # 2. MIDI controllers through process() params (CC map base + n), bend, AT, sustain, all notes off
-    base = h.call(IB + 0x31F2C0, rcx=h.core) if False else None   # base via midi; use host_param ids directly
-    # the CC-map base is core-relative; reuse the known mapping ids via params at offsets
-    for pid, val in [(VOICES, 6), (VOICES, 1), (SAMPLERATE, 2), (SAMPLERATE, 3), (SAMPLERATE, 0), (SAMPLERATE, 5)]:
-        h.process(256, params=[(pid, 0, val)], ctx=T)
-        h.process(256, ctx=T)
-    # 3. the editor's set (model set) of every record at a few values + commit + the host round trip
-    for pid, obj in recs:
-        for v in (0, 1, 127, 255):
-            h.call(IB + MODEL_SET, rcx=model, rdx=obj, r8=v & 0xFFFFFFFF, r9=1, count=500_000_000)
-        h.process(256, ctx=T)
-    for rva in COMMIT:
-        h.call(IB + rva, rcx=model, count=500_000_000)
-    log('editor set done; functions %d' % len({func_of(a) for a in executed} - {None}))
-    # 4. the UI-timer drain + MIDI learn / forget
-    h.call(IB + UITICK, rcx=h.core, count=2_000_000_000)
-    for pid in list(kidx)[:4]:
-        h.call(IB + CC_LEARN, rcx=h.core + 24, rdx=kidx[pid])
-        h.call(IB + CC_FORGET, rcx=h.core + 24, rdx=kidx[pid])
-    # 5. getState / setState round trip + an engine-rate setting state
-    st = h.get_state()
-    h.set_state(st)
-    h.process(256, ctx=T)
-    # 6. the editor attached + the window zoom getter over a screen
-    try:
+    log('patches done; functions %d' % len({func_of(a) for a in executed} - {None}))
+
+    # every surface after the patches is INDEPENDENT: a throw on one must not lose the census
+    # (the plugin's own C++ exceptions stop by name in the oracle; the reach up to the throw is kept).
+    def step(name, fn):
+        try:
+            fn()
+        except Exception as e:
+            log('step %s stopped (reach kept): %s' % (name, e))
+        log('after %s: functions %d' % (name, len({func_of(a) for a in executed} - {None})))
+
+    def s_midi():                              # MIDI-ish params (voice count, engine-rate setting) through process()
+        for pid, val in [(VOICES, 6), (VOICES, 1), (SAMPLERATE, 2), (SAMPLERATE, 3), (SAMPLERATE, 0), (SAMPLERATE, 5)]:
+            h.process(256, params=[(pid, 0, val)], ctx=T)
+            h.process(256, ctx=T)
+
+    def s_editor_attach():                     # attach the editor FIRST: it builds the GUI tree the panel paths need
         h.attach_editor(1920, 1080)
         for size in list(getattr(h, 'windows', {})):
             h.window_conv(size)
-    except Exception as e:
-        log('editor/zoom step skipped: %s' % e)
+
+    def s_model_set():                         # the editor's set of every record at a few values + a block each
+        for pid, obj in recs:
+            for v in (0, 1, 127, 255):
+                h.call(IB + MODEL_SET, rcx=model, rdx=obj, r8=v & 0xFFFFFFFF, r9=1, count=500_000_000)
+        h.process(256, ctx=T)
+
+    def s_commit():
+        for rva in COMMIT:
+            h.call(IB + rva, rcx=model, count=500_000_000)
+
+    def s_uitick():
+        h.call(IB + UITICK, rcx=h.core, count=2_000_000_000)
+
+    def s_learn():
+        for pid in list(kidx)[:4]:
+            h.call(IB + CC_LEARN, rcx=h.core + 24, rdx=kidx[pid])
+            h.call(IB + CC_FORGET, rcx=h.core + 24, rdx=kidx[pid])
+
+    def s_state():
+        st = h.get_state()
+        h.set_state(st)
+        h.process(256, ctx=T)
+
+    for name, fn in [('midi', s_midi), ('editor_attach', s_editor_attach), ('model_set', s_model_set),
+                     ('commit', s_commit), ('uitick', s_uitick), ('learn', s_learn), ('state', s_state)]:
+        step(name, fn)
     log('drive done')
 
     funcs = sorted({f for f in (func_of(a) for a in executed) if f is not None})
