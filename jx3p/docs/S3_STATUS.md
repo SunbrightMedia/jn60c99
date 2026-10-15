@@ -3,6 +3,18 @@
 What is PROVEN, what is transcribed-not-proven, and the exact next steps. "Done"
 means null EXACTLY 0; nothing below is called done that is not.
 
+## 2026-10-15 (25) — THE USER'S DECISIONS: ROW 26 CLOSED (NO ROLAND ITEMS), THE USER-BANK CLASS WAIVED
+
+The user, in writing (2026-10-15): "leave out anything Roland related" -- row 26 CLOSED: the option menu's
+"Authentication..." (Roland Cloud login), its five hidden developer items, Help / About and the SYSTEM-8 link's
+messages stay out of the port (JX-3P.exe shows the items exactly, as row 25 grades them, and says "not part of this
+port"). And: "The plugin doesn't HAVE any more bank files" -- docs/GATE_PARITY.tsv user_bank_parity WAIVED (it had
+waited on JX-3P user banks that do not exist; the patch browser on any bank stays graded with seeded random records and
+a bank file of them, jx_patch_gate.py chains 1, 3, and their audio, jx_product_gate.py --recall r). gate_parity.py
+GREEN: 63 classes, 0 BLOCKED (it was RED first on the JUNO's new editor_gate.py, unclassified: now the class
+editor_set, the JX's jx_state_gate.py chains 'editor' / 'gesture'). Row 24 (two NaNs meeting) stays ACCEPTED: the user,
+2026-10-15, "don't worry about nans yet". THE JX-3P PORT IS DONE: no scope row is OPEN.
+
 ## 2026-10-15 (24) — ROW 23 CLOSED: EVERY SECTION OF THE VERIFY GREEN ON 0f0d6948; THE KEY HOLDER; THE PATCH WINDOW'S OWN TIMER (playbooks 269-273)
 
 - Section 5c's first full run went RED after row 25 was closed on the quick run alone (playbook 271): Up / Down

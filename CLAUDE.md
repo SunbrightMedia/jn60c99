@@ -30,6 +30,13 @@ NO multi-ESP32-S3 runs, ever: the user judged chip-to-chip linkage not stable en
 board of ESP32-S3-class power. Two-chip / CHAIN4 / 4-slot multi-chip plans below are RETIRED (history only).
 An engine that does not fit one board gets a cheaper engine graded against the bit-exact port. END_GOAL.md top.
 
+# ⚑ THE PLUGIN'S OWN CODE, LIFTED (USER-BINDING 2026-10-15, overrides every hand-port line below)
+"Nothing should be hand-written from scratch unless it's to do with glue to the ESP32 or raspi, and seldom code at
+that." The JUNO-60 port is the plugin's own machine code, lifted to C99 (docs/JUNO_LIFT.md: the plan L1-L7, the
+proof: the lifter per instruction form, every reachable instruction lifted, gates EXACTLY 0, a machine search). The
+hand-written port stays the product only until the lift passes. JX-3P work is STOPPED (the user, 2026-10-15).
+EVERY reply states the progress to full completion as a percentage (the measure: docs/JUNO_LIFT.md).
+
 # ⚑ READ FIRST, IN ORDER
 1. `END_GOAL.md` — WHAT we build (user's words, binding). Short form: audibly
    identical, 6 voices, ONE ESP32-S3-class board (amended 2026-09-23; was two), full FX incl. chorus, seamless
@@ -146,7 +153,11 @@ mine is a hypothesis (playbook 80).
   docs/LED_METER.md), and the CC assign menu -- the right press, the plugin's
   search on its own GUI tree (built at its module init), Learn / Forget -- and
   the web skin's MIDI CC / bend / aftertouch input (A38, cc_menu_gate.py runs
-  the plugin's own handler on the plugin's own tree, docs/CC_MENU.md).
+  the plugin's own handler on the plugin's own tree, docs/CC_MENU.md), and the
+  editor's set -- a panel value goes to the HOST (performEdit, one open edit) for
+  79 parameters and back through process(), a record for 16; JUNO-60.exe and the
+  page are that host (A42, editor_gate.py, docs/EDITOR_SET.md; found on the way:
+  the engine-rate setting switches at the next block, not at the set, playbook 275).
   JUNO-60.exe = the port + the plugin's
   panel as ONE Windows program (gui/win, CLAIMS C6, `make native`; LOCAL ONLY:
   it embeds the artwork and the user's banks). Every host call:
@@ -156,7 +167,7 @@ mine is a hypothesis (playbook 80).
   gui/skin/ draws the plugin's own GUI from truth/Script.xml + truth/Script/*.png,
   local only, never published; CLAIMS C5, gui/skin/README.md). The web app's WASM is rebuilt
   with all of it (make webapp green: WASM == native, headless check; emcc from
-  /home/user/emsdk/emsdk_env.sh). PROVENANCE 39/39 PROVEN (35 engine and host rows, 4 GUI rows: A37-A40);
+  /home/user/emsdk/emsdk_env.sh). PROVENANCE 40/40 PROVEN (35 engine and host rows, 5 GUI rows: A37-A40, A42);
   NaN parity of the render code (A41, 2026-10-11, playbooks 219-225): every relation, equality and min / max in
   its instruction's form, every site run, every float compare instruction graded (nan_sites.py census), the
   helpers alone (nan_helpers.py), GCC's NaN-sign folds off (-frounding-math -fsignaling-nans, nan_codegen.py),
@@ -271,8 +282,8 @@ mine is a hypothesis (playbook 80).
   record image, the patch window (gui/juno_pm.c on the JX bridge). Row 25 CLOSED 2026-10-15 (S3_STATUS (23),
   JX_PANEL.md): every input of JX-3P.exe -- the generic classes' mouse and wheel, the editor's timer, the keys, the
   resize corner, the leave, the window's points, the patch window's buttons, the plugin's own option menu (its
-  SYSTEM-8 CC preset generated, jx_gen_cc_preset.py) -- graded through the plugin's own handlers. Row 26 OPEN, the
-  USER's call: the option menu's "Authentication..." (Roland Cloud login) and its five hidden developer items. The
+  SYSTEM-8 CC preset generated, jx_gen_cc_preset.py) -- graded through the plugin's own handlers. Row 26 CLOSED
+  2026-10-15, the USER's decision: "leave out anything Roland related" (the login, the hidden developer items). The
   verify runs in lanes (jx3p/tools/jx_lanes.py: a section re-runs only when its traced inputs change; playbook 264).
   Row 20, the drawn panel, CLOSED 2026-10-14: JX-3P.exe (the user's Script folder,
   jx3p/truth/Script; jx3p/gui/win, make_native_jx.py; jx3p/docs/JX_PANEL.md) -- its five JX classes' mouse, the CC
@@ -281,7 +292,7 @@ mine is a hypothesis (playbook 80).
   capture, a drag's one open host edit -- playbooks 251-255).
   The JUNO-60's gate classes on the JX (JX-26, S3_STATUS (14)): every class of
   docs/GATE_PARITY.tsv has a JX gate jx_verify.sh runs (gate_parity.py rule 4),
-  but 1 BLOCKED on an input (the user's JX banks); ISO C99 checked
+  the user-bank class WAIVED (no JX-3P user banks exist, the user 2026-10-15); ISO C99 checked
   (tools/verify/c99_gate.py, both ports); every JX file's role and proof in
   jx3p/docs/PROVENANCE.tsv (jx_provenance.py). Row 23 (NaN parity, the JUNO's
   A41 classes: 53 + 37 equalities, 3 helpers, 12 sign folds, the page's
