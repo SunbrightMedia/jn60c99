@@ -49,6 +49,10 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   await page.locator('#vGrid').click(); await page.locator('#vGrid').click();   // redraw through a UI path
   await page.evaluate(() => document.getElementById('depths').querySelector('button:last-child').click());
   s0 = await st(); console.log('after restore', s0.n, 'boards, bad', s0.bad);
+  // base thickness: set it in its field; the exported meshes must follow (check_cases reads it from layout.json)
+  await page.fill('#p_plateT', '4.2'); await page.dispatchEvent('#p_plateT', 'change'); await page.waitForTimeout(300);
+  const th = await page.evaluate(() => __plate.S.params.plateT);
+  console.log('base thickness field ->', th, th === 4.2 ? 'OK' : 'FAIL');
   for (const [btn, name] of [['#bStl', 'app_plate.zip'], ['#bCoupon', 'app_coupons.zip'], ['#bSvg', 'app_layout.svg']]) {
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(btn)]);
     await dl.saveAs(path.join(out, name)); console.log('saved', name, fs.statSync(path.join(out, name)).size, 'bytes');

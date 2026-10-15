@@ -41,6 +41,8 @@ piece with zero clearance (gap 0.075 != 0.15) and a board turned 90 degrees (pil
 - Cuts: rows first (straight across, never within `shoulderD/2 + footFlare + 1 + clearance` of a
   pillar), then columns per row; tabs point down / right; each piece + its tabs <= `maxPiece`.
 - Joint clearance = total gap; each mating edge moves clearance/2 into its own piece.
+- Base thickness: its own field ("Base plate" card, 1.2-20 mm, `plateT`); the shoulders keep their height
+  above the plate's top. Browser check: set 4.2 -> exported plate 0-4.2 mm, shoulder top 10.7, pin top 14.3.
 - Downloads: through the artifact `downloads` capability (zip / svg / json only), or a plain
   browser download when the file is opened directly.
 
