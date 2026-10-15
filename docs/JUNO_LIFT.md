@@ -46,4 +46,10 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   PASS: 0 reached traps of 570 (the rest int3 padding + AVX/FMA/SSE4 in CRT branches the SSE oracle never takes).
   check_reached counts only WHOLE-instruction traps, not div0 guards. EVERY executed product instruction is now
   C99. Not yet compiled or run -- that is L4 (template + build) and L5 (the gate EXACTLY 0).
-
+- 2026-10-15 L4 keystone: tools/lift/jn_template_export.py (the proven JP8 exporter adapted to the JUNO host
+  oracle at the post-boot_host cut, format JNT v1). Exported lift/jn_template.bin (38 MB; image 14.1 MB, stack
+  57 KB, heap [base,bump) 24.7 MB, page0/stub empty): SELF-CHECK every region byte-identical to oracle memory,
+  scalars equal; the TOOTH bites. Outside the template (scope for the L5 gate): 0x580000000, a 16 MB region at
+  0x5a0000000, and BUF 0x700000000 -- carried only if the lifted host reads them (the gate traps otherwise).
+  NEXT L4: junoh.h + lift/jn_host.c (the lifted VST3 entries on jp8_cpu.h, host-object + import shims), then L5
+  (the gate vs host_process_emu, EXACTLY 0).

@@ -97,3 +97,5 @@ tests/test_multi_instance
 jx3p/gen/*_96k.bin
 jx3p/gen/jx_guest_44k.bin
 lift/jn_lift.c
+lift/jn_template.bin
+lift/jn_template.bin.gz
