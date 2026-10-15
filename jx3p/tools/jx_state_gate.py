@@ -184,7 +184,11 @@ def oracle(ci):
     name, rate, steps = chains()[ci]
     h = X.JXHost()
     h.start(rate, 512)
-    h.process(256)                             # the first block: initialize's queue applied (the port's: jx3p_product_init)
+    boot = [(0, off, rec[8], rec[9], rec[10]) if kind == 0 else          # initialize's records, before the first block
+            (kind, off, struct.unpack_from('<I', rec, 12)[0], struct.unpack_from('<i', rec, 20)[0])
+            for kind, off, rec in h.queue()]   # applies them: compared as queued (playbook 260: the engine ignores
+    h.process(256)                             # CC 120, so a wrong boot message left no other trace) -- the first
+    # block: initialize's queue applied (the port's: jx3p_product_init)
     q = lambda a: struct.unpack('<Q', h.uc.mem_read(a, 8))[0]
     vb, ve = q(h.core + 24), q(h.core + 32)    # the CC map's records: their index by id (rva 0x319B30)
     index = {h.call(X.IB + CC_INDEX, rcx=h.core + 24, rdx=i) & 0xFFFFFFFF: i for i in range((ve - vb) // 24)}
@@ -194,7 +198,7 @@ def oracle(ci):
     ids = sorted(index, key=index.get)          # the records' ids in the CC map's order
     sg = lambda v: v - (1 << 32) if v >= 1 << 31 else v
     ccof = lambda: [sg(h.call(X.IB + CC_OF, rcx=h.core + 24, rdx=i) & 0xFFFFFFFF) for i in range(len(ids))]
-    res = [dict(save=h.get_state().hex(), queue=[], edits=[], ccof=ccof(), ids=ids)]
+    res = [dict(save=h.get_state().hex(), queue=boot, edits=[], ccof=ccof(), ids=ids)]
     for stp in steps:
         k = stp[0]
         if k in ('state', 'state8', 'stream'):
@@ -252,9 +256,13 @@ def port(so, ci, tooth, idfile):
                              int(rate)) < 0:
         raise SystemExit('jx3p_product_init failed')
     L = (ctypes.c_float * 256)(); R = (ctypes.c_float * 256)()
-    lib.jx3p_product_block(L, R, 256, (ctypes.c_int * 1)(), 0)     # the first block: initialize's queue applied
     buf = (ctypes.c_ubyte * 4096)()
     pend = (ctypes.c_int * (5 * 512))()
+    nb = lib.jx3p_product_pending(pend, 5 * 512)                   # initialize's records, as queued
+    flat = list(pend)
+    boot = [(0, r[1], r[2] & 0xFF, r[3] & 0xFF, r[4] & 0xFF) if r[0] == 0 else (r[0], r[1], r[3] & 0xFFFFFFFF, r[4])
+            for r in (flat[5 * i:5 * i + 5] for i in range(nb))]
+    lib.jx3p_product_block(L, R, 256, (ctypes.c_int * 1)(), 0)     # the first block: initialize's queue applied
 
     def save():
         n = lib.jx3p_state_save(buf, 4096)
@@ -262,7 +270,7 @@ def port(so, ci, tooth, idfile):
         if tooth:
             b[-1] ^= 1
         return bytes(b).hex()
-    res = [dict(save=save(), queue=[], edits=[], ccof=ccof(),
+    res = [dict(save=save(), queue=boot, edits=[], ccof=ccof(),
                 entry=[lib.jx3p_cc_entry(i) for i in ids] + [lib.jx3p_cc_entry(i) for i in (0, 0x7777, 0x0FFFC002)])]
     eid, ev_, ekind = (ctypes.c_uint32 * 512)(), (ctypes.c_double * 512)(), (ctypes.c_int * 512)()
     rt = []                                    # the host edits not yet sent back

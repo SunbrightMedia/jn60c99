@@ -16,6 +16,13 @@ means null EXACTLY 0; nothing below is called done that is not.
   only when both operands are different NaNs; those sections feed no NaN into a ramp (bank patches, legal values;
   the meter gate's NaNs reach only the meter code), and 3e's lift gate does not build jx_bridge.c. Owed: S, 6, 3i,
   3g, 4, 5, 5b, 5c on the new commit.
+- jxverify_991d4470 (991d4470, the fix and the rebuilt web engine: jx_wasm_check GREEN on patches 0, 34, 61): S, 6
+  and 3i GREEN (the CPU census and its six teeth, the ramp walk 400 x 5 EXACTLY 0, --tooth and --tooth-nan BITE);
+  EXIT 2 in 3g, the mutation reach: 10 killed, 1 survived -- boot_record (the boot's all-sound-off made CC 121).
+  The state gate compared nothing before the first block, which applies initialize's records, and the engine's CC
+  entry ignores the message: no trace (playbook 260). jx_state_gate.py now compares initialize's queued records on
+  both sides before the first block: chain 0 GREEN (338 records), the mutant RED at step 0 (EXECUTED). Owed: 3f (its
+  gate changed), 3g, 4, 5, 5b, 5c.
 
 ## 2026-10-14 (21) — THE FULL VERIFY'S RED: A STALE TOOTH SEED, AND A REAL DEFECT THE SWEEP FOUND (playbook 256)
 

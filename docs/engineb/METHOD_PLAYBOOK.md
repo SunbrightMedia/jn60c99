@@ -4474,3 +4474,17 @@ Where two NaNs can meet in an add or a multiply, the C states the plugin's opera
 commutative there, and GCC picks the order. A Unicorn oracle grades such a meeting only where its x87 rule and the
 CPU's first-operand rule agree; the rest needs the plugin run natively (row 24).
 
+## 260. A MUTANT A GATE ONCE KILLED CAN ESCAPE LATER -- GRADE THE RECORD, NOT ONLY ITS TRACES
+Paid 2026-10-15 (jxverify_991d4470, EXIT 2 in section 3g: 10 killed, 1 survived). The mutant boot_record makes
+the boot's all-sound-off message (CC 120) CC 121. Its gate, jx_state_gate.py chain 0, KILLED it on 2026-10-10
+(job jx19_mutation); now it stayed GREEN. Both sides run the first block -- which applies initialize's records --
+before the gate's first comparison, so the message was graded only by its traces in the saves and later queues;
+the engine's CC entry ignores CC 120, and since the port's CC entries are the plugin's own, lifted, CC 121 at boot
+left no trace either (INFERRED: the 10-10 port answered CC 121 with transcribed code). The record itself was never
+compared. Fixed: the gate compares initialize's queued records, both sides, before the first block (338 records
+equal on chain 0; the mutant RED at step 0, "boot").
+### The rule
+A gate that grades a message by its effects goes blind when the effect vanishes -- an ignored command, an idle
+engine. Where the port emits a record, compare the record as emitted. And re-run the mutation reach after every
+change to the code its gates watch: a kill is a fact about one tree.
+
