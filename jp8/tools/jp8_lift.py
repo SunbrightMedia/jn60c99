@@ -19,7 +19,9 @@ import pefile, capstone
 from capstone import x86
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BIN = os.path.join(HERE, "..", "truth", "JUPITER-8VST3_64bit.vst3")
+# The lifter is image-generic (the user's rule, docs/JUNO_LIFT.md): LIFT_BIN points it at any .vst3 (the JUNO-60
+# lift sets it to truth/JUNO60.vst3). Unset, it is the JUPITER-8, so every JP8 gate is unchanged.
+BIN = os.environ.get("LIFT_BIN") or os.path.join(HERE, "..", "truth", "JUPITER-8VST3_64bit.vst3")
 pe = pefile.PE(BIN); IB = pe.OPTIONAL_HEADER.ImageBase; IMG = pe.get_memory_mapped_image()
 text = [s for s in pe.sections if s.Name.startswith(b'.text')][0]
 CLO = text.VirtualAddress; CHI = CLO + text.Misc_VirtualSize
