@@ -169,21 +169,32 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   for (let i = 0; i < 2; i++) { const p = await scr('#panel .cap-lever', 0); await page.mouse.click(p[0], p[1]); vals.push(await page.evaluate(() => { const i = __plate.S.insts.find(i => __plate.BOARDS[i.b].parts.some(p => p[0] === 'switch')); return Object.values(i.caps)[0]; })); }
   console.log('switch positions', vals.join(','), vals.join(',') === '1,-1' ? 'OK' : 'FAIL');
   await page.screenshot({ path: path.join(out, 'panel_view_moved.png'), fullPage: false });
-  // labels: one per fader and knob, its letters centred halfway between the board's top edge and
-  // the top of the fader slot / knob -- recomputed here from the oracle-checked cutouts and the caps
+  // labels, recomputed here: CNTRL centred between the board's top edge and the top of each fader
+  // slot / switch slot / knob (measured from its drawn cap) / button pack row; numbers 1..n centred
+  // between each button cap's bottom and the board's bottom edge, left to right
   const lab = await page.evaluate(() => {
-    const P = __plate, svg = document.getElementById('panel'), g = P.derived.g, size = P.S.params.labelSize;
-    const labels = [...svg.querySelectorAll('#labels .lbl')].map(t => { const b = t.getBBox(); return { x: +t.getAttribute('x'), base: +t.getAttribute('y'), a: t.getAttribute('text-anchor'), top: b.y, bot: b.y + b.height }; });
-    const want = [];
-    P.G.cutoutBoxes(P.BOARDS, P.S.insts, g, P.S.params).filter(c => c.kind === 'fader').forEach(c => want.push([c.inst, (c.box[0] + c.box[2]) / 2, c.box[1]]));
-    [...svg.querySelectorAll('.cap-knob .body')].forEach(e => { const inv = svg.getScreenCTM().inverse(), b = e.getBBox(), m = inv.multiply(e.getScreenCTM()), cx = m.a * (b.x + b.width / 2) + m.c * (b.y + b.height / 2) + m.e, cy = m.b * (b.x + b.width / 2) + m.d * (b.y + b.height / 2) + m.f;
-      const k = P.S.insts.findIndex(i => i.id === +e.closest('.board').dataset.id); want.push([k, cx, cy - b.width / 2]); });
-    const res = want.map(([k, x, top]) => { const bt = P.derived.v.placed[k].bbox[1], mid = (bt + top) / 2;
-      const l = labels.find(l => Math.abs(l.x - x) < 0.01);
-      return !!l && l.a === 'middle' && Math.abs(l.base - (mid + 0.717 * size / 2)) < 0.01 && l.top >= bt - 0.5 && l.bot <= top + 0.5; });
-    return { n: labels.length, want: want.length, ok: res.every(Boolean), size, text: svg.querySelector('#labels .lbl').textContent, fam: getComputedStyle(svg.querySelector('#labels .lbl')).fontFamily };
+    const P = __plate, svg = document.getElementById('panel'), g = P.derived.g, size = P.S.params.labelSize, inv = svg.getScreenCTM().inverse();
+    const labels = [...svg.querySelectorAll('#labels .lbl')].map(t => { const b = t.getBBox(); return { x: +t.getAttribute('x'), base: +t.getAttribute('y'), a: t.getAttribute('text-anchor'), txt: t.textContent, top: b.y, bot: b.y + b.height }; });
+    const want = [];   // [inst, x, partEdge, top?, text]
+    P.G.cutoutBoxes(P.BOARDS, P.S.insts, g, P.S.params).filter(c => c.kind === 'fader' || c.kind === 'switch').forEach(c => want.push([c.inst, (c.box[0] + c.box[2]) / 2, c.box[1], true, 'CNTRL']));
+    const drawn = sel => [...svg.querySelectorAll(sel)].map(e => { const b = e.getBBox(), m = inv.multiply(e.getScreenCTM());
+      const pts = [[b.x, b.y], [b.x + b.width, b.y + b.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+      return { k: P.S.insts.findIndex(i => i.id === +e.closest('.board').dataset.id), x0: Math.min(pts[0][0], pts[1][0]), x1: Math.max(pts[0][0], pts[1][0]), y0: Math.min(pts[0][1], pts[1][1]), y1: Math.max(pts[0][1], pts[1][1]) }; });
+    // knobs turn, so take the centre and the radius (a turned circle's box corners overstate its top)
+    [...svg.querySelectorAll('.cap-knob .body')].forEach(e => { const m = inv.multiply(e.getScreenCTM()), r = +e.getAttribute('r');
+      want.push([P.S.insts.findIndex(i => i.id === +e.closest('.board').dataset.id), m.e, m.f - r, true, 'CNTRL']); });
+    const btn = drawn('.cap-button .body'), packs = [...new Set(btn.map(c => c.k))];
+    packs.forEach(k => { const l = btn.filter(c => c.k === k).sort((a, b) => a.x0 - b.x0);
+      want.push([k, (Math.min(...l.map(c => c.x0)) + Math.max(...l.map(c => c.x1))) / 2, Math.min(...l.map(c => c.y0)), true, 'CNTRL']);
+      l.forEach((c, n) => want.push([k, (c.x0 + c.x1) / 2, c.y1, false, String(n + 1)])); });
+    const res = want.map(([k, x, edge, top, txt]) => { const bb = P.derived.v.placed[k].bbox, mid = top ? (bb[1] + edge) / 2 : (bb[3] + edge) / 2;
+      const l = labels.find(l => Math.abs(l.x - x) < 0.01 && l.txt === txt && Math.abs(l.base - (mid + 0.717 * size / 2)) < 0.01);
+      return !!l && l.a === 'middle' && (top ? (l.top >= bb[1] - 0.5 && l.bot <= edge + 0.5) : (l.top >= edge - 0.5 && l.bot <= bb[3] + 0.5)); });
+    window.__labbad = want.filter((w, i) => !res[i]).map(w => [P.BOARDS[P.S.insts[w[0]].b].name, ...w.slice(1)]).concat(labels.filter(l => /^[0-9]+$/.test(l.txt) || true).slice(0, 0));
+    return { badItems: window.__labbad, n: labels.length, want: want.length, bad: res.filter(r => !r).length, nums: labels.filter(l => /^[0-9]+$/.test(l.txt)).length, switches: svg.querySelectorAll('.cap-lever').length };
   });
-  console.log('labels', lab.n, 'for', lab.want, 'faders+knobs, centred between board top and part top:', lab.ok, lab.text, lab.size + ' mm', lab.n === lab.want && lab.ok && lab.text === 'CNTRL' ? 'OK' : 'FAIL');
+  if (lab.bad) console.log('  wrong:', JSON.stringify(lab.badItems));
+  console.log('labels', lab.n, 'expected', lab.want, '(numbers', lab.nums + ', switches', lab.switches + '), wrong', lab.bad, lab.n === lab.want && lab.bad === 0 && lab.nums > 0 && lab.switches > 0 ? 'OK' : 'FAIL');
   await page.click('#vLabels'); const nl = await page.evaluate(() => document.querySelectorAll('#labels .lbl').length); await page.click('#vLabels');
   await page.click('#vEdges'); const es = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke); await page.click('#vEdges');
   const es2 = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke);

@@ -827,19 +827,36 @@ function cutoutMarkup(b, P, attrsOf) {
   }).join('');
 }
 
-// "CNTRL" above every fader and knob, in the plate frame (always upright). Its letters are centred
-// halfway between the top edge of the part's board and the top of the part: the top of the fader's
-// throw (its slot) or the top of the knob. Baseline = that middle + half the cap height (Helvetica 0.717 em).
+// Panel labels, in the plate frame (always upright). Each text is centred halfway between an edge of
+// its board and the part: "CNTRL" between the board's TOP edge and the top of the fader slot, the
+// knob, the switch slot, or a button pack's row of caps (one per pack); the button numbers 1..n
+// between the bottom of each cap and the board's BOTTOM edge. Baseline = middle + half the cap
+// height (Helvetica 0.717 em).
 const LABEL_TEXT = 'CNTRL', CAP_HEIGHT = 0.717;
 function labelSpots() {
   const g = derived.g, P = S.params, out = [];
-  const tops = S.insts.map((i, k) => derived.v.placed[k].bbox[1]);
-  G.cutoutBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'fader').forEach(c => out.push({ inst: c.inst, kind: 'fader', x: (c.box[0] + c.box[2]) / 2, top: c.box[1] }));
-  G.capBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'pot').forEach(c => out.push({ inst: c.inst, kind: 'pot', x: (c.box[0] + c.box[2]) / 2, top: c.box[1] }));
-  return out.map(o => Object.assign(o, { boardTop: tops[o.inst], mid: (tops[o.inst] + o.top) / 2, baseline: (tops[o.inst] + o.top) / 2 + CAP_HEIGHT * P.labelSize / 2 }));
+  const bb = S.insts.map((i, k) => derived.v.placed[k].bbox);
+  const spot = (inst, x, partEdge, top, text) => {
+    const mid = top ? (bb[inst][1] + partEdge) / 2 : (bb[inst][3] + partEdge) / 2;
+    out.push({ inst, x, mid, top, text, baseline: mid + CAP_HEIGHT * P.labelSize / 2 });
+  };
+  G.cutoutBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'fader' || c.kind === 'switch')
+    .forEach(c => spot(c.inst, (c.box[0] + c.box[2]) / 2, c.box[1], true, LABEL_TEXT));
+  const caps = G.capBoxes(BOARDS, S.insts, g, P);
+  caps.filter(c => c.kind === 'pot').forEach(c => spot(c.inst, (c.box[0] + c.box[2]) / 2, c.box[1], true, LABEL_TEXT));
+  const packs = new Map();
+  caps.filter(c => c.kind === 'button').forEach(c => packs.set(c.inst, (packs.get(c.inst) || []).concat([c])));
+  for (const [inst, list] of packs) {
+    const x0 = Math.min(...list.map(c => c.box[0])), x1 = Math.max(...list.map(c => c.box[2]));
+    spot(inst, (x0 + x1) / 2, Math.min(...list.map(c => c.box[1])), true, LABEL_TEXT);
+    const wide = x1 - x0 >= Math.max(...list.map(c => c.box[3])) - Math.min(...list.map(c => c.box[1]));
+    list.slice().sort((a, b) => wide ? a.box[0] - b.box[0] : a.box[1] - b.box[1])
+      .forEach((c, n) => spot(inst, (c.box[0] + c.box[2]) / 2, c.box[3], false, String(n + 1)));
+  }
+  return out;
 }
 function labelsMarkup() {
-  return labelSpots().map(o => `<text class="lbl" x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" text-anchor="middle" style="font-size:${S.params.labelSize}px">${LABEL_TEXT}</text>`).join('');
+  return labelSpots().map(o => `<text class="lbl" x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" text-anchor="middle" style="font-size:${S.params.labelSize}px">${o.text}</text>`).join('');
 }
 
 // Caps of one placed board, in the board frame (shapes from G.capShapes).
@@ -1305,7 +1322,7 @@ $('bSvg').addEventListener('click', async () => {
     if ((b.parts || []).length) parts.push(`<g transform="matrix(${q.matrix.join(' ')})">` + cutoutMarkup(b, S.params, c => `data-kind="${c.kind}" data-parts="${c.n}"`) + '</g>');
   });
   parts.push('</g>', '<g id="labels" inkscape:groupmode="layer" inkscape:label="Labels" font-family="Helvetica, Arial, sans-serif" font-weight="700" text-anchor="middle" fill="#000">');
-  labelSpots().forEach(o => parts.push(`<text x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" font-size="${S.params.labelSize}">${LABEL_TEXT}</text>`));
+  labelSpots().forEach(o => parts.push(`<text x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" font-size="${S.params.labelSize}">${o.text}</text>`));
   parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
 });

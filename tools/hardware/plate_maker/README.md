@@ -85,8 +85,11 @@ movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 m
   (0,4) -> (2,6) -> (4,7) -> (6,7) over 12 turns; the new build: 40 turns, back every 4.
 - Panel view checkboxes: Board edges, Labels. Labels: "CNTRL" in Helvetica (Arial where the system
   has no Helvetica), `labelSize` 5 mm; the letters are centred halfway between the top edge of the
-  part's board and the top of the fader's slot / the knob (the user, 2026-10-15); also a "Labels"
+  part's board and the top of the fader's slot / the knob / the switch slot / a button pack's row of
+  caps (one per pack); under each PB86-A1 cap its number 1..n (left to right), centred between the
+  cap's bottom and the board's bottom edge (the user, 2026-10-15); also a "Labels"
   layer in the Layout SVG export. The browser check recomputes each spot from the cutouts and the
-  knob caps (seen to fail with a wrong cap-height constant).
+  knob caps (seen to fail with a wrong cap-height constant, and with the numbers measured from the
+  wrong board edge: 12 of 12 wrong).
 - Fader caps 6 x 10 (half the first placeholder); saved layouts that still hold the old default follow
   the new one (`OLD_DEFAULTS` in app.html).
