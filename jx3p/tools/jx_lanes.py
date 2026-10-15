@@ -65,6 +65,7 @@ PRELUDE = {
     '4': 'mkdir -p build/jx_full_ab && cc -std=c99 -O2 -ffp-contract=off -fno-strict-aliasing -shared -fPIC '
          '-o build/jx_full_ab/libjx3p.so jx3p/gui/jx_bridge.c jx3p/src/jx_voice_render.c jx3p/src/jx_voice_helpers.c '
          'jx3p/src/jx_master_render.c jx3p/src/jx_ftz.c -lm -lz',
+    '5c': 'python3 jx3p/tools/make_native_jx.py > /dev/null',     # JX-3P.exe, which 5b builds in the sequential run
 }
 MIN_FREE_GIB = float(os.environ.get('JX_LANES_MIN_FREE_GIB', '4'))
 MIN_DISK_GIB = float(os.environ.get('JX_LANES_MIN_DISK_GIB', '2'))
