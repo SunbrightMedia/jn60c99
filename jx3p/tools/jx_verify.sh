@@ -494,7 +494,7 @@ echo "=== JX GATE 5c: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (SCOPE_A
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/wine/wine64}" ]; then
   python3 "$HERE/jx_gen_cc_preset.py" --check
   python3 "$HERE/jx_panel_gate.py"
-  python3 "$HERE/jx_panel_gate.py" --teeth exe3-20,exe22-31,pm21,cc1-7,bridge1 --jobs 3
+  python3 "$HERE/jx_panel_gate.py" --teeth exe3-20,exe22-35,pm21,cc1-7,bridge1 --jobs 3
 else
   echo "[jx verify] FAIL -- no mingw-w64 or Wine: the drawn panel cannot be graded"; exit 1
 fi

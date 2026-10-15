@@ -4612,3 +4612,16 @@ juno 0, --tooth-twins bites.
 ### The rule
 In a file both ports build, cite only the first plugin's numbers; the second plugin's go in its own files. Before
 committing a shared file, run the census of BOTH ports.
+
+## 271. A QUICK GATE GREEN IS NOT THE GATE GREEN -- AND AN ORACLE THAT TICKS ONE WINDOW GRADES ONE WINDOW
+Paid 2026-10-15 (section 5c RED, seed 1, after row 25 was closed on the quick run alone). The full run's longer
+history put a CC assign press between a patch name's click and the key sweep: the plugin's handler takes the focus and
+lets it go (rva 0x31D384), the program kept it, and Up / Down loaded patches in the program only (284 failures). A focus
+trace on both sides (the plugin's holder after every event against a debug build's) found the rest: a patch block's
+down takes the focus, the patch window's creation gives it to its list, and that window has its OWN 50 ms timer
+(rva 0x311491) the oracle never fired -- the list's tick (arrow repeat, focus) unseen by the gate. Fixed in the
+program, the oracle and the gate (a "focus" line, a section, teeth 32-35).
+### The rule
+Run the full gate before closing a row: a quick run is the teeth's script, not the reach. When a GUI has two windows,
+census every SetTimer site and fire every live window's timer in the oracle; compare the state the next input reads
+(here the key holder) directly, not only through its later effects.

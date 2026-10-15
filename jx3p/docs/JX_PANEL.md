@@ -126,6 +126,21 @@ the gate):
   (a final set: the open host edit closes), the click direction back to 1. The tick: the key operator's states (1, 2
   repeat the step, 3 a step 0, 4 the focus let go), the wheel operator's 800 ms end; the display's order is the wheel
   operator's first (rva 0x2DE8B0, unseen: its step 0 is none).
+* **Who else holds the focus** (corrected 2026-10-15; EXECUTED by the gate's "focus" line, which compares the key
+  holder after each event of its section): every control's down that takes it lets the holder's go first. A patch
+  block's down takes it before its load (rva 0x351C90: vt+0xC0, vt+0xB8 1); the CC assign control's press, when its
+  search finds a record, takes it and lets it go before its menu (rva 0x31D384: vt+0xB8 1, then 0) -- the gate's
+  ccpick runs that handler too; the latch family's down takes it and its up lets it go, the patch window's buttons
+  too; the root takes it at the resize corner's down and lets it go at the up. The patch window's list (class
+  "patch", vt 0x99F958) takes it when the window is created (its window kind's, rva 0x3111A0) and at every tick of the
+  window's OWN 50 ms timer (SetTimer rva 0x311491; WM_TIMER rva 0x31167C ticks that root alone, no module idle; the
+  list's tick, rva 0x3280E0: a held arrow's repeat, then the focus); the window's destruction lets the list's go. A
+  key goes to the holder (the root's key, rva 0x2AA960): a frame control's or the patch name's key operator, or the
+  list's key (rva 0x3276F0: a down runs the patch manager's key, rva 0x3277A0 = juno_pm_key; an arrow's down starts
+  the repeat, 200 ms then every 50 ms, its up stops it); every other holder's key is the layout mover's (rva 0x2C4630,
+  off): nothing. The oracle now fires the patch window's timer after the main window's at each gtick (the program
+  likewise); before, it never ticked that window (playbook 271). The defect the full gate found (5c RED, seed 1): the
+  program kept a patch name's focus through a CC assign press, so Up / Down stepped the patch in the program only.
 * **The wheel** (WM_MOUSEWHEEL rva 0x3117C8 -> the message rva 0x43E370, the root's vt+0x50): a delta of 1..119
   counts 120; on a knob, a slider, a JX switch or the patch name: the focus, a step of (Ctrl: min(positions / 2, 10))
   x the notches (truncated), the 800 ms timer; on the keyboard OCTAVE SHIFT plus the notches (not taken); the latch

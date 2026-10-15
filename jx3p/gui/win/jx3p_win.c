@@ -963,6 +963,9 @@ static int eng_refresh(void)              /* the model as getState writes it; ca
     return changed;
 }
 
+static Ctl *g_focus;                       /* the editor's one focused control (below: THE FOCUS) */
+static void focus_set(Ctl *c, int flag);
+static void pw_focus_sync(void);
 static int pm_owns(uint32_t id) { return id == JPM_ID_PANEL || id == JPM_ID_MANAGER || id == JPM_ID_LIST_MAIN || id == JPM_ID_LIST_SUB; }
 static int val_get(const Leaf *L)
 {
@@ -1002,6 +1005,7 @@ static void val_set(const Leaf *L, int v)
     if (r) eng_refresh();
     LeaveCriticalSection(&g_lock);
     if (L->id == JPM_ID_PANEL && v == 1 && EXE_TOOTH != 2) { zoom_conv(0); zoom_conv(1); }   /* the window opens: both convert (TOOTH 2: not) */
+    if (pm_owns(L->id)) pw_focus_sync();
     if (!r && !(g_pm && pm_owns(L->id))) local_put(L->id, v);
     if (!strcmp(L->name, "fm.SYNTH.COM.TEMPO")) g_tempo = 40.0 + v / 10.0;     /* "40.0BPM" + 0.1 per step */
     if (!strcmp(L->name, "vm.vs.mainZoom")) zoom_apply();
@@ -2664,6 +2668,8 @@ static int cc_menu(int x, int y, int choice)
     int cc, cmd = -1;
     char s[64];
     if (!cc_target(g_tree, x, y, &c) || !(L = cleaf(c))) return 0;
+    if (g_focus && EXE_TOOTH != 33) focus_set(g_focus, 0);   /* rva 0x31D384: the CC assign control takes the focus and
+                                                              * lets it go (vt+0xB8 1, then 0) -- TOOTH 33: not */
     EnterCriticalSection(&g_lock);
     cc = jx3p_cc_of(L->id);
     LeaveCriticalSection(&g_lock);
@@ -2964,6 +2970,56 @@ static void keyop_mouse(Ctl *c, int type)
     if (type == 0 || type == 2) { if (g_focus != c) focus_set(c, 1); }
     else if (g_cap == c) { c->kstate = 4; c->kt.period = 3200; gt_start(&c->kt); }
 }
+/* THE PATCH WINDOW'S LIST AS THE FOCUS HOLDER (class "patch", vt 0x99F958; EXECUTED, jx3p/tools/jx_panel_gate.py
+ * "# focus"): the window's creation (its window kind's, rva 0x3111A0) gives the list the focus; the window's
+ * destruction lets the list's go (a control that took it meanwhile keeps it). The window's own 50 ms timer (SetTimer at
+ * rva 0x311491; its WM_TIMER, rva 0x31167C, ticks its root only -- no module idle) ticks the list (rva 0x3280E0): a held
+ * arrow's repeat, then the focus taken again. The list's key (rva 0x3276F0): a key down runs the patch manager's key
+ * (rva 0x3277A0, juno_pm_key) with the message's code and Shift / Ctrl; an arrow's down keeps the message and starts the
+ * repeat (200 ms, then every 50 ms), its up stops it. Keys go to the focus holder only (the root's key, rva 0x2AA960):
+ * the list, or a frame control / the patch name (their key operators); every other holder's key is the layout mover's
+ * (rva 0x2C4630, off): nothing. */
+static Ctl *pw_find(int type);
+static void pm_after(void);
+static GTimer g_pl_rep = {0, -1};          /* the list's repeat (its +0xB8) */
+static int g_pl_code, g_pl_mods, g_pw_seen;
+static int pl_action(int code, int mods)   /* rva 0x3277A0 */
+{
+    int close = 0, r = juno_pm_key(g_pm, code, ((mods & 1) ? JPM_SHIFT : 0) | ((mods & 2) ? JPM_CTRL : 0), &close);
+    if (r) pm_after();
+    return r;
+}
+static int pl_key(int type, int code, int mods)          /* rva 0x3276F0 */
+{
+    int r = type == 1 ? pl_action(code, mods) : 0;
+    if (code >= 0x100 && code <= 0x103 && EXE_TOOTH != 35) {                /* TOOTH 35: no arrow repeat */
+        if (type == 1) { g_pl_code = code; g_pl_mods = mods; g_pl_rep.period = 200; gt_start(&g_pl_rep); }
+        else if (type == 2) gt_stop(&g_pl_rep);
+    }
+    return r;
+}
+static void pl_tick(void)                                /* rva 0x3280E0, from the patch window's own timer */
+{
+    Ctl *l = pw_find(C_PATCHLIST);
+    if (gt_on(&g_pl_rep) && gt_due(&g_pl_rep)) {
+        pl_action(g_pl_code, g_pl_mods);
+        g_pl_rep.period = 50;
+        gt_start(&g_pl_rep);
+    }
+    if (l && g_focus != l) focus_set(l, 1);
+}
+/* the window's creation and destruction as the program sees them (after each set, each patch manager call) */
+static void pw_focus_sync(void)
+{
+    int open = g_pm && juno_pm_value(g_pm, JPM_ID_PANEL) == 1;
+    Ctl *l = pw_find(C_PATCHLIST);
+    if (open == g_pw_seen) return;
+    g_pw_seen = open;
+    gt_stop(&g_pl_rep);
+    if (!l || EXE_TOOTH == 34) return;                                       /* TOOTH 34: the list never holds it */
+    if (open) focus_set(l, 1);
+    else if (g_focus == l) focus_set(l, 0);
+}
 /* the tick of a frame control (rva 0x2D07A0): the key operator's (rva 0x2D5C40) -- focused and due: states 1, 2 the
  * step again (state 2, 50 ms), 3 a step 0 (state 4, 3200 ms), 4 the focus let go unless it holds the mouse -- then the
  * wheel operator's (rva 0x2ECB70) -- focused, running and due: stopped, a step 0 */
@@ -3012,6 +3068,7 @@ static int ev_key(int type, int vk, int mods)       /* type 1 down, 2 up; mods: 
     int code = key_code((signed char)vk), dir;
     Ctl *c = g_focus;
     if (g_log) fprintf(g_log, "# key code %d\n", code);
+    if (c && c->type == C_PATCHLIST) return pl_key(type, code, mods);      /* the patch window's list */
     if (!c || !op_class(c)) return 0;
     if (code == 0x100 || code == 0x103) dir = 1;
     else if (code == 0x101 || code == 0x102) dir = -1;
@@ -3076,6 +3133,8 @@ static void gui_tick(void)
 {
     panel_tick(g_tree);
     fn_run();
+    if (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL) == 1) pl_tick();       /* the patch window's timer (after the main's:
+                                                                           * jx_panel_gate.py's order) */
 }
 /* THE WHEEL (WM_MOUSEWHEEL, rva 0x3117C8 -> 0x312720 -> the message, rva 0x43E370): a delta of 1 .. 119 counts 120;
  * notches = delta / 120; Shift 1, Ctrl 2 (MK_SHIFT, MK_CONTROL), Alt 8; the root panel (rva 0x2AB590) turns it when
@@ -3347,7 +3406,9 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
         g_drag = NULL;
 #endif
         break;
-    case C_PATCHBLOCK:                  /* a down or a double click (rva 0x351C90) */
+    case C_PATCHBLOCK:                  /* a down or a double click (rva 0x351C90): the focus taken when not held (vt+0xC0,
+                                         * vt+0xB8 1), then the selection and its load */
+        if (g_focus != c && EXE_TOOTH != 32) focus_set(c, 1);           /* TOOTH 32: the patch block takes no focus */
         juno_pm_pick(g_pm, EXE_TOOTH == 7 ? (c->patchid + 1) % 64 : c->patchid);
         pm_after();
         g_drag = NULL;
@@ -3592,6 +3653,7 @@ static Ctl *g_pmbtn;                       /* the patch window's button that hol
 static void pm_after(void)
 {
     pm_status();
+    pw_focus_sync();
     g_dirty = 1;
 }
 static int patch_down(int x, int y, int dbl)
@@ -3610,6 +3672,7 @@ static int patch_down(int x, int y, int dbl)
         if (c->args && (!strcmp(c->args, "sendUser") || !strcmp(c->args, "getUser"))) continue;
         frame_size(c->bmp, &w, &h);
         if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h) {
+            focus_set(c, 1);                   /* the latch family's down (rva 0x2CD350): focused, */
             press(c);                          /* the latch family's down (rva 0x2CD350): pressed and captured; its press
                                                 * (unlatchButton's vt+0x120, rva 0x2CD7E0) comes with the up */
             g_pmbtn = c;
@@ -3639,6 +3702,7 @@ static int pm_mouse_up(int x, int y)
         Ctl *c = g_pmbtn;
         int w = 0, h = 0;
         g_pmbtn = NULL;
+        focus_set(c, 0);                       /* the latch family's up: the mouse and the focus let go, then the press */
         if (c->bmp) frame_size(c->bmp, &w, &h);
         if (x >= c->x && x < c->x + w && y >= c->y && y < c->y + h && c->action) {
             if (EXE_TOOTH == 24) action(c->fn, c->args);   /* TOOTH 24: run at the up, not queued */
@@ -4035,15 +4099,9 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
               ((wp & MK_SHIFT) ? 1 : 0) | ((wp & MK_CONTROL) ? 2 : 0) | (GetAsyncKeyState(VK_MENU) < 0 ? 8 : 0));
         InvalidateRect(h, NULL, FALSE);
         return 0;
-    case WM_KEYDOWN:                     /* the patch window's list takes the keys while it is open (in the plugin
-                                          * its own window: the main panel gets none then) */
-        if (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL)) {
-            if (pm_key((int)wp, GetKeyState(VK_SHIFT) < 0, GetKeyState(VK_CONTROL) < 0)) InvalidateRect(h, NULL, FALSE);
-            return 0;
-        }
-        /* fall through */
-    case WM_KEYUP:                       /* the panel's key (rva 0x310724): a key down's repeats (lParam bit 30) none */
-        if ((m == WM_KEYDOWN && (lp & 0x40000000)) || (g_pm && juno_pm_value(g_pm, JPM_ID_PANEL))) break;
+    case WM_KEYDOWN:                     /* the panel's key (rva 0x310724, the patch window's alike): a key down's */
+    case WM_KEYUP:                       /* repeats (lParam bit 30) none; the key goes to the focus holder (ev_key) */
+        if (m == WM_KEYDOWN && (lp & 0x40000000)) break;
         if (ev_key(m == WM_KEYDOWN ? 1 : 2, (int)wp, (GetKeyState(VK_SHIFT) < 0 ? 1 : 0) | (GetKeyState(VK_CONTROL) < 0 ? 2 : 0) |
                    (GetKeyState(VK_MENU) < 0 ? 8 : 0))) {
             InvalidateRect(h, NULL, FALSE);
@@ -4713,15 +4771,22 @@ static int kb_script(const char *path)
             fprintf(g_log, "# ccmsg %d %d %d %d\n", a, b, c, d);   /* never a press on a control */
             fprintf(g_log, "# ccmsg taken %d\n", cc_press(a, b, c, d));
         }
-        else if (sscanf(line, "ccpick %d %d", &a, &b) == 2) {         /* the CC assign search alone */
-            Ctl *t = NULL;
-            Leaf *Lf;
-            fprintf(g_log, "# ccpick %d %d %ld\n", a, b,
-                    cc_target(g_tree, a, b, &t) && (Lf = cleaf(t)) ? (long)Lf->id : -1L);
+        else if (sscanf(line, "ccpick %d %d", &a, &b) == 2) {         /* the CC assign search alone (the gate runs */
+            Ctl *t = NULL;                                               /* the plugin's handler: a found record's */
+            Leaf *Lf;                                                    /* focus as cc_menu's, its menu answered none) */
+            long id = cc_target(g_tree, a, b, &t) && (Lf = cleaf(t)) ? (long)Lf->id : -1L;
+            fprintf(g_log, "# ccpick %d %d %ld\n", a, b, id);
+            if (id >= 0 && g_focus && EXE_TOOTH != 33) focus_set(g_focus, 0);
         }
         else if (!strncmp(line, "cctree", 6)) cc_tree(g_tree, g_log);
         else if (!strncmp(line, "state", 5)) log_state();
         else if (!strncmp(line, "pending", 7)) log_pending();
+        else if (!strncmp(line, "focus", 5)) {        /* the key holder: a frame control or the patch name (its */
+            Ctl *f = g_focus && (op_class(g_focus) || g_focus->type == C_PATCHLIST) ? g_focus : NULL;  /* class, place), */
+            if (!f) fprintf(g_log, "# focus -\n");                       /* the patch window's list, or none of those */
+            else if (f->type == C_PATCHLIST) fprintf(g_log, "# focus patch\n");
+            else fprintf(g_log, "# focus %s %d %d\n", f->typestr, f->x, f->y);
+        }
         else if (!strncmp(line, "pmv", 3)) {          /* the patch window's values: open, patchManager, the lists, the
                                                        * view's bankId and patchId */
             int vb = 0, vp = 0, tk = 0;

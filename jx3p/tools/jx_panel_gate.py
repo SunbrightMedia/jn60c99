@@ -50,7 +50,9 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
                  zoom), 23 no leave, 24 a patch window button's function run at the up (the plugin: queued), 25 the
                  leave's point not inside every open panel, 26 Up's key code read as Down's, 27 no resize corner,
                  28 the option menu's "Clear" never greyed, 29 "Clear" applies the preset, 30 the wrong voice count
-                 checked, 31 no separator after the CPU item
+                 checked, 31 no separator after the CPU item; the key holder: 32 a patch block takes no focus, 33 the
+                 CC assign control's press leaves the holder, 34 the patch window's list never holds the focus, 35 no
+                 arrow repeat on the list
   --bridge-tooth N  builds it with -DJX_PRESET_TOOTH=N (jx3p/gui/win/jx_bridge_exe.c): 1 the preset test reads one entry of
                  a record (the plugin reads them all)
   --pm-tooth N   builds it with -DPM_TOOTH=N (gui/juno_pm.c): 21 the patch menu's half ignored
@@ -399,6 +401,10 @@ class Plugin:
         self.h.call(self.q(self.q(self.root) + 0x60), rcx=self.root, rdx=self.msg, count=4_000_000_000)
         mod = self.h.call(self.IB + MODULE, count=500_000_000)
         self.h.call(self.q(self.q(mod) + 0x38), rcx=mod, count=4_000_000_000)
+        w = self.pw()                                # the patch window's own 50 ms timer (its window kind: SetTimer at
+        if w is not None:                            # rva 0x311491, WM_TIMER rva 0x31167C -- its root's tick alone), fired
+            self.uc.mem_write(self.msg, struct.pack('<Q', self.IB + TIMER_MSG_VT))     # after the main window's (the
+            self.h.call(self.q(self.q(w) + 0x60), rcx=w, rdx=self.msg, count=4_000_000_000)   # program's order)
 
     def wheel(self, x, y, delta, keys):
         """WM_MOUSEWHEEL at a panel point: the editor's message (its delta, its MK_ keys), the root panel's wheel"""
@@ -725,6 +731,21 @@ def oracle(log):
                 res['n']['key steps'] += 1
             in_event = True
             continue
+        if ln.startswith('# focus'):           # the key holder after the event: a frame control or the patch name (its
+            sync()                             # class and place), the patch window's list, or none of those
+            foc = g.q(g.q(g.q(g.root + 0x10) + 0x10) + 0x18)
+            inf = g.info.get(foc)
+            if inf and inf[0] in ('knob', 'slider', 'jx3pSlider', 'patchName'):
+                mine = '%s %d %d' % inf[:3]
+            elif foc and not inf and g.tname(foc) == 'patch':
+                mine = 'patch'
+            else:
+                mine = '-'
+            if mine != ln[len('# focus'):].strip():
+                fail('%s: the key holder -- the plugin %s, the program %s' % (where(), mine, ln[len('# focus'):].strip()))
+            res['n']['focus'] += 1
+            res['n']['focus ' + mine.split()[0]] += 1
+            continue
         if ln.startswith('# pmv '):            # the patch window's values: the program's against the plugin's model
             sync()
             mine, got = [int(v) for v in t[2:8]], [g.value(k) for k in PW_IDS]
@@ -1033,7 +1054,7 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
             clock[0] += 50
             o.append('gtick %d' % clock[0])
         return o
-    last_gen = (None, {}, [])
+    last_gen = (None, {}, [], [])
     press_at, seen = set(), set()                  # the mouse in the first configuration of each layout and EDIT
     for ci, cfg in enumerate(configs):             # state, and in a quarter of the others
         if cfg[:2] not in seen or quick or rnd.random() < 0.25:
@@ -1156,7 +1177,8 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
                 gen[tn].append((k, tn, l, t, r, b))
         jxs_live = [c for c in jx if c[1] == 'jx3pSlider' and live(c[0])]
         if not cfg[4] and (jxs_live or last_gen[0] is None):   # the keys' controls (below): the last configuration
-            last_gen = (cfg, gen, jxs_live)            # without the SETUP page (modal: it takes every press outside it)
+            last_gen = (cfg, gen, jxs_live, [c for c in jx if c[1] == 'patchBlock' and live(c[0])])   # without the SETUP
+                                                       # page (modal: it takes every press outside it)
                                                        # whose JX switches are live -- the SYSTEM-8 layout has none
         livec = [(c[1], c[2], c[3], c[4]) for k, p in enumerate(tree) if live(k) for c in p[3] if c[3] > c[1] and c[4] > c[2]]
         after = ['opens', 'state', 'pending']
@@ -1275,7 +1297,7 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
     out += ['key %d %d %d' % (1 + (vk & 1), vk, 0) for vk in range(256)] + ['opens', 'state']   # (lines ending the event:
                                                     # the sets below are not the key's -- playbook 265)
     kr = random.Random(seed * 104729 + 7)
-    kcfg, gen_last, jxs_last = last_gen
+    kcfg, gen_last, jxs_last, blocks_last = last_gen
     if kcfg is not None:
         out += config_lines(kcfg) + ['opens', 'state', 'pending']
     keyctl = [c for tn in ('knob', 'slider', 'patchName') for c in gen_last.get(tn, [])] + list(jxs_last)
@@ -1304,6 +1326,39 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
             out += ['key 2 %d %d' % (vk, mods), 'state'] + ticks(kr.randrange(0, 20)) + ['opens', 'state', 'pending']
         if kr.random() < 0.3:                          # the focus's 3200 ms: let go, then a key does nothing
             out += ticks(70) + ['key 1 38 0', 'opens', 'state', 'key 2 38 0', 'opens', 'state']
+    # ---- the key holder (jx3p_win.c THE PATCH WINDOW'S LIST): the CC assign control's press on a focused knob (its
+    # menu answered: none), a patch block's press, the patch window's creation (its list: the patch manager's keys, a
+    # held arrow repeating on the window's own timer, Enter loading and closing), a button of the window (its up lets
+    # the focus go, the window's timer gives it back to the list) and the window's destruction; an arrow after each;
+    # the holder compared ('focus') with the state, the records, the window's values
+    fr = random.Random(seed * 2654435 + 11)
+    knobs_f = gen_last.get('knob', [])
+    if knobs_f and blocks_last:
+        (mw_, mh_), (pw_, ph_) = panel_sizes()
+        pox, poy = (mw_ - pw_) // 2, (mh_ - ph_) // 2
+        after = ['focus', 'opens', 'state', 'pending']
+        arrow = ['key 1 38 0'] + after + ['key 2 38 0'] + after
+        for j in range(3 if quick else 6):
+            k, tn, l, t, r, b = fr.choice(knobs_f)
+            kx, ky = (l + r) // 2, (t + b) // 2
+            press = ['move %d %d 0' % (kx, ky), 'down %d %d 0' % (kx, ky), 'up %d %d' % (kx, ky)] + after
+            out += press + ['ccmsg %d %d 0 2' % (kx, ky)] + after + arrow
+            k, tn, l, t, r, b = fr.choice(blocks_last)
+            bx, by = (l + r) // 2, (t + b) // 2
+            out += press + ['move %d %d 0' % (bx, by), 'down %d %d 0' % (bx, by), 'up %d %d' % (bx, by)] + after + arrow
+            out += press + ['set 1 vm.vs.panelPatch'] + after + ['pmv']
+            for vk in [0x28] if j == 0 else fr.sample((0x28, 0x26, 0x27, 0x25, 0x28), 3):   # the first: Down held 9
+                held = 9 if j == 0 else fr.randrange(0, 12)                        # ticks (its repeats), then Enter
+                out += ['key 1 %d %d' % (vk, fr.choice((0, 0, 1)))] + after + ticks(held) + ['pmv']
+                out += ['key 2 %d 0' % vk] + after + ticks(fr.randrange(0, 3)) + ['pmv']
+            if j == 0 or fr.random() < 0.5:
+                out += ['key 1 13 0'] + after + ['pmv', 'key 2 13 0'] + after + arrow
+            else:
+                l2, t2, r2, b2 = PW_BTN[fr.choice(('dec', 'inc'))]
+                px, py = pox + (l2 + r2) // 2, poy + (t2 + b2) // 2
+                out += ['down %d %d 0' % (px, py)] + after + ['up %d %d' % (px, py)] + after + ticks(1) + after
+                out += ticks(2) + ['pmv', 'set 0 vm.vs.panelPatch'] + after + ['pmv'] + arrow
+        out += ['set 0 vm.vs.panelPatch'] + after + ['pmv']
     # ---- the resize corner (the root's own mouse, before its dispatch: rva 0x2AAEF0): a point in its 20 px circle and
     # on its edge, a down there (a control focused by the wheel first, sometimes: the root takes the focus), drags out
     # and back (the zoom), the up; the zoom, converted points, the hover flags and the state after them
@@ -1495,6 +1550,8 @@ def main():
         'the CC menu taken, a learn, a forget, the CC map moved': n['cc taken'] > 0 and n['learn'] > 0
         and n['forget'] > 0 and n['moved'] > 0,
         'states, pending records, host edits compared': n['state'] > 0 and n['pending'] > 0 and n['edits'] > 0,
+        'the key holder compared: none, a knob, the patch window\'s list': n['focus -'] > 0 and n['focus knob'] > 0
+        and n['focus patch'] > 0,
         'every generic class that takes a down pressed (%s)' % ', '.join(GEN_TAKE): all(pr[c] > 0 for c in GEN_TAKE),
         'knobs, sliders, latch buttons changing the state': all(ch[c] > 0 for c in ('knob', 'slider', 'latchButton')),
         'labels, displays, bar graphs pressed at': all(res['at'][c] > 0 for c in ('label', 'display', 'barGraphX')),
