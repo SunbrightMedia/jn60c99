@@ -197,7 +197,11 @@ the gate):
   vm.vs.patchManager to 11-15), and the setup panel's buttons (midiIn / midiOut, "MIDI CTRL Input / Output", rva
   0x2E5BB0 -> 0x2E5F00: the plugin's own OS MIDI ports -- the SYSTEM-8 link the user ruled out on 2026-10-07,
   docs/HOST_CALL_CENSUS.md). The program shows the two items and does nothing but say so; its setup panel's first
-  button is the program's own MIDI input menu (a standalone program has no host to give it MIDI).
+  button is the program's own MIDI input menu (a standalone program has no host to give it MIDI). Also the vendor's
+  texts and windows (EXECUTED under the oracle): Help launches the plugin's manual (its message 13 where the manual is
+  missing), About opens a window the oracle cannot see, the SYSTEM-8 link's buttons show message 4 (no SYSTEM-8); the
+  texts are in the plugin's TextCodeTable.dat, not in truth/. The program shows its own help and about text and a
+  status line for the link's buttons. SCOPE_AUDIT row 26.
 
 The oracle's side: the patch name's text is its own update's (vt+0xB0, before each event: the template never draws,
 so the live editor's notifications are the gate's call), the patch menu's popup answers a path (the service writes
