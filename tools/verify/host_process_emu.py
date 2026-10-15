@@ -134,7 +134,7 @@ class HostProcess(W.Wrapper):
     def _top(self):
         return self._nested_top if self._nested_top is not None else (E.STACK_BASE + E.STACK_SIZE - 0x10000) & ~0xF
 
-    def call(self, fn, rcx=0, rdx=0, r8=0, r9=0, count=0):
+    def call(self, fn, rcx=0, rdx=0, r8=0, r9=0, count=0, stack=()):
         uc = self.uc
         rsp = self._top() - 8
         RET = E.SCRATCH + 0x5000
@@ -142,6 +142,8 @@ class HostProcess(W.Wrapper):
         for r, v in ((UC_X86_REG_RCX, rcx), (UC_X86_REG_RDX, rdx), (UC_X86_REG_R8, r8), (UC_X86_REG_R9, r9)):
             uc.reg_write(r, v & (2 ** 64 - 1))
         uc.mem_write(rsp, struct.pack('<Q', RET))
+        for k, v in enumerate(stack):             # the fifth argument on: past the return address and the home space
+            uc.mem_write(rsp + 0x28 + 8 * k, struct.pack('<Q', v & (2 ** 64 - 1)))
         start = fn
         while True:
             self._req = None

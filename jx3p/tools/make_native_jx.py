@@ -72,6 +72,10 @@ def main():
     rc = shutil.which('x86_64-w64-mingw32-windres')
     if not cc or not rc:
         raise SystemExit('mingw-w64 not found (apt-get install mingw-w64)')
+    import fcntl
+    os.makedirs(OUT, exist_ok=True)
+    lock = open(os.path.join(OUT, 'native_jx.lock'), 'w')     # one build at a time: each empties and refills BUILD
+    fcntl.flock(lock, fcntl.LOCK_EX)                          # (two at once broke each other: playbook 263)
     if os.path.exists(BUILD):
         shutil.rmtree(BUILD)
     os.makedirs(BUILD)

@@ -31,14 +31,21 @@ for the next block (kind, offset, id, value) and the host's edits (beginEdit / p
 the CC probes as cc_menu_gate.py's. REACH: each class pressed on its live controls with its value changed, both patch
 classes loading, a slider dragged, double clicks, the CC menu taken, a learn, a forget, the CC map moved.
 
-usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-tooth N] [--keep LOG | --log LOG]
+usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-tooth N | --pm-tooth N] [--keep LOG | --log LOG]
   --quick        three panel configurations (QUICK: the teeth's run)
   --tooth N      builds JX-3P.exe with -DEXE_TOOTH=N (jx3p/gui/win/jx3p_win.c) and runs it: must FAIL --
                  3 a jx3pLatchButton flips its other bit, 4 a jx3pSlider's click does not turn at the ends,
                  5 exprLatchButton's on and off pairs swapped, 6 patchSelectButton's lanes swapped,
                  7 patchBlock loads the next patch, 8 the latch family presses at the down (the plugin: at the up),
                  9 a jx3pSlider's drag steps are final sets (the plugin keeps one host edit open through a drag),
-                 10 a panel's hover flag ignored (a press just outside a panel never reaches its controls)
+                 10 a panel's hover flag ignored (a press just outside a panel never reaches its controls);
+                 the generic classes, the wheel, the editor's timer (scope row 25): 11 a patch step one too far,
+                 12 the patch name's positions 16 (its Ctrl step 8), 13 its edit's chars unsigned and NULs past the
+                 end, 14 it never takes the focus, 15 its edit's offer untrimmed, 16 a knob's travel 16 px a position,
+                 17 an unlatchButton's function run at the press (the plugin: queued, the next idle), 18 the wheel's
+                 Ctrl step not capped at 10, 19 the wheel's edit closed after 1000 ms (the plugin: 800), 20 a
+                 latchButton toggles at the down
+  --pm-tooth N   builds it with -DPM_TOOTH=N (gui/juno_pm.c): 21 the patch menu's half ignored
   --cc-tooth N   builds it with -DCC_TOOTH=N (cc_menu_gate.py's teeth on the JX: 1 a panel's controls searched first
                  to last -- the JX has three overlapping pairs, each in one panel --, 2 the right and bottom edges inside,
                  3 closed panels searched, 4 Shift / Ctrl / Alt ignored, 5 a greyed Forget acts, 6 labels and displays
@@ -83,12 +90,35 @@ MAP_RECORD, MAP_ID = 0x3199F0, 0x319B30        # (0x319B10, 0x319C50)
 CCASSIGN_VT, CCA_ATTACH = 0x981498, 0x31D690   # (0x94A4C0, 0x31D7B0)
 MENU_OVERRIDE = 0xCEA428                       # (0xCB21F8)
 SET, NOTIFY, COMMIT = 0x283C90, 0x2852A0, 0x283000          # (0x283DB0, 0x2853C0, 0x283120)
+# the editor's 50 ms timer (its window's WM_TIMER, rva 0x3103BE): the root panel's timer message (vt+0x60; the message
+# object's vtable, rva 0x97FA28) then the module's idle (the CModuleB singleton, rva 0x34D320; its vt+0x38: the
+# function queue). WM_MOUSEWHEEL (rva 0x3117C8): the message the editor builds (rva 0x43E370), the root's vt+0x50
+TIMER_MSG_VT, MODULE, MOUSEWHEEL_MSG = 0x97FA28, 0x34D320, 0x43E370
+# the display's edit (vt+0x140, rva 0x2CF920): its call of the text edit service (rva 0x2AD3E0, answered by PlugPM's
+# hook from the scripted answers), r9 the text offered -- the patch name's edit (scope row 25)
+PN_EDIT_CALL = 0x2CFA19
 TRIO = (0x285200, 0x2852A0, 0x283000)          # a panel control's notifies and commit
 UI_DRAIN = 0x320000                            # (0x320120)
 HEAP = (0x310000000, 0x320000000)              # where the module init's GUI objects live in the emulator
 JX_VT = {0x99F690: 'jx3pLatchButton', 0x99F4D0: 'jx3pSlider', 0x9A0048: 'exprLatchButton',
          0x9A0F28: 'patchSelectButton', 0x9A0348: 'patchBlock'}
 JX_TYPES = tuple(JX_VT.values())
+# the generic classes (scope row 25): pressed on every live control, each class's own handlers -- the knob's and the
+# slider's (rva 0x2D0660), the latch family's (0x2CD350), the keyboard's (0x2D40D0), the patch name's (0x33E950), the
+# display's (0x2DE770); a label, a bar graph take nothing. Not yet pressed: menuButton, setupButton and the Help / About
+# buttons (their menus and dialogs: the program's need a scripted answer first)
+GENERIC = ('knob', 'slider', 'latchButton', 'unlatchButton', 'keyboardX', 'patchName', 'label', 'display', 'barGraphX')
+GEN_N = {'knob': 10, 'slider': 8, 'latchButton': 6, 'unlatchButton': 4, 'keyboardX': 8, 'patchName': 3, 'label': 3,
+         'display': 6, 'barGraphX': 2}
+GEN_TAKE = ('knob', 'slider', 'latchButton', 'unlatchButton', 'keyboardX', 'patchName')   # the classes that take a down
+# the patch name (row 25f): presses on its arrow (the name's edit) and elsewhere on it (the patch menu), with the
+# answers -- names: plain, empty, one char, 16, past 16, chars past 0x7F (signed), spaces, a cancel; menu cells of
+# both halves of the one bank, none
+PN_N = 16
+PN_TEXTS = (b'NEW NAME', b'', b'A', b'0123456789ABCDEF', b'0123456789ABCDEFGHIJK', b'\xe9t\xe9 \xff\x80z\x7f',
+            b'  two  spaces  ', b'Brass [Brs1]', None, None)
+SKIP_FN = ('Help', 'About', 'PlugOut')
+WHEELS = 24                                    # wheel sequences per configuration with presses
 MODS = CG.MODS
 # the panel configurations: (vm.vs.mode, vm.vs.edit, TEMPO SYNC, DELAY TYPE, vm.vs.setup) -- every open condition of
 # jx3p/truth/Script.xml but the patch window's, the setup page's sub-panels and the activation's
@@ -159,6 +189,9 @@ class Plugin:
             raise SystemExit('the plugin\'s attach (rva 0x%X) left +0x80 = %x, not the core %x'
                              % (CCA_ATTACH, self.q(self.cca + 0x80), h.core))
         self.names, self.panels, self.tree, self.jx, self.info, self.ctl_panel = {}, [], [], [], {}, {}
+        self.allc = []                                  # every control: (panel, type, rectangle)
+        self.pnames = []                                # the patch name controls (their text kept: refresh_names)
+        self.pn_answers = []                            # the patch menu's scripted answers: (t, s) or None
         self._walk(self.root)
         mp_ = h.core + 24
         vb, ve = self.q(mp_), self.q(mp_ + 8)
@@ -180,7 +213,8 @@ class Plugin:
         self.offered = self.taker = None           # the control a mouse message went to, the one that took it
         uc.hook_add(UC_HOOK_CODE, self._offer, begin=IB + OFFER, end=IB + OFFER)
         uc.hook_add(UC_HOOK_CODE, self._answer, begin=IB + OFFER_RET, end=IB + OFFER_RET)
-        self.msg = h.alloc_com(0x20)
+        uc.hook_add(UC_HOOK_CODE, self._pn_edit, begin=IB + PN_EDIT_CALL, end=IB + PN_EDIT_CALL)
+        self.msg = h.alloc_com(0x100)
         self.root_mouse = self.q(self.q(self.root) + 0x48)        # the root panel's mouse handler, from its vtable
         if self.root_mouse != IB + ROOT_MOUSE or self.q(self.q(self.tree_panel(1)) + 0x48) != IB + DISPATCH:
             raise SystemExit('the root panel\'s mouse handler 0x%X / a child panel\'s: not 0x%X / 0x%X'
@@ -225,6 +259,9 @@ class Plugin:
             ctl.append((tn, l, t, r, b, nrefs, rec, pid))
             self.info[c] = (tn, l, t, r, b)
             self.ctl_panel[c] = p
+            if tn == 'patchName':
+                self.pnames.append(c)
+            self.allc.append((k_self, tn, l, t, r, b))
             if q(c) - self.IB in JX_VT:
                 if JX_VT[q(c) - self.IB] != tn:
                     raise SystemExit('class at vtable 0x%X names itself %r' % (q(c) - self.IB, tn))
@@ -235,6 +272,28 @@ class Plugin:
 
     def _popup(self, uc, addr, size, ud):
         v = uc.reg_read(self.RDX)
+        b, e = self.q(v), self.q(v + 8)
+        its = [self.q(b + 8 * k) for k in range((e - b) // 8)]
+        if any(self.q(it + 0x20) for it in its):    # the patch name's menu (rva 0x334590): items with submenus, the
+            from unicorn.x86_const import UC_X86_REG_R8        # path in and out (a vector of two ints at r8)
+            pv = uc.reg_read(UC_X86_REG_R8)
+            pb, pe = self.q(pv), self.q(pv + 8)
+            path = struct.unpack('<%di' % ((pe - pb) // 4), bytes(uc.mem_read(pb, pe - pb)))
+            cut = lambda bs: bs.split(b'\0')[0]
+            top = [cut(self.sstr(it).encode('latin1')) for it in its]
+            cells = []
+            for it in its:
+                sv = self.q(it + 0x20)
+                sb, se = self.q(sv), self.q(sv + 8)
+                cells.append([cut(self.sstr(self.q(sb + 8 * k)).encode('latin1')) for k in range((se - sb) // 8)])
+            ans = self.pn_answers.pop(0) if self.pn_answers else None
+            self.st.setdefault('pn', []).append(('menu', tuple(path), ans, top, cells))
+            if ans is None or len(path) != 2:
+                uc.reg_write(self.RAX, 0xFFFFFFFFFFFFFFFF)
+            else:
+                uc.mem_write(pb, struct.pack('<ii', *ans))
+                uc.reg_write(self.RAX, 0)
+            return
         b, e = self.q(v), self.q(v + 8)
         items = [(self.sstr(self.q(b + 8 * k)), uc.mem_read(self.q(b + 8 * k) + 0x28, 1)[0]) for k in range((e - b) // 8)]
         self.st['items'] = items
@@ -255,6 +314,10 @@ class Plugin:
         if self.taker is None and uc.reg_read(self.RAX) & 0xFF:
             self.taker = self.offered
 
+    def _pn_edit(self, uc, addr, size, ud):
+        from unicorn.x86_const import UC_X86_REG_R9
+        self.st.setdefault('pn', []).append(('text', self.sstr(uc.reg_read(UC_X86_REG_R9)).encode('latin1')))
+
     def _pick(self, uc, addr, size, ud):
         r = uc.reg_read(self.RAX) & 0xFFFFFFFF
         self.st['pick'] = r - (1 << 32) if r >= 1 << 31 else r
@@ -273,13 +336,42 @@ class Plugin:
         return (taken, self.rec_id[k] if k is not None and 0 <= k < len(self.rec_id) else -1,
                 self.st['items'], self.st['calls'])
 
+    def refresh_names(self):
+        """the patch name controls' text as the live editor keeps it (their values' notifications reach the
+        controls; the template has no live view): each control's own update, vt+0xB0 (rva 0x2CFEE0: its text
+        writer's text from the values, +0x88 -> +0x108), what its edit offers"""
+        for c in self.pnames:
+            self.h.call(self.q(self.q(c) + 0xB0), rcx=c, count=500_000_000)
+
     def mouse(self, typ, x, y, flags):
         """the root panel's own dispatch on a mouse message: taken or not"""
         self.write_opens()
-        self.st = dict(choice=-1, items=None, calls=[], pick=None)
+        self.refresh_names()
+        self.st = dict(choice=-1, items=None, calls=[], pick=None, pn=[])
         self.taker = None
         self.uc.mem_write(self.msg, struct.pack('<iiii', typ, x, y, flags))
         return self.h.call(self.root_mouse, rcx=self.root, rdx=self.msg, count=4_000_000_000) & 0xFF
+
+    def gtick(self, t):
+        """the editor's timer at the GUI's clock t ms (GetTickCount): the root panel's tick, the module's idle"""
+        self.write_opens()
+        self.h.tick_ms = t
+        self.uc.mem_write(self.msg, struct.pack('<Q', self.IB + TIMER_MSG_VT))
+        self.h.call(self.q(self.q(self.root) + 0x60), rcx=self.root, rdx=self.msg, count=4_000_000_000)
+        mod = self.h.call(self.IB + MODULE, count=500_000_000)
+        self.h.call(self.q(self.q(mod) + 0x38), rcx=mod, count=4_000_000_000)
+
+    def wheel(self, x, y, delta, keys):
+        """WM_MOUSEWHEEL at a panel point: the editor's message (its delta, its MK_ keys), the root panel's wheel"""
+        self.write_opens()
+        self.refresh_names()
+        self.st = dict(choice=-1, items=None, calls=[], pick=None, pn=[])
+        self.taker = None
+        pt, out = self.msg + 0x40, self.msg + 0x60
+        self.uc.mem_write(pt, struct.pack('<ii', x, y))
+        self.h.call(self.IB + MOUSEWHEEL_MSG, rcx=out, rdx=0x20A, r8=delta & 0xFFFF, r9=pt, stack=[keys & 0xFFFF],
+                    count=500_000_000)
+        return self.h.call(self.q(self.q(self.root) + 0x50), rcx=self.root, rdx=out, count=4_000_000_000) & 0xFF
 
     def live(self, k):
         """panel k and every panel above it open"""
@@ -300,7 +392,7 @@ def plugin_tree(_):
                                                      # (the state's CC map: entries 0x10000000 + CC -> a parameter id)
     rects = sorted(set((c[1], c[2], c[3], c[4]) for t in g.tree for c in t[3] if CG.searchable(c) and c[7] in mapped))
     prects = [struct.unpack('<iiii', bytes(g.uc.mem_read(p + 0x18, 16))) for p in g.panels]   # each panel's +0x18
-    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx, rects, prects
+    return [t[:4] for t in g.tree], [t[4] for t in g.tree], g.jx, rects, prects, g.allc
 
 
 def jx_by_panel(items):
@@ -340,7 +432,7 @@ def oracle(log):
     """the program's log played into the plugin (a worker: Unicorn only)"""
     import gc
     res = dict(fails=[], notes=[], opens=set(), order=set(), n=collections.Counter(), press=collections.Counter(),
-               changed=collections.Counter())
+               changed=collections.Counter(), at=collections.Counter())
     g = h = None
     MAIN, PATCH = panel_sizes()
     calls = ('model_set', 'commit', 'queue_record', 'pm_set', 'pm_commit', 'pm_notify', 'keybed', 'cc_learn', 'cc_forget')
@@ -374,6 +466,46 @@ def oracle(log):
         n = struct.unpack('>I', st[:4])[0] // 8
         return {k: v for k, v in (struct.unpack('>Ii', st[4 + 8 * j: 12 + 8 * j]) for j in range(n)) if k >= 0x10000000}
 
+    dlg = []                                       # the plugin's dialogs in the current event (the patch name's)
+
+    def run_event(fn, *a):
+        """a mouse or wheel message into the plugin: its dialogs kept for the program's '# pn' lines, then the
+        event's unused scripted answers dropped (as the program drops them)"""
+        nonlocal dlg
+        if dlg:
+            fail('%s: the plugin asked %d dialog(s) the program did not: %s' % (where(), len(dlg), dlg[0][:2]))
+        r = fn(*a)
+        dlg = list(g.st.get('pn', []))
+        h.answers.clear()
+        g.pn_answers.clear()
+        return r
+
+    def pn_line(t):
+        """the program's patch name dialog in its event: the plugin's, in order"""
+        nonlocal dlg
+        if not dlg:
+            fail('%s: the program asked a dialog (%s) the plugin did not' % (where(), ' '.join(t[1:4])))
+            return
+        d = dlg.pop(0)
+        if t[2] == 'text':
+            want = bytes.fromhex(t[3][1:])
+            if d[0] != 'text' or d[1] != want:
+                fail('%s: the name edit offered -- the plugin %r, the program %r' % (where(), d[:2], want))
+            res['n']['pn text'] += 1
+            res['n']['pn text set'] += t[4] != '-'
+            return
+        hx = lambda w: b'' if w in ('-', '=') else bytes.fromhex(w[1:])
+        p_in, p_out, ntop = (int(t[3]), int(t[4])), (int(t[5]), int(t[6])), int(t[7])
+        items = [hx(w) for w in t[8:]]
+        top, cells = items[:ntop], [items[ntop + 32 * k: ntop + 32 * (k + 1)] for k in range(ntop)]
+        ans = None if p_out[0] < 0 else p_out
+        if d[0] != 'menu' or d[1] != p_in or d[2] != ans or d[3] != top or d[4] != cells:
+            fail('%s: the patch menu -- the plugin (in %s, out %s, %d items: %s), the program (in %s, out %s, %d: %s)'
+                 % (where(), d[1:2], d[2:3], len(d[3]) if d[0] == 'menu' else -1, d[3][:2] if d[0] == 'menu' else d,
+                    p_in, ans, ntop, top[:2]))
+        res['n']['pn menu'] += 1
+        res['n']['pn chosen'] += ans is not None
+
     def control_at(x, y):
         """the live JX control under a point (the plugin's tree, the program's opens), for the reach count"""
         for k, tn, l, t, r, b in g.jx:
@@ -387,8 +519,11 @@ def oracle(log):
         t = ln.split()
         if not t:
             continue
-        if in_event and (t[0] in calls or ln.startswith('# hostedit') or ln.startswith('# pm ') or ln.startswith('# hit')):
-            if ln.startswith('# hit'):          # the program's dispatch: the control its press went to
+        if in_event and (t[0] in calls or t[0] == 'zoomfit' or ln.startswith('# hostedit') or ln.startswith('# pm ') or
+                         ln.startswith('# hit') or ln.startswith('# pn ')):
+            if ln.startswith('# pn '):
+                pn_line(t)
+            elif ln.startswith('# hit'):          # the program's dispatch: the control its press went to
                 want = tuple([t[2]] + [int(v) for v in t[3:7]]) if len(t) >= 7 else None
                 got = g.info.get(g.taker) if g.taker is not None else None
                 if want != got:
@@ -403,12 +538,35 @@ def oracle(log):
         if ln.startswith('# hostedit'):
             exe_edits += edits_of_exe(t)
             continue
+        if ln.startswith('# ans '):              # the next event's scripted answers (the program's "ans" lines)
+            if t[2] == 't':
+                h.answers.append(('text', None if t[3] == '-' else bytes.fromhex(t[3][1:])))
+            elif t[2] == 'p':
+                g.pn_answers.append(None if int(t[3]) < 0 else (int(t[3]), int(t[4])))
+            continue
+        if ln.startswith('# gtick '):          # the editor's 50 ms timer at the GUI's clock (ms)
+            sync()
+            g.gtick(int(t[2]))
+            res['n']['gticks'] += 1
+            in_event = True
+            continue
+        if ln.startswith('# kb wheel '):       # WM_MOUSEWHEEL: x y delta MK_ keys
+            sync()
+            x, y, d, kk = (int(v) for v in t[3:7])
+            taken = run_event(g.wheel, x, y, d, kk)
+            res['n']['wheels'] += 1
+            res['n']['wheels taken'] += bool(taken)
+            for k2, tn2, l2, t2, r2, b2 in g.allc:
+                if g.live(k2) and l2 <= x < r2 and t2 <= y < b2:
+                    res['at'][tn2 + ' wheel'] += 1
+            in_event = True
+            continue
         if ln.startswith('# kb '):
             sync()
             kind, a = t[2], [int(v) for v in t[3:]]
             if kind == 'up':
                 x, y = (a[0], a[1]) if a[0] >= 0 else last
-                taken = g.mouse(1, x, y, 0)
+                taken = run_event(g.mouse, 1, x, y, 0)
                 await_state = down_ctl              # the next state line: the press's effect, for the reach
             else:
                 x, y, s = a                     # s: the plugin's flag bits (1 Shift, 2 Ctrl, 8 Alt)
@@ -416,15 +574,22 @@ def oracle(log):
                 if kind in ('down', 'dbl'):
                     last = (x, y)
                     down_ctl = control_at(x, y)
-                    state_before = h.get_state() if down_ctl else None
+                    state_before = h.get_state()
                     if down_ctl:
                         res['press'][down_ctl + (' dbl' if kind == 'dbl' else '')] += 1
+                    for k2, tn2, l2, t2, r2, b2 in g.allc:
+                        if tn2 in GENERIC and g.live(k2) and l2 <= x < r2 and t2 <= y < b2:
+                            res['at'][tn2] += 1
                 elif down_ctl == 'jx3pSlider':
                     res['n']['slider moves'] += 1
-                taken = g.mouse(typ, x, y, s)
+                taken = run_event(g.mouse, typ, x, y, s)
                 if kind in ('down', 'dbl') and g.taker is not None:      # a press its panel's hover let through
                     pl, pt, pr, pb = struct.unpack('<iiii', bytes(g.uc.mem_read(g.ctl_panel[g.taker] + 0x18, 16)))
                     res['n']['outside'] += not (pl <= x < pr and pt <= y < pb)
+                    tn2 = g.info[g.taker][0]
+                    if tn2 not in JX_TYPES:             # a generic class: counted by the control that took it
+                        down_ctl = tn2
+                        res['press'][tn2 + (' dbl' if kind == 'dbl' else '')] += 1
             res['n']['events'] += 1
             res['n']['taken'] += bool(taken)
             in_event = True
@@ -540,6 +705,9 @@ def oracle(log):
         elif t[0] == 'editor':
             h.attach_editor(int(t[1]), int(t[2]))
         elif t[0] == 'zoomfit':
+            if (MAIN if t[1] == '0' else PATCH) not in getattr(h, 'windows', {}):
+                res['notes'].append('zoomfit %s: the plugin has no such window open (the zoom: jx_zoom_fit_gate.py)' % t[1])
+                continue
             got = h.window_conv(MAIN if t[1] == '0' else PATCH)
             if got != int(t[2]):
                 fail('zoomfit %s: the plugin %d, the program %s' % (t[1], got, t[2]))
@@ -608,14 +776,14 @@ def config_lines(cfg):
 
 
 def probe_script(configs):
-    """the program's open flags in each configuration"""
-    out = []
+    """the program's open flags in each configuration (and its tree first: each control's function)"""
+    out = ['cctree']
     for cfg in configs:
         out += config_lines(cfg) + ['opens']
     return out
 
 
-def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, prects=()):
+def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, prects=(), allc=(), skip=frozenset()):
     """the seeded kbscript: the CC probes (cc_menu_gate.script's) and the mouse on every live JX control"""
     rnd = random.Random(seed)
     refs = script_refs()
@@ -634,6 +802,14 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
         return live
 
     out = ['block', 'cctree', 'state', 'pending']   # the boot's queue applied: both sides' pending lists empty
+    clock = [0]                                    # the GUI's clock (ms), the editor's timer every 50
+
+    def ticks(n):
+        o = []
+        for _ in range(n):
+            clock[0] += 50
+            o.append('gtick %d' % clock[0])
+        return o
     press_at, seen = set(), set()                  # the mouse in the first configuration of each layout and EDIT
     for ci, cfg in enumerate(configs):             # state, and in a quarter of the others
         if cfg[:2] not in seen or quick or rnd.random() < 0.25:
@@ -746,6 +922,115 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
             out += (['move %d %d 0' % (cx, cy), 'down %d %d 0' % (cx, cy)] + after + ['move %d %d 0' % (sx, sy)] + after +
                     ['up %d %d' % (sx, sy)] + after + ['dbl %d %d 0' % (sx, sy)] + after + ['up %d %d' % (sx, sy)] + after +
                     ['block', 'state'])
+        # ---- the mouse on the live controls of the generic classes (scope row 25), from a stream of its own (the
+        # draws above stay as they were): a down, drags, the up, double clicks; Shift / Ctrl; inside, on the edges,
+        # just off them; a patch loaded first for the values the control reads
+        rg = random.Random(seed * 7919 + ci)
+        gen = collections.defaultdict(list)
+        for k, tn, l, t, r, b in allc:
+            if tn in GENERIC and live(k) and r > l and b > t and (l, t, r, b) not in skip:
+                gen[tn].append((k, tn, l, t, r, b))
+        livec = [(c[1], c[2], c[3], c[4]) for k, p in enumerate(tree) if live(k) for c in p[3] if c[3] > c[1] and c[4] > c[2]]
+        after = ['opens', 'state', 'pending']
+        for tn in GENERIC:
+            ctls = gen.get(tn, [])
+            if not ctls:
+                continue
+            want = GEN_N[tn] if not quick else max(1, GEN_N[tn] // 2)
+            picks = [rg.choice(ctls) for _ in range(want)] if len(ctls) < want else rg.sample(ctls, want)
+            for k, _, l, t, r, b in picks:
+                if rg.random() < 0.5:
+                    out += ['patch %d 1' % rg.randrange(64), 'opens', 'state', 'pending']
+                inside = [((l + r) // 2, (t + b) // 2), (l, t), (r - 1, b - 1), (l, b - 1), (r - 1, t),
+                          (rg.randrange(l, r), rg.randrange(t, b)), (rg.randrange(l, r), rg.randrange(t, b))]
+                near = [q for q in ((l - 1, t), (r, b - 1), (l, t - 1), (r - 1, b), (l - 3, (t + b) // 2), ((l + r) // 2, b + 2))
+                        if not any(L <= q[0] < R and T <= q[1] < B for L, T, R, B in livec)]
+                p = rg.choice(inside) if not near or rg.random() < 0.85 else rg.choice(near)
+                u = rg.random()
+                s = 0 if u < 0.7 else 1 if u < 0.85 else 2
+                ev = ['move %d %d 0' % p, 'down %d %d %d' % (p[0], p[1], s)] + after
+                x, y = p
+                if tn in ('knob', 'slider', 'keyboardX') and rg.random() < 0.6:     # a drag
+                    for _ in range(rg.randrange(1, 7)):
+                        if tn == 'keyboardX':
+                            x, y = rg.randrange(l - 12, r + 12), rg.randrange(t - 12, b + 12)
+                        else:
+                            x, y = x + rg.randrange(-25, 26), y + rg.randrange(-70, 71)
+                        ev += ['move %d %d %d' % (x, y, s)] + after
+                elif rg.random() < 0.25:                                           # off and back, or off
+                    x, y = rg.choice(inside + near)
+                    ev += ['move %d %d %d' % (x, y, s)] + after
+                ev += ['up %d %d' % (x, y)] + after
+                if rg.random() < 0.25:                                             # a double click there
+                    ev += ['dbl %d %d %d' % (x, y, 0)] + after + ['up %d %d' % (x, y)] + after
+                out += ev + ticks(rg.randrange(1, 3)) + after + ['block', 'state']  # the timer: queued functions
+                if tn == 'latchButton':          # PATCH, SETUP, EDIT are latch buttons: the configuration back (the
+                    out += ['set 0 vm.vs.panelPatch'] + config_lines(cfg) + after     # patch window: its own gate)
+        # ---- the patch name: its arrow (20 x 32 at the control's corner: the name's edit) and the rest of it (the
+        # patch menu), answered; a double click too (the same as a down: rva 0x2DE770, 0x33E950)
+        pns = gen.get('patchName', [])
+        for _ in range(PN_N if not quick else PN_N // 2):
+            if not pns:
+                break
+            k, tn, l, t, r, b = rg.choice(pns)
+            if rg.random() < 0.4:
+                out += ['patch %d 1' % rg.randrange(64), 'opens', 'state', 'pending']
+            if rg.random() < 0.5:
+                p = (rg.randrange(l, min(l + 20, r)), rg.randrange(t, b))
+                a = rg.choice(PN_TEXTS)
+                ans = 'ans t -' if a is None else 'ans t =' + a.hex()
+            else:
+                p = (rg.randrange(min(l + 20, r - 1), r), rg.randrange(t, b))
+                ans = 'ans p %d %d' % (rg.randrange(2), rg.randrange(32)) if rg.random() < 0.75 else 'ans p -1'
+            kind = 'dbl' if rg.random() < 0.2 else 'down'      # (the answers just before their press: an event drops
+            out += ['move %d %d 0' % p, ans, '%s %d %d 0' % (kind, p[0], p[1])] + after + ['up %d %d' % p] + after
+                                                               # the unused ones)
+            out += ticks(rg.randrange(0, 3)) + after + ['block', 'state']
+        # ---- the wheel (WM_MOUSEWHEEL as the editor takes it) and the editor's timer: notches (deltas of a notch, of
+        # less, of several; Shift, Ctrl), ticks between them, the edit closed by the timer (800 ms) or by a press on
+        # another control (the focus), on knobs, sliders, the JX switches, the keyboard, displays, labels
+        wh = [c for tn in ('knob', 'slider', 'keyboardX', 'display', 'label', 'patchName') for c in gen.get(tn, [])]
+        wh += [(k, tn, l, t, r, b) for k, tn, l, t, r, b in jx if tn == 'jx3pSlider' and live(k)]
+        presses = [c for tn in ('knob', 'slider', 'latchButton', 'patchName') for c in gen.get(tn, [])]
+        firsts = []
+        for tn in ('knob', 'slider', 'jx3pSlider', 'keyboardX', 'patchName'):
+            cs = [c for c in wh if c[1] == tn]
+            if cs:
+                firsts.append(rg.choice(cs))
+        for wi in range(len(firsts) + (WHEELS if not quick else WHEELS // 2)):
+            if not wh:
+                break
+            k, tn, l, t, r, b = firsts[wi] if wi < len(firsts) else rg.choice(wh)
+            if rg.random() < 0.4:
+                out += ['patch %d 1' % rg.randrange(64), 'opens', 'state', 'pending']
+            q = (rg.randrange(l, r), rg.randrange(t, b)) if rg.random() < 0.9 else (l - 2, t)
+            for _ in range(rg.randrange(1, 5)):
+                d = rg.choice((120, -120, 120, -120, 240, -240, 360, 60, -60, 1, -1, 119, -119, 121))
+                kk = rg.choice((0, 0, 0, 4, 8, 12))
+                out += ['wheel %d %d %d %d' % (q[0], q[1], d, kk)] + after + ticks(rg.randrange(0, 4)) + after
+            if presses and rg.random() < 0.3:              # a press elsewhere: the focus moves
+                k2, tn2, l2, t2, r2, b2 = rg.choice(presses)
+                px, py = (l2 + r2) // 2, (t2 + b2) // 2
+                out.append('move %d %d 0' % (px, py))
+                if tn2 == 'patchName':                     # the patch name takes the focus, its menu answered: none
+                    out.append('ans p -1')
+                out += ['down %d %d 0' % (px, py)] + after + ['up %d %d' % (px, py)] + after
+                if tn2 == 'latchButton':
+                    out += ['set 0 vm.vs.panelPatch'] + config_lines(cfg) + after
+            out += ticks(rg.randrange(0, 80)) + after + ['block', 'state']
+        # a fixed sequence (no draw): a knob's wheel, then a press on the patch name's menu part within the 800 ms (the
+        # focus moves: the knob's open edit closes at the press), then the patch name's Ctrl wheel (a step of 10) and
+        # a plain one
+        knobs, pn1 = gen.get('knob', []), gen.get('patchName', [])
+        if knobs and pn1:
+            k, tn, l, t, r, b = knobs[0]
+            kx, ky = (l + r) // 2, (t + b) // 2
+            k, tn, l, t, r, b = pn1[0]
+            px, py = min(l + 100, r - 1), (t + b) // 2
+            out += (['wheel %d %d 120 0' % (kx, ky)] + after + ticks(2) + after +
+                    ['move %d %d 0' % (px, py), 'ans p -1', 'down %d %d 0' % (px, py)] + after + ['up %d %d' % (px, py)] +
+                    after + ['wheel %d %d 120 8' % (px, py)] + after + ['wheel %d %d -120 0' % (px, py)] + after +
+                    ticks(20) + after + ['block', 'state'])
         out += ['state', 'pending']
     return out
 
@@ -759,10 +1044,16 @@ def wine_env():
 
 
 def run_exe(exe, lines, work, name):
+    """the program under Wine on a kbscript; one run at a time holds the prefix (its start empties the program's
+    files there: two runs at once spoiled each other's, playbook 263)"""
+    import fcntl
     sp = os.path.join(work, name)
     open(sp, 'w').write('\n'.join(lines) + '\n')
-    subprocess.run([WINE, os.path.basename(exe), '--kbscript', name], cwd=work, env=wine_env(), check=True,
-                   timeout=3600, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.makedirs(WORK, exist_ok=True)
+    with open(os.path.join(WORK, 'wine.lock'), 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        subprocess.run([WINE, os.path.basename(exe), '--kbscript', name], cwd=work, env=wine_env(), check=True,
+                       timeout=3600, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return open(sp + '.log', newline=None).read().splitlines()
 
 
@@ -776,14 +1067,14 @@ def build_tooth(define):
 def main():
     arg = lambda k, d: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d
     exe, seed, quick = arg('--exe', EXE), int(arg('--seed', '1')), '--quick' in sys.argv
-    tooth, cctooth = int(arg('--tooth', '0')), int(arg('--cc-tooth', '0'))
+    tooth, cctooth, pmtooth = int(arg('--tooth', '0')), int(arg('--cc-tooth', '0')), int(arg('--pm-tooth', '0'))
     import make_native_jx
     make_native_jx.verify_truth()               # Script.xml, the art, the binary: their pinned bytes
-    if (tooth or cctooth) and '--exe' not in sys.argv:
-        exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth)
+    if (tooth or cctooth or pmtooth) and '--exe' not in sys.argv:
+        exe = build_tooth('EXE_TOOTH=%d' % tooth if tooth else 'CC_TOOTH=%d' % cctooth if cctooth else 'PM_TOOTH=%d' % pmtooth)
     ctx = mp.get_context('spawn')
     with ctx.Pool(1) as pool:
-        tree, parents, jx, mapped, prects = pool.map(plugin_tree, [0])[0]
+        tree, parents, jx, mapped, prects, allc = pool.map(plugin_tree, [0])[0]
     configs = QUICK if quick else CONFIGS
     if '--log' in sys.argv:                     # a saved log (debugging): the program is not run
         log = open(arg('--log', None)).read().splitlines()
@@ -795,8 +1086,14 @@ def main():
         opens = [[int(c) for c in ln.split()[2]] for ln in plog if ln.startswith('# opens ')]
         if len(opens) != len(configs):
             raise SystemExit('the program gave %d open flag lines for %d configurations' % (len(opens), len(configs)))
-        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, mapped, opens, configs, seed, quick, prects), work,
-                      'panel.txt')
+        skip = set()                            # the buttons whose dialogs the program cannot yet answer in a script
+        for ln in plog:
+            f = ln.split()
+            if ln.startswith('# cctree C ') and len(f) >= 12 and f[3] == 'unlatchButton' and f[11] in SKIP_FN:
+                x0, y0, w0, h0 = (int(v) for v in f[4:8])
+                skip.add((x0, y0, x0 + w0, y0 + h0))
+        log = run_exe(os.path.join(work, 'JX-3P.exe'), script(tree, parents, jx, mapped, opens, configs, seed, quick, prects, allc,
+                                                             frozenset(skip)), work, 'panel.txt')
         if '--keep' in sys.argv:
             shutil.copyfile(os.path.join(work, 'panel.txt.log'), arg('--keep', None))
         shutil.rmtree(work)
@@ -812,14 +1109,25 @@ def main():
         'the CC menu taken, a learn, a forget, the CC map moved': n['cc taken'] > 0 and n['learn'] > 0
         and n['forget'] > 0 and n['moved'] > 0,
         'states, pending records, host edits compared': n['state'] > 0 and n['pending'] > 0 and n['edits'] > 0,
+        'every generic class that takes a down pressed (%s)' % ', '.join(GEN_TAKE): all(pr[c] > 0 for c in GEN_TAKE),
+        'knobs, sliders, latch buttons changing the state': all(ch[c] > 0 for c in ('knob', 'slider', 'latchButton')),
+        'labels, displays, bar graphs pressed at': all(res['at'][c] > 0 for c in ('label', 'display', 'barGraphX')),
+        'the wheel on knobs, sliders, the JX switches, the keyboard (taken), the editor\'s timer': all(
+            res['at'][c + ' wheel'] > 0 for c in ('knob', 'slider', 'jx3pSlider', 'keyboardX')) and n['wheels taken'] > 0
+        and n['gticks'] > 0,
+        'the patch name: its edit set and cancelled, its menu chosen and not, the wheel on it':
+            n['pn text set'] > 0 and n['pn text'] > n['pn text set'] and n['pn chosen'] > 0
+            and n['pn menu'] > n['pn chosen'] and res['at']['patchName wheel'] > 0,
     }
     ok = not res['fails'] and all(reach.values())
     print('the plugin\'s tree: %d panels, %d controls, %d the CC search can stop at, %d of the five JX classes'
           % (n['panels'], n['controls'], n['searchable'], n['jx controls']))
     for s in sorted(set(res['notes']))[:12]:
         print('  note: ' + s)
-    print('mouse events %d (%d taken by the plugin), presses per class %s; the state changed by %s'
-          % (n['events'], n['taken'], dict(pr), dict(ch)))
+    print('mouse events %d (%d taken by the plugin), presses per class %s; the state changed by %s; downs on the generic '
+          'classes %s' % (n['events'], n['taken'], dict(pr), dict(ch), dict(res['at'])))
+    print('wheels %d (%d taken), editor timer ticks %d; the patch name: edits %d (%d set), menus %d (%d chosen)'
+          % (n['wheels'], n['wheels taken'], n['gticks'], n['pn text'], n['pn text set'], n['pn menu'], n['pn chosen']))
     print('states %d, pending lists %d (%d records), host edits %d, blocks %d; CC probes %d (x2), right presses %d '
           '(%d taken, %d learns, %d forgets), %d CC map entries moved; %d panel configurations'
           % (n['state'], n['pending'], n['records'], n['edits'], n['blocks'], n['pick'], n['msg'], n['cc taken'],
@@ -831,9 +1139,9 @@ def main():
         print('  FAIL ' + s)
     if res.get('nfail'):
         print('  %d failures in all' % res['nfail'])
-    if tooth or cctooth:
-        print('jx_panel_gate --%s %d: %s' % ('tooth' if tooth else 'cc-tooth', tooth or cctooth,
-                                             'BITES' if not ok else 'DID NOT BITE'))
+    if tooth or cctooth or pmtooth:
+        print('jx_panel_gate --%s %d: %s' % ('tooth' if tooth else 'cc-tooth' if cctooth else 'pm-tooth',
+                                             tooth or cctooth or pmtooth, 'BITES' if not ok else 'DID NOT BITE'))
         return 0 if not ok else 1
     print('jx_panel_gate: %s (seed %d%s)' % ('GREEN' if ok else 'RED', seed, ', quick' if quick else ''))
     return 0 if ok else 1

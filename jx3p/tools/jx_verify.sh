@@ -481,14 +481,16 @@ else
 fi
 fi
 if sec 5c; then
-echo "=== JX GATE 5c: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (SCOPE_AUDIT row 20: jx3p/docs/JX_PANEL.md) ==="
-# JX-3P.exe's mouse on the five JX classes and its CC menu, each event through the plugin's own panel dispatch on its
-# own GUI tree (jx_panel_gate.py): the state, the pending engine records, the host's edits and the press's target equal
-# after every event; the teeth: the program built with a defect in each class (EXE_TOOTH 3-10) and in the CC search
+echo "=== JX GATE 5c: THE DRAWN PANEL AGAINST THE PLUGIN'S OWN GUI CODE (SCOPE_AUDIT rows 20, 25: jx3p/docs/JX_PANEL.md) ==="
+# JX-3P.exe's mouse on the five JX classes and the generic ones, the wheel, the editor's timer and its CC menu, each
+# event through the plugin's own panel dispatch on its own GUI tree (jx_panel_gate.py): the state, the pending engine
+# records, the host's edits, the press's target and the patch name's dialogs equal after every event; the teeth: the
+# program built with a defect in each class (EXE_TOOTH 3-20), in the patch menu (PM_TOOTH 21) and in the CC search
 # (CC_TOOTH 1-7) -- each run exits 0 only when its tooth bites
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && [ -x "${WINE:-/usr/lib/wine/wine64}" ]; then
   python3 "$HERE/jx_panel_gate.py"
-  for t in 3 4 5 6 7 8 9 10; do python3 "$HERE/jx_panel_gate.py" --quick --tooth $t; done
+  for t in 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do python3 "$HERE/jx_panel_gate.py" --quick --tooth $t; done
+  python3 "$HERE/jx_panel_gate.py" --quick --pm-tooth 21
   # CC teeth 1-7; 8 (the panels searched before the controls) cannot bite here: no two live controls the search can stop
   # at overlap across panels in any configuration (computed from the trees: the JX's three overlapping pairs are each in
   # one panel -- so tooth 1, the controls' order, does bite)

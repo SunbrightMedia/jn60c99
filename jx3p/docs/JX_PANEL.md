@@ -91,14 +91,62 @@ What the plugin's own code showed (EXECUTED; each was a defect of the program, f
 * **A label takes no mouse event** (rva 0x2D8B20): the plug-in-only "disable" layer over TEMPO (`<control-pi>`,
   black at alpha 0x60) passes presses to the knob under it. The program does not draw that layer: in the program the
   TEMPO knob IS the host's tempo (it is the host, JX-8) -- the same choice as JUNO-60.exe (docs/CC_MENU.md).
-* **The patch name** (rva 0x33E950): its rectangle is Script.xml's (231,294)-(501,324); it takes a down on its
-  button (the art's frame, 20 x 32) and changes nothing -- no model call, record or state (EXECUTED). The program
-  takes the button's frame (two rows lower, 324-325, than the plugin's rectangle lets through) and changes nothing.
+* **The patch name** (rva 0x33E950; corrected 2026-10-15, scope row 25): its rectangle is Script.xml's
+  (231,294)-(501,324). The row-20 note "a down on its button changes nothing" was measured with every dialog
+  cancelled: the arrow opens the name's edit, the rest of it the patch menu (see "The generic classes" below).
 
 * **A drag holds the host's edit open.** The slider's steps set the position with the flag 0 and its release with
   1 (rva 0x283A60); the controller keeps one open edit (beginEdit at the first step, endEdit at the final set:
   HOST_LAYER.md 3n). The program sent beginEdit / performEdit / endEdit at every step. Now the switch passes the
   flag (jx3p_model_set_flag); tooth 9 makes every step final again.
+
+## The generic classes, the wheel and the editor's timer (scope row 25, 2026-10-15)
+
+jx_panel_gate.py now presses every live control of every class the program draws -- knob, slider, latchButton,
+unlatchButton, keyboardX, patchName, label, display, barGraphX -- turns the wheel on them, and runs the editor's timer,
+against the plugin's own handlers on its own tree. What it found the program had to become (READ, then EXECUTED by
+the gate):
+
+* **The knob** (the slider class's frame, rva 0x2D0660; the knob's own 0x2D6050 / 0x2D74C0): a down lays out a
+  travel of n x 15 px (at most 200, under 4 x the control's height) with the point at the position; moves set by the
+  point (flag 0: one host edit open), Shift one position per move past 2 px, Ctrl alone the default; the up sets the
+  last point (flag 1), a click without a drag steps the clickable ones.
+* **The slider** (the same frame; the JX switch is its class with a two-position accessor): the cap's place and the
+  point's position with the tilt, the slack across, the resolution's remainder, Shift one step; a grab off the cap
+  first jumps to the point.
+* **The latch family** (rva 0x2CD350): the press at the UP, with the up on the control -- latchButton toggles its
+  positions (on "1", off "0"), unlatchButton QUEUES its function (below), menuButton / setupButton open their menus.
+* **The editor's timer** (SetTimer 50 ms; WM_TIMER rva 0x3103BE): the root panel's tick (rva 0x2AB250: an open
+  panel's controls last to first, then its panels), then the module's idle (CModuleB vt+0x38): the function registry
+  (rva 0x296300) runs each queued function whose time is BEFORE now (a press's function waits for the next tick).
+  The clock is GetTickCount; a script's is its own ("gtick T"); the oracle answers GetTickCount with the same T.
+* **The focus** (+0x10 -> +0x10 -> +0x18) and the operators: a control with a key operator (+0x80; the patch name's
+  at +0x98) and a wheel operator (+0x90) takes the focus on a down or a wheel; on: the key operator's state 4 and its
+  3200 ms timer; off: a step 0 when it was in state 3, the wheel operator's running 800 ms timer stopped with a step 0
+  (a final set: the open host edit closes), the click direction back to 1. The tick: the key operator's states (1, 2
+  repeat the step, 3 a step 0, 4 the focus let go), the wheel operator's 800 ms end; the display's order is the wheel
+  operator's first (rva 0x2DE8B0, unseen: its step 0 is none).
+* **The wheel** (WM_MOUSEWHEEL rva 0x3117C8 -> the message rva 0x43E370, the root's vt+0x50): a delta of 1..119
+  counts 120; on a knob, a slider, a JX switch or the patch name: the focus, a step of (Ctrl: min(positions / 2, 10))
+  x the notches (truncated), the 800 ms timer; on the keyboard OCTAVE SHIFT plus the notches (not taken); the latch
+  family, labels, displays (not editable): nothing.
+* **The patch name** (vt 0x99FA80, an editable display of fm.PATCH.NAME0.name[0..7], two chars each): a down or a
+  double click on its rectangle takes the focus; ON ITS ARROW (the bitmap's frame at buttonPosition) the display's
+  edit (rva 0x2CF920): the text -- the values' bytes, trimmed (rva 0x41A330: to the first zero, spaces of the C
+  locale off both ends) -- offered, the answer trimmed and set (rva 0x2CFC70 -> 0x2EB160: two signed chars per value,
+  the first the high byte, past the end a space; the eight with the flag 1, then the trio), the focus let go and taken
+  again -- taken. ELSEWHERE ON IT (Script.xml gives no nonActiveArea: that rectangle is empty) the patch menu (rva
+  0x330CF0 + 0x334590: two items per bank -- its name, then " " -- of 32 cells each, the current cell's path offered,
+  a chosen path [t, s] the bank t / 2 and the patch (t % 2) x 32 + s) and, when a cell was chosen, its load without a
+  push (rva 0x337F70) -- taken only then; a press it does not take goes on to the controls under it. Its wheel and
+  its keys step the patch (its accessor, rva 0x33EBA0: the selection plus the step in 0..63, loaded; 64 positions).
+  Ported: gui/juno_pm.c (juno_pm_patch_menu, juno_pm_load_selection, juno_pm_step) and jx3p_win.c (pn_mouse,
+  pn_edit, the wheel and the timer through the operator classes).
+
+The oracle's side: the patch name's text is its own update's (vt+0xB0, before each event: the template never draws,
+so the live editor's notifications are the gate's call), the patch menu's popup answers a path (the service writes
+the vector the menu passes), the edit's offer is read at its call of the text service (rva 0x2CFA19). A down that the
+patch name does not take (its menu cancelled) is the plugin's too: the walk goes on.
 
 The harness's own defects, found the same way: the plugin's queue at the boot (the script starts with a block); a
 mouse that pressed where it had not moved (the hover flags decide what a panel offers: playbook 253); a pipe in

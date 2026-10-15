@@ -550,6 +550,9 @@ enum { C_SLIDER, C_KNOB, C_DISPLAY, C_LATCH, C_UNLATCH, C_MENU, C_SETUP, C_JXLAT
        C_PATCHSEL, C_PATCHBLOCK, C_PATCHNAME, C_KEYBOARD, C_PATCHBANKNAME, C_PATCHLIST, C_BARGRAPH, C_OTHER };
 #define BAR_BLITS 64                       /* a bar draws 1 + fade blits (Script.xml: fade 10) */
 typedef struct { int n, black, shape, x, y, w, h; } Key;
+/* the plugin's timer (rva 0x41D3D0 .. 0x41D420): a period and a start (GetTickCount; -1 stopped); due when the start
+ * plus the period less now is 0 or less (int arithmetic) */
+typedef struct { int period, start; } GTimer;
 typedef struct Ctl {
     int type, x, y, w, h, has_size;
     XN *el;
@@ -569,8 +572,13 @@ typedef struct Ctl {
     const char *expr;                      /* exprLatchButton: its state's expression */
     const char *onref[8], *offref[8];      /* exprLatchButton: its onValueRef / onValue pairs, its off pairs */
     int onv[8], offv[8], non, noff;
-    int dir, dragged;                      /* jx3pSlider: a click's direction (+0xCC), a drag moved it (+0xBC) */
-    int gx, gy, lx, ly, fine;              /* jx3pSlider: the grab (+0xB4), the last point (+0xAC), Shift (+0xBD) */
+    int dir, dragged;                      /* slider: a click's direction (+0xCC), a drag moved it (+0xBC); knob: +0xD8, +0xF4 */
+    int gx, gy, lx, ly, fine;              /* slider: the grab (+0xB4), the last point (+0xAC), Shift (+0xBD); knob: the
+                                            * last point +0xDC, Shift +0xF5 */
+    int tilt, resolution, krect[4];        /* slider: tilt (+0xA4), resolution (+0xA8); knob: its travel (+0xE4) */
+    int action;                            /* the latch family: Script.xml action (+0x170) */
+    GTimer kt, wt;                         /* knob, slider: the key operator's timer (+0x80: +0x24), the wheel's (+0x90) */
+    int kstate, kstep;                     /* the key operator's state (+0x20) and step (+0x2C) */
     int horiz, decay, ch, fade, state, rect[4], blits[7 * BAR_BLITS], nblits;   /* barGraphX (rva 0x31C450) */
     struct Panel *panel;                   /* the panel that holds it */
 } Ctl;
@@ -702,6 +710,7 @@ static Ctl *control(XN *el, int ox, int oy)
     c->gx = c->gy = c->lx = c->ly = -2147483647;   /* jx3pSlider: no grab, no last point (0x80000001) */
     c->dir = 1;
     c->fn = xtext(el, "function");
+    c->action = (s = xtext(el, "action")) ? atoi(s) : 0;
     c->args = xtext(el, "arguments");
     c->unit = xtext(el, "unit");
     if ((s = xtext(el, "position2")) && ints(s, v, 2) == 2) { c->x2 = ox + v[0]; c->y2 = oy + v[1]; c->has_p2 = 1; }
@@ -729,6 +738,15 @@ static Ctl *control(XN *el, int ox, int oy)
         c->ptype = (s = xtext(el, "patchType")) ? atoi(s) : 0;
     }
     c->dir = 1;
+    c->kt.start = c->wt.start = -1;        /* the operators' timers stopped */
+    c->wt.period = 800;
+    c->resolution = 1;                     /* the slider's factory default (rva 0x28B400) */
+    if (c->type == C_KNOB || c->type == C_SLIDER || c->type == C_JXSLIDER) {   /* direction: the knob's +0xA8, the
+                                            * slider's +0xA0 (1 horizontal); the slider's tilt +0xA4, resolution +0xA8 */
+        c->horiz = (s = xtext(el, "direction")) && atoi(s) != 0;
+        if ((s = xtext(el, "tilt"))) c->tilt = atoi(s);
+        if (c->type != C_KNOB && (s = xtext(el, "resolution")) && atoi(s) >= 1) c->resolution = atoi(s);
+    }
     if (c->type == C_BARGRAPH) {           /* CBarGraphControl: its object zeroed (rva 0x34FA60), then Script.xml */
         c->horiz = (s = xtext(el, "direction")) && atoi(s) != 0;
         c->decay = (s = xtext(el, "decay")) ? atoi(s) : 0;
@@ -784,7 +802,13 @@ static Panel *build(const char *type, int ox, int oy)
                                              * 4 a jx3pSlider's click does nothing, 5 exprLatchButton's on and off pairs
                                              * swapped, 6 patchSelectButton's lanes swapped, 7 patchBlock loads the next
                                              * patch, 8 the latch family presses at the down, 9 a jx3pSlider's drag
-                                             * steps are final sets, 10 a panel's hover flag ignored
+                                             * steps are final sets, 10 a panel's hover flag ignored; the generic
+                                             * classes (scope row 25): 11 a patch step one too far, 12 the patch
+                                             * name's positions 16, 13 its edit's chars unsigned and NULs past the
+                                             * end, 14 it never takes the focus, 15 its edit's offer untrimmed, 16 a
+                                             * knob's travel 16 px a position, 17 an unlatchButton's function run at
+                                             * the press, 18 the wheel's Ctrl step not capped at 10, 19 the wheel's
+                                             * edit closed after 1000 ms, 20 a latchButton toggles at the down
                                              * (jx_panel_gate.py) */
 #endif
 static void *g_eng;
@@ -1246,36 +1270,101 @@ static void jxslider_set(const Ctl *c, int p, int flag)
     val_set_raw_flag(L, value_of(L, n), flag || EXE_TOOTH == 9);   /* the position's set (rva 0x283A60) with its flag:
                                                                    * a drag's steps 0, its end 1 (TOOTH 9: every set final) */
 }
-/* the cap's place at a position (rva 0x2E7C00, vertical; positions 2, its step offset +0xA4 0): centred across,
- * from the bottom (position 0) to the top (position 1), C division */
+static int bounds(const Ctl *c, int *b);
+/* THE SLIDER CLASS (slider vt 0x9729D0, jx3pSlider 0x99F4D0: one class, the JX's with its own value accessor -- two
+ * positions, bit role) -- its value's accessor (+0x98): the positions (vt+0x28), the position (vt+0x20), the default
+ * position (vt+0x30: the default value's, rva 0x2C0130), the set (vt+0x38, rva 0x2D0890: nothing when the position
+ * stays and the flag is 0, else the model's set by position with the flag, rva 0x283A60, and the panel's trio) */
+static int slider_n(const Ctl *c) { return c->type == C_JXSLIDER ? 2 : npos(c); }
+static int slider_pos(const Ctl *c) { return c->type == C_JXSLIDER ? jxslider_pos(c) : position(c); }
+static int slider_default(const Ctl *c)
+{
+    Leaf *D = cleaf(c);
+    return c->type == C_JXSLIDER ? (D ? (D->def >> c->role) & 1 : 0) : D ? index_of(D, D->def) : 0;
+}
+static void slider_set(const Ctl *c, int p, int flag)
+{
+    Leaf *L = cleaf(c);
+    if (c->type == C_JXSLIDER) { jxslider_set(c, p, flag); return; }
+    if (!L || (p == position(c) && !flag)) return;
+    val_set_raw_flag(L, value_at(c, p), flag);
+}
+/* the cap's place at a position (rva 0x2E7C00): across, centred plus the tilt's share (tilt x position / (n - 1),
+ * rounded); along, from the bottom (position 0) to the top (vertical) or from the left to the right, C division,
+ * kept between the ends */
 static void jxslider_cap(const Ctl *c, int pos, int *cx, int *cy)
 {
-    int fw, fh, lo, hi, v;
+    int fw, fh, lo, hi, v, across, nm1 = slider_n(c) - 1;
     frame_size(c->bmp, &fw, &fh);
-    *cx = (c->x + c->x + c->w) / 2 - fw / 2;
-    lo = c->y + c->h - fh;
-    hi = c->y;
-    v = ((hi - lo) * pos * 2 / 1 + lo * 2 + 1) / 2;
+    if (nm1 < 1) nm1 = 1;                  /* (one position: the plugin's divisions trap) */
+    across = (c->tilt * pos + nm1 / 2) / nm1 + (c->horiz ? (c->y + c->y + c->h) / 2 - fh / 2 : (c->x + c->x + c->w) / 2 - fw / 2);
+    if (c->horiz) { lo = c->x; hi = c->x + c->w - fw; }
+    else { lo = c->y + c->h - fh; hi = c->y; }
+    v = ((hi - lo) * pos * 2 / nm1 + lo * 2 + 1) / 2;
     if (lo <= hi) v = v < lo ? lo : v > hi ? hi : v;
     else v = v < hi ? hi : v > lo ? lo : v;
-    *cy = v;
+    if (c->horiz) { *cx = v; *cy = across; } else { *cx = across; *cy = v; }
 }
-/* a point's position (rva 0x2E7D80, vertical): the point less the grab along the travel -- the cap's bottom place
- * to its top place, widened by the point's distance past the slider's width across (the slack) -- rounded in C
- * division; Shift (+0xBD) moves one position at most; clamped to 0 .. 1 */
+/* a point's position (rva 0x2E7D80): the point less the grab along the travel -- the cap's first place to its last,
+ * widened by the point's distance past the slider's breadth across (the slack) -- rounded in C division; the
+ * resolution (+0xA8 > 1) keeps the position's remainder; Shift (+0xBD) moves one position at most; clamped */
 static int jxslider_point(const Ctl *c, int x, int y)
 {
-    int fw, fh, xc = (c->x + c->x + c->w) / 2, w = c->w, sl, lo, num, den, p, cur = jxslider_pos(c), d;
+    int fw, fh, n = slider_n(c), nm1 = n - 1, cross, mid, size, sl, lo, hi, a, p, cur, d;
     frame_size(c->bmp, &fw, &fh);
-    sl = abs(x - xc) - w;
+    cross = c->horiz ? y : x;
+    mid = c->horiz ? (c->y + c->h + c->y) / 2 : (c->x + c->w + c->x) / 2;
+    size = c->horiz ? c->h : c->w;
+    sl = abs(cross - mid) - size;
     if (sl < 0) sl = 0;
-    lo = c->y + c->h - fh + sl;
-    num = (y - c->gy) - lo;
-    den = (c->y - sl) - lo;
-    p = den ? (num * 1 * 2 / den + 1) / 2 : 0;
+    if (c->horiz) { a = x - c->gx; lo = c->x - sl; hi = c->x + c->w - fw + sl; }
+    else { lo = c->y + c->h - fh + sl; a = y - c->gy; hi = c->y - sl; }
+    p = hi != lo ? ((a - lo) * nm1 * 2 / (hi - lo) + 1) / 2 : 0;
+    if (c->resolution > 1) p += slider_pos(c) % c->resolution - p % c->resolution;
+    cur = slider_pos(c);
     d = p - cur;
-    if (c->fine && (unsigned)(d + 1) > 2u) p = cur + (c->ly - y < 0 ? -1 : c->ly - y > 0 ? 1 : 0);
-    return p < 0 ? 0 : p > 1 ? 1 : p;
+    if (c->fine && (unsigned)(d + 1) > 2u) {
+        int dd = c->horiz ? x - c->lx : c->ly - y;
+        p = cur + (dd < 0 ? -1 : dd > 0 ? 1 : 0);
+    }
+    return p < 0 ? 0 : p > nm1 ? nm1 : p;
+}
+/* THE KNOB (vt 0x972010; its mouse frame is the slider's, rva 0x2D0660): its value's accessor as the slider's; the
+ * circular drag (+0xA0) is off -- no attribute sets it and the factory zeroes the object (READ); +0xA8 direction (0
+ * vertical); +0xD4 clickable; +0xD8 a click's direction; +0xDC the last point; +0xE4 the drag's travel; +0xF4 a drag
+ * moved it; +0xF5 Shift. The travel (the down, rva 0x2D6050): n x 15 pixels, at most 200 and less than 4 x the
+ * control's height (width), placed so the point is the position, 8 pixels across */
+static void knob_travel(Ctl *c, int x, int y)
+{
+    int b[4], n = npos(c), len = n * (EXE_TOOTH == 16 ? 16 : 15), size, offs;     /* TOOTH 16: 16 px a position */
+    if (!bounds(c, b)) b[2] = b[3] = 0;
+    size = c->horiz ? b[2] : b[3];
+    if (len > 200) len = 200;
+    if (len >= 4 * size) len = 4 * size;
+    offs = n > 1 ? (position(c) * len * 2 / (n - 1) + 1) / 2 : 0;
+    if (c->horiz) { c->krect[0] = x - offs; c->krect[1] = y - 4; c->krect[2] = x - offs + len; c->krect[3] = y + 4; }
+    else { c->krect[0] = x - 4; c->krect[1] = y - len + offs; c->krect[2] = x + 4; c->krect[3] = y + offs; }
+}
+/* a point's position on the travel (rva 0x2D74C0): along it, widened by the point's distance past its breadth
+ * across, rounded in C division; Shift moves one position at most; clamped */
+static int knob_point(const Ctl *c, int x, int y)
+{
+    const int *R = c->krect;
+    int n = npos(c), nm1 = n - 1, cross = c->horiz ? y : x, mid, size, sl, lo, hi, a, p, cur, d;
+    mid = c->horiz ? (R[3] + R[1]) / 2 : (R[2] + R[0]) / 2;
+    size = c->horiz ? R[3] - R[1] : R[2] - R[0];
+    sl = abs(cross - mid) - size;
+    if (sl < 0) sl = 0;
+    if (c->horiz) { lo = R[0] - sl; hi = R[2] + sl; a = x; }
+    else { lo = R[3] + sl; hi = R[1] - sl; a = y; }
+    p = hi != lo ? ((a - lo) * nm1 * 2 / (hi - lo) + 1) / 2 : 0;
+    cur = position(c);
+    d = p - cur;
+    if (c->fine && (unsigned)(d + 1) > 2u) {
+        int dd = c->horiz ? x - c->lx : c->ly - y;
+        p = cur + (dd < 0 ? -1 : dd > 0 ? 1 : 0);
+    }
+    return p < 0 ? 0 : p > nm1 ? nm1 : p;
 }
 /* exprLatchButton (vt 0x9A0048): on while its state's expression holds (rva 0x350980); the press (rva 0x350770): on,
  * its off pairs -- else its on pairs -- set in order (one multi-set, rva 0x283B30), then the panel's commit */
@@ -1355,10 +1444,14 @@ static void draw_control(Ctl *c)
     int held = is_pressed(c), w, h;
     char s[256];
     switch (c->type) {
-    case C_SLIDER:
+    case C_SLIDER:                                               /* the cap at its place (rva 0x2E7C00) */
         if (!c->bmp || !c->bmp->px) return;
-        frame_size(c->bmp, &w, &h);
-        draw_frame(c->bmp, 0, c->x + (c->w - w) / 2, (int)floor(c->y + (c->h - h) * (1.0 - cnorm(c)) + 0.5));
+        {
+            int cx, cy;
+            jxslider_cap(c, slider_pos(c), &cx, &cy);
+            draw_frame(c->bmp, 0, cx, cy);
+        }
+        (void)w; (void)h;
         return;
     case C_KNOB:
         if (!c->bmp || !c->bmp->px) return;
@@ -1741,7 +1834,7 @@ static char **pm_list(void *u, const char *dir, int *n)
  * the user: the name's edit over the bank name or the selected cell, a popup menu, a message box,
  * the shell's file dialogs. The message texts are this program's own (the plugin's text table,
  * TextCodeTable.dat, is not in truth/); their box types are the plugin's (EXECUTED: 0x30, 0x31). */
-typedef struct { char kind; char *text; int num; char **files; int nfiles; } Ans;
+typedef struct { char kind; char *text; int num, num2; char **files; int nfiles; } Ans;
 static Ans g_ans[16];
 static int g_nans;
 static const Ans *ans_take(char kind)
@@ -1776,28 +1869,12 @@ static LRESULT CALLBACK edit_proc(HWND h, UINT m, WPARAM wp, LPARAM lp)
     if (m == WM_KILLFOCUS && !g_edit_done) g_edit_done = 1;           /* a click elsewhere: taken */
     return CallWindowProcA(g_edit_orig, h, m, wp, lp);
 }
-/* the name's edit: modal, over the bank name's text (what 1) or the selected cell (what 0) */
-static int pm_text(void *u, int what, const char *offered, char *out, int cap)
+/* a text edit, modal, over a panel rectangle: 1 and its text (Enter or a click elsewhere), 0 (Esc) */
+static int edit_box(int x, int y, int w, int hgt, const char *offered, char *out, int cap)
 {
-    Ctl *c = pw_find(what == JPM_TEXT_BANK ? C_PATCHBANKNAME : C_PATCHLIST);
-    int x = 0, y = 0, w = 200, hgt = 24;
     HWND e;
     MSG m;
-    (void)u;
-    if (g_scripted) {
-        const Ans *a = ans_take('t');
-        if (g_pmlog) { fprintf(g_pmlog, "text "); hexstr(g_pmlog, offered); fprintf(g_pmlog, " "); hexstr(g_pmlog, a ? a->text : NULL); fprintf(g_pmlog, "\n"); }
-        if (!a || !a->text) return 0;
-        snprintf(out, (size_t)cap, "%s", a->text);
-        return 1;
-    }
     if (!g_wnd) return 0;
-    if (c && what == JPM_TEXT_BANK) { x = c->tx; y = c->y; w = c->x + c->w - c->tx; hgt = c->h; }
-    else if (c) {
-        int s = juno_pm_sel(g_pm);
-        double cw = c->w / 4.0, rh = c->h / 16.0;
-        x = c->x + (int)((s / 16) * cw); y = c->y + (int)((s % 16) * rh); w = (int)cw; hgt = (int)rh;
-    }
     e = CreateWindowExA(0, "EDIT", offered, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
                         x * g_zoom / 100, y * g_zoom / 100, w * g_zoom / 100, hgt * g_zoom / 100, g_wnd, NULL,
                         GetModuleHandleA(NULL), NULL);
@@ -1822,6 +1899,83 @@ static int pm_text(void *u, int what, const char *offered, char *out, int cap)
     DestroyWindow(e);
     SetFocus(g_wnd);
     return g_edit_done > 0;
+}
+/* the name's edit: modal, over the bank name's text (what 1) or the selected cell (what 0) */
+static int pm_text(void *u, int what, const char *offered, char *out, int cap)
+{
+    Ctl *c = pw_find(what == JPM_TEXT_BANK ? C_PATCHBANKNAME : C_PATCHLIST);
+    int x = 0, y = 0, w = 200, hgt = 24;
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('t');
+        if (g_pmlog) { fprintf(g_pmlog, "text "); hexstr(g_pmlog, offered); fprintf(g_pmlog, " "); hexstr(g_pmlog, a ? a->text : NULL); fprintf(g_pmlog, "\n"); }
+        if (!a || !a->text) return 0;
+        snprintf(out, (size_t)cap, "%s", a->text);
+        return 1;
+    }
+    if (c && what == JPM_TEXT_BANK) { x = c->tx; y = c->y; w = c->x + c->w - c->tx; hgt = c->h; }
+    else if (c) {
+        int s = juno_pm_sel(g_pm);
+        double cw = c->w / 4.0, rh = c->h / 16.0;
+        x = c->x + (int)((s / 16) * cw); y = c->y + (int)((s % 16) * rh); w = (int)cw; hgt = (int)rh;
+    }
+    return edit_box(x, y, w, hgt, offered, out, cap);
+}
+/* the patch name's dialogs. Its edit over its text: scripted, the next "ans t" (logged "# pn text =OFFERED ANSWER",
+ * hex); its menu (two levels: a bank's halves, their cells), scripted the next "ans p T S"
+ * (logged "# pn menu IN0 IN1 OUT0 OUT1 NTOP" then the items, -1 -1 for none), else a popup at the mouse, the
+ * current cell checked */
+static int pn_text(const Ctl *c, const char *off, char *out, int cap)
+{
+    if (g_scripted) {
+        const Ans *a = ans_take('t');
+        if (g_log) {
+            fprintf(g_log, "# pn text ");
+            hexstr(g_log, off);
+            fprintf(g_log, " ");
+            hexstr(g_log, a ? a->text : NULL);
+            fprintf(g_log, "\n");
+        }
+        if (!a || !a->text) return 0;
+        snprintf(out, (size_t)cap, "%s", a->text);
+        return 1;
+    }
+    return edit_box(c->tx, c->ty, c->tw, c->th, off, out, cap);
+}
+static int pn_menu(void *u, const char *const *top, int ntop, const char *const *cells, int ncell, int path[2])
+{
+    HMENU m;
+    POINT p;
+    int t, k, r;
+    (void)u;
+    if (g_scripted) {
+        const Ans *a = ans_take('p');
+        r = a && a->num >= 0 && a->num < ntop && a->num2 >= 0 && a->num2 < ncell;
+        if (g_log) {
+            fprintf(g_log, "# pn menu %d %d %d %d %d", path[0], path[1], r ? a->num : -1, r ? a->num2 : -1, ntop);
+            for (t = 0; t < ntop; ++t) { fputc(' ', g_log); hexstr(g_log, top[t]); }
+            for (k = 0; k < ntop * ncell; ++k) { fputc(' ', g_log); hexstr(g_log, cells[k]); }
+            fprintf(g_log, "\n");
+        }
+        if (r) { path[0] = a->num; path[1] = a->num2; }
+        return r;
+    }
+    if (!g_wnd || !(m = CreatePopupMenu())) return 0;
+    for (t = 0; t < ntop; ++t) {
+        HMENU sub = CreatePopupMenu();
+        if (!sub) continue;
+        for (k = 0; k < ncell; ++k)
+            AppendMenuA(sub, MF_STRING | (t == path[0] && k == path[1] ? MF_CHECKED : 0), (UINT_PTR)(1 + t * ncell + k),
+                        cells[t * ncell + k]);
+        AppendMenuA(m, MF_POPUP, (UINT_PTR)sub, top[t]);
+    }
+    GetCursorPos(&p);
+    r = (int)TrackPopupMenu(m, TPM_RETURNCMD | TPM_NONOTIFY, p.x, p.y, 0, g_wnd, NULL);
+    DestroyMenu(m);
+    if (r <= 0) return 0;
+    path[0] = (r - 1) / ncell;
+    path[1] = (r - 1) % ncell;
+    return 1;
 }
 static int pm_menu(void *u, const char *const *items, const int *checked, int n)
 {
@@ -2405,8 +2559,6 @@ static DWORD WINAPI audio_main(LPVOID arg)
 
 /* -------------------------------------------------------------- interaction */
 static Ctl *g_drag;
-static int g_dy, g_dv, g_dboth;
-static double g_dacc;
 static char g_tip[128];
 static int g_tipx, g_tipy, g_has_tip;
 
@@ -2461,7 +2613,7 @@ static int bounds(const Ctl *c, int *b)
         b[0] = c->x; b[1] = c->y; b[2] = c->w; b[3] = c->h;
         return 1;
     }
-    if (c->type == C_PATCHNAME) { frame_size(c->bmp, &w, &h); b[0] = c->bx; b[1] = c->by; b[2] = w; b[3] = h; return w > 0; }
+    if (c->type == C_PATCHNAME) { b[0] = c->x; b[1] = c->y; b[2] = c->w; b[3] = c->h; return 1; }   /* its arrow: pn_mouse */
     if (c->bmp && c->bmp->px) { frame_size(c->bmp, &w, &h); b[0] = c->x; b[1] = c->y; b[2] = w; b[3] = h; return 1; }
     if (c->has_size) { b[0] = c->x; b[1] = c->y; b[2] = c->w; b[3] = c->h; return 1; }
     return 0;
@@ -2543,8 +2695,8 @@ static void cc_tree(Panel *p, FILE *f)
         if (!c) continue;
         if (!bounds(c, b)) b[0] = b[1] = b[2] = b[3] = -1;
         L = cleaf(c);
-        fprintf(f, "# cctree C %s %d %d %d %d %d %ld %d\n", c->typestr, b[0], b[1], b[2], b[3], c->nrefs,
-                L ? (long)L->id : -1L, L ? jx3p_cc_entry(L->id) : -1);
+        fprintf(f, "# cctree C %s %d %d %d %d %d %ld %d %s\n", c->typestr, b[0], b[1], b[2], b[3], c->nrefs,
+                L ? (long)L->id : -1L, L ? jx3p_cc_entry(L->id) : -1, c->fn && *c->fn ? c->fn : "-");   /* its function */
     }
     for (i = 0; i < p->n; ++i)
         if (p->items[i].p) cc_tree(p->items[i].p, f);
@@ -2596,10 +2748,17 @@ static int panel_held(const Panel *p)
     for (q = g_cap_panel; q; q = q->parent) if (q == p) return 1;
     return 0;
 }
+static int ctl_hit(const Ctl *c, int x, int y)
+{
+    int b[4];
+    return bounds(c, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
+}
+static int pn_mouse(Ctl *c, int type, int x, int y);
 static int ctl_takes(const Ctl *c, int x, int y, int type)
 {
     int b[4];
     if (type == 1 || type == 3) return c == g_cap;
+    if (c->type == C_PATCHNAME) return pn_mouse((Ctl *)c, type, x, y);    /* its own: it may act and not take */
     if (c->type == C_DISPLAY || c->type == C_BARGRAPH || !strcmp(c->typestr, "label") ||
         (c->fn && !strcmp(c->fn, "PlugOut"))) return 0;
     return bounds(c, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
@@ -2734,12 +2893,271 @@ static void latch_press(Ctl *c)
     else if (c->type == C_PATCHSEL) { juno_pm_pick(g_pm, psel_target(c)); pm_after(); }
 }
 
+/* ---------------------------------------------------------------- the GUI's time (scope row 25)
+ * The editor's 50 ms timer (SetTimer at rva 0x30FDE6) does, at each WM_TIMER (rva 0x3103BE): the root panel's timer
+ * message (vt+0x60, the panels' tick: rva 0x2AB250), then the module's idle (CModuleB vt+0x38, rva 0x34B790): its
+ * function queue (rva 0x296730) runs every function due. Time is GetTickCount's; a script's (kbscript gtick) is the
+ * gate's clock. */
+static int g_script_clock;                 /* the clock is the script's */
+static DWORD g_gclock;
+static int gui_now(void) { return (int)(g_script_clock ? g_gclock : GetTickCount()); }
+static void gt_start(GTimer *t) { t->start = gui_now(); }
+static int gt_on(const GTimer *t) { return t->start != -1; }
+static int gt_due(const GTimer *t) { return t->start + t->period - gui_now() <= 0; }
+static void gt_stop(GTimer *t) { t->start = -1; }
+/* the controls of the slider class's frame (rva 0x2D0660): knob, slider, jx3pSlider -- each with a key operator
+ * (CKoaSingleKeyOperator, +0x80), a tip bar operator (+0x88: the tip's show) and a wheel operator
+ * (CKoaSingleWheelOperator, +0x90) */
+static int frame_class(const Ctl *c) { return c->type == C_KNOB || c->type == C_SLIDER || c->type == C_JXSLIDER; }
+/* the controls with a key operator and a wheel operator: the frame's and the patch name (its display's: the key
+ * operator at +0x98, the wheel operator at +0x90; its value accessor's step, rva 0x33EBA0: juno_pm_step) */
+static int op_class(const Ctl *c) { return frame_class(c) || c->type == C_PATCHNAME; }
+/* the value's step (the accessor's vt+0x40, rva 0x2E6A40): 0 a final set at the position (it closes the host edit),
+ * else the position plus the step, kept in range, set (flag 0) when it moves */
+static void accessor_step(Ctl *c, int n)
+{
+    int cur, nm1, p;
+    if (c->type == C_PATCHNAME) { juno_pm_step(g_pm, EXE_TOOTH == 11 && n ? n + (n > 0 ? 1 : -1) : n); return; }
+    cur = slider_pos(c); nm1 = slider_n(c) - 1;           /* TOOTH 11: a patch step one too far */
+    if (!n) { slider_set(c, cur, 1); return; }
+    p = cur + n;
+    p = p < 0 ? 0 : p > nm1 ? nm1 : p;
+    if (p != cur) slider_set(c, p, 0);
+}
+/* THE FOCUS: the editor's one focused control (+0x10 -> +0x10 -> +0x18). A control's vt+0xB8 (rva 0x2C39B0): taking
+ * it first takes it from the holder (its vt+0xB8(0)); the slider class's (rva 0x2CFFD0, knob 0x2D5EC0, slider
+ * 0x2E6AF0) also lets go of the mouse when it loses the focus while it holds it, tells its operators -- the key
+ * operator's (rva 0x2D5A60): on, state 4 and its 3200 ms timer; off, a step 0 when it was in state 3, stopped --,
+ * the wheel operator's (rva 0x2ECB30): off, a running timer stopped and a step 0 -- and a click's direction back to 1 */
+static Ctl *g_focus;
+static void focus_set(Ctl *c, int flag)
+{
+    if (flag) {
+        if (g_focus && g_focus != c) focus_set(g_focus, 0);
+        g_focus = c;
+    } else if (g_focus == c) g_focus = NULL;
+    if (!op_class(c)) return;
+    if (!flag && g_cap == c) { g_cap = NULL; g_cap_panel = NULL; if (g_drag == c) g_drag = NULL; }
+    if (flag) { c->kstate = 4; c->kt.period = 3200; gt_start(&c->kt); c->kstep = 0; }
+    else {
+        if (c->kstate == 3) accessor_step(c, 0);
+        gt_stop(&c->kt);
+        c->kstate = c->kstep = 0;
+    }
+    if (!flag && gt_on(&c->wt)) { gt_stop(&c->wt); accessor_step(c, 0); }
+    if (!flag) c->dir = 1;
+}
+/* the key operator's mouse (rva 0x2D5BC0, before the frame's): a down or a double click takes the focus; a move or an
+ * up while the control holds the mouse restarts the 3200 ms timer (state 4) */
+static void keyop_mouse(Ctl *c, int type)
+{
+    if (type == 0 || type == 2) { if (g_focus != c) focus_set(c, 1); }
+    else if (g_cap == c) { c->kstate = 4; c->kt.period = 3200; gt_start(&c->kt); }
+}
+/* the tick of a frame control (rva 0x2D07A0): the key operator's (rva 0x2D5C40) -- focused and due: states 1, 2 the
+ * step again (state 2, 50 ms), 3 a step 0 (state 4, 3200 ms), 4 the focus let go unless it holds the mouse -- then the
+ * wheel operator's (rva 0x2ECB70) -- focused, running and due: stopped, a step 0 */
+static void wheelop_tick(Ctl *c)
+{
+    if (g_focus == c && gt_on(&c->wt) && gt_due(&c->wt)) { gt_stop(&c->wt); accessor_step(c, 0); }
+}
+static void frame_tick(Ctl *c)
+{
+    if (c->type == C_PATCHNAME) wheelop_tick(c);    /* the display's (rva 0x2DE8B0): the wheel operator's first (its
+                                                     * order unseen: the patch step of 0 is none) */
+    if (g_focus == c && gt_due(&c->kt)) {
+        if (c->kstate == 1 || c->kstate == 2) { accessor_step(c, c->kstep); c->kstate = 2; c->kt.period = 50; gt_start(&c->kt); }
+        else if (c->kstate == 3) { accessor_step(c, 0); c->kstate = 4; c->kt.period = 3200; gt_start(&c->kt); }
+        else if (c->kstate == 4 && g_cap != c) focus_set(c, 0);
+    }
+    if (c->type != C_PATCHNAME) wheelop_tick(c);
+}
+/* the panels' tick (rva 0x2AB250): an open panel's controls, last to first, then its panels, last to first */
+static void panel_tick(Panel *p)
+{
+    int i;
+    if (!panel_open(p)) return;
+    for (i = p->n - 1; i >= 0; --i) if (p->items[i].c && op_class(p->items[i].c)) frame_tick(p->items[i].c);
+    for (i = p->n - 1; i >= 0; --i) if (p->items[i].p) panel_tick(p->items[i].p);
+}
+/* THE FUNCTION QUEUE (the registry, rva 0x296300): a button's function is queued (rva 0x296120, delay 0: due at the
+ * press's time); the module's idle (rva 0x296730) runs, in order, each queued function whose time is before now and
+ * puts the others back in front of those queued meanwhile */
+typedef struct { int time; const char *fn, *args; } QFn;
+static QFn g_q[64];
+static int g_nq;
+static void action(const char *fn, const char *args);
+static void fn_queue(const char *fn, const char *args)
+{
+    if (g_nq < 64) { g_q[g_nq].time = gui_now(); g_q[g_nq].fn = fn; g_q[g_nq].args = args; ++g_nq; }
+}
+static void fn_run(void)
+{
+    QFn run[64];
+    int n = g_nq, i, keep = 0, now = gui_now();
+    memcpy(run, g_q, sizeof g_q[0] * (size_t)n);
+    g_nq = 0;
+    for (i = 0; i < n; ++i) {
+        if (run[i].time - now < 0) action(run[i].fn, run[i].args);
+        else run[keep++] = run[i];
+    }
+    if (keep) {                                   /* the ones not due, in front of those queued meanwhile */
+        int m = g_nq < 64 - keep ? g_nq : 64 - keep;
+        memmove(g_q + keep, g_q, sizeof g_q[0] * (size_t)m);
+        memcpy(g_q, run, sizeof g_q[0] * (size_t)keep);
+        g_nq = keep + m;
+    }
+}
+/* the editor's timer: the panels' tick, then the module's idle */
+static void gui_tick(void)
+{
+    panel_tick(g_tree);
+    fn_run();
+}
+/* THE WHEEL (WM_MOUSEWHEEL, rva 0x3117C8 -> 0x312720 -> the message, rva 0x43E370): a delta of 1 .. 119 counts 120;
+ * notches = delta / 120; Shift 1, Ctrl 2 (MK_SHIFT, MK_CONTROL), Alt 8; the root panel (rva 0x2AB590) turns it when
+ * the inverting setting is on (not this program's: off); the panels (rva 0x2AB3B0): an open panel that holds the
+ * mouse or the point, its controls last to first, its panels last to first, the first that takes it ending the walk;
+ * a modal panel takes the rest */
+static int ctl_hit(const Ctl *c, int x, int y);
+static int wheel_ctl(Ctl *c, int x, int y, double notches, int flags)
+{
+    if (op_class(c)) {                    /* rva 0x2D0810 (the patch name's: the display's, rva 0x2DE910 -> 0x33EB20):
+                                           * on the control, the wheel operator (rva 0x2ECBE0) */
+        int step, n;
+        if (!ctl_hit(c, x, y)) return 0;
+        focus_set(c, 1);
+        step = 1;                         /* its step (rva 0x2ECC50): the turn (+0x10: off), Ctrl min(positions / 2, 10);
+                                           * the patch name's positions 64 (rva 0x33E910) */
+        if (flags & 2) {                  /* TOOTH 12: the patch name's positions 16; TOOTH 18: no cap at 10 */
+            n = (c->type == C_PATCHNAME ? (EXE_TOOTH == 12 ? 16 : 64) : slider_n(c)) / 2;
+            step *= EXE_TOOTH == 18 || n < 10 ? n : 10;
+        }
+        accessor_step(c, (int)notches * step);
+        c->wt.period = EXE_TOOTH == 19 ? 1000 : 800;   /* TOOTH 19: the wheel's edit closed after 1000 ms */
+        gt_start(&c->wt);
+        return 1;
+    }
+    if (c->type == C_KEYBOARD && c->nwr) {   /* rva 0x2D4300: on it, OCTAVE SHIFT's value plus the notches, kept in
+                                          * range, set (flag 1) and the trio; not taken */
+        const Leaf *O = resolve("fm.PATCH.NAME1.OCTAVE SHIFT");
+        if (O && ctl_hit(c, x, y)) {
+            double v = (double)get("fm.PATCH.NAME1.OCTAVE SHIFT") + notches;
+            int iv = v >= (double)O->min ? (v > (double)O->max ? O->max : (int)v) : O->min;
+            val_set(O, iv);
+        }
+        return 0;
+    }
+    return 0;                             /* the latch family, the displays (not editable), labels: none */
+}
+static int wheel_panel(Panel *p, int x, int y, double notches, int flags)
+{
+    int i;
+    if (!panel_open(p)) return 0;
+    if (!panel_held(p) && p->has_size && !(x >= p->x && y >= p->y && x < p->x + p->w && y < p->y + p->h)) return 0;
+    for (i = p->n - 1; i >= 0; --i) if (p->items[i].c && wheel_ctl(p->items[i].c, x, y, notches, flags)) return 1;
+    for (i = p->n - 1; i >= 0; --i) if (p->items[i].p && wheel_panel(p->items[i].p, x, y, notches, flags)) return 1;
+    return p->modal;
+}
+static int wheel_event(int x, int y, int delta, int keys)
+{
+    int d = (short)delta, flags = ((keys & MK_SHIFT) ? 1 : 0) | ((keys & MK_CONTROL) ? 2 : 0) |
+                                  (!g_script_clock && GetKeyState(VK_MENU) < 0 ? 8 : 0);
+    if (d >= -119 && d <= -1) d = -120;
+    else if (d >= 1 && d <= 119) d = 120;
+    g_dirty = 1;
+    return wheel_panel(g_tree, x, y, (double)d / 120.0, flags);
+}
+
+/* THE PATCH NAME (its class, vt 0x99FA80; EXECUTED, jx3p/tools/jx_panel_gate.py): an editable display (+0xA1) of the
+ * patch's name -- fm.PATCH.NAME0.name[0..7], two chars each -- with an arrow (its bitmap's frame at buttonPosition,
+ * +0x80). Its mouse (rva 0x33E950 after the display's, rva 0x2DE770): a down or a double click on its rectangle takes
+ * the focus; on the arrow the display's edit (vt+0x140) and the focus again (+0x98: vt+0xB8(1)) -- taken; elsewhere
+ * (Script.xml gives no nonActiveArea: its rectangle is empty) the patch menu (juno_pm_patch_menu), the focus again,
+ * and when a cell was chosen its load, no push -- taken only then: a press it does not take goes on to the controls
+ * and panels under it. Its wheel and its timer: the operators of the frame's controls (op_class), on the patch step.
+ * Its rectangles are converted to the window's (the zoom getter) for the edit and the menu. */
+static int pn_text(const Ctl *c, const char *off, char *out, int cap);
+static int pn_menu(void *u, const char *const *top, int ntop, const char *const *cells, int ncell, int path[2]);
+/* the trim (rva 0x41A270 -> 0x41A330): the C string (to its first zero) less its leading and trailing spaces (the
+ * CRT's isspace, the C locale: 0x09-0x0D, 0x20) */
+static void pn_trim(const char *in, char *out, int cap)
+{
+    const char *b = in, *e;
+    int n;
+    while (*b == ' ' || (*b >= 9 && *b <= 13)) ++b;
+    e = b + strlen(b);
+    while (e > b && (e[-1] == ' ' || (e[-1] >= 9 && e[-1] <= 13))) --e;
+    n = (int)(e - b) < cap - 1 ? (int)(e - b) : cap - 1;
+    memcpy(out, b, (size_t)n);
+    out[n] = 0;
+}
+/* the display's edit (rva 0x2CF920): its text -- its text writer's last (+0x88 -> +0x108: the values' chars, the
+ * high byte then the low, 16 bytes as they are), trimmed -- offered to the app's text edit; the answer trimmed and
+ * set (vt+0x150, rva 0x2CFC70 -> 0x2EB160): each value from two chars, the first the high one, past the text's end a
+ * space, each char signed, 8 bits each (the values' type 7) -- the eight set with the flag 1 in order, then the
+ * trio; at its end (vt+0x148) the focus let go (vt+0xB8(0)) */
+static void pn_edit(Ctl *c)
+{
+    char raw[17], off[17], got[256], ans[256], ref[64];
+    int k, n, v[8];
+    for (k = 0; k < 8; ++k) {
+        int w;
+        snprintf(ref, sizeof ref, "fm.PATCH.NAME0.name[%d]", k);
+        w = get(ref);
+        raw[2 * k] = (char)((w >> 8) & 0xFF);
+        raw[2 * k + 1] = (char)(w & 0xFF);
+    }
+    raw[16] = 0;
+    if (EXE_TOOTH == 15) memcpy(off, raw, sizeof off);       /* TOOTH 15: the text offered untrimmed */
+    else pn_trim(raw, off, sizeof off);
+    if (pn_text(c, off, got, sizeof got)) {
+        pn_trim(got, ans, sizeof ans);
+        n = (int)strlen(ans);
+        for (k = 0; k < 8; ++k) {
+            int hi = 2 * k < n ? (signed char)ans[2 * k] : ' ', lo = 2 * k + 1 < n ? (signed char)ans[2 * k + 1] : ' ';
+            if (EXE_TOOTH == 13) { hi = 2 * k < n ? (unsigned char)ans[2 * k] : 0; lo = 2 * k + 1 < n ? (unsigned char)ans[2 * k + 1] : 0; }
+            v[k] = hi * 256 + lo;         /* TOOTH 13: unsigned chars, a NUL past the end */
+        }
+        EnterCriticalSection(&g_lock);
+        for (k = 0; k < 8; ++k) {
+            const Leaf *L;
+            snprintf(ref, sizeof ref, "fm.PATCH.NAME0.name[%d]", k);
+            if ((L = resolve(ref)) && !E_model_set_flag(L->id, v[k], 1)) local_put(L->id, v[k]);
+        }
+        E_commit();
+        eng_refresh();
+        LeaveCriticalSection(&g_lock);
+        g_dirty = 1;
+    }
+    focus_set(c, 0);
+}
+static int pn_mouse(Ctl *c, int type, int x, int y)
+{
+    int fw = 0, fh = 0, r;
+    if (x < c->x || y < c->y || x >= c->x + c->w || y >= c->y + c->h) return 0;     /* vt+0x110 (never holds) */
+    if (type != 0 && type != 2) return 0;
+    if (g_focus != c && EXE_TOOTH != 14) focus_set(c, 1);    /* vt+0xC0, vt+0xB8(1) (TOOTH 14: the focus never taken) */
+    if (c->bmp) frame_size(c->bmp, &fw, &fh);
+    if (!c->bmp || (x >= c->bx && y >= c->by && x < c->bx + fw && y < c->by + fh)) {
+        press(c);
+        zoom_conv(0);
+        pn_edit(c);
+        if (EXE_TOOTH != 14) focus_set(c, 1);
+        return 1;
+    }
+    zoom_conv(0);
+    r = juno_pm_patch_menu(g_pm, pn_menu, c);
+    if (EXE_TOOTH != 14) focus_set(c, 1);
+    if (r) juno_pm_load_selection(g_pm);
+    return r;
+}
+
 static int g_mx, g_my;                     /* the last point of a down or a move: an up without one goes there */
 static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's message flags (1 Shift, 2 Ctrl, 8 Alt;
                                                           * 4 a right-button press the CC menu did not take) */
 {
     Ctl *c;
-    Leaf *L;
     Panel *modal;
     int shift = mods & 1;
     g_mx = x; g_my = y;
@@ -2758,56 +3176,36 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
         if (modal && !dbl) modal_down(modal, x, y);
         return;
     }
-    L = cleaf(c);
     g_drag = c;
-    g_dy = y;
-    g_dv = L ? cval(c) : 0;
-    g_dacc = 0;
-    g_dboth = 0;
+    if (frame_class(c)) keyop_mouse(c, dbl ? 2 : 0);   /* the frame (rva 0x2D0660): the key operator first */
+    else if (c->type == C_LATCH || c->type == C_UNLATCH || c->type == C_MENU || c->type == C_SETUP || c->type == C_JXLATCH ||
+             c->type == C_EXPRLATCH || c->type == C_PATCHSEL)
+        focus_set(c, 1);                  /* the latch family's down (rva 0x2CD350): pressed, captured, focused */
     switch (c->type) {
-    case C_SLIDER: {
-        int w, h;
-        double travel, capy;
-        frame_size(c->bmp, &w, &h);
-        travel = c->h - h;
-        capy = c->y + travel * (1.0 - cnorm(c));
-        if (L && (y < capy || y > capy + h) && travel > 0) {
-            int nv = L->min + (int)floor((1.0 - (y - c->y - h / 2.0) / travel) * (L->max - L->min) + 0.5);
-            val_set(L, nv);
-            g_dv = cval(c);
+    case C_KNOB:                        /* the knob's down (rva 0x2D6050; a down or a double click): Ctrl alone sets the
+                                         * default position (final) and lets go of the mouse; else the travel */
+        if (mods == 2) {
+            slider_set(c, slider_default(c), 1);
+            g_drag = NULL; g_cap = NULL; g_cap_panel = NULL;
+            break;
         }
+        c->lx = x; c->ly = y;
+        knob_travel(c, x, y);
         show_tip(c);
         break;
-    }
-    case C_KNOB:
-        if (c->bmp && c->bmp->n <= 4 && c->clickable) {
-            NTable *t = nt_get(c->table);
-            int n = t ? t->n : (L ? L->max - L->min + 1 : c->bmp->n);
-            if (n > c->bmp->n) n = c->bmp->n;
-            if (n > 0) val_set(L, value_at(c, (position(c) + 1) % n));
-            g_drag = NULL;
-        }
-        show_tip(c);
-        break;
-    case C_LATCH:
-        press(c);
-        if (c->has_on && c->has_off && c->onValue != c->offValue) val_set(L, cval(c) == c->onValue ? c->offValue : c->onValue);
-        else if (c->has_on) val_set(L, c->onValue);
-        else val_set(L, cval(c) ? 0 : 1);
-        break;
-    case C_UNLATCH:
-        press(c);
-        action(c->fn, c->args);
-        break;
+    case C_LATCH:                       /* the latch family's down (rva 0x2CD350): pressed and captured; its press
+    case C_UNLATCH:                      * (vt+0x120) comes with the up, on the control (mouse_up_at) */
     case C_MENU:
-        press(c);
-        g_dirty = 1;
-        option_menu();
-        break;
     case C_SETUP:
         press(c);
+#if EXE_TOOTH == 20                     /* TOOTH 20: the latchButton's toggle at the down */
+        if (c->type == C_LATCH && cleaf(c)) {
+            int on = c->has_on ? c->onValue : 1, off = c->has_off ? c->offValue : 0, v = position(c) == on ? off : on, n = npos(c);
+            v = v < 0 ? 0 : v > n - 1 ? n - 1 : v;
+            val_set(cleaf(c), value_at(c, v));
+        }
+#endif
         g_dirty = 1;
-        midi_menu();
         break;
     case C_JXLATCH:                     /* the latchButton's down (its mouse handler rva 0x2CD350, a down or a double
                                          * click): pressed and captured; the press itself (vt+0x120) comes with the up,
@@ -2825,6 +3223,7 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
         pm_after();
         g_drag = NULL;
         break;
+    case C_SLIDER:
     case C_JXSLIDER: {                  /* the slider's press (rva 0x2E6B20, a down or a double click): Ctrl alone
                                          * sets the default and lets go; on the cap, its grab; off it, clickable,
                                          * it waits for the release (else the cap's middle grabbed and set there) */
@@ -2832,25 +3231,23 @@ static void mouse_down(int x, int y, int mods, int dbl)  /* mods: the plugin's m
         c->dragged = 0;
         c->gx = c->gy = -2147483647;
         if (mods == 2) {
-            Leaf *D = cleaf(c);
-            jxslider_set(c, D ? (D->def >> c->role) & 1 : 0, 1);
-            g_drag = NULL;
+            slider_set(c, slider_default(c), 1);
+            g_drag = NULL; g_cap = NULL; g_cap_panel = NULL;
             break;
         }
         c->lx = x; c->ly = y;
-        jxslider_cap(c, jxslider_pos(c), &cx, &cy);
+        jxslider_cap(c, slider_pos(c), &cx, &cy);
         frame_size(c->bmp, &fw, &fh);
         if (x >= cx && x < cx + fw && y >= cy && y < cy + fh) { c->gx = x - cx; c->gy = y - cy; }
         else if (!c->clickable) {
-            c->gx = x - cx; c->gy = fh / 2;
-            jxslider_set(c, jxslider_point(c, x, y), 0);
+            if (c->horiz) { c->gx = fw / 2; c->gy = y - cy; } else { c->gx = x - cx; c->gy = fh / 2; }
+            slider_set(c, jxslider_point(c, x, y), 0);
             c->dragged = 1;
         }
         show_tip(c);
         break;
     }
-    case C_PATCHNAME:
-        press(c);
+    case C_PATCHNAME:                   /* its handler ran in the dispatch (pn_mouse) */
         break;
     case C_KEYBOARD: {                  /* the control's mouse handler (rva 0x2D41F0): down */
         int vel, n = key_hit(c, x, y, &vel);
@@ -2875,35 +3272,30 @@ static void mouse_move(int x, int y, int mods)
     if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 3, &m);    /* the panels' hover flags */
     if (!c) return;
     L = cleaf(c);
-    if (c->type == C_SLIDER && L) {
-        int w, h;
-        frame_size(c->bmp, &w, &h);
-        if (c->h - h > 0) g_dacc += (double)(g_dy - y) / (c->h - h) * (L->max - L->min) * fine;
-        g_dy = y;
-        val_set(L, (int)floor(g_dv + g_dacc + 0.5));
+    (void)L; (void)fine;
+    if (frame_class(c) && g_cap == c) keyop_mouse(c, 3);
+    if (c->type == C_KNOB) {            /* the knob's drag (rva 0x2D6F80): a new point; Shift alone, 2 pixels at least
+                                         * along the travel; the point's position, set (flag 0) */
+        if (x == c->lx && y == c->ly) return;
+        c->fine = mods == 1;
+        if (c->fine && abs(c->horiz ? x - c->lx : y - c->ly) < 2) return;
+        slider_set(c, knob_point(c, x, y), 0);
+        c->lx = x; c->ly = y;
+        c->dragged = 1;
         show_tip(c);
-    } else if (c->type == C_KNOB && L) {
-        if (c->bmp->n <= 4) {
-            int steps = (g_dy - y) / 20;
-            if (steps) { val_set(L, value_at(c, position(c) + (steps > 0 ? 1 : -1))); g_dy = y; }
-        } else {
-            g_dacc += (double)(g_dy - y) / 200.0 * (L->max - L->min) * fine;
-            g_dy = y;
-            val_set(L, (int)floor(g_dv + g_dacc + 0.5));
-        }
-        show_tip(c);
-    } else if (c->type == C_JXSLIDER) {  /* the drag (rva 0x2E7940): Shift alone, 2 pixels at least; a grab from an
-                                         * off-cap press, the cap's middle; the point's position, set (flag 0) */
+    } else if (c->type == C_SLIDER || c->type == C_JXSLIDER) {   /* the drag (rva 0x2E7940): Shift alone, 2 pixels
+                                         * at least; a grab from an off-cap press, the cap's middle; the point's
+                                         * position, set (flag 0) */
         int cx, cy, fw, fh;
         if (x == c->lx && y == c->ly) return;
         c->fine = mods == 1;
-        if (c->fine && abs(y - c->ly) < 2) return;
+        if (c->fine && abs(c->horiz ? x - c->lx : y - c->ly) < 2) return;
         if (c->clickable && c->gx == -2147483647 && c->gy == -2147483647) {
-            jxslider_cap(c, jxslider_pos(c), &cx, &cy);
+            jxslider_cap(c, slider_pos(c), &cx, &cy);
             frame_size(c->bmp, &fw, &fh);
-            c->gx = x - cx; c->gy = fh / 2;
+            if (c->horiz) { c->gx = fw / 2; c->gy = y - cy; } else { c->gx = x - cx; c->gy = fh / 2; }
         }
-        jxslider_set(c, jxslider_point(c, x, y), 0);
+        slider_set(c, jxslider_point(c, x, y), 0);
         c->lx = x; c->ly = y;
         c->dragged = 1;
         show_tip(c);
@@ -2921,6 +3313,11 @@ static void mouse_up_at(int x, int y)
 {
     Panel *m;
     if (get("vm.vs.panelPatch") != 1) dispatch(x, y, 1, &m);    /* the panels' hover flags; the holder takes it */
+    if (g_drag && frame_class(g_drag) && g_cap == g_drag) keyop_mouse(g_drag, 1);
+    if (g_drag && g_drag == g_cap && (g_drag->type == C_LATCH || g_drag->type == C_UNLATCH || g_drag->type == C_MENU ||
+                                      g_drag->type == C_SETUP || g_drag->type == C_JXLATCH || g_drag->type == C_EXPRLATCH ||
+                                      g_drag->type == C_PATCHSEL))
+        focus_set(g_drag, 0);             /* the latch family's up: the mouse and the focus let go, then the press */
     if (g_drag && g_drag->type == C_KEYBOARD && g_kb_drag) { g_kb_drag = 0; kb_release(1); }
     if (g_drag && (g_drag->type == C_JXLATCH || g_drag->type == C_EXPRLATCH || g_drag->type == C_PATCHSEL)) {
         int b[4], in = bounds(g_drag, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
@@ -2929,18 +3326,58 @@ static void mouse_up_at(int x, int y)
          * hit +0x104 at the up; EXECUTED) */
         if (g_drag->type == C_JXLATCH || in) latch_press(g_drag);
     }
-    if (g_drag && g_drag->type == C_JXSLIDER) {   /* the release (rva 0x2E7AD0) */
+    if (g_drag && (g_drag->type == C_LATCH || g_drag->type == C_UNLATCH || g_drag->type == C_MENU || g_drag->type == C_SETUP)) {
+        Ctl *c = g_drag;
+        int b[4], in = bounds(c, b) && x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3];
+        Leaf *L = cleaf(c);
+        /* the presses with the up on the control (+0x104): latchButton (rva 0x2CD6D0) the position onValue -- else
+         * offValue when the position is onValue (the factory's "1" and "0"), clamped, set (flag 1) and the trio;
+         * unlatchButton (0x2CD7E0) its function with its arguments when it has an action (+0x170); menuButton
+         * (0x3251C0, with an action) its menu; setupButton (0x2E5BB0) its MIDI menu */
+        if (in && c->type == C_LATCH && L && EXE_TOOTH != 20) {
+            int on = c->has_on ? c->onValue : 1, off = c->has_off ? c->offValue : 0, v = position(c) == on ? off : on, n = npos(c);
+            v = v < 0 ? 0 : v > n - 1 ? n - 1 : v;
+            val_set(L, value_at(c, v));
+        } else if (in && c->type == C_UNLATCH && c->action) {
+            if (EXE_TOOTH == 17) action(c->fn, c->args);   /* TOOTH 17: run at the press, not queued */
+            else fn_queue(c->fn, c->args);     /* the registry (rva 0x296120, delay 0): the next idle runs it */
+        } else if (in && c->type == C_MENU && c->action) {
+            g_drag = NULL;
+            option_menu();
+        } else if (in && c->type == C_SETUP) {
+            g_drag = NULL;
+            midi_menu();
+        }
+    }
+    if (g_drag && (g_drag->type == C_SLIDER || g_drag->type == C_JXSLIDER)) {   /* the release (rva 0x2E7AD0) */
         Ctl *c = g_drag;
         if (c->dragged) {                 /* a drag: the point's position (Shift: the last point within 2 pixels) */
-            if (!(c->fine && abs(y - c->ly) < 2)) { c->lx = x; c->ly = y; }
-            jxslider_set(c, jxslider_point(c, c->lx, c->ly), 1);
-        } else if (c->clickable && EXE_TOOTH != 4) {   /* a click: one position on, turning at the ends */
-            int p = jxslider_pos(c);
+            if (!(c->fine && abs(c->horiz ? x - c->lx : y - c->ly) < 2)) { c->lx = x; c->ly = y; }
+            slider_set(c, jxslider_point(c, c->lx, c->ly), 1);
+        } else if (c->clickable && (EXE_TOOTH != 4 || c->type != C_JXSLIDER)) {   /* a click: one position on,
+                                                                             * turning at the ends */
+            int p = slider_pos(c);
             if (p <= 0) c->dir = 1;
-            else if (p >= 1) c->dir = -1;
-            jxslider_set(c, p + c->dir, 1);
+            else if (p >= slider_n(c) - 1) c->dir = -1;
+            slider_set(c, p + c->dir, 1);
         }
         c->lx = c->ly = c->gx = c->gy = -2147483647;
+        c->dragged = c->fine = 0;
+    }
+    if (g_drag && g_drag->type == C_KNOB) {   /* the knob's release (rva 0x2D7110) */
+        Ctl *c = g_drag;
+        if (c->dragged) {                 /* a drag: the point's position on the travel (Shift: the last point within
+                                           * 2 pixels), final */
+            if (!(c->fine && abs(c->horiz ? x - c->lx : y - c->ly) < 2)) { c->lx = x; c->ly = y; }
+            slider_set(c, knob_point(c, c->lx, c->ly), 1);
+        } else if (c->clickable) {        /* clickable (+0xD4; no JX knob is): one position on, turning at the ends */
+            int p = position(c);
+            if (p <= 0) c->dir = 1;
+            else if (npos(c) - 1 <= p) c->dir = -1;
+            slider_set(c, p + c->dir, 1);
+        }
+        c->lx = c->ly = -2147483647;
+        c->krect[0] = c->krect[1] = c->krect[2] = c->krect[3] = 0;
         c->dragged = c->fine = 0;
     }
     g_drag = NULL;
@@ -2952,30 +3389,10 @@ static void mouse_up_at(int x, int y)
 }
 static void mouse_up(void) { mouse_up_at(g_mx, g_my); }
 
-static void mouse_wheel(int x, int y, int up)
-{
-    Ctl *c = hit(x, y);
-    Leaf *L;
-    if (c && c->type == C_KEYBOARD && c->nwr) {   /* the keyboard's wheel (rva 0x2D4420): OCTAVE SHIFT */
-        const Leaf *O = resolve("fm.PATCH.NAME1.OCTAVE SHIFT");       /* + the step, in its range, */
-        if (O) val_set(O, get("fm.PATCH.NAME1.OCTAVE SHIFT") + (up ? 1 : -1));   /* then the commit */
-        g_dirty = 1;
-        return;
-    }
-    if (!c || !(c->type == C_SLIDER || c->type == C_KNOB) || !(L = cleaf(c))) return;
-    if (c->type == C_KNOB && c->bmp && c->bmp->n <= 4) val_set(L, value_at(c, position(c) + (up ? 1 : -1)));
-    else val_set(L, cval(c) + (up ? 1 : -1));
-    show_tip(c);
-    g_dirty = 1;
-}
 
-static void mouse_dbl(int x, int y)
-{
-    Ctl *c = hit(x, y);
-    Leaf *L;
-    if (!c || !(c->type == C_SLIDER || (c->type == C_KNOB && c->bmp && c->bmp->n > 4)) || !(L = cleaf(c))) return;
-    val_set(L, L->def);
-}
+/* a double click: the knob's and the slider's frame (rva 0x2D0660) takes it as a down -- no default of its own (the
+ * default: Ctrl alone) */
+static void mouse_dbl(int x, int y) { (void)x; (void)y; }
 
 /* --------------------------------------------------------- the patch window */
 /* The list's cells as the plugin draws them (rva 0x326930, READ): 4 columns of 16; a cell's text the
@@ -3175,7 +3592,6 @@ static void option_menu(void)
     else if (cmd >= 300 && cmd <= 303) set("vm.vs.sampleRate", cmd - 300);
     else if (cmd >= 700) { InterlockedExchange(&g_lat_ms, cmd - 700); InterlockedExchange(&g_reopen, 1); ini_put("audio", "latency_ms", cmd - 700); }
     else if (cmd >= 400) { set("vm.vs.mainZoom", cmd - 400); ini_put("window", "zoom", cmd - 400); }
-    mouse_up();
 }
 
 static void midi_menu(void)
@@ -3199,7 +3615,6 @@ static void midi_menu(void)
         midi_open(cmd - 500);
         if (midiInGetDevCapsA((UINT_PTR)(cmd - 500), &caps, sizeof caps) == MMSYSERR_NOERROR) ini_puts("midi", "input", caps.szPname);
     } else if (cmd == 499) { midi_open(-1); status_set("MIDI input off"); ini_puts("midi", "input", "off"); }
-    mouse_up();
 }
 
 /* ---------------------------------------------------------------- the window */
@@ -3341,7 +3756,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         p.x = GET_X_LPARAM(lp);
         p.y = GET_Y_LPARAM(lp);
         ScreenToClient(h, &p);
-        mouse_wheel(p.x * 100 / g_zoom, p.y * 100 / g_zoom, GET_WHEEL_DELTA_WPARAM(wp) > 0);
+        wheel_event(p.x * 100 / g_zoom, p.y * 100 / g_zoom, GET_WHEEL_DELTA_WPARAM(wp), GET_KEYSTATE_WPARAM(wp));
         InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -3386,6 +3801,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM wp, LPARAM lp)
         LeaveCriticalSection(&g_lock);
         if (changed) g_dirty = 1;
         juno_pm_tick(g_pm);                        /* the manager's 50 ms timer (rva 0x32F280): autosave */
+        gui_tick();                                /* the editor's 50 ms timer (rva 0x3103BE) */
         if (g_dirty) InvalidateRect(h, NULL, FALSE);
         return 0;
     }
@@ -3662,6 +4078,44 @@ static void pm_digest(FILE *f, int full, char dirs[][MAX_PATH], int ndirs)
 }
 /* the scripted run: the commands through the program's handlers (keys: WM_KEYDOWN's; mouse: the list's
  * and the bank name's, as patch_down routes them; buttons: action()) */
+/* a scripted answer for the next dialog of its kind: "ans t =HEX" a text (t -: a cancel), "ans m N" a menu's item,
+ * "ans b N" a message box's, "ans f N PATH..." the file dialogs' (tab-separated), "ans p T S" the patch name's menu
+ * (p -1: none) */
+static void ans_line(const char *line)
+{
+    Ans *s;
+    int k;
+    if (g_nans >= 16) return;
+    s = &g_ans[g_nans++];
+    memset(s, 0, sizeof *s);
+    s->kind = line[4];
+    if (s->kind == 't') {
+        const char *h = line + 6;
+        if (*h == '=') ++h;                         /* "=HEX": a text; "-": a cancel */
+        else if (*h == '-') h = NULL;
+        if (!h) s->text = NULL;
+        else {
+            int l = 0;
+            s->text = xmalloc(strlen(h) / 2 + 2);
+            while (isxdigit((unsigned char)h[0]) && isxdigit((unsigned char)h[1])) { unsigned v; sscanf(h, "%2x", &v); s->text[l++] = (char)v; h += 2; }
+            s->text[l] = 0;
+        }
+    } else if (s->kind == 'f') {
+        const char *q = line + 6;
+        char *e;
+        s->nfiles = (int)strtol(q, &e, 10);
+        s->files = s->nfiles > 0 ? xmalloc(sizeof *s->files * (size_t)s->nfiles) : NULL;
+        for (k = 0; k < s->nfiles; ++k) {                    /* tab-separated paths */
+            char *tab;
+            q = e + 1;
+            tab = strpbrk(q, "\t\r\n");
+            s->files[k] = xstrndup(q, tab ? (size_t)(tab - q) : strlen(q));
+            e = tab ? tab : (char *)q + strlen(q);
+        }
+    } else if (s->kind == 'p') {
+        if (sscanf(line + 6, "%d %d", &s->num, &s->num2) < 2) s->num2 = -1;
+    } else s->num = atoi(line + 6);
+}
 static int pm_script(const char *path, char dirs[][MAX_PATH], int ndirs)
 {
     FILE *in = fopen(path, "r");
@@ -3672,37 +4126,7 @@ static int pm_script(const char *path, char dirs[][MAX_PATH], int ndirs)
     pm_digest(g_pmlog, 1, dirs, ndirs);
     while (fgets(line, 1 << 16, in)) {
         int r[4], bt[4];
-        if (!strncmp(line, "ans ", 4)) {
-            Ans *s;
-            if (g_nans >= 16) continue;
-            s = &g_ans[g_nans++];
-            memset(s, 0, sizeof *s);
-            s->kind = line[4];
-            if (s->kind == 't') {
-                char *h = line + 6;
-                if (*h == '=') ++h;                         /* "=HEX": a text; "-": a cancel */
-                else if (*h == '-') h = NULL;
-                if (!h) s->text = NULL;
-                else {
-                    int l = 0;
-                    s->text = xmalloc(strlen(h) / 2 + 2);
-                    while (isxdigit((unsigned char)h[0]) && isxdigit((unsigned char)h[1])) { unsigned v; sscanf(h, "%2x", &v); s->text[l++] = (char)v; h += 2; }
-                    s->text[l] = 0;
-                }
-            } else if (s->kind == 'f') {
-                char *q = line + 6, *e;
-                s->nfiles = (int)strtol(q, &e, 10);
-                s->files = s->nfiles > 0 ? xmalloc(sizeof *s->files * (size_t)s->nfiles) : NULL;
-                for (k = 0; k < s->nfiles; ++k) {                    /* tab-separated paths */
-                    char *tab;
-                    q = e + 1;
-                    tab = strpbrk(q, "\t\r\n");
-                    s->files[k] = xstrndup(q, tab ? (size_t)(tab - q) : strlen(q));
-                    e = tab ? tab : q + strlen(q);
-                }
-            } else s->num = atoi(line + 6);
-            continue;
-        }
+        if (!strncmp(line, "ans ", 4)) { ans_line(line); continue; }
         if (sscanf(line, "full %d", &full) == 1) continue;
         if (!strncmp(line, "dirs ", 5) || line[0] == '\n' || line[0] == '\r' || !line[0]) continue;
         if (!juno_pm_value(g_pm, JPM_ID_PANEL)) set("vm.vs.panelPatch", 1);    /* the PATCH button */
@@ -3906,7 +4330,9 @@ static int play_test(const char *path, int change_patch)
 }
 
 /* --kbscript: one panel event per line through the program's own handlers --
- *   down X Y SHIFT | move X Y SHIFT | up | wheel X Y UP     the mouse, panel pixels
+ *   down X Y SHIFT | move X Y SHIFT | up                    the mouse, panel pixels
+ *   wheel X Y DELTA KEYS | gtick T                          WM_MOUSEWHEEL (its delta, MK_ keys) | the editor's
+ *                                                           50 ms timer with the GUI's clock at T ms
  *   set V REF                                               a panel control's edit
  *   patch IDX COMMIT                                        a patch load (buttons: 1)
  *   note N V | off N                                        MIDI in, channel 1
@@ -3926,6 +4352,9 @@ static int play_test(const char *path, int change_patch)
  *                                                           a point (jx_panel_gate.py: the plugin's message)
  *   pending | opens                                         the engine records queued for the next block |
  *                                                           each panel's open flag, in cctree's order
+ *   ans t =HEX | ans t - | ans p T S | ans p -1             the next event's dialogs' answers (the patch name's
+ *                                                           edit, its menu's cell; pm_script's other kinds),
+ *                                                           logged "# ans ..." first; dropped after the event
  * every engine call to FILE.log (the calls a GUI makes, in order); each mouse event first as "# kb ..." */
 static int kb_script(const char *path)
 {
@@ -3935,7 +4364,14 @@ static int kb_script(const char *path)
     int a, b, c, d, k;
     if (!in) return 2;
     fprintf(g_log, "# kbscript\n");                  /* the calls before it are the boot's */
+    g_script_clock = 1;                               /* the GUI's clock: the script's (gtick) */
+    g_scripted = 1;                                   /* the dialogs answered by the script's "ans" lines */
     while (fgets(line, sizeof line, in)) {
+        if (!strncmp(line, "ans ", 4)) {              /* the next event's answers: logged first */
+            fprintf(g_log, "# %.*s\n", (int)strcspn(line, "\r\n"), line);
+            ans_line(line);
+            continue;
+        }
         if (sscanf(line, "rdown %d %d %d %d", &a, &b, &c, &d) == 4) {
             fprintf(g_log, "# rdown %d %d %d %d\n", a, b, c, d);
             if (!cc_press(a, b, c, d)) mouse_down(a, b, 4 | c, 0);
@@ -3974,7 +4410,15 @@ static int kb_script(const char *path)
             fprintf(g_log, "# kb up %d %d\n", a, b);
             mouse_up_at(a, b);
         }
-        else if (sscanf(line, "wheel %d %d %d", &a, &b, &c) == 3) mouse_wheel(a, b, c);
+        else if (sscanf(line, "wheel %d %d %d %d", &a, &b, &c, &d) == 4) {     /* WM_MOUSEWHEEL: delta, MK_ keys */
+            fprintf(g_log, "# kb wheel %d %d %d %d\n", a, b, c, d);
+            wheel_event(a, b, c, d);
+        }
+        else if (sscanf(line, "gtick %d", &a) == 1) {   /* the editor's timer at the script's clock */
+            fprintf(g_log, "# gtick %d\n", a);
+            g_gclock = (DWORD)a;
+            gui_tick();
+        }
         else if (sscanf(line, "set %d %127[^\r\n]", &a, ref) == 2) set(ref, a);
         else if (sscanf(line, "patch %d %d", &a, &b) == 2) pm_scripted_patch(a, b);
         else if (sscanf(line, "note %d %d", &a, &b) == 2) midi_in(0x90u | ((uint32_t)a << 8) | ((uint32_t)b << 16), 0);
@@ -3987,6 +4431,9 @@ static int kb_script(const char *path)
             meters_tick();
             LeaveCriticalSection(&g_lock);
         }
+        if (!strncmp(line, "down", 4) || !strncmp(line, "dbl", 3) || !strncmp(line, "move", 4) || !strncmp(line, "up", 2) ||
+            !strncmp(line, "wheel", 5) || !strncmp(line, "rdown", 5) || !strncmp(line, "ccmsg", 5))
+            g_nans = 0;                                   /* an event's unused answers go with it */
     }
     fclose(in);
     return 0;

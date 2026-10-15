@@ -4488,3 +4488,41 @@ A gate that grades a message by its effects goes blind when the effect vanishes 
 engine. Where the port emits a record, compare the record as emitted. And re-run the mutation reach after every
 change to the code its gates watch: a kill is a fact about one tree.
 
+
+## 261. A GUI HAS A CLOCK OF ITS OWN -- AN ORACLE THAT NEVER TICKS GRADES A PANEL THAT NEVER WAITS
+Paid 2026-10-15 (JX scope row 25, jx_panel_gate.py: 41 failures after the generic classes' first port). An
+unlatchButton's function did not run at its press: the latch family's press (rva 0x2CD7E0) QUEUES it in the function
+registry (rva 0x296120, delay 0), and only the module's idle -- which the editor's 50 ms WM_TIMER calls after the root
+panel's tick -- runs what is due, strictly before now (rva 0x296730). The wheel's edit closes on an 800 ms timer, the
+focus goes on a 3200 ms one; all read GetTickCount, which the emulator answered with 0 (its "Get*" default). The
+oracle had no timer at all: every queued function stayed queued, no timer came due, and the program -- on the wall
+clock -- could not be compared. Fixed: the script carries the GUI's clock ("gtick T"), the program reads it in a test
+run, the oracle answers GetTickCount with it and calls the root's tick and the module's idle as WM_TIMER does;
+1781-2389 ticks a quick run, every one compared.
+### The rule
+A GUI port is graded on its clock too. Find every timer and queue its handlers read (GetTickCount, SetTimer, the
+idle), drive both sides from one scripted clock, and compare the ticks as events.
+
+## 262. "CHANGES NOTHING", MEASURED WITH EVERY DIALOG CANCELLED, IS A CLAIM ABOUT THE CANCEL
+Paid 2026-10-15 (JX scope row 25: the patch name). Row 20 recorded, EXECUTED, that the patch name "takes a down on
+its button and changes nothing". The oracle's text service had answered every edit with a cancel and its menu none.
+In truth the arrow opens the name's edit (rva 0x2CF920: the offer and the answer trimmed, two signed chars a value,
+set with the flag 1) and the rest of the control a two-level patch menu (rva 0x334590) whose cell loads its patch;
+the wheel steps the patch. Two more traps on the way: Script.xml gives the class none of its own elements, so its
+rectangles from them are empty (READ in the parser, EXECUTED as (231,294,231,294)); and the template never draws, so
+the display's text -- what the edit offers -- exists only after the control's own update (vt+0xB0).
+### The rule
+Where a handler opens a dialog, script its answers -- each kind: a text, an empty one, a cancel, every menu path --
+before saying what the handler does. A cancelled dialog proves only the cancel path.
+
+## 263. TWO RUNS OF ONE GATE AT ONCE SHARE ITS FRESH START -- EACH WIPES THE OTHER
+Paid 2026-10-15 (row 25's teeth in two lanes). jx_panel_gate.py gives every run "a first run": it empties the
+program's files in ONE Wine prefix (build/jx_panel_gate/wine) before it starts the program; make_native_jx.py empties
+ONE build folder before it compiles. Two lanes of teeth -- and the clean run beside them -- shared both: two tooth
+builds failed (a folder emptied under the other's windres), and every verdict of the parallel runs, a bite as much as
+a GREEN, could have come from the other run deleting the program's banks mid-script. All were run again one at a time.
+Fixed: each tool takes an exclusive lock on what it empties (the prefix for the program's run, the build folder for a
+build), so a second run waits instead of spoiling the first.
+### The rule
+A "fresh start" that deletes shared state is a lock, whether the code says so or not. Before running a gate twice at
+once, find what each run empties or overwrites; lock it, or give each run its own copy.

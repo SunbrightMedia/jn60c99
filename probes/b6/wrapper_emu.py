@@ -239,6 +239,8 @@ class Wrapper(BASE):
             return ret(rcx)
         if name == 'IsProcessorFeaturePresent': return ret(1)
         if name == 'IsDebuggerPresent': return ret(0)
+        if name == 'GetTickCount':                # the GUI's clock: a gate's (tick_ms; 0 when none sets it, as before)
+            return ret(getattr(self, 'tick_ms', 0) & 0xFFFFFFFF)
         if name == 'FlsAlloc': i = self.fls_ctr; self.fls_ctr += 1; return ret(i)
         if name == 'FlsSetValue': self.fls[rcx] = rdx; return ret(1)
         if name == 'FlsGetValue': return ret(self.fls.get(rcx, 0))

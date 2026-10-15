@@ -565,6 +565,60 @@ int juno_pm_pick(juno_pm *pm, int idx)                    /* select, then load t
     cmd_load(pm, 1, -1);
     return 1;
 }
+/* THE PATCH NAME CONTROL'S CALLS (the main panel's patchName, its class's mouse JX rva 0x33E950, its value accessor's
+ * step 0x33EBA0; EXECUTED, jx3p/tools/jx_panel_gate.py). The menu (JX rva 0x330CF0 then 0x334590): the bank and the
+ * selection from the view, then two items per bank -- its name, then " " -- of 32 cells each (rva 0x335520: the
+ * cell's text, patches 0-31 and 32-63), the current cell's path offered [bank x 2 + selection / 32, selection % 32];
+ * a path chosen [t, s]: the bank t / 2, the selection (t % 2) x 32 + s. 1 when chosen (then the load, no push:
+ * juno_pm_load_selection) */
+int juno_pm_patch_menu(juno_pm *pm, int (*menu)(void *u, const char *const *top, int ntop, const char *const *cells,
+                                                int ncell, int path[2]), void *u)
+{
+    int nb, t, s, r = 0, path[2];
+    const char **top, **cells;
+    char *buf;
+    if (!pm) return 0;
+    sync_view(pm);
+    nb = pm->nbank;
+    if (!menu || nb <= 0) return 0;
+    top = malloc((size_t)(2 * nb) * sizeof *top);
+    cells = malloc((size_t)(2 * nb * 32) * sizeof *cells);
+    buf = malloc((size_t)(2 * nb * 32) * 64);
+    if (top && cells && buf) {
+        for (t = 0; t < 2 * nb; ++t) {
+            top[t] = t % 2 ? " " : cur_state(pm, t / 2)->name;
+            for (s = 0; s < 32; ++s) {
+                char *o = buf + (size_t)(t * 32 + s) * 64;
+                juno_pm_cell_text(pm, t / 2, (t % 2) * 32 + s, o, 64);
+                cells[t * 32 + s] = o;
+            }
+        }
+        path[0] = pm->cur[0] * 2 + pm->sel[0] / 32;
+        path[1] = pm->sel[0] % 32;
+        r = menu(u, top, 2 * nb, cells, 32, path);
+        if (r) {
+            pm->cur[0] = path[0] / 2;
+            pm->sel[0] = (PM_TOOTH == 21 ? 0 : path[0] % 2) * 32 + path[1];     /* TOOTH 21: the half ignored */
+        }
+    }
+    free(top); free(cells); free(buf);
+    return r;
+}
+void juno_pm_load_selection(juno_pm *pm)                  /* rva 0x337F70 (pm, view, list 0, push 0, -1) */
+{
+    if (pm) cmd_load(pm, 0, -1);
+}
+/* the accessor's step (rva 0x33EBA0): none for 0; else the bank and the selection from the view, the selection plus
+ * the step kept in 0 .. 63 (rva 0x334D80), the load (no push) */
+void juno_pm_step(juno_pm *pm, int n)
+{
+    int v;
+    if (!pm || !n) return;
+    sync_view(pm);
+    v = pm->sel[0] + n;
+    pm->sel[0] = v < 0 ? 0 : v > 63 ? 63 : v;
+    cmd_load(pm, 0, -1);
+}
 
 /* ------------------------------------------------------------------ bank files */
 static const char KOA[16] = { 'K','o','a','B','a','n','k','F','i','l','e','0','0','0','0','3' };
