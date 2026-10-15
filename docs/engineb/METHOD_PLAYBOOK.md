@@ -4589,3 +4589,15 @@ from, the edit redone with both anchors including the definition's brace and ass
 ### The rule
 Anchor a scripted edit on text only the target has (a definition with its brace, not a bare name), assert each anchor
 is unique and that start < end, and compare the file's line count with the edit's size before building.
+
+## 269. A HARNESS THAT SETS AN ENVIRONMENT VARIABLE CHANGES THE PROGRAM IT RUNS -- REPRODUCE WITH ITS ENVIRONMENT FIRST
+Paid 2026-10-15 (the first lane runs of sections 5b and 5c). jx_lanes.py gives each lane a TMPDIR of its own. Every
+Wine start in a lane then aborted, "free(): invalid pointer", before the prefix was made -- this Wine build (Ubuntu
+9.0) aborts whenever TMPDIR is set, to any value, /tmp included (EXECUTED: `TMPDIR=/tmp wine64 cmd /c echo` aborts,
+the same line without it runs). Two suspects were tested first and cleared: the disk (a full disk gives "could not
+load kernel32.dll", exit 53) and strace (the same render under the lane's strace line passes). The two Wine callers
+(jx_exe_check.py, jx_panel_gate.py) now pass Wine no TMPDIR.
+### The rule
+When a gate fails only under a new harness, diff the harness's environment against the old run's and reproduce with
+the harness's exact environment before suspecting the tracer, the disk or the program. A variable the harness sets
+for its own reasons reaches every program the section starts.

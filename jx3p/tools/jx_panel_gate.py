@@ -60,7 +60,7 @@ usage: jx_panel_gate.py [--exe PATH] [--seed N] [--quick] [--tooth N | --cc-toot
                  searched, 7 controls with many values searched): must FAIL; 8 (the panels before the controls) cannot:
                  no overlap across panels
 Wine: $WINE (default /usr/lib/wine/wine64); a private prefix in build/jx_panel_gate/wine, the program's own files
-(%APPDATA%\\JX-3P) removed before each run.
+(%APPDATA%\\JX-3P) removed before each run; TMPDIR not passed to it.
 """
 import collections
 import glob
@@ -1385,7 +1385,9 @@ def wine_env():
     os.makedirs(prefix, exist_ok=True)
     for d in glob.glob(os.path.join(prefix, 'drive_c', 'users', '*', 'AppData', 'Roaming', 'JX-3P')):
         shutil.rmtree(d, ignore_errors=True)          # the program's settings and banks: a first run each time
-    return dict(os.environ, WINEDEBUG='-all', WINEPREFIX=prefix)
+    env = dict(os.environ, WINEDEBUG='-all', WINEPREFIX=prefix)
+    env.pop('TMPDIR', None)     # this Wine (Ubuntu 9.0) aborts, "free(): invalid pointer", when TMPDIR is set (playbook 269)
+    return env
 
 
 def run_exe(exe, lines, work, name):

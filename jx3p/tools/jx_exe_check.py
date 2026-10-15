@@ -25,7 +25,7 @@ usage: python3 jx3p/tools/jx_exe_check.py [--exe PATH] [--patches 0,34] [--tooth
   --tooth controls  the jx3pLatchButton rule flips the other bit: must FAIL
   --tooth state     the replay loses the CC menu's learn (CC 20 then sets no parameter): must FAIL
   --tooth tick      the replay misses the first meter tick: must FAIL
-Wine: $WINE (default /usr/lib/wine/wine64); a private prefix in build/jx_exe_check/wine.
+Wine: $WINE (default /usr/lib/wine/wine64); a private prefix in build/jx_exe_check/wine; TMPDIR not passed to it.
 exit 0 = GREEN (or the tooth bites)."""
 import ctypes
 import hashlib
@@ -406,6 +406,7 @@ def run_exe(exe, work, patch):
     prefix = os.path.join(WORK, 'wine')
     os.makedirs(prefix, exist_ok=True)
     env = dict(os.environ, WINEDEBUG='-all', WINEPREFIX=prefix)
+    env.pop('TMPDIR', None)     # this Wine (Ubuntu 9.0) aborts, "free(): invalid pointer", when TMPDIR is set (playbook 269)
     r = subprocess.run(args, cwd=work, env=env, timeout=1800, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if r.returncode or not os.path.exists(raw + '.log'):
         raise SystemExit('the program failed (%d): %s' % (r.returncode, r.stdout.decode(errors='replace')[-600:]))
