@@ -1,0 +1,4 @@
+# jx3p/tools/jx_lanes.py: each section's input stamps and lane logs -- local evidence (paths and sha256 of this
+# machine), never committed
+*
+!.gitignore
