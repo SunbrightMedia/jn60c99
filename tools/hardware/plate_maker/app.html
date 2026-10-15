@@ -115,7 +115,10 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 #panel .cap.pressed .body { fill-opacity: .9; filter: brightness(.7); }
 #panel .cap.grab { cursor: grabbing; }
 .viewbar .seg button { padding: 3px 10px; }
-.viewbar.panelmode .wbonly { display: none; }
+.viewbar.panelmode .wbonly, .viewbar:not(.panelmode) .panelonly { display: none; }
+#panel.panelview.noedges .board .hitbox { stroke: none; }
+#panel .lbl { font: 700 2.8px Helvetica, "Helvetica Neue", Arial, sans-serif; letter-spacing: .12px; fill: #F2F2EE; pointer-events: none; }
+#panel .marquee { fill: var(--accent-soft); stroke: var(--sel); stroke-width: .4; stroke-dasharray: 2 1; pointer-events: none; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
 #panel .dim { font: 5px var(--mono); fill: var(--muted); }
@@ -189,6 +192,8 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align:
     <div class="viewbar" id="viewbar">
       <div class="seg" role="group" aria-label="View"><button type="button" id="mWork" aria-pressed="true">Workbench</button><button type="button" id="mPanel" aria-pressed="false">Panel</button></div>
       <label><input type="checkbox" id="vCaps" checked> Caps</label>
+      <label class="panelonly"><input type="checkbox" id="vEdges" checked> Board edges</label>
+      <label class="panelonly"><input type="checkbox" id="vLabels" checked> Labels</label>
       <label class="wbonly"><input type="checkbox" id="vBoards" checked> Boards</label>
       <label class="wbonly"><input type="checkbox" id="vCutouts" checked> Panel cutouts</label>
       <label class="wbonly"><input type="checkbox" id="vFront" checked> Front silk</label>
@@ -263,7 +268,7 @@ function firstFree(bi, rot, insts, g) {
 }
 
 function exampleState() {
-  S = { depth: 'MAX', insts: [], params: Object.assign({}, G.DEFAULTS), sel: null, example: true };
+  S = { depth: 'MAX', insts: [], params: Object.assign({}, G.DEFAULTS), sel: [], example: true };
   const g = G.grid(G.depthMM(S.depth));
   const order = ['EspMotherboard', 'muxboardv1', 'SatelliteBoard', 'HeadphoneBreakout', 'midi3', 'KeyswitchKeybed', 'SegmentBackpack',
     'buttonpack3', 'FaderBoard', 'FaderBoard', 'FaderBoard', 'PotentiometerPack1', 'PotentiometerPack1', 'SwitchBoard', 'buttonpack2', 'PotentiometerBoard'];
@@ -278,6 +283,13 @@ function serial() {
   return { app: 'module-plate-maker', version: 1, depth: S.depth, params: S.params,
     boards: S.insts.map(i => Object.assign({ name: BOARDS[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot }, i.caps && Object.keys(i.caps).length ? { caps: i.caps } : {})) };
 }
+// Defaults changed since a layout was saved: a saved value equal to the OLD default follows the new one.
+const OLD_DEFAULTS = [{ capFaderL: 12.0, capFaderW: 20.0 }];
+function migrateParams(o) {
+  const p = Object.assign({}, G.DEFAULTS, o.params || {});
+  for (const od of OLD_DEFAULTS) for (const k in od) if (o.params && o.params[k] === od[k]) p[k] = G.DEFAULTS[k];
+  return p;
+}
 function loadSerial(o) {
   if (!o || o.app !== 'module-plate-maker') throw new Error('This file is not a Module Plate Maker layout.');
   const missing = [];
@@ -289,7 +301,7 @@ function loadSerial(o) {
     insts.push({ id: nextId++, b: bi, cx: x.cx | 0, cy: x.cy | 0, rot: x.rot & 3, caps });
   }
   S = { depth: G.DEPTHS.some(d => d.key === o.depth) ? o.depth : 'MAX', insts,
-    params: Object.assign({}, G.DEFAULTS, o.params || {}), sel: null, example: false };
+    params: migrateParams(o), sel: [], example: false };
   if (missing.length) toast('Not in this app: ' + missing.join(', '));
 }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(serial())); } catch (e) { /* storage blocked: fine */ } }
@@ -326,6 +338,16 @@ function cutoutMarkup(b, P, attrsOf) {
     const r = c.type === 'stadium' ? Math.min(w, h) / 2 : 0;
     return `<rect ${a} x="${x0}" y="${y0}" width="${w}" height="${h}"${r ? ` rx="${r}" ry="${r}"` : ''}/>`;
   }).join('');
+}
+
+// "CNTRL" above every fader and knob, in the plate frame (always upright): centred on the cap's
+// box over its whole movement, its baseline 1.2 mm above that box.
+const LABEL_TEXT = 'CNTRL', LABEL_GAP = 1.2;
+function labelBoxes() {
+  return G.capBoxes(BOARDS, S.insts, derived.g, S.params).filter(c => c.kind === 'fader' || c.kind === 'pot');
+}
+function labelsMarkup() {
+  return labelBoxes().map(c => `<text class="lbl" x="${((c.box[0] + c.box[2]) / 2).toFixed(3)}" y="${(c.box[1] - LABEL_GAP).toFixed(3)}" text-anchor="middle">${LABEL_TEXT}</text>`).join('');
 }
 
 // Caps of one placed board, in the board frame (shapes from G.capShapes).
@@ -370,6 +392,7 @@ function drawPanel() {
   svg.setAttribute('viewBox', `-4 -4 ${g.W + 8} ${g.D + 12}`);
   svg.classList.toggle('noboards', !$('vBoards').checked && viewMode !== 'panel');
   svg.classList.toggle('panelview', viewMode === 'panel');
+  svg.classList.toggle('noedges', !$('vEdges').checked);
   let base = svg.querySelector('#base'), cuts = svg.querySelector('#cuts'), bl = svg.querySelector('#boards');
   if (!base) {
     const defs = el('defs', {}, svg);
@@ -419,12 +442,15 @@ function drawPanel() {
     e.querySelector('.caps').innerHTML = $('vCaps').checked ? capsMarkup(b, inst) : '';
     e.querySelector('.silkF').style.display = $('vFront').checked ? '' : 'none';
     e.querySelector('.silkB').style.display = $('vBack').checked ? '' : 'none';
-    e.classList.toggle('sel', S.sel === inst.id);
+    e.classList.toggle('sel', isSel(inst.id));
     e.classList.toggle('bad', v.issues[k].length > 0);
     seen.add(String(inst.id));
   });
   for (const [id, e] of boardEls) if (!seen.has(String(id))) { e.remove(); boardEls.delete(id); }
 
+  let lbls = svg.querySelector('#labels');
+  if (!lbls) lbls = el('g', { id: 'labels' }, svg);
+  lbls.innerHTML = (viewMode === 'panel' && $('vLabels').checked) ? labelsMarkup() : '';
   cuts.innerHTML = '';
   if ($('vCuts').checked && !plan.error) {
     const rf = S.params.shoulderD / 2 + S.params.footFlare;
@@ -530,9 +556,10 @@ function drawSide() {
   $('bStl').disabled = derived.bad || !pieces.length;
   $('exampleTag').hidden = !S.example;
 
-  const si = $('selInfo'), k = S.insts.findIndex(i => i.id === S.sel);
-  ['bRot', 'bDup', 'bDel'].forEach(id => $(id).disabled = k < 0);
-  if (k < 0) si.textContent = 'No board selected.';
+  const si = $('selInfo'), k = S.sel.length === 1 ? S.insts.findIndex(i => i.id === S.sel[0]) : -1;
+  ['bRot', 'bDup', 'bDel'].forEach(id => $(id).disabled = !S.sel.length);
+  if (!S.sel.length) si.textContent = 'No board selected. Drag on an empty part of the panel to select several.';
+  else if (k < 0) si.textContent = S.sel.length + ' boards selected. Drag one to move them all; R turns them as a group.';
   else {
     const inst = S.insts[k], b = BOARDS[inst.b], q = v.placed[k];
     si.innerHTML = `<b></b><div class="mono hint"></div>`;
@@ -553,24 +580,62 @@ function addBoard(bi) {
   const g = G.grid(G.depthMM(S.depth));
   const inst = firstFree(bi, 0, S.insts, g) || firstFree(bi, 1, S.insts, g);
   if (!inst) { toast('No free place for ' + BOARDS[bi].name + ' at this depth.'); return; }
-  const id = nextId++; S.insts.push(Object.assign({ id }, inst)); S.sel = id; changed();
+  const id = nextId++; S.insts.push(Object.assign({ id }, inst)); S.sel = [id]; changed();
 }
-function select(id, redraw) { if (S.sel === id) return; S.sel = id; if (redraw !== false) changed(true); else { drawPanel(); drawSide(); } }
-function selInst() { return S.insts.find(i => i.id === S.sel); }
+function isSel(id) { return S.sel.includes(id); }
+function select(id, redraw) { if (S.sel.length === 1 && S.sel[0] === id) return; S.sel = [id]; if (redraw !== false) changed(true); else { drawPanel(); drawSide(); } }
+function selInsts() { return S.insts.filter(i => isSel(i.id)); }
+function selInst() { const l = selInsts(); return l.length === 1 ? l[0] : null; }
+function cellsOf(i) { const q = G.place(BOARDS[i.b], i, derived.g); return [q.cellsX, q.cellsY]; }
+// Move every board in `list` by the same cell delta, clamped so that every hole stays on the grid
+// (a board can never be pushed off the panel and lost).
+function moveGroup(list, start, dx, dy) {
+  const g = derived.g;
+  let lo = [-Infinity, -Infinity], hi = [Infinity, Infinity];
+  list.forEach((i, k) => { const [w, h] = cellsOf(i);
+    lo = [Math.max(lo[0], -start[k][0]), Math.max(lo[1], -start[k][1])];
+    hi = [Math.min(hi[0], g.nx - w - start[k][0]), Math.min(hi[1], Math.max(0, g.ny - h) - start[k][1])]; });
+  dx = Math.max(lo[0], Math.min(hi[0], dx)); dy = Math.max(lo[1], Math.min(hi[1], dy));
+  if (!isFinite(dx)) dx = 0; if (!isFinite(dy)) dy = 0;
+  list.forEach((i, k) => {
+    const nx = start[k][0] + dx, ny = start[k][1] + dy;
+    if (nx !== i.cx || ny !== i.cy) { i.cx = nx; i.cy = ny; delete i.rc; rotMemo = null; }
+  });
+}
+function clampInst(i) { const g = derived.g, [w, h] = cellsOf(i);
+  i.cx = Math.max(0, Math.min(Math.max(0, g.nx - w), i.cx)); i.cy = Math.max(0, Math.min(Math.max(0, g.ny - h), i.cy)); }
+// Rotate the selection 90 degrees clockwise about its centre. The exact (unrounded) centres are
+// remembered between turns, so four turns land exactly where the board started: no drift.
+let rotMemo = null;
+function bboxCentre(i) { const q = G.place(BOARDS[i.b], i, derived.g); return [(q.bbox[0] + q.bbox[2]) / 2, (q.bbox[1] + q.bbox[3]) / 2]; }
 function rotateSel() {
-  const i = selInst(); if (!i) return;
-  const g = derived.g, b = BOARDS[i.b];
-  // keep the board's centre near where it was
-  const before = G.place(b, i, g), cx0 = (before.bbox[0] + before.bbox[2]) / 2, cy0 = (before.bbox[1] + before.bbox[3]) / 2;
-  i.rot = (i.rot + 1) & 3;
-  const after = G.place(b, i, g);
-  i.cx += Math.round((cx0 - (after.bbox[0] + after.bbox[2]) / 2) / 21); i.cy += Math.round((cy0 - (after.bbox[1] + after.bbox[3]) / 2) / 21);
+  const list = selInsts(); if (!list.length) return;
+  const key = list.map(i => i.id).sort().join(',');
+  const cs = list.map(i => i.rc || bboxCentre(i));
+  let gc;
+  if (rotMemo && rotMemo.key === key) gc = rotMemo.gc;
+  else { const bb = list.map(i => G.place(BOARDS[i.b], i, derived.g).bbox);
+    gc = [(Math.min(...bb.map(q => q[0])) + Math.max(...bb.map(q => q[2]))) / 2, (Math.min(...bb.map(q => q[1])) + Math.max(...bb.map(q => q[3]))) / 2]; }
+  list.forEach((i, k) => {
+    const c = [gc[0] - (cs[k][1] - gc[1]), gc[1] + (cs[k][0] - gc[0])];   // (dx, dy) -> (-dy, dx): clockwise, y down
+    i.rot = (i.rot + 1) & 3;
+    const at0 = G.place(BOARDS[i.b], Object.assign({}, i, { cx: 0, cy: 0 }), derived.g);
+    i.cx = Math.round((c[0] - (at0.bbox[0] + at0.bbox[2]) / 2) / 21); i.cy = Math.round((c[1] - (at0.bbox[1] + at0.bbox[3]) / 2) / 21);
+    clampInst(i);
+    i.rc = c;
+  });
+  rotMemo = { key, gc };
   changed();
 }
-function removeSel() { const k = S.insts.findIndex(i => i.id === S.sel); if (k < 0) return; S.insts.splice(k, 1); S.sel = null; changed(); }
-function dupSel() { const i = selInst(); if (!i) return; const n = firstFree(i.b, i.rot, S.insts, derived.g); if (!n) { toast('No free place for a copy.'); return; } const id = nextId++; S.insts.push(Object.assign({ id }, n)); S.sel = id; changed(); }
+function removeSel() { if (!S.sel.length) return; S.insts = S.insts.filter(i => !isSel(i.id)); S.sel = []; changed(); }
+function dupSel() {
+  const ids = [];
+  for (const i of selInsts()) { const n = firstFree(i.b, i.rot, S.insts, derived.g); if (!n) { toast('No free place for a copy of ' + BOARDS[i.b].name + '.'); continue; }
+    const id = nextId++; S.insts.push(Object.assign({ id, caps: Object.assign({}, i.caps || {}) }, n)); ids.push(id); }
+  if (ids.length) { S.sel = ids; changed(); }
+}
 
-let drag = null;
+let drag = null, marquee = null;
 function svgPoint(evt) {
   const svg = $('panel'), pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
   return pt.matrixTransform(svg.getScreenCTM().inverse());
@@ -578,34 +643,59 @@ function svgPoint(evt) {
 function startDrag(evt) {
   const id = +evt.currentTarget.dataset.id, inst = S.insts.find(i => i.id === id);
   if (!inst) return;
-  evt.preventDefault();
-  S.sel = id;
-  const p = svgPoint(evt);
-  drag = { inst, x: p.x, y: p.y, cx: inst.cx, cy: inst.cy, el: evt.currentTarget, pid: evt.pointerId, moved: false };
+  evt.preventDefault(); evt.stopPropagation();
+  if (evt.shiftKey) { S.sel = isSel(id) ? S.sel.filter(x => x !== id) : S.sel.concat([id]); drawPanel(); drawSide(); return; }
+  if (!isSel(id)) S.sel = [id];
+  const p = svgPoint(evt), list = selInsts();
+  drag = { list, start: list.map(i => [i.cx, i.cy]), x: p.x, y: p.y, el: evt.currentTarget, pid: evt.pointerId, moved: false };
   evt.currentTarget.setPointerCapture(evt.pointerId);
   evt.currentTarget.classList.add('drag');
   drawPanel(); drawSide();
 }
-window.addEventListener('pointermove', evt => {
-  if (!drag || evt.pointerId !== drag.pid) return;
+function startMarquee(evt) {
+  if (evt.target.closest('.board') || evt.button > 0) return;
   const p = svgPoint(evt);
-  const cx = drag.cx + Math.round((p.x - drag.x) / 21), cy = drag.cy + Math.round((p.y - drag.y) / 21);
-  if (cx !== drag.inst.cx || cy !== drag.inst.cy) { drag.inst.cx = cx; drag.inst.cy = cy; drag.moved = true; derive(); drawPanel(); drawSide(); }
+  marquee = { x: p.x, y: p.y, pid: evt.pointerId, add: evt.shiftKey, base: evt.shiftKey ? S.sel.slice() : [], el: null };
+  $('panel').setPointerCapture(evt.pointerId);
+}
+window.addEventListener('pointermove', evt => {
+  if (drag && evt.pointerId === drag.pid) {
+    const p = svgPoint(evt), dx = Math.round((p.x - drag.x) / 21), dy = Math.round((p.y - drag.y) / 21);
+    const cur = drag.list.map(i => [i.cx, i.cy]);
+    moveGroup(drag.list, drag.start, dx, dy);
+    if (drag.list.some((i, k) => i.cx !== cur[k][0] || i.cy !== cur[k][1])) { drag.moved = true; derive(); drawPanel(); drawSide(); }
+    return;
+  }
+  if (marquee && evt.pointerId === marquee.pid) {
+    const p = svgPoint(evt), r = [Math.min(marquee.x, p.x), Math.min(marquee.y, p.y), Math.max(marquee.x, p.x), Math.max(marquee.y, p.y)];
+    if (!marquee.el) marquee.el = el('rect', { class: 'marquee' }, $('panel'));
+    marquee.el.setAttribute('x', r[0]); marquee.el.setAttribute('y', r[1]);
+    marquee.el.setAttribute('width', r[2] - r[0]); marquee.el.setAttribute('height', r[3] - r[1]);
+    const hit = S.insts.filter((i, k) => { const q = derived.v.placed[k].bbox; return q[0] < r[2] && r[0] < q[2] && q[1] < r[3] && r[1] < q[3]; }).map(i => i.id);
+    S.sel = [...new Set(marquee.base.concat(hit))];
+    drawPanel(); drawSide();
+  }
 });
 window.addEventListener('pointerup', evt => {
-  if (!drag || evt.pointerId !== drag.pid) return;
-  drag.el.classList.remove('drag');
-  const moved = drag.moved; drag = null;
-  changed(!moved);
+  if (drag && evt.pointerId === drag.pid) {
+    drag.el.classList.remove('drag');
+    const moved = drag.moved; drag = null;
+    changed(!moved);
+    return;
+  }
+  if (marquee && evt.pointerId === marquee.pid) {
+    if (marquee.el) marquee.el.remove(); else if (!marquee.add) S.sel = [];   // a plain click on empty panel clears
+    marquee = null; changed(true);
+  }
 });
 document.addEventListener('keydown', evt => {
   if (evt.target.closest && evt.target.closest('input, select, textarea')) return;
-  const i = selInst(); if (!i) return;
+  const list = selInsts(); if (!list.length) return;
   const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[evt.key];
-  if (mv) { i.cx += mv[0]; i.cy += mv[1]; evt.preventDefault(); changed(); }
+  if (mv) { moveGroup(list, list.map(i => [i.cx, i.cy]), mv[0], mv[1]); evt.preventDefault(); changed(); }
   else if (evt.key === 'r' || evt.key === 'R') { rotateSel(); evt.preventDefault(); }
   else if (evt.key === 'Delete' || evt.key === 'Backspace') { removeSel(); evt.preventDefault(); }
-  else if (evt.key === 'Escape') { S.sel = null; changed(true); }
+  else if (evt.key === 'Escape') { S.sel = []; changed(true); }
 });
 /* ---------- caps: move them with the mouse ---------- */
 let capDrag = null;
@@ -660,7 +750,7 @@ function setView(m) {
 $('mWork').addEventListener('click', () => setView('work'));
 $('mPanel').addEventListener('click', () => setView('panel'));
 
-$('panel').addEventListener('pointerdown', evt => { if (!evt.target.closest('.board') && S.sel !== null) { S.sel = null; changed(true); } });
+$('panel').addEventListener('pointerdown', startMarquee);
 
 /* ---------- files ---------- */
 let dlNs = null;
@@ -722,6 +812,8 @@ $('bSvg').addEventListener('click', async () => {
     const b = BOARDS[inst.b], q = v.placed[k];
     if ((b.parts || []).length) parts.push(`<g transform="matrix(${q.matrix.join(' ')})">` + cutoutMarkup(b, S.params, c => `data-kind="${c.kind}" data-parts="${c.n}"`) + '</g>');
   });
+  parts.push('</g>', '<g id="labels" inkscape:groupmode="layer" inkscape:label="Labels" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="2.8" text-anchor="middle" fill="#000">');
+  labelBoxes().forEach(c => parts.push(`<text x="${((c.box[0] + c.box[2]) / 2).toFixed(3)}" y="${(c.box[1] - LABEL_GAP).toFixed(3)}">${LABEL_TEXT}</text>`));
   parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
 });
@@ -736,10 +828,10 @@ $('fLoad').addEventListener('change', async () => {
 let clearArmed = 0;
 $('bClear').addEventListener('click', () => {
   if (Date.now() - clearArmed > 3000) { clearArmed = Date.now(); $('bClear').textContent = 'Click again to clear'; setTimeout(() => $('bClear').textContent = 'Clear', 3000); return; }
-  S.insts = []; S.sel = null; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
+  S.insts = []; S.sel = []; $('bClear').textContent = 'Clear'; clearArmed = 0; changed();
 });
 $('bRot').addEventListener('click', rotateSel); $('bDel').addEventListener('click', removeSel); $('bDup').addEventListener('click', dupSel);
-['vCaps', 'vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
+['vEdges', 'vLabels', 'vCaps', 'vBoards', 'vCutouts', 'vFront', 'vBack', 'vCuts', 'vGrid'].forEach(id => $(id).addEventListener('change', () => drawPanel()));
 
 let toastT = null;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }

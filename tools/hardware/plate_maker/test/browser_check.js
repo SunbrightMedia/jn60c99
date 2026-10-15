@@ -72,6 +72,50 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   await page.locator('#vBoards').click(); await page.waitForTimeout(200);
   await page.locator('#panel').screenshot({ path: path.join(out, 'cutouts_only.png') });
   await page.locator('#vBoards').click();
+  // ---- selection, rotation drift, group moves (fresh example layout) ----
+  await page.evaluate(() => { localStorage.clear(); }); await page.reload(); await page.waitForTimeout(800);
+  const toScreen = (x, y) => page.evaluate(([x, y]) => { const svg = document.getElementById('panel'), m = svg.getScreenCTM(); return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; }, [x, y]);
+  const pos = () => page.evaluate(() => __plate.S.insts.map(i => [i.id, i.cx, i.cy, i.rot]));
+  const g0 = await page.evaluate(() => __plate.derived.g);
+  // a board whose cell counts differ by an odd number (buttonpack3, 5 x 2): its centre falls between
+  // cells after each turn -- the old code drifted one cell per 4 turns. 40 turns.
+  const fId = await page.evaluate(() => __plate.S.insts.find(i => __plate.BOARDS[i.b].name === 'buttonpack3').id);
+  await page.evaluate(id => { __plate.S.sel = [id]; __plate.refresh(); }, fId);
+  const fst = (await pos()).find(q => q[0] === fId);
+  let drift = 'OK';
+  for (let n = 1; n <= 40; n++) {
+    await page.keyboard.press('r');
+    const q = (await pos()).find(q => q[0] === fId), ok = await page.evaluate(id => { const k = __plate.S.insts.findIndex(i => i.id === id), b = __plate.derived.v.placed[k].bbox, g = __plate.derived.g; return b[0] >= 0 && b[2] <= g.W && b[1] >= 0 && b[3] <= g.D; }, fId);
+    if (!ok) drift = 'FAIL (off the panel after ' + n + ' turns)';
+    if (n % 4 === 0 && (q[1] !== fst[1] || q[2] !== fst[2] || q[3] !== fst[3])) drift = 'FAIL (moved after ' + n + ' turns: ' + q + ' vs ' + fst + ')';
+  }
+  console.log('40 turns of one board', drift);
+  // box select: drag over an empty start point across the upper boards
+  const a = await toScreen(g0.gx0 + 2, g0.D - 4), b = await toScreen(g0.gx0 + 150, 60);
+  await page.mouse.move(a[0], a[1]); await page.mouse.down(); await page.mouse.move(b[0], b[1], { steps: 8 }); await page.mouse.up();
+  const sel = await page.evaluate(() => __plate.S.sel.slice());
+  const want = await page.evaluate(([x0, y0, x1, y1]) => __plate.S.insts.filter((i, k) => { const q = __plate.derived.v.placed[k].bbox; return q[0] < x1 && x0 < q[2] && q[1] < y1 && y0 < q[3]; }).map(i => i.id), [g0.gx0 + 2, 60, g0.gx0 + 150, g0.D - 4]);
+  console.log('box select', sel.length, 'boards', sel.length >= 2 && sel.sort().join() === want.sort().join() ? 'OK' : 'FAIL ' + sel + ' vs ' + want);
+  // group: 4 turns -> every board back where it started
+  const before4 = JSON.stringify((await pos()).filter(q => sel.includes(q[0])));
+  for (let n = 0; n < 4; n++) await page.keyboard.press('r');
+  const after4 = JSON.stringify((await pos()).filter(q => sel.includes(q[0])));
+  console.log('group of', sel.length, '4 turns', before4 === after4 ? 'OK' : 'FAIL ' + before4 + ' -> ' + after4);
+  // group drag: grab one selected board, move one cell down -> all move together
+  const pre = (await pos()).filter(q => sel.includes(q[0]));
+  const bx = await page.evaluate(id => { const r = [...document.querySelectorAll('#panel .board')].find(e => +e.dataset.id === id).querySelector('.pcb').getBoundingClientRect(); return [r.x + 4, r.y + r.height / 2]; }, sel[0]);
+  const mmPx = await page.evaluate(() => document.getElementById('panel').getScreenCTM().a);
+  await page.mouse.move(bx[0], bx[1]); await page.mouse.down(); await page.mouse.move(bx[0], bx[1] + 21 * mmPx, { steps: 5 }); await page.mouse.up();
+  const post = (await pos()).filter(q => sel.includes(q[0]));
+  const deltas = new Set(post.map((q, k) => (q[1] - pre[k][1]) + ',' + (q[2] - pre[k][2])));
+  console.log('group drag delta', [...deltas].join(' '), deltas.size === 1 && [...deltas][0] === '0,1' ? 'OK' : 'FAIL');
+  // arrows never push a board off the grid
+  await page.keyboard.press('Escape');
+  await page.evaluate(id => { __plate.S.sel = [id]; __plate.refresh(); }, fId);
+  for (let n = 0; n < 40; n++) await page.keyboard.press('ArrowLeft');
+  const fl = (await pos()).find(q => q[0] === fId);
+  console.log('40 x left arrow -> cell x', fl[1], fl[1] === 0 ? 'OK (stops at the edge)' : 'FAIL');
+
   // ---- caps, in the Panel view, on a fresh example layout ----
   await page.evaluate(() => { localStorage.clear(); }); await page.reload(); await page.waitForTimeout(800);
   await page.click('#mPanel'); await page.waitForTimeout(300);
@@ -125,6 +169,25 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   for (let i = 0; i < 2; i++) { const p = await scr('#panel .cap-lever', 0); await page.mouse.click(p[0], p[1]); vals.push(await page.evaluate(() => { const i = __plate.S.insts.find(i => __plate.BOARDS[i.b].parts.some(p => p[0] === 'switch')); return Object.values(i.caps)[0]; })); }
   console.log('switch positions', vals.join(','), vals.join(',') === '1,-1' ? 'OK' : 'FAIL');
   await page.screenshot({ path: path.join(out, 'panel_view_moved.png'), fullPage: false });
+  // labels: one per fader and knob, above its cap box; edges checkbox
+  const lab = await page.evaluate(() => {
+    const svg = document.getElementById('panel'), inv = svg.getScreenCTM().inverse();
+    const labels = [...svg.querySelectorAll('#labels .lbl')].map(t => [+t.getAttribute('x'), +t.getAttribute('y'), t.getAttribute('text-anchor'), t.getBBox().y + t.getBBox().height]);
+    const caps = [...svg.querySelectorAll('.cap-fader, .cap-knob')].length;
+    const boxes = __plate.G.capBoxes(__plate.BOARDS, __plate.S.insts, __plate.derived.g, __plate.S.params).filter(c => c.kind === 'fader' || c.kind === 'pot');
+    // anchor = centre of the cap's box, baseline 1.2 above it, and the drawn glyphs end above the box
+    const above = boxes.every(c => labels.some(l => l[2] === 'middle' && Math.abs(l[0] - (c.box[0] + c.box[2]) / 2) < 0.01 && Math.abs(l[1] - (c.box[1] - 1.2)) < 0.01 && l[3] <= c.box[1]));
+    const fam = getComputedStyle(svg.querySelector('#labels .lbl')).fontFamily;
+    return { n: labels.length, caps, above, fam, text: svg.querySelector('#labels .lbl').textContent };
+  });
+  console.log('labels', lab.n, 'for', lab.caps, 'faders+knobs, above:', lab.above, lab.text, '|', lab.fam, lab.n === lab.caps && lab.above && lab.text === 'CNTRL' ? 'OK' : 'FAIL');
+  await page.click('#vLabels'); const nl = await page.evaluate(() => document.querySelectorAll('#labels .lbl').length); await page.click('#vLabels');
+  await page.click('#vEdges'); const es = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke); await page.click('#vEdges');
+  const es2 = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke);
+  console.log('labels off ->', nl, '| edges off ->', es, '| on ->', es2, nl === 0 && es === 'none' && es2 !== 'none' ? 'OK' : 'FAIL');
+  const fsz = await page.evaluate(() => { const b = document.querySelector('#panel .cap-fader .body').getBBox(); return [b.width, b.height]; });
+  console.log('fader cap', fsz.join(' x '), fsz[0] === 6 && fsz[1] === 10 ? 'OK' : 'FAIL');
+  await page.screenshot({ path: path.join(out, 'panel_labels.png'), fullPage: false });
   const capsSaved = await page.evaluate(() => JSON.parse(localStorage.getItem('module-plate-maker-v1')).boards.filter(b => b.caps).length);
   console.log('caps saved in layout', capsSaved > 0 ? 'OK' : 'FAIL');
   const d = await open({ viewport: { width: 1400, height: 1100 }, colorScheme: 'dark' });

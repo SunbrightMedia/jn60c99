@@ -32,7 +32,7 @@
     cutBtnW: 13.0, cutBtnL: 17.6, faderTravel: 60.0, faderLeverL: 4.0, faderLeverW: 1.2, faderClear: 0.4,
     minWeb: 1.0, mergeSlots: 1,
     // cap placeholders
-    capFaderL: 12.0, capFaderW: 20.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0
+    capFaderL: 6.0, capFaderW: 10.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
@@ -165,7 +165,7 @@
      u = (cos a, -sin a), its y axis v = (sin a, cos a). Values per part index k in inst.caps:
      fader 0..1 along the travel, knob 0..1 over 280 degrees (Alps RK09K), switch -1 / 0 / 1. */
   const CAPS = {
-    fader: { label: 'Fader cap', source: 'placeholder 12 x 20 for a 4 x 1.2 lever; moves over the travel' },
+    fader: { label: 'Fader cap', source: 'placeholder 6 x 10 for a 4 x 1.2 lever; moves over the travel' },
     pot: { label: 'Knob', source: 'placeholder dia 15 on the 6 mm shaft; 280 degrees (Alps RK09K)' },
     keyswitch: { label: 'Keycap', source: 'MX 1u keycap, 18 x 18 at the base' },
     button: { label: 'PB86-A1 cap', source: 'the part\'s own cap, 12.4 x 17.0 (FVWIN)' },

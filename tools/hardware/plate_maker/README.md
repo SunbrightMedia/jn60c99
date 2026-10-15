@@ -75,3 +75,16 @@ layout (`boards[].caps`). Browser checks: caps at rest sit on their (oracle-chec
 0.01 mm, a fader cap's two ends are exactly the travel apart, a knob turned past its stop stays at
 it, press / release, switch cycle, caps saved. The page warns when caps overlap over their whole
 movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 mm pitch) overlap.
+
+## Selection, rotation, labels (2026-10-15)
+- Box select: drag on an empty part of the panel (Shift adds); Shift-click toggles one board. A drag,
+  the arrow keys, R, Delete and Duplicate act on the whole selection; a group turns about its centre.
+- Rotation no longer drifts: the exact centre is kept between turns, so 4 turns return every board to
+  its start cell. Moves are clamped so every hole stays on the grid (a board can never be lost).
+  Seen to fail on the old build: buttonpack3 (5 x 2 cells, an odd difference) moved
+  (0,4) -> (2,6) -> (4,7) -> (6,7) over 12 turns; the new build: 40 turns, back every 4.
+- Panel view checkboxes: Board edges, Labels. Labels: "CNTRL" in Helvetica (Arial where the system
+  has no Helvetica), 2.8 mm, centred 1.2 mm above each knob and each fader's whole travel; also a
+  "Labels" layer in the Layout SVG export.
+- Fader caps 6 x 10 (half the first placeholder); saved layouts that still hold the old default follow
+  the new one (`OLD_DEFAULTS` in app.html).
