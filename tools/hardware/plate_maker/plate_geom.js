@@ -32,7 +32,8 @@
     cutBtnW: 13.0, cutBtnL: 17.6, faderTravel: 60.0, faderLeverL: 4.0, faderLeverW: 1.2, faderClear: 0.4,
     minWeb: 1.0, mergeSlots: 1,
     // cap placeholders
-    capFaderL: 6.0, capFaderW: 10.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0
+    capFaderL: 6.0, capFaderW: 10.0, capKnobD: 15.0, capKey: 18.0, capBtnW: 12.4, capBtnL: 17.0, capLeverD: 4.0,
+    labelSize: 5.0      // panel label font size (mm)
   };
 
   /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).

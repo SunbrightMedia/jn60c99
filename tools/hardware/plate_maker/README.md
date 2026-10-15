@@ -84,7 +84,9 @@ movement: with 18 mm MX keycaps the KeyswitchBoard / KeyswitchKeybed keys (~16 m
   Seen to fail on the old build: buttonpack3 (5 x 2 cells, an odd difference) moved
   (0,4) -> (2,6) -> (4,7) -> (6,7) over 12 turns; the new build: 40 turns, back every 4.
 - Panel view checkboxes: Board edges, Labels. Labels: "CNTRL" in Helvetica (Arial where the system
-  has no Helvetica), 2.8 mm, centred 1.2 mm above each knob and each fader's whole travel; also a
-  "Labels" layer in the Layout SVG export.
+  has no Helvetica), `labelSize` 5 mm; the letters are centred halfway between the top edge of the
+  part's board and the top of the fader's slot / the knob (the user, 2026-10-15); also a "Labels"
+  layer in the Layout SVG export. The browser check recomputes each spot from the cutouts and the
+  knob caps (seen to fail with a wrong cap-height constant).
 - Fader caps 6 x 10 (half the first placeholder); saved layouts that still hold the old default follow
   the new one (`OLD_DEFAULTS` in app.html).

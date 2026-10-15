@@ -117,7 +117,7 @@ main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .viewbar .seg button { padding: 3px 10px; }
 .viewbar.panelmode .wbonly, .viewbar:not(.panelmode) .panelonly { display: none; }
 #panel.panelview.noedges .board .hitbox { stroke: none; }
-#panel .lbl { font: 700 2.8px Helvetica, "Helvetica Neue", Arial, sans-serif; letter-spacing: .12px; fill: #F2F2EE; pointer-events: none; }
+#panel .lbl { font: 700 5px Helvetica, "Helvetica Neue", Arial, sans-serif; letter-spacing: .12px; fill: #F2F2EE; pointer-events: none; }
 #panel .marquee { fill: var(--accent-soft); stroke: var(--sel); stroke-width: .4; stroke-dasharray: 2 1; pointer-events: none; }
 #panel .cut { fill: none; stroke: var(--accent); stroke-width: .55; stroke-dasharray: 2.2 1.2; }
 #panel .pcl { font: 600 7px var(--display); fill: var(--accent); }
@@ -249,7 +249,8 @@ const PARAM_UI = [
     ['faderLeverW', 'Fader lever thickness', 'mm'], ['faderClear', 'Fader slot clearance per side', 'mm'],
     ['minWeb', 'Least metal between cutouts', 'mm'], ['mergeSlots', 'Merge close cutouts into one slot (1 = yes, 0 = no)', '']]],
   ['Caps (placeholders)', [['capFaderL', 'Fader cap length (along travel)', 'mm'], ['capFaderW', 'Fader cap width', 'mm'], ['capKnobD', 'Knob diameter', 'mm'],
-    ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]]
+    ['capKey', 'Keycap size', 'mm'], ['capBtnW', 'PB86-A1 cap width', 'mm'], ['capBtnL', 'PB86-A1 cap length', 'mm'], ['capLeverD', 'Switch lever diameter', 'mm']]],
+  ['Labels', [['labelSize', 'Label text size', 'mm']]]
 ];
 
 let S = null;   // state: {depth, insts:[{id,b,cx,cy,rot}], params, sel, example}
@@ -340,14 +341,19 @@ function cutoutMarkup(b, P, attrsOf) {
   }).join('');
 }
 
-// "CNTRL" above every fader and knob, in the plate frame (always upright): centred on the cap's
-// box over its whole movement, its baseline 1.2 mm above that box.
-const LABEL_TEXT = 'CNTRL', LABEL_GAP = 1.2;
-function labelBoxes() {
-  return G.capBoxes(BOARDS, S.insts, derived.g, S.params).filter(c => c.kind === 'fader' || c.kind === 'pot');
+// "CNTRL" above every fader and knob, in the plate frame (always upright). Its letters are centred
+// halfway between the top edge of the part's board and the top of the part: the top of the fader's
+// throw (its slot) or the top of the knob. Baseline = that middle + half the cap height (Helvetica 0.717 em).
+const LABEL_TEXT = 'CNTRL', CAP_HEIGHT = 0.717;
+function labelSpots() {
+  const g = derived.g, P = S.params, out = [];
+  const tops = S.insts.map((i, k) => derived.v.placed[k].bbox[1]);
+  G.cutoutBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'fader').forEach(c => out.push({ inst: c.inst, kind: 'fader', x: (c.box[0] + c.box[2]) / 2, top: c.box[1] }));
+  G.capBoxes(BOARDS, S.insts, g, P).filter(c => c.kind === 'pot').forEach(c => out.push({ inst: c.inst, kind: 'pot', x: (c.box[0] + c.box[2]) / 2, top: c.box[1] }));
+  return out.map(o => Object.assign(o, { boardTop: tops[o.inst], mid: (tops[o.inst] + o.top) / 2, baseline: (tops[o.inst] + o.top) / 2 + CAP_HEIGHT * P.labelSize / 2 }));
 }
 function labelsMarkup() {
-  return labelBoxes().map(c => `<text class="lbl" x="${((c.box[0] + c.box[2]) / 2).toFixed(3)}" y="${(c.box[1] - LABEL_GAP).toFixed(3)}" text-anchor="middle">${LABEL_TEXT}</text>`).join('');
+  return labelSpots().map(o => `<text class="lbl" x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" text-anchor="middle" style="font-size:${S.params.labelSize}px">${LABEL_TEXT}</text>`).join('');
 }
 
 // Caps of one placed board, in the board frame (shapes from G.capShapes).
@@ -812,8 +818,8 @@ $('bSvg').addEventListener('click', async () => {
     const b = BOARDS[inst.b], q = v.placed[k];
     if ((b.parts || []).length) parts.push(`<g transform="matrix(${q.matrix.join(' ')})">` + cutoutMarkup(b, S.params, c => `data-kind="${c.kind}" data-parts="${c.n}"`) + '</g>');
   });
-  parts.push('</g>', '<g id="labels" inkscape:groupmode="layer" inkscape:label="Labels" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="2.8" text-anchor="middle" fill="#000">');
-  labelBoxes().forEach(c => parts.push(`<text x="${((c.box[0] + c.box[2]) / 2).toFixed(3)}" y="${(c.box[1] - LABEL_GAP).toFixed(3)}">${LABEL_TEXT}</text>`));
+  parts.push('</g>', '<g id="labels" inkscape:groupmode="layer" inkscape:label="Labels" font-family="Helvetica, Arial, sans-serif" font-weight="700" text-anchor="middle" fill="#000">');
+  labelSpots().forEach(o => parts.push(`<text x="${o.x.toFixed(3)}" y="${o.baseline.toFixed(3)}" font-size="${S.params.labelSize}">${LABEL_TEXT}</text>`));
   parts.push('</g>', '</svg>');
   await saveFile(`panel_layout_${S.depth}_${stamp()}.svg`, parts.join('\n'));
 });

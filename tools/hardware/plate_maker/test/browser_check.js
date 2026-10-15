@@ -169,18 +169,21 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   for (let i = 0; i < 2; i++) { const p = await scr('#panel .cap-lever', 0); await page.mouse.click(p[0], p[1]); vals.push(await page.evaluate(() => { const i = __plate.S.insts.find(i => __plate.BOARDS[i.b].parts.some(p => p[0] === 'switch')); return Object.values(i.caps)[0]; })); }
   console.log('switch positions', vals.join(','), vals.join(',') === '1,-1' ? 'OK' : 'FAIL');
   await page.screenshot({ path: path.join(out, 'panel_view_moved.png'), fullPage: false });
-  // labels: one per fader and knob, above its cap box; edges checkbox
+  // labels: one per fader and knob, its letters centred halfway between the board's top edge and
+  // the top of the fader slot / knob -- recomputed here from the oracle-checked cutouts and the caps
   const lab = await page.evaluate(() => {
-    const svg = document.getElementById('panel'), inv = svg.getScreenCTM().inverse();
-    const labels = [...svg.querySelectorAll('#labels .lbl')].map(t => [+t.getAttribute('x'), +t.getAttribute('y'), t.getAttribute('text-anchor'), t.getBBox().y + t.getBBox().height]);
-    const caps = [...svg.querySelectorAll('.cap-fader, .cap-knob')].length;
-    const boxes = __plate.G.capBoxes(__plate.BOARDS, __plate.S.insts, __plate.derived.g, __plate.S.params).filter(c => c.kind === 'fader' || c.kind === 'pot');
-    // anchor = centre of the cap's box, baseline 1.2 above it, and the drawn glyphs end above the box
-    const above = boxes.every(c => labels.some(l => l[2] === 'middle' && Math.abs(l[0] - (c.box[0] + c.box[2]) / 2) < 0.01 && Math.abs(l[1] - (c.box[1] - 1.2)) < 0.01 && l[3] <= c.box[1]));
-    const fam = getComputedStyle(svg.querySelector('#labels .lbl')).fontFamily;
-    return { n: labels.length, caps, above, fam, text: svg.querySelector('#labels .lbl').textContent };
+    const P = __plate, svg = document.getElementById('panel'), g = P.derived.g, size = P.S.params.labelSize;
+    const labels = [...svg.querySelectorAll('#labels .lbl')].map(t => { const b = t.getBBox(); return { x: +t.getAttribute('x'), base: +t.getAttribute('y'), a: t.getAttribute('text-anchor'), top: b.y, bot: b.y + b.height }; });
+    const want = [];
+    P.G.cutoutBoxes(P.BOARDS, P.S.insts, g, P.S.params).filter(c => c.kind === 'fader').forEach(c => want.push([c.inst, (c.box[0] + c.box[2]) / 2, c.box[1]]));
+    [...svg.querySelectorAll('.cap-knob .body')].forEach(e => { const inv = svg.getScreenCTM().inverse(), b = e.getBBox(), m = inv.multiply(e.getScreenCTM()), cx = m.a * (b.x + b.width / 2) + m.c * (b.y + b.height / 2) + m.e, cy = m.b * (b.x + b.width / 2) + m.d * (b.y + b.height / 2) + m.f;
+      const k = P.S.insts.findIndex(i => i.id === +e.closest('.board').dataset.id); want.push([k, cx, cy - b.width / 2]); });
+    const res = want.map(([k, x, top]) => { const bt = P.derived.v.placed[k].bbox[1], mid = (bt + top) / 2;
+      const l = labels.find(l => Math.abs(l.x - x) < 0.01);
+      return !!l && l.a === 'middle' && Math.abs(l.base - (mid + 0.717 * size / 2)) < 0.01 && l.top >= bt - 0.5 && l.bot <= top + 0.5; });
+    return { n: labels.length, want: want.length, ok: res.every(Boolean), size, text: svg.querySelector('#labels .lbl').textContent, fam: getComputedStyle(svg.querySelector('#labels .lbl')).fontFamily };
   });
-  console.log('labels', lab.n, 'for', lab.caps, 'faders+knobs, above:', lab.above, lab.text, '|', lab.fam, lab.n === lab.caps && lab.above && lab.text === 'CNTRL' ? 'OK' : 'FAIL');
+  console.log('labels', lab.n, 'for', lab.want, 'faders+knobs, centred between board top and part top:', lab.ok, lab.text, lab.size + ' mm', lab.n === lab.want && lab.ok && lab.text === 'CNTRL' ? 'OK' : 'FAIL');
   await page.click('#vLabels'); const nl = await page.evaluate(() => document.querySelectorAll('#labels .lbl').length); await page.click('#vLabels');
   await page.click('#vEdges'); const es = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke); await page.click('#vEdges');
   const es2 = await page.evaluate(() => getComputedStyle(document.querySelector('#panel .board .hitbox')).stroke);
