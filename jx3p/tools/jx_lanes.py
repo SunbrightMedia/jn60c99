@@ -54,6 +54,8 @@ SCAFFOLD = ('scratchpad', 'scratchpad/work', 'scratchpad/tmp')      # made by th
 SNAP_LINKS = ('scratchpad', 'bench/jobs', 'node_modules')           # a snapshot's links to the main tree
 # the system's volatile places (Wine's server sockets live in /tmp/.wine-<uid>); /tmp itself is followed
 EXCLUDE = ('/proc/', '/sys/', '/dev/', '/run/', '/tmp/.wine-', '/tmp/.X11-unix', '/var/tmp/')
+VOLATILE = tuple(e.rstrip('/') for e in EXCLUDE if e.endswith('/'))   # those folders themselves: a listing of /proc
+                                                                    # names its pids (section 5 never carried)
 ENV_FIXED = ('WINE', 'PATH', 'LD_LIBRARY_PATH', 'LD_PRELOAD', 'PYTHONPATH', 'PYTHONHASHSEED', 'NODE_PATH', 'LANG', 'LC_ALL',
              'LC_NUMERIC', 'LC_COLLATE', 'TZ', 'HOME', 'WINEPREFIX', 'WINEDEBUG', 'WINEARCH', 'CC', 'CFLAGS', 'EMSDK')
 ENV_SKIP = ('JX_VERIFY_ONLY', 'JX_VERIFY_WORK', 'JX_LANES_ROOT', 'JX_LANES_MIN_FREE_GIB', 'JX_LANES_MIN_DISK_GIB')
@@ -366,7 +368,7 @@ class View:
 def key_of(path, roots):
     """the stamp's name for a path: R:<repo path> inside a lane, the base or the main tree, A:<path> elsewhere; None:
     not an input (the system's volatile places, git's own files, Python's caches)"""
-    if path.startswith(EXCLUDE) or '/__pycache__/' in path or path.endswith(('.pyc', '/__pycache__')):
+    if path.startswith(EXCLUDE) or path in VOLATILE or '/__pycache__/' in path or path.endswith(('.pyc', '/__pycache__')):
         return None
     for r in roots:
         if path == r:
@@ -514,6 +516,8 @@ def check_one(sec, stamps, order, view, sysrec):
             return 'owed', 'the system changed: %s' % part
     diff = []
     for k, (kind, was) in rec['inputs'].items():
+        if k.startswith('A:') and key_of(k[2:], []) is None:
+            continue                                   # a place an older stamp took and today's rule does not
         if k == 'R:' + VERIFY_SH and kind == 'file':
             now = slice_state(os.path.join(view.root, VERIFY_SH), sec)
         else:
@@ -754,7 +758,8 @@ def self_test():
     under a known folder, an absent probe, a listed folder, a write then a read of the same file (made, not an input),
     a read then a write (an input), a rename, a chdir, a child's relative open through its parent's folder printed
     before the parent's clone line, an fchdir, a symlink (only the link made), a failed program start (absent), a Unix
-    socket's bind then a stat of it (made; an abstract or an internet bind: no path)"""
+    socket's bind then a stat of it (made; an abstract or an internet bind: no path); key_of on the volatile folders
+    (none: not inputs), a place outside the tree and one inside it"""
     t = tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False)
     t.write('\n'.join([
         '10  execve("/usr/bin/python3", ["python3"], 0x0 /* 1 vars */) = 0',
@@ -794,6 +799,10 @@ def self_test():
     ok = not bad and need_w <= wr and '/elsewhere/target' not in first and not unres and '/home/user' not in wr
     stray = [k for k in first if k.endswith(('abstract', '0.0.0.0'))]
     ok = ok and not stray
+    keys = [key_of(x, ['/r']) for x in ('/proc', '/proc/12/stat', '/dev', '/home/user/emsdk', '/r/a.c')]
+    if keys != [None, None, None, 'A:/home/user/emsdk', 'R:a.c']:
+        print('jx_lanes --self-test: key_of %s' % keys)
+        ok = False
     if stray:
         print('jx_lanes --self-test: a bind with no path seen as one: %s' % stray)
     print('jx_lanes --self-test: %s%s%s%s' % ('ok' if ok else 'FAILED', (' wrong: %s' % bad) if bad else '',

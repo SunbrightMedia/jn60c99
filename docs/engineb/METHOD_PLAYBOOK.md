@@ -4639,6 +4639,10 @@ named /home/user/lanes4 -- the folder its lane sat in (a process asked whether i
 folder owed 5b for that alone. Fixed in jx_lanes.py: the trace takes bind (a Unix socket's path is MADE; an abstract
 or an internet bind names no file), and the presence of a folder the lane sits in is not an input. The self-test
 plants the binds; each tooth (the bind case removed; an abstract name taken as a path) fails it.
+Then the volatile folders THEMSELVES: EXCLUDE held '/proc/' but not '/proc', and a listing of /proc (its pids) made
+the new GREEN of section 5 owed at the first check. VOLATILE (/proc, /sys, /dev, /run, /var/tmp) is now no input, at
+the stamp and at the check (an older stamp's place the rule now drops is skipped); the self-test grades key_of, its
+tooth (the rule taken out) fails, and section 5 carries.
 Seen on the way: a Unix socket's path holds 107 bytes. Under a long TMPDIR (the session's scratchpad) Chromium's bind
 fails and Chromium dies with SIGTRAP before its first page -- keep JX_LANES_ROOT short.
 ### The rule
