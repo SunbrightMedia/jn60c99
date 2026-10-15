@@ -67,3 +67,10 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   composition as glue (graded against e2e_emu by L5), the JUNO twin of jp8_host.c's thread transport. The JUNO editor
   is simpler than JP8's (no window-message model): createView + attached, a window found by its fit (0x312750), zoom
   via 0x2AA590. NEXT L4: junoh.h + lift/jn_host.c (init via the live host setup + the render composition), then L5.
+- 2026-10-15 L4 host-flavor lift: jp8_lift.py gained a minimal, JP8-safe --replace flag (a named rva becomes one host
+  hook, f_x(c){jp8_hook(c,rva);}, body never lifted; the twin of --alloc's body replacement; guarded, so JP8's gate
+  is unchanged). tools/lift/gen_juno_lift.sh now emits the HOST flavor: --hostcalls (imports / COM -> jn_host.c),
+  --alloc 0x67522C --alloc-tailcall (the CRT allocator = e2e_emu ALLOC), --replace 0x3c7400 (the engine render's
+  thread transport, served by the host). Regenerated lift/jn_lift.c: 1883 functions, 157054 instructions, 601 traps
+  (471 int3 padding + AVX/FMA/SSE4 in unreached CRT branches). L2 check PASS (0 reached traps of 566). Compiles clean
+  under the device/web build flags (-DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL, rc 0, 8.3 MB object).
