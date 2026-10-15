@@ -26,7 +26,26 @@
     tabDepth: 7.0, tabNeck: 9.0, tabHead: 13.0, tabSpacing: 45.0,
     clearance: 0.15,    // total gap between two mating joint faces
     maxPiece: 176,      // max piece size on the bed (A1 mini: 180 x 180)
-    segs: 48            // facets per circle
+    segs: 48,           // facets per circle
+    // front-panel cutouts (see CUTOUTS for the source of each number)
+    cutKeyW: 14.0, cutKeyH: 14.0, cutPotD: 7.0, cutSwW: 5.0, cutSwL: 15.0,
+    cutBtnW: 13.0, cutBtnL: 17.6, cutFaderL: 62.0, cutFaderW: 2.5, minWeb: 1.0
+  };
+
+  /* Front-panel cutout per part kind, in the part's own frame (KiCad footprint frame, y down).
+     The centre and angle of every part come from the board files (pcb_outline.py, panel_parts).
+     status READ = taken from a drawing; ASSUMED = no drawing yet, measure the part. */
+  const CUTOUTS = {
+    keyswitch: { label: 'Keyswitch', status: 'READ', shape: p => ({ type: 'rect', w: p.cutKeyW, h: p.cutKeyH }),
+      source: 'Kailh PG1511F drawing RHA-PG1511F-004EN: MX-style housing 13.95 x 13.95 below the panel -> 14.0 x 14.0 cutout on the centre post' },
+    pot: { label: 'Pot shaft', status: 'READ', shape: p => ({ type: 'circle', d: p.cutPotD }),
+      source: 'Alps RK09K1130A70, drawing 7: knurled shaft dia 6 on the line of the two legs -> dia 7 (0.5 per side)' },
+    switch: { label: 'Slide switch', status: 'READ', shape: p => ({ type: 'stadium', w: p.cutSwW, h: p.cutSwL }),
+      source: 'Footprint F.Fab lever slot 5 x 15 (EasyEDA ground truth TS-23E01AT15), lever dia 4' },
+    button: { label: 'PB86-A1 cap', status: 'READ', shape: p => ({ type: 'rect', w: p.cutBtnW, h: p.cutBtnL }),
+      source: 'FVWIN PB86-A1 cap 12.4 x 17.0 (footprint silk 12.35 x 17.0) + 0.3 per side' },
+    fader: { label: 'Fader slot', status: 'ASSUMED', shape: p => ({ type: 'stadium', w: p.cutFaderL, h: p.cutFaderW }),
+      source: 'No drawing: 60 mm travel (part name) + lever, centred on the body. Measure the lever width and its end positions.' }
   };
 
   /* ---------- placement ---------- */
@@ -95,6 +114,37 @@
       issues[i] = [...new Set(issues[i])];
     });
     return { placed: P, issues };
+  }
+
+  // Every panel cutout as an axis-aligned box in the plate frame (parts turn in 90 degree steps).
+  function cutoutBoxes(boards, insts, g, p) {
+    const out = [];
+    insts.forEach((inst, k) => {
+      const b = boards[inst.b], q = place(b, inst, g), m = q.matrix;
+      for (const [kind, x, y, ang] of (b.parts || [])) {
+        const C = CUTOUTS[kind]; if (!C) continue;
+        const sh = C.shape(p), w = sh.type === 'circle' ? sh.d : sh.w, h = sh.type === 'circle' ? sh.d : sh.h;
+        const turned = Math.round(((ang % 180) + 180) % 180) === 90;
+        let ex = turned ? h : w, ey = turned ? w : h;
+        if (inst.rot & 1) { const t = ex; ex = ey; ey = t; }
+        const cx = m[0] * x + m[2] * y + m[4], cy = m[1] * x + m[3] * y + m[5];
+        out.push({ inst: k, kind, circle: sh.type === 'circle', box: [cx - ex / 2, cy - ey / 2, cx + ex / 2, cy + ey / 2] });
+      }
+    });
+    return out;
+  }
+
+  // Pairs of cutouts with less metal between them than minWeb (mm).
+  function cutoutWebs(boxes, minWeb) {
+    const bad = [];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i].box, b = boxes[j].box;
+      const dx = Math.max(a[0] - b[2], b[0] - a[2], 0), dy = Math.max(a[1] - b[3], b[1] - a[3], 0);
+      const web = (dx > 0 && dy > 0) ? Math.hypot(dx, dy) : Math.max(dx, dy);
+      const overlap = a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+      if (overlap || web < minWeb) bad.push({ i, j, web: overlap ? 0 : web });
+    }
+    return bad;
   }
 
   /* ---------- cut planning ---------- */
@@ -344,7 +394,7 @@
     return out;
   }
 
-  const api = { INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
+  const api = { CUTOUTS, cutoutBoxes, cutoutWebs, INCH, PANEL_W, EAR, PITCH, HOLE_INSET, DEPTHS, DEFAULTS, depthMM, grid, place, rotMatrix,
     validate, planCuts, buildPieces, pieceMesh, stl, coupons, zip, crc32, area, label };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PlateGeom = api;
 })(typeof window !== 'undefined' ? window : globalThis);

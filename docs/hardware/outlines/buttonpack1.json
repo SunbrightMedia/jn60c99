@@ -67,6 +67,35 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "button",
+   "ref": "SW1",
+   "footprint": "PB_86_A1",
+   "x": 8.25,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW2",
+   "footprint": "PB_86_A1",
+   "x": 20.75,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW3",
+   "footprint": "PB_86_A1",
+   "x": 33.25,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "line",

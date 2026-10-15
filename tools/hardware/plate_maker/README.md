@@ -12,7 +12,8 @@ bed), joined by dovetails. Spec and board data: `docs/hardware/outlines/README.m
 | `plate_maker.html` | the built page (open it in any browser; needs network for earcut + three.js + fonts) |
 | `test/make_cases.js` | builds plates for 1U / 3U / 7U (rotated boards) / MAX with plate_geom.js |
 | `test/check_cases.py` | the INDEPENDENT checker (trimesh + shapely + hole positions recomputed from the KiCad JSON) |
-| `test/browser_check.js` | drives the built page in headless Chromium: drag, rotate, all three exports |
+| `test/browser_check.js` | drives the built page in headless Chromium: drag, rotate, all three exports, cutouts as drawn |
+| `test/check_cutouts.py` | the cutout ORACLE: pcbnew finds each panel part in the KiCad files, own placement code, 0.01 mm |
 
 ## Rebuild and prove
 ```
@@ -22,6 +23,7 @@ cd tools/hardware/plate_maker/test
 NODE_PATH=$N node make_cases.js /tmp/c && python3 check_cases.py /tmp/c                 # PASS
 NODE_PATH=$N node make_cases.js /tmp/t --tooth && python3 check_cases.py /tmp/t         # must FAIL
 NODE_PATH=$N node browser_check.js /tmp/w && python3 check_cases.py /tmp/w/app_plate.zip # PASS
+python3 check_cutouts.py /tmp/w/cutouts_drawn.json                                     # PASS (separate process: pcbnew)
 ```
 Python needs trimesh, shapely, scipy, networkx. The checker grades: every piece watertight,
 one body, outward winding, within the bed limit; every board hole has exactly one pillar at the
@@ -41,3 +43,20 @@ piece with zero clearance (gap 0.075 != 0.15) and a board turned 90 degrees (pil
 - Joint clearance = total gap; each mating edge moves clearance/2 into its own piece.
 - Downloads: through the artifact `downloads` capability (zip / svg / json only), or a plain
   browser download when the file is opened directly.
+
+## Panel cutouts (2026-10-15)
+The "Panel cutouts" layer shows only what is cut in the metal front panel. Part centres and angles
+come from the board files (`pcb_outline.py` -> `panel_parts` in each outline JSON); sizes and their
+sources live in `plate_geom.js` `CUTOUTS` and are editable in the page.
+
+| kind | cutout | status | source |
+|---|---|---|---|
+| keyswitch (Kailh CPG1511F01S04) | 14.0 x 14.0 on the centre post | READ | Kailh drawing RHA-PG1511F-004EN (LCSC C400226): housing 13.95 below the panel |
+| pot (Alps RK09K1130A70) | dia 7.0 on the legs' line | READ | Alps RK09K catalogue, drawing 7 (LCSC C351173): knurled shaft dia 6 |
+| slide switch (Daier TS-22E01 / TS-23E01) | 5 x 15 stadium | READ | footprint F.Fab lever slot (EasyEDA ground truth) |
+| PB86-A1 | 13.0 x 17.6 | READ | FVWIN: cap 12.4 x 17.0 (= footprint silk 12.35 x 17.0) + 0.3 per side |
+| fader 75 mm / 60 mm travel | 62 x 2.5 stadium | ASSUMED | no drawing: MEASURE the lever (width, end positions) |
+
+Found on the way: the PB86-A1 packs put caps 12.4 wide at a 12.5 mm pitch, so separate holes leave
+no metal; the page warns below `minWeb` (1.0 mm). Seen to fail: 13.0 -> 0.00, 12.0 -> 0.50, 11.0 -> clean.
+The cutout oracle was seen to fail on a stale drawing (boards turned without a recompute).

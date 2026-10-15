@@ -51,6 +51,27 @@ const file = path.join(out, 'page.html'); fs.writeFileSync(file, wrapped);
   }
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(out, 'desktop_light_after.png'), fullPage: true });
+  // cutouts as drawn: turn some boards, then read every cutout's centre and extent in panel mm
+  const cut = await page.evaluate(() => {
+    const S = __plate.S, B = __plate.BOARDS;
+    S.insts.forEach((i, k) => { const n = B[i.b].name; if (n === 'FaderBoard' && k % 2) i.rot = 1; if (n === 'PotentiometerPack1') i.rot = 3; if (n === 'buttonpack2') i.rot = 2; if (n === 'SwitchBoard') i.rot = 1; });
+    __plate.refresh();
+    const svg = document.getElementById('panel'), inv = svg.getScreenCTM().inverse();
+    const pts = [];
+    svg.querySelectorAll('.cutout').forEach(e => {
+      const bb = e.getBBox(), m = inv.multiply(e.getScreenCTM());
+      const corners = [[bb.x, bb.y], [bb.x + bb.width, bb.y], [bb.x, bb.y + bb.height], [bb.x + bb.width, bb.y + bb.height]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+      const xs = corners.map(c => c[0]), ys = corners.map(c => c[1]);
+      const inst = +e.closest('.board').dataset.id;
+      pts.push({ inst, x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) });
+    });
+    return { layout: { depth: S.depth, params: S.params, boards: S.insts.map(i => ({ id: i.id, name: B[i.b].name, cx: i.cx, cy: i.cy, rot: i.rot })) }, cutouts: pts };
+  });
+  fs.writeFileSync(path.join(out, 'cutouts_drawn.json'), JSON.stringify(cut));
+  console.log('cutouts drawn', cut.cutouts.length);
+  await page.locator('#vBoards').click(); await page.waitForTimeout(200);
+  await page.locator('#panel').screenshot({ path: path.join(out, 'cutouts_only.png') });
+  await page.locator('#vBoards').click();
   const d = await open({ viewport: { width: 1400, height: 1100 }, colorScheme: 'dark' });
   await d.page.screenshot({ path: path.join(out, 'desktop_dark.png'), fullPage: true });
   const ph = await open({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2 });

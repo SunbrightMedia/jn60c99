@@ -67,6 +67,116 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "keyswitch",
+   "ref": "SW2",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 15.87,
+   "y": 17.4,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW4",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 31.82,
+   "y": 17.4,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW7",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 63.82,
+   "y": 17.4,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW9",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 79.825,
+   "y": 17.4,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW11",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 95.825,
+   "y": 17.4,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW1",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 7.995,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW3",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 23.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW5",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 39.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW6",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 55.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW8",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 71.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW10",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 87.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW12",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 103.945,
+   "y": 43.33,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "arc",

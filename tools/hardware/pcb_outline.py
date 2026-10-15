@@ -11,7 +11,7 @@ units mm, viewed from the FRONT (back silk is NOT mirrored: it is where it sits 
 Self-check: the kicad-cli Edge.Cuts plot and pcbnew's outline must give the same box (two paths);
 --tooth shifts one path by 0.01 mm and the check must then FAIL.
 """
-import argparse, json, math, os, re, subprocess, sys, tempfile, zipfile
+import argparse, json, math, os, re, shutil, subprocess, sys, tempfile, zipfile
 
 import pcbnew
 
@@ -55,6 +55,49 @@ def find_boards(inputs, tmp):
     return sorted(out)
 
 
+# Parts that reach through the front panel. kind -> how to find its centre from the footprint's
+# own pads (absolute KiCad coordinates, so no rotation maths here). The cutout SIZE is not here:
+# it lives in tools/hardware/plate_maker/plate_geom.js (CUTOUTS, with its source per kind).
+PANEL_PARTS = [
+    # (footprint name contains, kind, anchor rule)
+    ('CPG1511', 'keyswitch', 'pad_unnumbered'),          # MX-style: centre post (the 4.2 mm pad)
+    ('RK09K', 'pot', 'mid_pads_4_5'),                     # shaft on the line of the 2 legs (Alps drawing 7)
+    ('SW_Slide_Daier', 'switch', 'origin'),               # lever slot drawn on F.Fab about the origin
+    ('PB_86_A1', 'button', 'origin'),                     # cap 12.4 x 17.0 centred on the origin (silk)
+    ('Fader_Slide', 'fader', 'origin'),                   # body silk centred on the origin
+]
+
+
+def panel_parts(board, x0, y0, notes):
+    out = []
+    for fp in board.Footprints():
+        lib = str(fp.GetFPID().GetLibItemName())
+        rule = next((r for r in PANEL_PARTS if r[0] in lib), None)
+        if not rule:
+            continue
+        pads = list(fp.Pads())
+        if rule[2] == 'origin':
+            pos = fp.GetPosition()
+            c = (mm(pos.x), mm(pos.y))
+        elif rule[2] == 'pad_unnumbered':
+            pp = [p for p in pads if not p.GetNumber() and p.GetDrillSize().x > 3 * NM]
+            if len(pp) != 1:
+                notes.append('%s: no single centre-post pad' % fp.GetReference()); continue
+            c = (mm(pp[0].GetPosition().x), mm(pp[0].GetPosition().y))
+        elif rule[2] == 'mid_pads_4_5':
+            pp = [p for p in pads if p.GetNumber() in ('4', '5')]
+            if len(pp) != 2:
+                notes.append('%s: pads 4/5 not found' % fp.GetReference()); continue
+            c = (mm(pp[0].GetPosition().x + pp[1].GetPosition().x) / 2, mm(pp[0].GetPosition().y + pp[1].GetPosition().y) / 2)
+        if fp.IsFlipped():
+            notes.append('%s (%s) is on the BACK side' % (fp.GetReference(), rule[1]))
+        out.append({'kind': rule[1], 'ref': fp.GetReference(), 'footprint': lib,
+                    'x': round(c[0] - x0, 4), 'y': round(c[1] - y0, 4),
+                    'angle': round(fp.GetOrientationDegrees() % 360, 3), 'back': fp.IsFlipped()})
+    out.sort(key=lambda q: (q['kind'], q['y'], q['x']))
+    return out
+
+
 def edge_primitives(board):
     prims = []
     for d in board.GetDrawings():
@@ -81,6 +124,8 @@ def edge_primitives(board):
 
 def plot_layers(pcb, tmp):
     d = tempfile.mkdtemp(dir=tmp)
+    src = os.path.join(tempfile.mkdtemp(dir=tmp), os.path.basename(pcb))   # kicad-cli writes a .kicad_prl beside its input
+    shutil.copy(pcb, src); pcb = src
     r = subprocess.run(['kicad-cli', 'pcb', 'export', 'svg', '-l', 'Edge.Cuts,F.Silkscreen,B.Silkscreen',
                         '--mode-multi', '--page-size-mode', '1', '--exclude-drawing-sheet',
                         '--black-and-white', '--drill-shape-opt', '0', '-o', d, pcb],
@@ -192,7 +237,7 @@ def process(pcb, outdir, tmp, tooth):
             'grid': {'pitch_mm': GRID, 'x': grid_fit(w), 'y': grid_fit(h)},
             'hole_grid': hole_grid(holes, notes),
             'thickness': mm(board.GetDesignSettings().GetBoardThickness()),
-            'holes': holes, 'edge_primitives': prims, 'outline_polygon': poly, 'notes': notes}
+            'holes': holes, 'panel_parts': panel_parts(board, x0, y0, notes), 'edge_primitives': prims, 'outline_polygon': poly, 'notes': notes}
 
     t = 'translate(%.4f %.4f)' % (-x0, -y0)
     hole_svg = '\n'.join('<circle cx="%.4f" cy="%.4f" r="%.4f" data-ref="%s"/>' % (hh['x'], hh['y'], hh['diameter'] / 2, hh['ref'])

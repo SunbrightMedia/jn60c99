@@ -67,6 +67,35 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "keyswitch",
+   "ref": "SW1",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 15.44,
+   "y": 10.26,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW2",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 31.24,
+   "y": 10.26,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "keyswitch",
+   "ref": "SW3",
+   "footprint": "KEY-TH_CPG1511_15.75",
+   "x": 47.04,
+   "y": 10.26,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "arc",

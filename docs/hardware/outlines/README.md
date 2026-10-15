@@ -27,6 +27,7 @@ The `assert "m_choices.GetCount() > 0"` lines on stderr are KiCad noise.
 - `NAME.svg` — 1:1 in mm (`width="..mm"`), four Inkscape layers: `silk_back` (50 % opacity,
   NOT mirrored = where it sits under the board), `silk_front`, `edge`, `holes`.
 - `NAME.json` — the exact numbers: `width`, `height`, `holes[]` (x, y, diameter, plated),
+  `panel_parts[]` (keyswitch / pot / switch / button / fader: centre from the footprint's own pads, angle),
   `edge_primitives[]` (lines / arcs with centre + radius, exact), `outline_polygon` (arcs
   flattened by KiCad), `grid` fit, `thickness`, `notes` (anything odd, e.g. not 4 holes).
 - `index.json` — all boards, short form.

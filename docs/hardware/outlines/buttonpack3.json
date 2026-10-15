@@ -67,6 +67,80 @@
    "footprint": "MountingHole_3.2mm_M3_Pad"
   }
  ],
+ "panel_parts": [
+  {
+   "kind": "button",
+   "ref": "SW1",
+   "footprint": "PB_86_A1",
+   "x": 8.5,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW2",
+   "footprint": "PB_86_A1",
+   "x": 21.0,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW3",
+   "footprint": "PB_86_A1",
+   "x": 33.5,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW4",
+   "footprint": "PB_86_A1",
+   "x": 46.0,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW5",
+   "footprint": "PB_86_A1",
+   "x": 58.5,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW6",
+   "footprint": "PB_86_A1",
+   "x": 71.0,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW7",
+   "footprint": "PB_86_A1",
+   "x": 83.5,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  },
+  {
+   "kind": "button",
+   "ref": "SW8",
+   "footprint": "PB_86_A1",
+   "x": 96.0,
+   "y": 20.75,
+   "angle": 0.0,
+   "back": false
+  }
+ ],
  "edge_primitives": [
   {
    "type": "line",
