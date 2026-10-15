@@ -1154,9 +1154,10 @@ def script(tree, parents, jx, mapped, opens_by_cfg, configs, seed, quick=False, 
         for k, tn, l, t, r, b in allc:
             if tn in GENERIC and live(k) and r > l and b > t and (l, t, r, b) not in skip:
                 gen[tn].append((k, tn, l, t, r, b))
-        if not cfg[4]:                                 # the keys' controls (below): a configuration without the
-            last_gen = (cfg, gen, [c for c in jx if c[1] == 'jx3pSlider' and live(c[0])])   # SETUP page (modal: it
-                                                       # takes every press outside it); its JX switches
+        jxs_live = [c for c in jx if c[1] == 'jx3pSlider' and live(c[0])]
+        if not cfg[4] and (jxs_live or last_gen[0] is None):   # the keys' controls (below): the last configuration
+            last_gen = (cfg, gen, jxs_live)            # without the SETUP page (modal: it takes every press outside it)
+                                                       # whose JX switches are live -- the SYSTEM-8 layout has none
         livec = [(c[1], c[2], c[3], c[4]) for k, p in enumerate(tree) if live(k) for c in p[3] if c[3] > c[1] and c[4] > c[2]]
         after = ['opens', 'state', 'pending']
         for tn in GENERIC:
