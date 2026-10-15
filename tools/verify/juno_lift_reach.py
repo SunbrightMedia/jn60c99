@@ -108,11 +108,15 @@ def main():
         if not (CLO <= rva < CHI):
             return
         last = None
+        last_rva = rva
         for a, mn in decode_block(rva):
             executed.add(a)
             last = mn
-        if last == 'call':                              # the block after a call/indirect is the target
-            prev_ind[0] = rva
+            last_rva = a
+        if last == 'call':                              # the next block is the target; key the edge by the CALL
+            prev_ind[0] = last_rva                       # INSTRUCTION's rva -- discover() and the lifter's `extra`
+            #                                              both look dyn up by the call-site rva, not the block start
+            #                                              (a non-pdata indirect target, e.g. 0x3cacf0, was dropped)
 
     uc.hook_add(UC_HOOK_BLOCK, block)
     h.setup(48000.0, 512)                 # setupProcessing + setActive(1) + the blocks' host objects: the lifted
