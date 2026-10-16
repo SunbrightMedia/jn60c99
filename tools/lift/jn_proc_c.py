@@ -41,13 +41,13 @@ def main():
         print('junoh_init rc=%d: %s' % (rc, lib.junoh_error().decode('latin1', 'replace'))); return 2
     ref = open(os.path.join(refdir, 'words.bin'), 'rb').read()
     got = bytearray()
-    shifted = False
     for st in jn_proc_seq.steps():
         n = st['n']
         evs = []
         for (k, off, ch, p, v) in st['events']:
-            if tooth and not shifted and k == 'on':
-                p += 1; shifted = True                              # the tooth: one semitone up -> the audio differs
+            if tooth and k == 'on':
+                p += 1                                              # the tooth: every note a semitone up -> the audio
+                #                                                     differs (the low note sounds past the start mute)
             evs.append(EV(1 if k == 'on' else 0, off, ch, p, v))
         eva = (EV * len(evs))(*evs) if evs else None
         ctxp = None
