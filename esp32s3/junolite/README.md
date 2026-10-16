@@ -22,3 +22,8 @@ program change = preset. No MIDI → a demo plays every preset (6-note + 4-note 
 - `test/qemu.sh`: boots, 5 BENCH lines, the demo reaches 6 voices, silence probe SILENT, never STUCK (the probe was
   seen to fail: it read the chorus tail as STUCK until it waited > 100 blocks after the last voice).
 - QEMU BENCH (NOT the chip's timing): 13–21 % of one core for 6 voices. The board's own BENCH lines decide.
+
+## On the board (2026-10-16, the user's DevKitC-1 N16R8 on the motherboard, 70ad29c image)
+BENCH (6 voices, one core, MEASURED): Strings 48.5 %, Brass 48.3 %, PWM Pad 62.2 %, Bass 58.3 %, Organ 61.8 %.
+Demo 17 s: underruns 0, max block load 82 % (first block), SIL never STUCK; every JL peak equals the QEMU log's
+(2602, 2458, 1973, ... 4645) — the chip renders the same samples as the host build. Core 0 is idle.
