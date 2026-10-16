@@ -34,6 +34,7 @@ in [`PROVENANCE.tsv`](PROVENANCE.tsv) (status: 20/20 PROVEN).
 | JX-3P (the repeat) | `jx3p/` | Done: recall + full chain EXACTLY 0, listen proofs, web app |
 | JUPITER-8 | `jp8/` | Lifted x86 -> C99, layer gates on the corrected drive; engine + full-chain gate next |
 | TB-303 | `tb303/` | Intake + cost recon only |
+| BOSS Effects Pedals | `boss/` | Intake only: the .vst3 pinned in `boss/truth/` |
 
 ## Quick start (desktop)
 
@@ -63,7 +64,7 @@ needed). Engine-B gates: `tools/engineb/` (`o2_gates.sh`, `o3_gates.sh`, …).
 | `engine_b/` | The fast engine (trunk = bit-exact; fork = S3 flags) and its input boundary (`engine_b/event/`) |
 | `esp32s3/` | ESP32-S3 firmware (the live device target) and its images |
 | `pi/` | The bare-metal Raspberry Pi build (Circle submodule) |
-| `jx3p/`, `jp8/`, `tb303/` | The next synths' ports -- proof the method repeats |
+| `jx3p/`, `jp8/`, `tb303/`, `boss/` | The next plugins' ports -- proof the method repeats |
 | `refs/` | The decompile archive (provenance for READ claims) and a June live-plugin memory dump (`refs/state_dump/`, diagnostic only) |
 | `archive/` | Retired device targets: the Daisy Seed and Teensy builds (history) |
 | `docs/` | All findings -- start at `docs/INDEX.md`; the user's older charters `docs/GOAL.md`, `docs/AIRTIGHT_PLAN.md` |

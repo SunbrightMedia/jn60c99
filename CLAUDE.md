@@ -116,7 +116,7 @@ mine is a hypothesis (playbook 80).
   kernels in `tools/trackb/native/`). `truth.py`, `e2e_emu.py` (oracle), `recall_gate.py`,
   `recall_render_ab.py` (arp set now DERIVED per bank via `juno_bank_arp` —
   never hardcode data properties), `userbank_parity.py`, `approx_audit.py`.
-- `jx3p/`, `jp8/`, `tb303/` — the next-synth ports, each with `truth/`
+- `jx3p/`, `jp8/`, `tb303/`, `boss/` — the next-plugin ports, each with `truth/`
   (checksummed), `tools/`, `docs/S3_STATUS.md` (its only status page).
   `pi/` — the bare-metal Raspberry Pi track (Circle). `docs/hardware/` —
   boards, BOM, ordering, the user's board snapshots.
@@ -338,6 +338,9 @@ mine is a hypothesis (playbook 80).
 - **TB-303**: intake + cost recon only (tb303/docs/S3_STATUS.md): voice + FX
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.
+- **BOSS Effects Pedals** (a separate track, 2026-10-16): intake only (boss/docs/S3_STATUS.md):
+  the .vst3 pinned in boss/truth/ (resolve via boss/tools/boss_truth.py); 31 pedal models (READ); the
+  companion files (Script.xml, TextCodeTable.dat, Initial.bin) are owed by the user.
 - **Parked tracks**: DAW-parity (HOSTPATH_PARITY_SCOPE steps 2-5) and Track B
   Daisi sonic-identity fork (harness done, zero voice code, blind-gate warning
   stands). Both resumable from HISTORY.md pointers.
