@@ -106,3 +106,6 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   lift: init (image+heap+com byte-identical, tooth bites) AND process (4224 output words byte-identical, note tooth
   bites). The lifted JUNO boots and renders bit-exact to the oracle. NEXT: end-state memory compare after the process
   drive, the state save/load + patch load + editor drives, the all-patch product gate; then L3 and L6.
+- 2026-10-16 L5 process end-state GREEN: the process gate now compares the plugin's end-state memory (image + heap +
+  host arena) after the drive as well as every output word. Both byte-identical to the oracle on the full-census lift.
+  The lifted render is proven to the sample AND to every internal engine-state byte (ramps, LFO phases, filter state).
