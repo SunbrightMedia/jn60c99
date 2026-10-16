@@ -17,10 +17,15 @@ BASE="-std=c99 -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC 
 HB="-std=gnu99 -O2 -ffp-contract=off -fno-strict-aliasing -fwrapv -DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL -I$R/jp8/src -I$R/tools/lift"
 echo "[L3 1/4] the work list"
 python3 "$R/tools/lift/l3_cases.py" $ALL --out "$B"
-cc $BASE -w -c "$B/l3_cases.c" -o "$B/l3_cases.o"
+GATE="-DJP8_SOFTFP=1 -DJP8_ORACLE_NAN"
+cc $BASE -w -c "$B/l3_cases.c" -o "$B/l3_cases.o" &
+cc $BASE $GATE -w -c "$B/l3_cases.c" -o "$B/l3_cases_gate.o" &
+wait
 cc $HB -Wall -c "$R/tools/lift/l3_harness.c" -o "$B/l3_harness.o"
+cc $HB $GATE -Wall -c "$R/tools/lift/l3_harness.c" -o "$B/l3_harness_gate.o"
 cc -o "$B/l3_harness" "$B/l3_harness.o" "$B/l3_cases.o" -lz -lm
-echo "[L3 2/4] every statement vs the CPU, every state vs Unicorn"
+cc -o "$B/l3_harness_gate" "$B/l3_harness_gate.o" "$B/l3_cases_gate.o" -lz -lm
+echo "[L3 2/4] the PRODUCT flavor: every statement vs the CPU, every state vs Unicorn"
 set +e
 "$B/l3_harness" "$B/image.bin" "$B/pool.bin" "$NS" "$NR" 2>"$B/harness_err.txt" | \
     python3 "$R/tools/lift/l3_unicorn.py" --cases "$B/l3_cases.json" --out "$B/l3_report.json"
@@ -30,9 +35,17 @@ tail -1 "$B/harness_err.txt"
 lift=$(sed -n 's/.*lift != CPU in \([0-9]*\) states.*/\1/p' "$B/harness_err.txt" | tail -1)
 [ "${lift:-x}" = 0 ] || { echo "L3 RED: the lift differs from the CPU (build/l3/harness_err.txt)"; exit 1; }
 [ "$U" = 0 ] || { echo "L3 RED: Unicorn differs from the CPU outside its known classes (build/l3/l3_report.json)"; exit 1; }
+echo "[L3 2b/4] the GATE flavor (the oracle's float semantics): every state's lift vs Unicorn"
+set +e
+"$B/l3_harness_gate" "$B/image.bin" "$B/pool.bin" "$NS" "$NR" --emit-lift 2>"$B/harness_gate_err.txt" | \
+    python3 "$R/tools/lift/l3_unicorn.py" --cases "$B/l3_cases.json" --vs lift --out "$B/l3_report_gate.json"
+U=$?
+set -e
+tail -1 "$B/harness_gate_err.txt"
+[ "$U" = 0 ] || { echo "L3 RED: the gate flavor differs from Unicorn (build/l3/l3_report_gate.json)"; exit 1; }
 echo "[L3 3/4] no read of an undefined flag"
 python3 "$R/tools/lift/l3_flags.py"
 python3 "$R/tools/lift/l3_flags.py" --tooth | tail -1
 echo "[L3 4/4] teeth"
 sh "$R/tools/lift/l3_teeth.sh"
-echo "L3 GREEN: every statement equal to the CPU in every state; Unicorn's differences all known; no undefined flag read; teeth bite"
+echo "L3 GREEN: the product flavor equal to the CPU in every state, the gate flavor to Unicorn; Unicorn's departures from the CPU all named; no undefined flag read; teeth bite"

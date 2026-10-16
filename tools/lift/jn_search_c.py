@@ -63,6 +63,8 @@ def main():
             print('search seed %d DIVERGES at op %d %s: the lift failed where the oracle ran: %s'
                   % (meta['seed'], k, json.dumps(op)[:200], str(e)[:300])); return 1
         d, ht, cn = ops.digest()
+        if os.environ.get('JN_DUMP_AT') == str(k):                # a divergence's diff: the regions after op k
+            ops.dump(os.path.join(os.environ.get('JN_DUMP_DIR', refdir), 'c_%d' % k))
         diffs = [n for n, a, bb in (('status', status, row['status']), ('digest', d, row['digest']),
                                     ('heap_top', ht, row['heap_top']), ('com_next', cn, row['com_next']),
                                     ('words', w, ref_words[row['woff']:row['woff'] + row['wlen']])) if a != bb]

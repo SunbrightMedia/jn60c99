@@ -156,6 +156,26 @@ def main():
     for head, lst in sorted(h.__dict__.get('slists', {}).items()):
         for i, e in enumerate(lst):
             facts['sl:%d:%d' % (head, i)] = e
+    # the editor imports' Python-side state (wrapper_emu._imp / _gdip): the GDI+ images and DIB sections the module init
+    # made (26 + 26 at the cut), the skin's blank-image sizes by file name (wrapper_emu.skin_sizes over Script.xml; the
+    # name in 8-byte chunks). The screen and the GUI clock are unset at the cut (asserted): the gates set them.
+    assert not h.screen and not getattr(h, 'tick_ms', 0), 'the screen or the GUI clock is set at the cut: carry it'
+    for i, (hd, im) in enumerate(h.__dict__.get('gdip_imgs', {}).items()):
+        facts['gi:%d' % i] = hd
+        facts['gs:%d' % i] = (im['w'] & 0xFFFFFFFF) << 32 | (im['h'] & 0xFFFFFFFF)
+        facts['gf:%d' % i] = im['fmt'] & 0xFFFFFFFF
+    for i, (hb, (w_, h_, bpp, stride, bits)) in enumerate(h.__dict__.get('dibs', {}).items()):
+        assert hb == 0xB0000 + 0x10 * i, 'a DIB handle out of the oracle order'
+        facts['dh:%d' % i] = hb
+        facts['dw:%d' % i] = (w_ & 0xFFFFFFFF) << 32 | (h_ & 0xFFFFFFFF)
+        facts['dp:%d' % i] = (bpp & 0xFFFFFFFF) << 32 | (stride & 0xFFFFFFFF)
+        facts['db:%d' % i] = bits
+    for i, (nm, (w_, h_)) in enumerate(sorted(h.skin.items())):
+        nb = nm.encode('ascii')                  # ASCII lower case (the C side's match rule; non-ASCII would need str.lower)
+        assert nm == nm.lower() and 0 < len(nb) < 56, 'a skin name the C side cannot hold: %r' % nm
+        facts['sk:%d' % i] = (w_ & 0xFFFFFFFF) << 32 | (h_ & 0xFFFFFFFF)
+        for k in range(0, len(nb), 8):
+            facts['sn:%d:%d' % (i, k // 8)] = int.from_bytes(nb[k:k + 8].ljust(8, b'\0'), 'little')
     assert all(len(k) <= 24 for k in facts), 'a fact key is longer than the 24-byte key field'
     stubs = sorted((a, nm[1]) for a, nm in h.stub2name.items())
 

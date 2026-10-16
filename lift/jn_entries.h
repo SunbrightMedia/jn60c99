@@ -18,4 +18,9 @@
 #define JN_RVA_COMMIT0       0x285320ULL   /* the panel's commit, three calls on the model (editor_gate.py TRIO) */
 #define JN_RVA_COMMIT1       0x2853C0ULL   /*   ... the second is a leaf (no pdata) */
 #define JN_RVA_COMMIT2       0x283120ULL
+/* the editor (host_process_emu.attach_editor / window_conv, docs/WINDOW_ZOOM.md) */
+#define JN_RVA_ZOOM_GET      0x2AA590ULL   /* a panel window's zoom getter: rcx = the window (window_conv) */
+#define JN_RVA_VO_GET        0x34E170ULL   /* the model's value-object list: rcx = model (the zoom drive finds vs objects) */
+#define JN_RVA_WINDOW_FIT    0x312750ULL   /* a panel window's fit to the screen: NOT called -- a lifter HOOK
+                                              (gen_juno_lift.sh --hook): the glue finds each window by it, as the oracle */
 #endif

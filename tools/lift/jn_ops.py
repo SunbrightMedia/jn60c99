@@ -107,6 +107,14 @@ class OracleOps:
         m.update(bytes(self.uc.mem_read(self.H.W.COM, h.com_next - self.H.W.COM)))
         return m.hexdigest(), h.heap, h.com_next
 
+    def dump(self, d):
+        """the digested regions as files (a divergence's diff: JN_DUMP_AT)"""
+        E, h = self.H.E, self.h
+        os.makedirs(d, exist_ok=True)
+        for nm, a, n in (('image', E.IB, E.IMGSZ), ('heap', E.HEAP_BASE, h.heap - E.HEAP_BASE),
+                         ('com', self.H.W.COM, h.com_next - self.H.W.COM)):
+            open(os.path.join(d, nm + '.bin'), 'wb').write(bytes(self.uc.mem_read(a, n)))
+
 
 class LiftOps:
     """the lifted side: lib is libjunohost.so after junoh_init; lay the memory layout (IB, IMGSZ, HEAP_BASE, COM)"""
@@ -212,6 +220,15 @@ class LiftOps:
         m.update(self._mem(lay['HEAP_BASE'], ht - lay['HEAP_BASE']))
         m.update(self._mem(lay['COM'], cn - lay['COM']))
         return m.hexdigest(), ht, cn
+
+    def dump(self, d):
+        """the digested regions as files (a divergence's diff: JN_DUMP_AT)"""
+        lay, lib = self.lay, self.lib
+        ht, cn = lib.junoh_heap_top(), lib.junoh_com_next()
+        os.makedirs(d, exist_ok=True)
+        for nm, a, n in (('image', lay['IB'], lay['IMGSZ']), ('heap', lay['HEAP_BASE'], ht - lay['HEAP_BASE']),
+                         ('com', lay['COM'], cn - lay['COM'])):
+            open(os.path.join(d, nm + '.bin'), 'wb').write(self._mem(a, n))
 
 
 class _Throw(Exception):

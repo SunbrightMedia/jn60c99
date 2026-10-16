@@ -10,16 +10,8 @@ set -e
 R=${REPO:-.}
 OUT="$R/build/jn_host"; mkdir -p "$OUT"
 [ -f "$R/scratchpad/lift/juno_reach.json" ] || { echo "no L1 census -- run tools/verify/juno_lift_reach.py"; exit 2; }
-echo "[1/5] generate the host-flavor lift"
-sh "$R/tools/lift/gen_juno_lift.sh"
-echo "[2/5] the template (facts + stubs + registers)"
-python3 "$R/tools/lift/jn_host_ref.py" "$OUT/jn_host_template.bin" >/dev/null
-BASE="-std=c99 -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL -I$R/jp8/src -I$R/lift"
-echo "[3/5] build libjunohost.so"
-cc $BASE -w -c "$R/lift/jn_lift.c" -o "$OUT/jn_lift.o"
-cc $BASE -pedantic-errors -c "$R/jp8/src/jp8_rt.c" -o "$OUT/jn_rt.o"
-cc $BASE -pedantic-errors -c "$R/lift/jn_host.c" -o "$OUT/jn_host.o"
-cc -shared -o "$OUT/libjunohost.so" "$OUT/jn_lift.o" "$OUT/jn_rt.o" "$OUT/jn_host.o" -lm
+echo "[1-3/5] the build: the lift, the template, libjunohost.so (the gate flavor) -- tools/lift/jn_build.sh, the one build"
+sh "$R/tools/lift/jn_build.sh"
 echo "[4/5] the oracle reference (Unicorn, a process of its own)"
 python3 "$R/tools/lift/jn_host_mem_ref.py" "$OUT/ref"
 echo "[5/7] the lifted host vs the oracle after init (ctypes) + the tooth"

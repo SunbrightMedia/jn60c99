@@ -2,7 +2,7 @@
 # jn_l5_all.sh -- EVERY L5 gate of the JUNO lift in one command (docs/JUNO_LIFT.md): init; process() at 48 / 44.1 /
 # 96 kHz; the bank (all 64 factory patches through the patch browser); DAW state save/load; the editor's set; the
 # surfaces (voice count, engine-rate setting, UI timer, MIDI learn / forget, commit, state round trip, host-rate
-# changes). Each gate: the oracle reference (Unicorn, its own process -- reused from build/jn_host/<gate> when present;
+# changes); the editor attached and its windows' zoom (jn_zoom_seq.py). Each gate: the oracle reference (Unicorn, its own process -- reused from build/jn_host/<gate> when present;
 # JN_REFS=1 remakes every one), the lifted host's C side EXACTLY 0 (ctypes, its own process), and its teeth SEEN TO
 # FAIL. Needs the build (sh tools/lift/jn_build.sh). A long job: run it with tools/run_job.sh.
 # usage: sh tools/lift/jn_l5_all.sh            (run from the repo root)
@@ -37,4 +37,7 @@ echo "[8/8] the surfaces (voice count, engine rate, UI timer, learn / forget, co
 grep -q '"rates": true' "$OUT/surf_ref/meta.json" 2>/dev/null || rm -rf "$OUT/surf_ref"
 ref "$OUT/surf_ref" python3 "$L/jn_surf_ref.py" "$OUT/surf_ref"
 python3 "$L/jn_surf_c.py" "$SO" "$T" "$OUT/surf_ref"; python3 "$L/jn_surf_c.py" "$SO" "$T" "$OUT/surf_ref" --tooth
-echo "jn_l5_all: GREEN (8 gates EXACTLY 0 against the oracle; every tooth bites)"
+echo "[9/9] the editor: attached on four screens, window zoom 25-200 % on the main and patch windows"
+ref "$OUT/zoom_ref" python3 "$L/jn_zoom_ref.py" "$OUT/zoom_ref/ref.json"
+python3 "$L/jn_zoom_c.py" "$SO" "$T" "$OUT/zoom_ref/ref.json"; python3 "$L/jn_zoom_c.py" "$SO" "$T" "$OUT/zoom_ref/ref.json" --tooth
+echo "jn_l5_all: GREEN (9 gates EXACTLY 0 against the oracle; every tooth bites)"

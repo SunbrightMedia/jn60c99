@@ -32,6 +32,7 @@ R_MXF = 32
 # the KNOWN ways Unicorn 2.1.4 departs from the CPU (each one a single-instruction fact, printed per form): a denormal
 # result or min / max operand it does not flush, the NaN it picks from two NaN operands, a bsf / bsr of zero
 KNOWN = re.compile(r'^unicorn!=cpu (xmm:(denormal|nan|denormal\+nan)|gpr:bsf-zero)$')
+KNOWN_LIFT = re.compile(r'^unicorn!=lift gpr:bsf-zero$')       # the gate flavor: only bsf of zero (integer code)
 FIELDS = ('gpr', 'rip', 'flags', 'xmm', 'mxcsr', 'mem', 'gs', 'ea', 'fault')
 
 
@@ -65,18 +66,21 @@ def flush_class(cpu, uni, fpk):
     sign = 1 << (w * 8 - 1)
     expm = (0x7FF << 52) if w == 8 else (0xFF << 23)
     kinds = set()
-    for o in range(0, 16, w):
+    for o in range(0, len(cpu), w):                                # every lane of every register
         a, b = cpu[o:o + w], uni[o:o + w]
         if a == b:
             continue
         av, bv = int.from_bytes(a, 'little'), int.from_bytes(b, 'little')
-        if (av & ~sign) == 0 and (bv & expm) == 0 and (bv & ~sign) and (av & sign) == (bv & sign):
-            kinds.add('denormal')
+        minv = (1 << 52) if w == 8 else (1 << 23)                    # the smallest normal
+        if (av & ~sign) == 0 and (av & sign) == (bv & sign) and (((bv & expm) == 0 and (bv & ~sign)) or
+                                                                  (bv & ~sign) == minv):
+            kinds.add('denormal')                                   # the CPU flushed (FTZ / DAZ) a result Unicorn
+            #                                                         kept: a denormal, or one rounded up to MIN
         elif (av & expm) == expm and (av & ~sign & ~expm) and (bv & expm) == expm and (bv & ~sign & ~expm):
             kinds.add('nan')
         else:
             return 'other'
-    return '+'.join(sorted(kinds))
+    return '+'.join(sorted(kinds)) or 'other'
 
 
 def main():
@@ -86,6 +90,10 @@ def main():
     ap.add_argument('--tooth', action='store_true', help='flip one input bit for Unicorn in every 1000th state: '
                                                          'the comparison MUST report it')
     ap.add_argument('--dump', nargs=2, type=int, default=None, help='case state: print the XMM / GPR values')
+    ap.add_argument('--dump-class', default=None, help="print the first states of a class (e.g. 'other')")
+    ap.add_argument('--vs', choices=('cpu', 'lift'), default='cpu', help="what the stream's out-state is: the CPU's "
+                    "(the product flavor's run) or the lift's (the gate flavor's run, --emit-lift: then Unicorn must "
+                    "equal the lift except bsf of zero, which the lift keeps as the CPU does)")
     a = ap.parse_args()
     meta = json.load(open(a.cases))
     cases, forms = meta['cases'], meta['forms']
@@ -99,6 +107,8 @@ def main():
     uc.mem_map(WBASE, WSIZE, UC_PROT_ALL)
     uc.mem_map(GBASE, GSIZE, UC_PROT_ALL)
     uc.reg_write(X.UC_X86_REG_GS_BASE, GBASE)
+    known = KNOWN if a.vs == 'cpu' else KNOWN_LIFT
+    dumped = [0]
     stat = collections.defaultdict(lambda: collections.Counter())
     examples = collections.defaultdict(list)
     src = sys.stdin.buffer
@@ -168,8 +178,11 @@ def main():
                     diff.append('rip')
                 if (fl5(ufl) ^ fl5(ofl)) & defined_flags(k, r[1]):
                     diff.append('flags')
-                if ox != ux:
-                    diff.append('xmm:' + flush_class(ox, ux, k.get('fpk', 1) or 1))
+                if ox != ux:                                        # judged in float lanes, then in double
+                    cls = flush_class(ox, ux, 1)                    # lanes (a conversion's result lanes need
+                    if cls == 'other':                              # not be its source's)
+                        cls = flush_class(ox, ux, 2)
+                    diff.append('xmm:' + cls)
                 if (omx ^ umx) & ~0x3F:
                     diff.append('mxcsr')
                 if (omx ^ umx) & 0x3F:
@@ -180,6 +193,13 @@ def main():
                     diff.append('gs')
                 if ea is not None and oea != uea:
                     diff.append('ea')
+            if a.dump_class and any(d.endswith(a.dump_class) for d in diff) and dumped[0] < 6:
+                dumped[0] += 1
+                print('CLASS %s case %d state %d %s mxcsr %#x' % (a.dump_class, ci, si, k['text'][:70], mx))
+                for i in range(16):
+                    xi, xo, xu = xin[16 * i:16 * i + 16], ox[16 * i:16 * i + 16], ux[16 * i:16 * i + 16]
+                    if xi != xo or xo != xu:
+                        print('  x%-2d in %s cpu %s uni %s' % (i, xi[::-1].hex(), xo[::-1].hex(), xu[::-1].hex()))
             if a.dump and (ci, si) == tuple(a.dump):
                 print('DUMP case %d state %d %s mxcsr %#x: %s' % (ci, si, k['text'][:80], mx, diff))
                 for i in range(16):
@@ -192,7 +212,7 @@ def main():
                 for addr, ln, b in patches:
                     print('  patch %#x: %s' % (addr, b[:ln][::-1].hex()))
             if diff:
-                key = 'unicorn!=cpu ' + '+'.join(diff)
+                key = ('unicorn!=cpu ' if a.vs == 'cpu' else 'unicorn!=lift ') + '+'.join(diff)
                 st[key] += 1
                 if len(examples[k['form']]) < 3:
                     examples[k['form']].append(dict(case=ci, state=si, rva=hex(k['rva']), diff=diff, text=k['text'][:100]))
@@ -200,24 +220,24 @@ def main():
     rows = []
     for f in sorted(stat, key=lambda f: forms[f]):
         st = stat[f]
-        bad = {kk: v for kk, v in st.items() if kk.startswith('unicorn!=cpu') and not KNOWN.match(kk)}
+        bad = {kk: v for kk, v in st.items() if kk.startswith('unicorn!=') and not known.match(kk)}
         rows.append(dict(form=forms[f], **st, examples=examples.get(f, [])))
-        if bad or st['lift!=cpu']:
+        if bad or (st['lift!=cpu'] and a.vs == 'cpu'):
             print('%-28s %6d states  lift!=cpu %4d  %s' % (forms[f], st['states'], st['lift!=cpu'],
                                                            ' '.join('%s:%d' % kv for kv in st.items()
                                                                     if kv[0].startswith('unicorn'))))
     tot = collections.Counter()
     for st in stat.values():
         tot.update(st)
-    unknown = sum(v for kk, v in tot.items() if kk.startswith('unicorn!=cpu') and not KNOWN.match(kk))
-    print('L3 oracle side: %d states, %d forms; lift != CPU in %d states; Unicorn != CPU: %s; outside the known '
-          'Unicorn classes: %d' % (n, len(stat), tot['lift!=cpu'], ', '.join('%s %d' % (kk[13:], v) for kk, v in
-                                                                             sorted(tot.items())
-                                                                             if kk.startswith('unicorn')) or 'none',
-                                   unknown))
+    unknown = sum(v for kk, v in tot.items() if kk.startswith('unicorn!=') and not known.match(kk))
+    fmt = ('L3 oracle side: %d states, %d forms; lift != CPU in %d states; Unicorn != ' +
+           ('CPU' if a.vs == 'cpu' else 'lift') + ': %s; outside the known Unicorn classes: %d')
+    print(fmt % (n, len(stat), tot['lift!=cpu'], ', '.join('%s %d' % (kk.split(' ', 1)[1], v) for kk, v in
+                                                            sorted(tot.items()) if kk.startswith('unicorn')) or 'none',
+                 unknown))
     if a.out:
         json.dump(dict(states=n, forms=rows, total=dict(tot), unknown=unknown), open(a.out, 'w'), indent=1)
-    return 1 if (unknown or tot['lift!=cpu']) and not a.tooth else 0
+    return 1 if (unknown or (tot['lift!=cpu'] and a.vs == 'cpu')) and not a.tooth else 0
 
 
 if __name__ == '__main__':

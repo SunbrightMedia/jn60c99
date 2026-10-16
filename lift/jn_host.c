@@ -33,6 +33,13 @@
 #define CC_FORGET     JN_RVA_CC_FORGET
 #define REC_ID        JN_RVA_REC_ID
 #define MODEL_SET     JN_RVA_MODEL_SET
+#define ZOOM_GET      JN_RVA_ZOOM_GET
+#define WINDOW_FIT    JN_RVA_WINDOW_FIT  /* a lifter hook (gen_juno_lift.sh --hook): the window is found by its fit */
+#define NWIN_MAX      16
+#define NGD_MAX       4096            /* GDI+ images (the module init makes 26) */
+#define NDIB_MAX      4096            /* DIB sections (the module init makes 26) */
+#define NSKIN_MAX     256             /* the skin's bitmaps (Script.xml names 30) */
+#define NSKIN_NAME    64
 #define PROCESS_SLOT  9               /* IAudioProcessor::process (rva 0x34A380) */
 #define NPQ           8               /* parameter queues a block may use (one per parameter id) */
 #define NCC_MAX       1024
@@ -95,6 +102,17 @@ static struct {
     int nsl; uint64_t sl_head[NSL_MAX]; uint64_t *sl_e[NSL_MAX]; int sl_n[NSL_MAX], sl_cap[NSL_MAX];
     int nonce; uint64_t once[NKV_MAX];
     int nunh; const char *unh_name[NUNH_MAX]; uint64_t unh_n[NUNH_MAX];
+    /* the editor (host_process_emu.attach_editor): from its first attach on, each panel window found by its fit's
+     * call (WINDOW_FIT) -- windows[(w, h)] = the window, the latest of a size */
+    int ed_on; int nwin; struct { int32_t w, h; uint64_t win; } win[NWIN_MAX];
+    /* the editor's imports (wrapper_emu._imp / _gdip): the virtual screen (GetSystemMetrics 78 / 79, others 0), the
+     * GUI's clock (GetTickCount: the oracle's tick_ms), the GDI+ images (gdip_imgs: handle -> w, h, format), the DIB
+     * sections (dibs) and the skin's blank-image sizes by file name (wrapper_emu.skin_sizes over Script.xml): the
+     * oracle's Python-side state, seeded from the template's facts gi/gs/gf, dh/dw/dp/db, sk/sn (jn_host_ref.py) */
+    int32_t scr_cx, scr_cy; uint64_t tick_ms;
+    int ngd; struct { uint64_t hd; uint32_t w, h, fmt; } gd[NGD_MAX];
+    int ndib; struct { uint64_t hb, bits; int32_t w, h; uint32_t bpp, stride; } dib[NDIB_MAX];
+    int nskin; struct { char name[NSKIN_NAME]; uint32_t w, h; } skin[NSKIN_MAX];
 } H;
 
 /* ---------------------------------------------------------------- guest memory (one mapped band region) */
@@ -183,6 +201,120 @@ static int oracle_special(const char *n) {           /* the oracle singles this 
 static int name_in(const char *n, const char *const *set) { for (; *set; set++) if (!strcmp(n, *set)) return 1; return 0; }
 
 /* ---------------------------------------------------------------- the host objects and the imports (jp8_hostcall) */
+/* ---------------------------------------------------------------- the editor's imports (wrapper_emu._imp / _gdip)
+ * Answered EXACTLY as the oracle answers them, from the state it keeps on its Python side (H: screen, tick_ms,
+ * gdip_imgs, dibs, skin). Plumbing: blank images of the skin's real geometry; nothing here is plugin logic. */
+static uint64_t stack_arg(CPU *c, int k) { return gq(c->r[4] + 8 + 8 * (uint64_t)k); }    /* wrapper_emu.stack_arg */
+static uint8_t gb(uint64_t a) { uint8_t v = 0; void *p = junoh_guest(a, 1); if (p) memcpy(&v, p, 1); return v; }
+static int gd_find(uint64_t hd) { int i; for (i = 0; i < H.ngd; i++) if (H.gd[i].hd == hd) return i; return -1; }
+static void gd_of(uint64_t hd, uint32_t *w, uint32_t *h, uint32_t *fmt) {   /* imgs.get(h, dict(w=64, h=64, fmt=0x26200A)) */
+    int i = gd_find(hd);
+    *w = i < 0 ? 64 : H.gd[i].w; *h = i < 0 ? 64 : H.gd[i].h; *fmt = i < 0 ? 0x26200Au : H.gd[i].fmt;
+}
+static uint64_t new_img(CPU *c, uint32_t w, uint32_t h, uint32_t fmt) {     /* _gdip's new_img: alloc_com(32), imgs[hnd] */
+    uint64_t hd = alloc_com(32); int i = gd_find(hd);
+    if (i < 0) { if (H.ngd >= NGD_MAX) { jp8_trap(c, 0, "too many GDI+ images"); return 0; } i = H.ngd++; }
+    H.gd[i].hd = hd; H.gd[i].w = w; H.gd[i].h = h; H.gd[i].fmt = fmt;
+    return hd;
+}
+static int gui_import(CPU *c, const char *n) {      /* 1: answered (rax set); 0: not one of these */
+    uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
+    if (!strcmp(n, "GetTickCount")) { c->r[0] = H.tick_ms & 0xFFFFFFFFULL; return 1; }    /* getattr(self, 'tick_ms', 0) */
+    if (!strcmp(n, "GetSystemMetrics")) {                                 /* self.screen.get(i, 0): 78 / 79 only */
+        uint32_t i = (uint32_t)rcx;
+        c->r[0] = i == 0x4E ? (uint64_t)(int64_t)H.scr_cx : i == 0x4F ? (uint64_t)(int64_t)H.scr_cy : 0; return 1;
+    }
+    if (!strcmp(n, "MultiByteToWideChar")) {     /* latin1 bytes -> UTF-16 units; n = -1: rstr (to the NUL, <= 1200) + NUL */
+        uint64_t outp = stack_arg(c, 4); uint32_t outn = (uint32_t)stack_arg(c, 5), cnt = (uint32_t)r9, len, k;
+        if (cnt == 0xFFFFFFFFu) { for (len = 0; len < 1200 && gb(r8 + len); len++) {} len++; }
+        else len = cnt;
+        if (outn == 0) { c->r[0] = len; return 1; }
+        for (k = 0; k < len && k < outn; k++) { uint16_t w = (k < len - (cnt == 0xFFFFFFFFu)) ? gb(r8 + k) : 0; wmem(outp + 2 * (uint64_t)k, &w, 2); }
+        c->r[0] = len < outn ? len : outn; return 1;
+    }
+    if (!strncmp(n, "Gdip", 4)) {                                      /* _gdip: GdiplusStartup and every Gdip* name */
+        uint32_t w, h, fmt;
+        if (!strcmp(n, "GdiplusStartup")) { wq(rcx, 1); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipAlloc")) { c->r[0] = alloc_com(rcx > 16 ? rcx : 16); return 1; }    /* NOT e2e_emu's bump */
+        if (!strcmp(n, "GdipCreateBitmapFromFile") || !strcmp(n, "GdipCreateBitmapFromFileICM")) {
+            /* skin.get(base name, lower case; (16, 16)) -- rstr(rcx, wide): UTF-16 to the NUL. The plugin asks for its
+             * Script.xml names (ASCII; the template asserts the skin's keys are): a non-ASCII unit matches no key */
+            char nm[NSKIN_NAME + 1]; size_t k = 0, i; int j, bad = 0; uint16_t ch;
+            for (i = 0; i < 600; i++) {
+                ch = (uint16_t)(gb(rcx + 2 * i) | gb(rcx + 2 * i + 1) << 8);
+                if (!ch) break;
+                if (ch == '\\' || ch == '/') { k = 0; bad = 0; continue; }
+                if (ch > 0x7F) bad = 1;
+                if (k < NSKIN_NAME) nm[k] = (char)(ch >= 'A' && ch <= 'Z' ? ch + 32 : ch);
+                k++;
+            }
+            w = 16; h = 16;
+            if (!bad && k < NSKIN_NAME) {
+                nm[k] = 0;
+                for (j = 0; j < H.nskin; j++) if (!strcmp(H.skin[j].name, nm)) { w = H.skin[j].w; h = H.skin[j].h; break; }
+            }
+            wq(rdx, new_img(c, w, h, 0x26200Au)); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipCreateBitmapFromHBITMAP")) { wq(r8, new_img(c, 64, 64, 0x26200Au)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipCreateBitmapFromScan0")) {
+            wq(stack_arg(c, 5), new_img(c, (uint32_t)rcx, (uint32_t)rdx, (uint32_t)r9)); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipCloneImage")) { gd_of(rcx, &w, &h, &fmt); wq(rdx, new_img(c, w, h, fmt)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImageWidth") || !strcmp(n, "GdipGetImageHeight") || !strcmp(n, "GdipGetImagePixelFormat")) {
+            uint32_t v; gd_of(rcx, &w, &h, &fmt); v = strstr(n, "Width") ? w : strstr(n, "Height") ? h : fmt;
+            wmem(rdx, &v, 4); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipGetImagePaletteSize")) { int32_t v = 8; wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImagePalette")) { uint64_t z = 0; wmem(rdx, &z, 8); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipBitmapLockBits")) {              /* bump(w h 4 + 16), zeroed; '<IIiIQQ' at stack argument 4 */
+            uint8_t d[32]; uint64_t buf, data = stack_arg(c, 4); int32_t st_;
+            gd_of(rcx, &w, &h, &fmt);
+            buf = jp8_heap_alloc((uint64_t)w * h * 4 + 16);
+            memset(d, 0, sizeof d); memcpy(d, &w, 4); memcpy(d + 4, &h, 4); st_ = (int32_t)(w * 4); memcpy(d + 8, &st_, 4);
+            memcpy(d + 12, &fmt, 4); memcpy(d + 16, &buf, 8);
+            wmem(data, d, 32); c->r[0] = 0; return 1;
+        }
+        if (!strcmp(n, "GdipGetImageGraphicsContext") || !strcmp(n, "GdipCreateFromHDC") || !strcmp(n, "GdipCreatePath") ||
+            !strcmp(n, "GdipCreateSolidFill") || !strcmp(n, "GdipCloneBrush")) { wq(rdx, alloc_com(32)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipCreatePen1")) { wq(stack_arg(c, 3), alloc_com(32)); c->r[0] = 0; return 1; }   /* as the oracle */
+        if (!strcmp(n, "GdipCreateLineBrushI")) { wq(stack_arg(c, 5), alloc_com(32)); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetSmoothingMode")) { int32_t v = 0; wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        if (!strcmp(n, "GdipGetImageEncodersSize")) { uint32_t v = 0; wmem(rcx, &v, 4); wmem(rdx, &v, 4); c->r[0] = 0; return 1; }
+        c->r[0] = 0; return 1;                                          /* every other Gdip*: Ok (0), nothing written */
+    }
+    if (!strcmp(n, "CreateDIBSection")) {                /* blank bits of the real geometry: bump, zeroed; hb by count */
+        int32_t w_ = gi(rdx + 4), h_ = gi(rdx + 8); uint32_t bpp = ((uint32_t)gi(rdx + 12) >> 16) & 0xFFFFu, stride, size, ah;
+        uint64_t bits;
+        ah = (uint32_t)(h_ < 0 ? -h_ : h_); stride = ((uint32_t)(w_ < 0 ? -w_ : w_) * bpp + 31) / 32 * 4;
+        size = stride * ah; if (size < 16) size = 16;
+        if (H.ndib >= NDIB_MAX) { jp8_trap(c, 0, "too many DIB sections"); return 1; }
+        bits = jp8_heap_alloc(size);
+        H.dib[H.ndib].hb = 0xB0000 + 0x10 * (uint64_t)H.ndib; H.dib[H.ndib].bits = bits; H.dib[H.ndib].w = w_; H.dib[H.ndib].h = h_;
+        H.dib[H.ndib].bpp = bpp; H.dib[H.ndib].stride = stride;
+        if (r9) wq(r9, bits);
+        c->r[0] = H.dib[H.ndib++].hb; return 1;
+    }
+    if (!strcmp(n, "GetObjectA") || !strcmp(n, "GetObjectW")) {
+        int i; uint8_t bm[104]; int32_t v; uint32_t u; uint16_t hw;
+        for (i = 0; i < H.ndib && H.dib[i].hb != rcx; i++) {}
+        if (i == H.ndib) { c->r[0] = 0; return 1; }
+        memset(bm, 0, sizeof bm);                                       /* '<iiiiHHIQ', then (>= 104) '<IiiHHIIiiII' + 12 + '<QI' */
+        v = H.dib[i].w; memcpy(bm + 4, &v, 4); v = H.dib[i].h < 0 ? -H.dib[i].h : H.dib[i].h; memcpy(bm + 8, &v, 4);
+        v = (int32_t)H.dib[i].stride; memcpy(bm + 12, &v, 4); hw = 1; memcpy(bm + 16, &hw, 2); hw = (uint16_t)H.dib[i].bpp; memcpy(bm + 18, &hw, 2);
+        memcpy(bm + 24, &H.dib[i].bits, 8);
+        if ((uint32_t)rdx >= 104) {
+            u = 40; memcpy(bm + 32, &u, 4); v = H.dib[i].w; memcpy(bm + 36, &v, 4); v = H.dib[i].h; memcpy(bm + 40, &v, 4);
+            hw = 1; memcpy(bm + 44, &hw, 2); hw = (uint16_t)H.dib[i].bpp; memcpy(bm + 46, &hw, 2);
+            u = H.dib[i].stride * (uint32_t)(H.dib[i].h < 0 ? -H.dib[i].h : H.dib[i].h); memcpy(bm + 52, &u, 4);
+            wmem(r8, bm, 96); c->r[0] = 104; return 1;                  /* bm[:104] of a 96-byte struct: 96 written */
+        }
+        wmem(r8, bm, 32); c->r[0] = 32; return 1;
+    }
+    if (!strcmp(n, "SelectObject")) { c->r[0] = 0x77770; return 1; }
+    if (!strcmp(n, "DeleteObject") || !strcmp(n, "DeleteDC") || !strcmp(n, "ReleaseDC")) { c->r[0] = 1; return 1; }
+    return 0;
+}
+
 void jp8_hostcall(CPU *c, uint64_t target) {
     const char *n = stub_name(target); uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
     char msg[160];
@@ -281,6 +413,7 @@ void jp8_hostcall(CPU *c, uint64_t target) {
         if (name_in(n, PTR)) { c->r[0] = rcx; return; }
         if (!strcmp(n, "IsProcessorFeaturePresent")) { c->r[0] = 1; return; }
         if (!strcmp(n, "IsDebuggerPresent")) { c->r[0] = 0; return; }
+        if (gui_import(c, n)) return;                /* GetTickCount, GetSystemMetrics, MultiByteToWideChar, Gdip*, the DIBs */
         if (!strcmp(n, "FlsAlloc")) { c->r[0] = H.fls_ctr++; return; }
         if (!strcmp(n, "FlsSetValue")) { if (kv_set(&H.nfls, H.fls_k, H.fls_v, rcx, rdx)) { jp8_trap(c, target, "FLS table full"); return; } c->r[0] = 1; return; }
         if (!strcmp(n, "FlsGetValue")) { c->r[0] = kv_get(H.nfls, H.fls_k, H.fls_v, rcx); return; }
@@ -322,7 +455,8 @@ void jp8_hostcall(CPU *c, uint64_t target) {
         if (name_in(n, E_ONE)) { c->r[0] = 1; return; }    /* HeapFree frees nothing: the oracle's heap is a pure bump */
         if (!strcmp(n, "HeapSize")) { c->r[0] = 0x1000; return; }
         if (!strcmp(n, "VirtualAlloc") || !strcmp(n, "VirtualAllocEx")) { c->r[0] = jp8_heap_alloc(rdx ? rdx : 0x1000); return; }
-        if (!strcmp(n, "CoTaskMemAlloc") || !strcmp(n, "GlobalAlloc") || !strcmp(n, "GdipAlloc") || !strcmp(n, "SysAllocString")) { c->r[0] = jp8_heap_alloc(rcx ? rcx : 0x100); return; }
+        /* (e2e_emu's rule also names GdipAlloc: shadowed in the oracle by wrapper_emu's Gdip* rule -- answered above) */
+        if (!strcmp(n, "CoTaskMemAlloc") || !strcmp(n, "GlobalAlloc") || !strcmp(n, "SysAllocString")) { c->r[0] = jp8_heap_alloc(rcx ? rcx : 0x100); return; }
         if (!strcmp(n, "TlsAlloc")) { c->r[0] = H.tls_ctr++; return; }
         if (!strcmp(n, "TlsSetValue")) { if (kv_set(&H.ntls, H.tls_k, H.tls_v, rcx, rdx)) { jp8_trap(c, target, "TLS table full"); return; } c->r[0] = 1; return; }
         if (!strcmp(n, "TlsGetValue")) { c->r[0] = kv_get(H.ntls, H.tls_k, H.tls_v, rcx); return; }
@@ -401,6 +535,18 @@ void jp8_hook(CPU *c, uint64_t rva) {
         JP8_FPENV(c); c->r[0] = 0;               /* the render's MXCSR restored; the callers ignore the return value */
         return;
     }
+    if (rva == WINDOW_FIT) {                     /* a panel window lays itself out: the oracle's attach_editor hook (set
+                                                    at the first attach) records windows[(w, h)] = this; nothing written */
+        int32_t rc_[4]; int i; void *p;
+        if (!H.ed_on) return;
+        p = junoh_guest(c->r[1] + 0x18, 16);
+        if (!p) { jp8_trap(c, rva, "a window's rectangle is not mapped"); return; }
+        memcpy(rc_, p, 16);
+        for (i = 0; i < H.nwin && !(H.win[i].w == rc_[2] - rc_[0] && H.win[i].h == rc_[3] - rc_[1]); i++) {}
+        if (i == H.nwin) { if (H.nwin >= NWIN_MAX) { jp8_trap(c, rva, "too many windows"); return; } H.nwin++; }
+        H.win[i].w = rc_[2] - rc_[0]; H.win[i].h = rc_[3] - rc_[1]; H.win[i].win = c->r[1];
+        return;
+    }
     { char m[64]; snprintf(m, sizeof m, "a hook this runtime does not know (rva 0x%llx)", (unsigned long long)rva); jp8_trap(c, rva, m); }
 }
 
@@ -473,6 +619,35 @@ static int load(const unsigned char *b, size_t len) {
             char *e; uint64_t head = strtoull(key + 3, &e, 10); long idx = (*e == ':') ? strtol(e + 1, NULL, 10) : -1; int s_;
             if (idx < 0 || (s_ = sl_of(head)) < 0 || sl_put(s_, (int)idx, v)) return err(JUNOH_E_TEMPLATE, "template: an SList entry");
         }
+        /* the editor imports' state at the cut: GDI+ images gi/gs/gf:<i>, DIB sections dh/dw/dp/db:<i>, skin sk:<i> + sn:<i>:<k> */
+        else if (key[0] == 'g' && (key[1] == 'i' || key[1] == 's' || key[1] == 'f') && key[2] == ':') {
+            long i_ = strtol(key + 3, NULL, 10);
+            if (i_ < 0 || i_ >= NGD_MAX) return err(JUNOH_E_TEMPLATE, "template: a GDI+ image index");
+            if (key[1] == 'i') H.gd[i_].hd = v;
+            else if (key[1] == 's') { H.gd[i_].w = (uint32_t)(v >> 32); H.gd[i_].h = (uint32_t)v; }
+            else H.gd[i_].fmt = (uint32_t)v;
+            if (i_ + 1 > H.ngd) H.ngd = (int)i_ + 1;
+        }
+        else if (key[0] == 'd' && (key[1] == 'h' || key[1] == 'w' || key[1] == 'p' || key[1] == 'b') && key[2] == ':') {
+            long i_ = strtol(key + 3, NULL, 10);
+            if (i_ < 0 || i_ >= NDIB_MAX) return err(JUNOH_E_TEMPLATE, "template: a DIB section index");
+            if (key[1] == 'h') H.dib[i_].hb = v;
+            else if (key[1] == 'w') { H.dib[i_].w = (int32_t)(uint32_t)(v >> 32); H.dib[i_].h = (int32_t)(uint32_t)v; }
+            else if (key[1] == 'p') { H.dib[i_].bpp = (uint32_t)(v >> 32); H.dib[i_].stride = (uint32_t)v; }
+            else H.dib[i_].bits = v;
+            if (i_ + 1 > H.ndib) H.ndib = (int)i_ + 1;
+        }
+        else if (key[0] == 's' && (key[1] == 'k' || key[1] == 'n') && key[2] == ':') {
+            char *e; long i_ = strtol(key + 3, &e, 10);
+            if (i_ < 0 || i_ >= NSKIN_MAX) return err(JUNOH_E_TEMPLATE, "template: a skin index");
+            if (key[1] == 'k') { H.skin[i_].w = (uint32_t)(v >> 32); H.skin[i_].h = (uint32_t)v; }
+            else {                                          /* 8 bytes of the name, little endian, at chunk k */
+                long k_ = (*e == ':') ? strtol(e + 1, NULL, 10) : -1; int j;
+                if (k_ < 0 || 8 * k_ + 8 >= NSKIN_NAME) return err(JUNOH_E_TEMPLATE, "template: a skin name");
+                for (j = 0; j < 8; j++) H.skin[i_].name[8 * k_ + j] = (char)(v >> (8 * j));
+            }
+            if (i_ + 1 > H.nskin) H.nskin = (int)i_ + 1;
+        }
         else if (key[0] == 'r' && key[1] >= '0' && key[1] <= '9') { int r_ = atoi(key + 1); if (r_ >= 0 && r_ < 16) H.reg[r_] = v; }
         else if (key[0] == 'x' && key[1] >= '0' && key[1] <= '9') {
             int r_ = atoi(key + 1); const char *t = strstr(key, "hi"); if (r_ >= 0 && r_ < 16) H.xreg[r_][t ? 1 : 0] = v;
@@ -481,6 +656,10 @@ static int load(const unsigned char *b, size_t len) {
     }
     if (!H.audio || !H.comp || !H.core || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream)
         return err(JUNOH_E_TEMPLATE, "template: a fact is missing");
+    for (k = 0; k < (uint32_t)H.ngd; k++) if (!H.gd[k].hd) return err(JUNOH_E_TEMPLATE, "template: a GDI+ image is missing");
+    for (k = 0; k < (uint32_t)H.ndib; k++)            /* the oracle's handles: 0xB0000 + 0x10 * (the count before it) */
+        if (H.dib[k].hb != 0xB0000 + 0x10 * (uint64_t)k) return err(JUNOH_E_TEMPLATE, "template: a DIB section handle");
+    for (k = 0; k < (uint32_t)H.nskin; k++) if (!H.skin[k].name[0]) return err(JUNOH_E_TEMPLATE, "template: a skin name is missing");
     jp8_heap_set(heap_ptr, heap_lim); jp8_hc_set(hc);
     if (p + 4 > len - 4) return err(JUNOH_E_TEMPLATE, "template: no stubs");
     ns = le32(b + p); p += 4;
@@ -644,6 +823,39 @@ int junoh_commit(void) {         /* the panel's commit: rva 0x285320, 0x2853C0, 
     if (rc) return rc;
     model = gq(gq(H.core + 8));
     for (i = 0; i < 3; i++) if (call(IB + trio[i], model, 0, 0, 0)) return JUNOH_E_TRAP;
+    return JUNOH_OK;
+}
+/* ---------------------------------------------------------------- the editor (host_process_emu.attach_editor) */
+int junoh_screen(int32_t cx, int32_t cy) {      /* the machine's virtual screen changes: self.screen = {78: cx, 79: cy} */
+    int rc = live(); if (rc) return rc;
+    H.scr_cx = cx; H.scr_cy = cy; return JUNOH_OK;
+}
+int junoh_attach_editor(int32_t cx, int32_t cy, uint64_t *view) {   /* attach_editor(cx, cy), the oracle's steps in order */
+    uint64_t name, t, v; int rc = live(); if (rc) return rc;
+    H.scr_cx = cx; H.scr_cy = cy;
+    H.ed_on = 1;                                 /* its window-fit hook, installed at the first attach, stays */
+    name = alloc_com(16); t = alloc_com(16);
+    wmem(name, "editor", 7); wmem(t, "HWND", 5);
+    if (call(gq(gq(H.ctrl) + 8 * 17), H.ctrl, name, 0, 0)) return JUNOH_E_TRAP;     /* IEditController::createView */
+    v = H.cpu.r[0];
+    if (!v) return err(JUNOH_E_STATE, "createView(\"editor\") gave no view");
+    if (call(gq(gq(v) + 8 * 4), v, 0x10010, t, 0)) return JUNOH_E_TRAP;               /* IPlugView::attached */
+    if (view) *view = v;
+    return JUNOH_OK;
+}
+int junoh_window_zoom(int32_t w, int32_t h, int32_t *zoom) {   /* window_conv: the w x h window's own zoom getter */
+    int i, rc = live(); if (rc) return rc;
+    for (i = 0; i < H.nwin && !(H.win[i].w == w && H.win[i].h == h); i++) {}
+    if (i == H.nwin) return err(JUNOH_E_ARG, "no window of that size has laid itself out");
+    if (call(IB + ZOOM_GET, H.win[i].win, 0, 0, 0)) return JUNOH_E_TRAP;
+    if (zoom) *zoom = (int32_t)(uint32_t)H.cpu.r[0];
+    return JUNOH_OK;
+}
+int junoh_set_tick(uint32_t ms) { int rc = live(); if (rc) return rc; H.tick_ms = ms; return JUNOH_OK; }
+int junoh_call(uint64_t target, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9, uint64_t *rax) {
+    int rc = live(); if (rc) return rc;          /* the oracle's call(): one call of plugin code at a guest address */
+    if (call(target, rcx, rdx, r8, r9)) return JUNOH_E_TRAP;
+    if (rax) *rax = H.cpu.r[0];
     return JUNOH_OK;
 }
 int junoh_unhandled(char *buf, size_t cap) {   /* "name=count\n" per import answered by the oracle's default; distinct names */

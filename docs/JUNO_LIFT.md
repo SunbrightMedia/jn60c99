@@ -194,3 +194,15 @@ editor path in the lift).
   add, jl as jle, mulss as addss, a 32-bit load as 16-bit -- each seen by the CPU side; one flipped Unicorn input
   seen by the oracle side; the CPU against itself equal. L3 measure: 342 / 342 executed forms proven -> 1 (re-run on
   the next census).
+- 2026-10-16 THE GROWN CENSUS + TWO FLOAT FLAVORS. The census with the search's seeds: 919 functions, 67,161
+  executed instructions (was 64,630); re-lift 4,792 functions, 838,659 statements; L2 0 reached traps; all 8 L5 gates
+  EXACTLY 0 again with teeth; search seed 1000 CLEAN (it had found the gap). L3 on the grown census found a FOURTH
+  lift defect: cwde kept RAX's upper half (an EAX write clears it; playbook 288). The new L5 MIDI-controller drive
+  (tools/lift/jn_midi_gate.sh, jn_search_seq.plan_midi: every CC 0..127 at three values under a held chord, mod wheel
+  at 16 offsets, bend, aftertouch, sustain, all notes off, voice-count / engine-rate changes) diverged at op 46 by two
+  denormal heap words: the lift flushed them as the CPU does (FTZ), Unicorn kept them (playbook 289). Resolution: the
+  lift is built in two float flavors -- PRODUCT (libjunohost_hw.so: hardware floats; L3 proves each statement equal to
+  the CPU) and GATE (libjunohost.so: -DJP8_SOFTFP=1 -DJP8_ORACLE_NAN, the oracle's float semantics incl. its x87-style
+  NaN choice, MEASURED by L3; L3 proves each statement equal to Unicorn: on the old lift the ONLY difference left was
+  the cwde defect). Every L5 / L6 gate runs the gate flavor. Also fixed: l3_unicorn.py classed only XMM0's lanes.
+  NEXT: L3 over EVERY shipped statement (--all, in chunks), the re-run of L5 + MIDI on the gate flavor, then L6.

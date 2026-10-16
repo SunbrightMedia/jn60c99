@@ -43,6 +43,8 @@ def main():
             end = 'oracle_error'
             break
         d, ht, cn = ops.digest()
+        if os.environ.get('JN_DUMP_AT') == str(k):                # a divergence's diff: the regions after op k
+            ops.dump(os.path.join(os.environ.get('JN_DUMP_DIR', out), 'ref_%d' % k))
         rows.append(dict(k=k, status=status, digest=d, heap_top=ht, com_next=cn, woff=len(words), wlen=len(w)))
         words += w
         if status == 'throw':

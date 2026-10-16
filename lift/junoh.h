@@ -32,6 +32,13 @@ int  junoh_set_state(const void *data, size_t n, uint32_t *result);  /* ICompone
 int  junoh_model_set(uint64_t obj, uint32_t value);                  /* the editor's record set (rva 0x283DB0) */
 int  junoh_rec_id(int index, uint32_t *id, uint64_t *obj);           /* the record at index -> its parameter id + object */
 int  junoh_commit(void);                                             /* the panel's commit (0x285320, 0x2853C0, 0x283120) */
+/* the editor (host_process_emu.attach_editor / window_conv, docs/WINDOW_ZOOM.md): the editor opened on a machine whose
+ * virtual screen is cx x cy (GetSystemMetrics 78 / 79), a later screen change, a panel window's zoom getter (the window
+ * found by its fit's call: w x h its Script.xml size), the GUI's clock (GetTickCount) */
+int  junoh_attach_editor(int32_t cx, int32_t cy, uint64_t *view);    /* createView("editor"), attached(0x10010, "HWND") */
+int  junoh_screen(int32_t cx, int32_t cy);
+int  junoh_window_zoom(int32_t w, int32_t h, int32_t *zoom);
+int  junoh_set_tick(uint32_t ms);
 /* gates / the drive */
 const char *junoh_error(void);
 void     junoh_trace_open(const char *path);   /* the L5 trace-diff: with a --trace lift, record each insn to path */
@@ -44,4 +51,6 @@ int      junoh_edits(uint32_t *id, double *val, int cap);            /* the perf
 int      junoh_unhandled(char *buf, size_t cap);                      /* imports answered by the oracle's default 0:
                                                                          "name=count\n" lines; returns distinct names */
 uint64_t junoh_core(void);                                           /* the plugin's core object (a template fact) */
+int      junoh_call(uint64_t target, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9, uint64_t *rax);
+                                                                     /* one call of lifted plugin code (the oracle's call()) */
 #endif

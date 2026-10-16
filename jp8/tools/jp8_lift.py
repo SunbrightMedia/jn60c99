@@ -74,6 +74,11 @@ def read_table(tbl, near):
     return ents
 
 # ------------------------------------------------------------------ discovery
+# the instructions after which the stream does not go on (a jmp ends it too). "repz ret" (F3 C3, the two-byte return
+# of AMD's branch predictor advice) IS a return: walked on as an ordinary instruction, it took the bytes after it as
+# the function's (the JUNO's address-taken lift, 2026-10-16: 1,023 of them)
+ENDS = ("ret", "repz ret", "int3", "hlt", "ud2")
+
 def discover(roots, dyn_ind, stops=()):
     """returns funcs: {entry: {insns:{rva:ins}, targets:set(rva), ijmp:{site:[targets]}}}; a direct jmp to an rva in
     stops is a TAIL CALL (the target becomes a function of its own), never followed into the current function"""
@@ -91,7 +96,7 @@ def discover(roots, dyn_ind, stops=()):
                 if ins is None: break
                 insns[rva] = ins; prev.append(ins)
                 m = ins.mnemonic.replace("bnd ", ""); op = ins.operands
-                if m in ("ret", "int3", "hlt", "ud2"): break
+                if m in ENDS: break
                 if m == "jmp":
                     if op[0].type == x86.X86_OP_IMM and op[0].imm - IB in stops:
                         t = op[0].imm - IB
@@ -116,16 +121,24 @@ def discover(roots, dyn_ind, stops=()):
                             t = int(x, 16)
                             if t not in calls_seen: calls_seen.add(t); work.append(t)
                 rva += ins.size
-        funcs[f] = dict(insns=insns, targets=targets, ijmp=ijmp)
+        # keep each instruction's SIZE only: a capstone object per instruction held 1.68 M of them for the JUNO's
+        # address-taken lift and the run was killed for memory (2026-10-16); lift_func decodes each again, the same bytes
+        funcs[f] = dict(insns={r: i.size for r, i in insns.items()}, targets=targets, ijmp=ijmp)
     return funcs
 
 # ------------------------------------------------------------------ operand helpers
-def ea(ins, op):
+def ea(ins, op, seg=True):
+    """a memory operand's address as C. seg=False: the offset only (lea: no segment takes part, SDM LEA). x86-64
+    ignores a CS / DS / ES / SS override -- their base is 0 (SDM vol. 1 3.3.7.1): the CRT's memset writes through
+    ds:[rdi] (the JUNO's address-taken lift, 2026-10-16: the lifter gave None, the C did not compile). GS is the TEB;
+    FS, and GS over a RIP-relative address, are not modeled: ValueError, the statement becomes a trap"""
     m = op.mem; parts = []
+    s = ins.reg_name(m.segment) if (seg and m.segment != 0) else None
+    if s not in (None, "cs", "ds", "es", "ss", "gs"): raise ValueError("segment " + s)
     if m.base == x86.X86_REG_RIP:
+        if s == "gs": raise ValueError("segment gs over rip")
         return "0x%xULL" % ((ins.address + ins.size + m.disp) & 0xFFFFFFFFFFFFFFFF)
-    if m.segment != 0:
-        if ins.reg_name(m.segment) != "gs": return None
+    if s == "gs":
         # gs:[disp] -- the TEB under Windows; under Unicorn the GS base is 0 and page 0 is mapped, so the plugin reads
         # page-0 bytes there (__chkstk's stack limit). The C side keeps the oracle's page 0 at JP8_GS_BASE (jp8_cpu.h).
         parts.append("JP8_GS_BASE")
@@ -232,9 +245,13 @@ class Lifter:
         e("static void f_%x(CPU *c) {" % f)
         e("  X t0, t1; uint64_t a0, a1; (void)t0; (void)t1; (void)a0; (void)a1;")
         e("  goto L_%x;   /* the entry: blocks reached by backward jumps sort BEFORE it (paid 2026-09-22, note-off) */" % f)
+        # an address the code goes to (a jump target, or the next instruction of one that falls through) where no
+        # instruction decodes -- bytes of data in .text, found through an address-taken root (2026-10-16): the C goes to
+        # a trap there, never to an undefined label (no C) or on into the next block emitted (a silent wrong path)
+        nodec = set(t for t in targets | {f} if t not in insns)
         last = None
         for rva in sorted(insns):
-            ins = insns[rva]
+            ins = dis(rva)                     # decoded again (discover keeps sizes only): the same image bytes
             if rva in targets or rva == f: e("L_%x:" % rva)
             elif last is not None and last != rva:
                 e("L_%x: /* gap */" % rva)      # not a target but not fall-through either: unreachable label keeps C valid
@@ -258,6 +275,11 @@ class Lifter:
             e("  %s/*%x %s %s*/ %s" % ("jp8_tr(c,0x%x); " % rva if self.trace else "", rva, ins.mnemonic, ins.op_str.replace("*/", "* /"), stmt))
             self.n += 1
             last = rva + ins.size
+            mm = ins.mnemonic.replace("bnd ", "")
+            if last not in insns and mm not in ENDS and mm != "jmp":
+                nodec.add(last); e("  goto L_%x;   /* the stream runs into bytes that do not decode */" % last)
+        for t in sorted(nodec):
+            e('L_%x: jp8_trap(c, 0x%x, "no instruction decodes here"); return;' % (t, t)); self.unsup["no instruction decodes"] += 1
         e("}")
 
     # -------------------------------------------------------------- per instruction
@@ -277,7 +299,9 @@ class Lifter:
         if m in ("int3", "ud2", "hlt", "cpuid", "rdtsc", "syscall", "int"):
             return None
         # ---- control flow
-        if m == "ret": return "return;"
+        if m in ("ret", "repz ret"):          # the caller pops the return address (its R(4)+=8); ret n pops n more
+            n = op[0].imm & 0xFFFF if len(op) == 1 else 0
+            return "R(4)+=%d; return;" % n if n else "return;"
         if m == "jmp":
             if op[0].type == x86.X86_OP_IMM:
                 t = op[0].imm - IB
@@ -317,11 +341,11 @@ class Lifter:
         if m == "movsx": return wr_int(ins, op[0], "sext(%d,%s)" % (op[1].size * 8, rd_int(ins, op[1])))
         if m == "movsxd": return wr_int(ins, op[0], "sext(32,%s)" % rd_int(ins, op[1], 32))
         if m == "cdqe": return "R(0)=sext(32,R(0)&0xFFFFFFFFULL);"
-        if m == "cwde": return "R(0)=(R(0)&~0xFFFFFFFFULL)|(sext(16,R(0)&0xFFFF)&0xFFFFFFFFULL);"
+        if m == "cwde": return "R(0)=sext(16,R(0)&0xFFFF)&0xFFFFFFFFULL;"   # EAX written: RAX's upper half cleared (L3, 2026-10-16)
         if m == "cdq": return "R(2)=((int32_t)(R(0)&0xFFFFFFFFULL)<0)?0xFFFFFFFFULL:0;"
         if m == "cqo": return "R(2)=((int64_t)R(0)<0)?~0ULL:0;"
         if m == "lea":
-            a = ea(ins, op[1]); return wr_int(ins, op[0], a) if a else None
+            a = ea(ins, op[1], seg=False); return wr_int(ins, op[0], a) if a else None
         if m == "xchg":
             return "a0=%s; %s %s" % (rd_int(ins, op[0]), wr_int(ins, op[0], rd_int(ins, op[1])), wr_int(ins, op[1], "a0"))
         if m == "xadd":

@@ -11,18 +11,8 @@ set -e
 R=${REPO:-.}
 OUT="$R/build/jn_host"; mkdir -p "$OUT"
 SO="$OUT/libjunohost.so"; TMPL="$OUT/jn_host_template.bin"
-BASE="-std=c99 -ffp-contract=off -fno-strict-aliasing -fwrapv -fPIC -DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL -I$R/jp8/src -I$R/lift"
-if [ ! -f "$SO" ] || [ ! -f "$TMPL" ]; then
-    [ -f "$R/scratchpad/lift/juno_reach.json" ] || { echo "no L1 census -- run tools/verify/juno_lift_reach.py"; exit 2; }
-    echo "[build] generate the host-flavor lift"
-    sh "$R/tools/lift/gen_juno_lift.sh"
-    echo "[build] the template"
-    python3 "$R/tools/lift/jn_host_ref.py" "$TMPL" >/dev/null
-    echo "[build] libjunohost.so"
-    cc $BASE -w -c "$R/lift/jn_lift.c" -o "$OUT/jn_lift.o"
-    cc $BASE -pedantic-errors -c "$R/jp8/src/jp8_rt.c" -o "$OUT/jn_rt.o"
-    cc $BASE -pedantic-errors -c "$R/lift/jn_host.c" -o "$OUT/jn_host.o"
-    cc -shared -o "$SO" "$OUT/jn_lift.o" "$OUT/jn_rt.o" "$OUT/jn_host.o" -lm
+if [ ! -f "$SO" ] || [ ! -f "$TMPL" ]; then          # the one build (the lift in parts, both flavors)
+    sh "$R/tools/lift/jn_build.sh"
 else
     echo "[build] reusing $SO"
 fi

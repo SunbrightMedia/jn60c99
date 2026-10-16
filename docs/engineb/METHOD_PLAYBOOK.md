@@ -4814,3 +4814,66 @@ canonical (a jump table's own cases half the time); the CPU-against-itself contr
 ### The rule
 Before a difference is the code's, rule out the harness: give the test the semantics the hardware really has, and
 keep a control that must equal the CPU.
+
+## 288. A WRITE TO EAX CLEARS RAX'S UPPER HALF -- AND A PER-INSTRUCTION PROOF IS ONLY AS WIDE AS ITS WORK LIST
+Paid 2026-10-16 (JUNO lift, L3 on the grown census). The lifter emitted cwde as "keep RAX's upper half, write the
+sign-extended AX below it"; x86-64 writes EAX and so clears bits 63..32. L3's first run passed: its work list was the
+census's EXECUTED statements and no drive had run cwde. The census grew by the machine search's own seeds (+2,531
+executed instructions) -- one of them was a cwde -> L3 RED at once (112 of 256 states). EXECUTED: lifter fixed.
+### The rule
+A proof over "what ran" misses what runs next. The shipped lift holds 838,659 statements, the census executed 67,161:
+prove EVERY shipped statement (l3_cases.py --all), not only the executed ones; the census is a priority, not a bound.
+
+## 289. TWO FLOAT FLAVORS OF ONE LIFT: THE PRODUCT EQUAL TO THE CPU, THE GATE EQUAL TO THE ORACLE
+Paid 2026-10-16 (JUNO lift, L5 MIDI drive). The MIDI-controller drive diverged after op 46: two heap words, the
+oracle 0x0003BC36 / 0x801BC70E (denormal floats), the lift 0 / 0x80000000 -- the lift ran the plugin's float code on
+the CPU with FTZ on, as the plugin does; Unicorn keeps denormal results. Not a lift defect: an emulator departure.
+EXECUTED: one lift, two builds -- the PRODUCT flavor (hardware floats at the guest's MXCSR; L3: every statement equal
+to the CPU) and the GATE flavor (-DJP8_SOFTFP=1 -DJP8_ORACLE_NAN: DAZ on inputs, no FTZ, and Unicorn's NaN choice,
+which L3 MEASURED as x87's -- QEMU's pickNaN: an SNaN with a QNaN gives the QNaN, two of a kind the larger
+significand; L3: every statement equal to Unicorn). Every whole-program gate (L5, L6) runs the gate flavor. The text
+around the float operations is identical in both, so the gates prove the program, L3 proves each float operation.
+### The rule
+When the oracle is an emulator, give the code under test the emulator's arithmetic for the whole-program comparison
+and prove the product's arithmetic against the CPU instruction by instruction. Never tune either to the other.
+
+## 290. LIFT EVERY ADDRESS-TAKEN FUNCTION -- A CENSUS OF INDIRECT TARGETS IS NEVER COMPLETE
+Paid 2026-10-16 (JUNO lift, L6). The lift's roots were the census's functions plus the indirect targets the census's
+drives had met. The machine search's fourth seed (1003) set record 91 to 5 through the editor -- a value no drive had
+used -- and the plugin called through a vtable into 0x34B260, never met, never lifted: TRAP. Re-censusing would only
+move the edge: every new (record, value) can pick a new method. EXECUTED: tools/lift/jn_extra_roots.py rule 4 roots
+every ADDRESS-TAKEN code location -- each DIR64 base relocation whose target lies in .text (vtables, function-pointer
+tables, movabs; 9,804 targets, 3,783 of them leaves with no pdata) and each RIP-relative lea of a function start: an
+indirect transfer can only land on one of these (or on a jump table's case, which the lifter reads itself).
+### The rule
+The set of indirect targets is a static property of the image (its relocations and address-forming instructions), not
+of the drives. Lift that whole set; let the census set priorities, never the bound.
+
+## 291. A WIDER ROOT SET LIFTS BYTES THE OLD ONE NEVER MET -- THE LIFTER MUST EMIT VALID C FOR ANY BYTES
+Paid 2026-10-16 (JUNO lift, the address-taken re-lift of playbook 290). The 24,299-function lift did not compile, and
+it showed three lifter defects no smaller lift had: (a) a DIR64 relocation pointed at string data inside .text; its
+"code" jumped to an address where no instruction decodes, and the C named a label that did not exist (and a stream
+that ran into undecodable bytes fell, silently, into the next emitted block); (b) the CRT's memset writes through
+ds:[rdi] -- the lifter took every segment but GS as unsupported and printed None into the C; (c) "repz ret" (F3 C3)
+was not a return, so discovery walked on past it into the next function's bytes (1,023 sites). EXECUTED: jp8_lift.py
+-- a jump target or fall-through where nothing decodes is a trap label (the CPU raises #UD there); CS / DS / ES / SS
+overrides are ignored (base 0 in 64-bit mode; lea takes no segment at all); repz ret ends the stream and returns.
+Re-lift: 24,291 functions, 2,323,537 instructions, traps 39,789 -> 25,748.
+### The rule
+A lifter is exercised by its input set. Every growth of the roots is a new input: compile it, prove its new forms
+(L3 --all), and never let an unknown byte pattern become C that differs from the CPU or C that does not compile.
+
+## 292. A 2.3-MILLION-STATEMENT C FILE DOES NOT COMPILE IN ONE PIECE -- SPLIT THE LIFT, KEEP THE TEXT
+Paid 2026-10-16 (JUNO lift, the address-taken re-lift). One cc1 over lift/jn_lift.c (24,291 functions) reached 14 GB
+of RSS and the cgroup OOM-killed it. EXECUTED: tools/lift/split_lift.py divides the file into N parts (default 8) that
+are MECHANICAL TEXT -- the same function definitions, each made external (the word "static" dropped from its prototype
+and its definition line, nothing else), the include + declarations + every prototype copied into each part, the
+dispatch table / jp8_icall / jp8_run / the import names kept in part 0. A self-check joins the parts back and asserts
+they equal the file (with "static " dropped) and the tail is the file's own. jn_build.sh compiles the parts, a few at
+a time (each ~2.3 GB, ~1 min), and links them into the one .so; JN_KEEP_LIFT=1 keeps the part objects (stamped with
+the lift's sha256) when only the glue or template changed. The tools that READ the lift (l3_cases.py, check_reached.py,
+l3_flags.py) still read the one file -- the split is a build step, not a new source of truth.
+### The rule
+A generated translation unit can outgrow the compiler's memory. Split it by text into independent parts that provably
+re-join to the original, compile them within the memory budget, and keep the single file as the source everything
+else reads.

@@ -21,6 +21,7 @@
 #include <asm/prctl.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <xmmintrin.h>
 #include "l3_rt.h"
 
 #define WBASE 0x700000000ULL       /* the test window: every memory operand, the stack and string pointers land here */
@@ -40,6 +41,9 @@ static sigjmp_buf trap_jb;
 static int t_trapped;
 void jp8_trap(CPU *c, uint64_t rva, const char *what) { (void)c; (void)rva; (void)what; t_trapped = 1; siglongjmp(trap_jb, 1); }
 void jp8_tr(CPU *c, uint64_t rva) { (void)c; (void)rva; }
+#ifdef JP8_SOFTFP
+uint32_t jp8_daz_off, jp8_ftz_off;                             /* the software float model's flush modes (jp8_rt.c) */
+#endif
 
 int t_kind, t_called;
 uint64_t t_target;
@@ -299,36 +303,49 @@ static uint32_t defined_flags(const l3case *k, const rec_in *s) {
     return def;
 }
 static uint32_t fl5(uint64_t f) { return (uint32_t)((f & 1) | ((f >> 2 & 1) << 1) | ((f >> 6 & 1) << 2) | ((f >> 7 & 1) << 3) | ((f >> 11 & 1) << 4)); }
-static uint32_t lifted(const l3case *k, const rec_in *s, const rec_out *o, CPU *c) {
-    uint32_t res = 0, def, lf; uint64_t lrip = 0, lw; const CPU *L; int i, ret = 0;
+/* the lifted statement from the same state; its outcome as an out-state (lo), the CPU's convention: after a ret the
+ * CPU has popped the return address, in the lift the CALLER pops it (R(4)+=8 after the call), so lo's rsp is +8 */
+static void lifted(const l3case *k, const rec_in *s, CPU *c, rec_out *lo) {
+    uint64_t lrip = 0; const CPU *L; int i, ret = 0;
     mem_set(k, s);
     memset(c, 0, sizeof *c);
     memcpy(c->r, s->r, sizeof c->r); memcpy(c->x, s->x, sizeof c->x);
     c->cf = (int)(s->fl & 1); c->pf = (int)(s->fl >> 2 & 1); c->zf = (int)(s->fl >> 6 & 1);
     c->sf = (int)(s->fl >> 7 & 1); c->of = (int)(s->fl >> 11 & 1); c->mxcsr = s->mxcsr;
-    JP8_FPENV(c);                                              /* the runtime's invariant: real MXCSR = the guest's */
+    _mm_setcsr(0x1F80u);                                       /* the software model runs under IEEE ... */
+    JP8_FPENV(c);                                              /* ... the hardware one under the guest's MXCSR */
     t_kind = T_RETURNED; t_called = 0; t_trapped = 0;
     if (!sigsetjmp(trap_jb, 0)) k->fn(c);
     _mm_setcsr(0x1F80u);
-    if (t_trapped) return R_TRAP;
+    memset(lo, 0, sizeof *lo);
+    if (t_trapped) { lo->fault = 0xFFFFu; return; }
     L = t_called ? &t_snap : c;
     if (t_called) lrip = t_target;
     else if (t_kind == T_WENT) lrip = t_target;
     else if (t_kind == T_FELL) lrip = l3_ib + k->rva + (uint64_t)k->len;
-    else { ret = 1; memcpy(&lrip, (void *)(uintptr_t)s->r[4], 8); }  /* ret: the CPU pops the return address; in
-                                                                  the lift the CALLER pops it (R(4)+=8 after the call) */
-    for (i = 0; i < 16; i++) if ((i == 4 && ret ? L->r[i] + 8 : L->r[i]) != o->r[i]) res |= R_GPR;
-    if (lrip != o->rip) res |= R_RIP;
-    def = defined_flags(k, s);
-    lf = (uint32_t)(L->cf | L->pf << 1 | L->zf << 2 | L->sf << 3 | L->of << 4);
-    if ((lf ^ fl5(o->fl)) & def) res |= R_FLAGS;
-    if (memcmp(L->x, o->x, sizeof L->x)) res |= R_XMM;
-    if ((L->mxcsr ^ o->mxcsr) & ~0x3Fu) res |= R_MXC;
-    if ((o->mxcsr ^ L->mxcsr) & 0x3Fu) res |= R_MXF;
-    lw = t_called ? t_snap_w : hash(WBASE, WSIZE);
-    if (lw != o->whash) res |= R_MEMW;
-    if (hash(GBASE, GSIZE) != o->ghash) res |= R_MEMG;
-    if (k->mk == 2 && memcmp((void *)(uintptr_t)ea_of(k, s), o->ea, 16)) res |= R_EA;
+    else { ret = 1; memcpy(&lrip, (void *)(uintptr_t)s->r[4], 8); }
+    for (i = 0; i < 16; i++) lo->r[i] = (i == 4 && ret) ? L->r[i] + 8 : L->r[i];
+    lo->rip = lrip;
+    lo->fl = (uint64_t)L->cf | (uint64_t)L->pf << 2 | (uint64_t)L->zf << 6 | (uint64_t)L->sf << 7 | (uint64_t)L->of << 11;
+    memcpy(lo->x, L->x, sizeof lo->x);
+    lo->mxcsr = L->mxcsr;
+    lo->whash = t_called ? t_snap_w : hash(WBASE, WSIZE);
+    lo->ghash = hash(GBASE, GSIZE);
+    if (k->mk == 2) memcpy(lo->ea, (void *)(uintptr_t)ea_of(k, s), 16);
+}
+/* lift vs CPU, field by field; flags only where x86 defines them; MXCSR's sticky flags a class of their own */
+static uint32_t compare(const l3case *k, const rec_in *s, const rec_out *lo, const rec_out *o) {
+    uint32_t res = 0;
+    if (lo->fault == 0xFFFFu) return R_TRAP;
+    if (memcmp(lo->r, o->r, sizeof lo->r)) res |= R_GPR;
+    if (lo->rip != o->rip) res |= R_RIP;
+    if ((fl5(lo->fl) ^ fl5(o->fl)) & defined_flags(k, s)) res |= R_FLAGS;
+    if (memcmp(lo->x, o->x, sizeof lo->x)) res |= R_XMM;
+    if ((lo->mxcsr ^ o->mxcsr) & ~0x3Fu) res |= R_MXC;
+    if ((lo->mxcsr ^ o->mxcsr) & 0x3Fu) res |= R_MXF;
+    if (lo->whash != o->whash) res |= R_MEMW;
+    if (lo->ghash != o->ghash) res |= R_MEMG;
+    if (k->mk == 2 && memcmp(lo->ea, o->ea, 16)) res |= R_EA;
     if (o->fault) res |= R_NFAULT;
     return res;
 }
@@ -346,7 +363,7 @@ static uint8_t *slurp(const char *path, size_t *n) {
 }
 
 int main(int argc, char **argv) {
-    size_t nimg, npool; uint8_t *img; int i, from = 0, to = l3_ncases, stream = 1, self = 0, nst, nrep;
+    size_t nimg, npool; uint8_t *img; int i, from = 0, to = l3_ncases, stream = 1, self = 0, emit_lift = 0, nst, nrep;
     uint64_t seed = 0x4C33A5ULL; struct sigaction sa; stack_t alt; int dump_c = -1, dump_s = -1;
     static long nstates_run, nbad, nres[16], form_bad[4096], form_n[4096], form_seen[4096];
     if (argc < 5) { fprintf(stderr, "usage: l3_harness <image.bin> <pool.bin> <nstates> <nrep> [--from i] [--to j] "
@@ -358,6 +375,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--seed")) seed = strtoull(argv[++i], 0, 0);
         else if (!strcmp(argv[i], "--no-stream")) stream = 0;
         else if (!strcmp(argv[i], "--self")) self = 1;
+        else if (!strcmp(argv[i], "--emit-lift")) emit_lift = 1;   /* stream the LIFT's out-state (the gate flavor:
+                                                                       Unicorn is judged against the lift) */
         else if (!strcmp(argv[i], "--dump")) { dump_c = atoi(argv[++i]); dump_s = atoi(argv[++i]); }
     }
     if (to > l3_ncases) to = l3_ncases;
@@ -377,16 +396,17 @@ int main(int argc, char **argv) {
         int s, ns = form_seen[k->form]++ ? nst : nrep;
         if (k->mk == 2) memcpy(ea_save, (void *)(uintptr_t)(l3_ib + k->rva + (uint64_t)k->len + (uint64_t)k->mdisp), 16);
         for (s = 0; s < ns; s++) {
-            rec_in in; rec_out o, o2; CPU c; uint32_t r;
+            rec_in in; rec_out o, o2, lo; CPU c; uint32_t r;
             make_state(k, (uint32_t)i, (uint32_t)s, seed, &in);
             mem_set(k, &in); native(k, &in, &o);
             if (self) {
                 mem_set(k, &in); native(k, &in, &o2);
                 if (memcmp(&o, &o2, sizeof o)) { fprintf(stderr, "SELF: the CPU disagrees with itself at case %d state %d\n", i, s); return 1; }
             }
-            r = lifted(k, &in, &o, &c);
+            lifted(k, &in, &c, &lo);
+            r = compare(k, &in, &lo, &o);
             if (i == dump_c && s == dump_s) {
-                const CPU *L = t_called ? &t_snap : &c; int q;
+                const rec_out *L = &lo; int q;
                 fprintf(stderr, "DUMP case %d state %d rva %#llx res %#x mxcsr in %#x cpu %#x lift %#x fl in %#llx cpu %#llx\n", i, s,
                         (unsigned long long)k->rva, r, in.mxcsr, o.mxcsr, L->mxcsr, (unsigned long long)in.fl, (unsigned long long)o.fl);
                 for (q = 0; q < 16; q++) if (L->r[q] != o.r[q] || in.r[q] != o.r[q])
@@ -399,12 +419,13 @@ int main(int argc, char **argv) {
                         in.p[q].len, (unsigned long long)*(uint64_t *)in.p[q].b, (unsigned long long)*(uint64_t *)(in.p[q].b + 8));
             }
             o.lres = r; o.kind = (uint32_t)(t_called ? 2 : t_kind);
+            lo.lres = r; lo.kind = o.kind;
             if (k->mk == 2) memcpy((void *)(uintptr_t)ea_of(k, &in), ea_save, 16);
             nstates_run++;
             if (r & ~(uint32_t)R_MXF) { form_bad[k->form]++; nbad++; }
             for (int b = 0; b < 12; b++) if (r >> b & 1) nres[b]++;
             form_n[k->form]++;
-            if (stream) { fwrite(&in, sizeof in, 1, stdout); fwrite(&o, sizeof o, 1, stdout); }
+            if (stream) { fwrite(&in, sizeof in, 1, stdout); fwrite(emit_lift ? &lo : &o, sizeof o, 1, stdout); }
             if ((r & ~(uint32_t)R_MXF) && form_bad[k->form] <= 3)
                 fprintf(stderr, "LIFT != CPU: case %d rva %#llx form %d state %d res %#x (rip lift? cpu %#llx)\n", i,
                         (unsigned long long)k->rva, k->form, s, r, (unsigned long long)o.rip);

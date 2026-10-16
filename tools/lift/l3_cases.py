@@ -159,6 +159,7 @@ def main():
     ap.add_argument('--all', action='store_true')
     ap.add_argument('--tooth', type=int, default=0)
     ap.add_argument('--out', default=OUT)
+    ap.add_argument('--chunk', default=None, help='i/n: the i-th of n equal slices of the work list (--all runs)')
     a = ap.parse_args()
     exe = set(json.load(open(EXE)))
     seen, stmts, traps = set(), [], collections.Counter()
@@ -181,6 +182,9 @@ def main():
         stmts.append((rva, ins, s))
     if traps['executed']:
         raise SystemExit('L2 regression: %d executed instructions are lifted as traps' % traps['executed'])
+    if a.chunk:
+        ci, cn = (int(x) for x in a.chunk.split('/'))
+        stmts = stmts[ci * len(stmts) // cn:(ci + 1) * len(stmts) // cn]
     tooth_i = plant(stmts, a.tooth) if a.tooth else -1
     os.makedirs(a.out, exist_ok=True)
     img = bytes(L.IMG)                                             # the image as mapped (both sides map it at its base)
@@ -190,14 +194,18 @@ def main():
     with open(os.path.join(a.out, 'pool.bin'), 'wb') as fh:      # the memory windows' bytes: one seeded pool
         fh.write(random.Random(0x4C33).randbytes(1 << 20))
     forms = {}
-    cases, fstubs = [], set()
+    cases, fstubs, skipped = [], set(), []
     body = []
-    for i, (rva, ins, s) in enumerate(stmts):
+    for rva, ins, s in stmts:
+        i = len(cases)
         f = form_of(ins)
         fid = forms.setdefault(f, len(forms))
         d = describe(ins, s)
         if d['mk'] == 9 or d['divk'] == 9:
-            raise SystemExit('form not handled by the harness: %s at %#x (%s)' % (f, rva, s))
+            if not a.all:
+                raise SystemExit('form not handled by the harness: %s at %#x (%s)' % (f, rva, s))
+            skipped.append(dict(rva=rva, form=f, text=s[:120]))     # --all: named and counted, never silent
+            continue
         fstubs.update(re.findall(r'\bf_([0-9a-f]+)\(c\)', s))
         t = re.sub(r'goto L_([0-9a-f]+);', lambda g: '{ T_GOTO(0x%sULL); return; }' % g.group(1), s)
         body.append('static void t_%d(CPU *c) { X t0, t1; uint64_t a0, a1; (void)t0; (void)t1; (void)a0; (void)a1; '
@@ -225,11 +233,13 @@ def main():
         fh.write('\n'.join(src) + '\n')
     keep = ('rva', 'len', 'form', 'exe', 'mn', 'mk', 'msz', 'mdisp', 'flagdef', 'shk', 'shimm', 'shsz', 'fpk', 'text')
     meta = dict(ib=L.IB, forms=sorted(forms, key=forms.get), cases=[{k: d[k] for k in keep} for d in cases],
-                tooth=a.tooth, tooth_case=tooth_i, all=a.all, traps=dict(traps))
+                tooth=a.tooth, tooth_case=tooth_i, all=a.all, traps=dict(traps), skipped=skipped)
     with open(os.path.join(a.out, 'l3_cases.json'), 'w') as fh:
         json.dump(meta, fh)
-    print('l3_cases: %d statements (%s), %d forms, %d call stubs; traps outside the census: %d%s -> %s' % (
-        len(stmts), 'all' if a.all else 'executed', len(forms), len(fstubs), traps['not executed'],
+    print('l3_cases: %d statements (%s%s), %d forms, %d call stubs, %d not testable by the harness; traps outside the '
+          'census: %d%s -> %s' % (
+        len(cases), 'all' if a.all else 'executed', ' chunk ' + a.chunk if a.chunk else '', len(forms), len(fstubs),
+        len(skipped), traps['not executed'],
         ' TOOTH %d in case %d (%s)' % (a.tooth, tooth_i, stmts[tooth_i][1].mnemonic) if a.tooth else '', a.out))
 
 

@@ -13,6 +13,7 @@ import json
 import time
 import shutil
 import argparse
+import hashlib
 import threading
 import subprocess
 
@@ -27,10 +28,17 @@ SO = os.path.join(REPO, 'build', 'jn_host', 'libjunohost.so')
 TMPL = os.path.join(REPO, 'build', 'jn_host', 'jn_host_template.bin')
 
 
-def report():
+def lift_id(so):
+    """the lifted build a ledger row was graded on (the clock restarts on a new lift)"""
+    return hashlib.sha256(open(so, 'rb').read()).hexdigest()[:16]
+
+
+def report(so=SO):
     if not os.path.exists(LEDGER):
         print('no ledger yet'); return
+    lid = lift_id(so) if os.path.exists(so) else None
     rows = [json.loads(ln) for ln in open(LEDGER) if ln.strip()]
+    rows = [r for r in rows if r.get('lift') == lid]               # only this lift's rows count
     last_bad = max((r['t_end'] for r in rows if r['result'] == 'DIVERGE'), default=None)
     since = [r for r in rows if last_bad is None or r['t_end'] > last_bad]
     clean = [r for r in since if r['result'] == 'CLEAN']
@@ -40,12 +48,12 @@ def report():
     else:
         hours = 0.0
     lim = [r for r in since if r['result'] == 'ORACLE_LIMIT']
-    print('L6 ledger: %d seeds in all; since the last divergence: %d seeds, %d CLEAN, %d oracle-limited, %d ops '
+    print('L6 ledger (lift %s): %d seeds; since the last divergence: %d seeds, %d CLEAN, %d oracle-limited, %d ops '
           'compared, %.2f hours of wall clock with no divergence' %
-          (len(rows), len(since), len(clean), len(lim), sum(r['ops'] for r in since), hours))
+          (lid, len(rows), len(since), len(clean), len(lim), sum(r['ops'] for r in since), hours))
 
 
-def one(seed, nops, stop):
+def one(seed, nops, stop, so, tmpl, lid):
     if stop.is_set():
         return
     d = os.path.join(DIR, 'seed_%d' % seed)
@@ -55,13 +63,14 @@ def one(seed, nops, stop):
     if r.returncode != 0:
         res, msg, nop = 'REF_FAIL', (r.stdout + r.stderr)[-400:], 0
     else:
-        c = subprocess.run([sys.executable, os.path.join(HERE, 'jn_search_c.py'), SO, TMPL, d],
+        c = subprocess.run([sys.executable, os.path.join(HERE, 'jn_search_c.py'), so, tmpl, d],
                            capture_output=True, text=True)
         msg = (c.stdout + c.stderr).strip()[-600:]
         meta = json.load(open(os.path.join(d, 'meta.json')))
         nop = len(meta['rows'])
         res = {0: 'CLEAN', 1: 'DIVERGE', 3: 'ORACLE_LIMIT'}.get(c.returncode, 'C_CRASH(%d)' % c.returncode)
-    row = dict(seed=seed, ops=nop, result=res, secs=round(time.time() - t0, 1), t_end=time.time(), msg=msg[-300:])
+    row = dict(seed=seed, ops=nop, result=res, secs=round(time.time() - t0, 1), t_end=time.time(), msg=msg[-300:],
+               lift=lid)
     with LOCK:
         with open(LEDGER, 'a') as f:
             f.write(json.dumps(row) + '\n')
@@ -83,13 +92,17 @@ def main():
     ap.add_argument('--nops', type=int, default=120)
     ap.add_argument('--hours', type=float, default=24.0)
     ap.add_argument('--report', action='store_true')
+    ap.add_argument('--so', default=SO, help='the GATE-flavor lift (frozen: copy it first, playbook FREEZE)')
+    ap.add_argument('--tmpl', default=TMPL)
     a = ap.parse_args()
     if a.report:
-        report(); return 0
-    for p in (SO, TMPL):
+        report(a.so); return 0
+    for p in (a.so, a.tmpl):
         if not os.path.exists(p):
             print('missing %s -- run sh tools/lift/jn_build.sh' % p); return 2
     os.makedirs(DIR, exist_ok=True)
+    lid = lift_id(a.so)
+    print('L6 search on lift %s (%s)' % (lid, a.so), flush=True)
     done = {json.loads(ln)['seed'] for ln in open(LEDGER)} if os.path.exists(LEDGER) else set()
     stop, t_end = threading.Event(), time.time() + a.hours * 3600
     nxt = [a.seed0]
@@ -100,11 +113,11 @@ def main():
                 while nxt[0] in done:
                     nxt[0] += 1
                 s = nxt[0]; nxt[0] += 1
-            one(s, a.nops, stop)
+            one(s, a.nops, stop, a.so, a.tmpl, lid)
     ts = [threading.Thread(target=worker) for _ in range(a.workers)]
     [t.start() for t in ts]
     [t.join() for t in ts]
-    report()
+    report(a.so)
     return 1 if stop.is_set() else 0
 
 

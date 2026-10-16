@@ -359,12 +359,30 @@ static inline double jp8_sz_d(double r) { return jp8_bd(jp8_db(r) & 0x8000000000
 /* the x86 SSE NaN rules, enforced (ARM makes 0x7FC00000 for an invalid op, WASM leaves sign/payload open; PROVEN on
  * AArch64: the boot writes 3,851 x86 default NaNs 0xFFC00000 into the state): an operand NaN wins, first source
  * first, quieted; an invalid operation gives 0xFFC00000 / 0xFFF8000000000000. Then FTZ. */
+#ifdef JP8_ORACLE_NAN
+/* THE ORACLE'S NaN CHOICE (only the oracle-judged gate build of the JUNO lift defines this; docs/JUNO_LIFT.md L3):
+ * Unicorn 2.1.4 (QEMU's softfloat) propagates SSE NaNs by x87's rule -- an SNaN with a QNaN gives the QNaN, two of
+ * a kind give the larger significand (quiet bit included; the positive one on a tie), an SNaN alone is quieted.
+ * MEASURED by L3 against Unicorn, instruction by instruction. The CPU takes the first source's NaN (the default). */
+static inline int jp8_x87_pick_b(uint64_t ua, uint64_t ub, int an, int bn, uint64_t qbit, uint64_t fmask, uint64_t smask) {
+    int as = an && !(ua & qbit), bs = bn && !(ub & qbit), aq = an && !as, bq = bn && !bs;
+    uint64_t fa = ua & fmask, fb = ub & fmask; int alarger = fa > fb || (fa == fb && (ua & smask) < (ub & smask));
+    if (as) return bs ? !alarger : bq;
+    if (aq) return bs || !bq ? 0 : !alarger;
+    return 1;
+}
+#endif
 static inline float jp8_fixf(float r, float a, float b) {
     uint32_t u = jp8_fb(r);
     if (JP8_RARE((u & 0x7F800000u) == 0x7F800000u) && (u & 0x007FFFFFu)) {
         uint32_t ua = jp8_fb(a), ub = jp8_fb(b);
-        if ((ua & 0x7FFFFFFFu) > 0x7F800000u) return jp8_bf(ua | 0x00400000u);
-        if ((ub & 0x7FFFFFFFu) > 0x7F800000u) return jp8_bf(ub | 0x00400000u);
+        int an = (ua & 0x7FFFFFFFu) > 0x7F800000u, bn = (ub & 0x7FFFFFFFu) > 0x7F800000u;
+#ifdef JP8_ORACLE_NAN
+        if (an || bn) return jp8_bf((jp8_x87_pick_b(ua, ub, an, bn, 0x00400000u, 0x007FFFFFu, 0x80000000u) ? ub : ua) | 0x00400000u);
+#else
+        if (an) return jp8_bf(ua | 0x00400000u);
+        if (bn) return jp8_bf(ub | 0x00400000u);
+#endif
         return jp8_bf(0xFFC00000u);
     }
     return jp8_ftzf(r);
@@ -373,8 +391,14 @@ static inline double jp8_fixd(double r, double a, double b) {
     uint64_t u = jp8_db(r);
     if (JP8_RARE((u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && (u & 0x000FFFFFFFFFFFFFULL)) {
         uint64_t ua = jp8_db(a), ub = jp8_db(b);
-        if ((ua & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL) return jp8_bd(ua | 0x0008000000000000ULL);
-        if ((ub & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL) return jp8_bd(ub | 0x0008000000000000ULL);
+        int an = (ua & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL, bn = (ub & 0x7FFFFFFFFFFFFFFFULL) > 0x7FF0000000000000ULL;
+#ifdef JP8_ORACLE_NAN
+        if (an || bn) return jp8_bd((jp8_x87_pick_b(ua, ub, an, bn, 0x0008000000000000ULL, 0x000FFFFFFFFFFFFFULL,
+                                                    0x8000000000000000ULL) ? ub : ua) | 0x0008000000000000ULL);
+#else
+        if (an) return jp8_bd(ua | 0x0008000000000000ULL);
+        if (bn) return jp8_bd(ub | 0x0008000000000000ULL);
+#endif
         return jp8_bd(0xFFF8000000000000ULL);
     }
     return jp8_ftzd(r);

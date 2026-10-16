@@ -14,6 +14,7 @@ import sys
 import os
 import re
 import json
+import struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -91,9 +92,32 @@ def main():
     if not nent:
         sys.exit('jn_extra_roots: no JN_RVA_* entry in lift/jn_entries.h')
 
+    # 4. ADDRESS-TAKEN code -- L1's "every vtable and function pointer" (docs/JUNO_LIFT.md): every absolute address the
+    #    image stores (a DIR64 base relocation) that lies in .text -- vtables, function-pointer tables, movabs; leaf
+    #    methods with no pdata included -- and every RIP-relative lea of a function start. An indirect call or jump
+    #    lands on one of these (a jump table's case the lifter reads itself), so the lift holds every target a host
+    #    input can reach, not only those a drive ran (the L6 search found the census's gaps one by one: seed 1003, a
+    #    model set of record 91 to 5, reached 0x34B260)
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_BASERELOC']])
+    ntaken = len(roots)
+    if os.environ.get('JN_NO_TAKEN'):                           # the lifter's own regression check only
+        pe.DIRECTORY_ENTRY_BASERELOC = []
+    for blk in getattr(pe, 'DIRECTORY_ENTRY_BASERELOC', []):
+        for e in blk.entries:
+            if e.type == 10:                                        # IMAGE_REL_BASED_DIR64
+                t = struct.unpack_from('<Q', IMG, e.rva)[0] - IB
+                if CLO <= t < CHI:
+                    roots.add(t)
+    code = bytes(IMG[CLO:CHI])
+    for m in ([] if os.environ.get('JN_NO_TAKEN') else re.finditer(rb'[\x48\x4c]\x8d[\x05\x0d\x15\x1d\x25\x2d\x35\x3d]', code)):
+        t = CLO + m.start() + 7 + struct.unpack_from('<i', code, m.start() + 3)[0]
+        if t in pstarts:
+            roots.add(t)
+    ntaken = len(roots) - ntaken
+
     roots = sorted(roots)
-    sys.stderr.write('jn_extra_roots: %d gaps, %d thunks, %d host entries, %d total extra roots (incl. interior '
-                     'indirect targets)\n' % (len(gaps), nthunk, nent, len(roots)))
+    sys.stderr.write('jn_extra_roots: %d gaps, %d thunks, %d host entries, %d address-taken, %d total extra roots (incl. '
+                     'interior indirect targets)\n' % (len(gaps), nthunk, nent, ntaken, len(roots)))
     print(','.join('%#x' % r for r in roots))
 
 
