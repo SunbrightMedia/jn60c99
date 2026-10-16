@@ -109,3 +109,19 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
 - 2026-10-16 L5 process end-state GREEN: the process gate now compares the plugin's end-state memory (image + heap +
   host arena) after the drive as well as every output word. Both byte-identical to the oracle on the full-census lift.
   The lifted render is proven to the sample AND to every internal engine-state byte (ramps, LFO phases, filter state).
+- 2026-10-16 L5 BANK GREEN (the patch browser, all 64 factory patches): tools/lift/jn_bank_{seq,ref,c}.py +
+  jn_bank_gate.sh. For EVERY factory patch the plugin's own patch load (junoh_load_patch -> rva 0x335850) then a short
+  play, graded in two processes: 114,688 output words AND the end-state (image + heap + com) byte-identical to the
+  oracle; the note tooth bites. This is the FIRST gate to drive junoh_load_patch -- the init / process gates drove only
+  the boot patch. It found TWO of MY harness/config defects (mantra 5: the engine was never wrong), both where the JUNO
+  oracle (tools/verify/e2e_emu.py) differs from the JP8 oracle the host glue was copied from:
+    (1) jn_host.c turned the heap REUSE layer ON (jp8_heap_reuse(1), the JP8 path). The JUNO oracle's allocator
+        (e2e_emu._alloc, 0x67522C) is a PURE BUMP that never reuses a freed block. The patch browser frees the old
+        patch; with reuse on, the new blocks took lower addresses than the oracle's bump and the heap end-state
+        diverged (the audio stayed bit-exact -- addresses do not change the samples). Fix: reuse OFF.
+    (2) jn_host_ref.py mapped the COM host arena to only the boot size rounded to 1 MB (the heap got +256 MB of room,
+        COM got none). 51 patch loads bumped com_next past 1 MB and a store faulted (SIGSEGV at guest 0x5a0102d10).
+        Fix: map COM to the whole arena (H.W.COM_SIZE = 256 MB), as the oracle does; store only the used prefix.
+  Both were invisible to the init and process gates (their drive frees nothing and never grows COM past 47 KB) --
+  exactly "a defect where no gate looked", now closed by the first gate that looks. jn_host_gate.sh unchanged; the bank
+  gate is its own (long) job. NEXT: state save/load, the editor's set, MIDI controllers, multi-rate; then L3 and L6.

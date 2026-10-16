@@ -404,7 +404,14 @@ int junoh_init(const void *tmpl, size_t len, double rate, int max_block) {
     if (!tmpl) return err(JUNOH_E_ARG, "no template");
     if (max_block <= 0 || !(rate > 0.0)) return err(JUNOH_E_ARG, "rate or block size");
     if ((rc = load((const unsigned char *)tmpl, len)) != JUNOH_OK) return rc;
-    jp8_heap_reuse(1);                          /* the host's heap reuses freed blocks from the template's point */
+    jp8_heap_reuse(0);                          /* the JUNO oracle (e2e_emu._alloc, tools/verify/e2e_emu.py) is a PURE
+                                                 * BUMP: the plugin's own allocator (0x67522C, --alloc) and every
+                                                 * HeapAlloc / HeapFree / free is a bump that NEVER reuses a freed block,
+                                                 * so the host matches it with reuse OFF. (The init / process gates
+                                                 * matched with it ON only because their drive frees nothing; the patch
+                                                 * browser frees the old patch, and reuse would then put the new blocks
+                                                 * at lower addresses than the oracle's bump -- the heap end-state
+                                                 * diverges. The JP8 oracle reused; the JUNO's does not.) */
     memset(&H.cpu, 0, sizeof H.cpu); H.cpu.mxcsr = (uint32_t)H.mx0;
     for (i = 0; i < 16; i++) { H.cpu.r[i] = H.reg[i]; H.cpu.x[i].q[0] = H.xreg[i][0]; H.cpu.x[i].q[1] = H.xreg[i][1]; }
     H.cpu.cf = (int)(H.eflags & 1); H.cpu.pf = (int)((H.eflags >> 2) & 1); H.cpu.zf = (int)((H.eflags >> 6) & 1);

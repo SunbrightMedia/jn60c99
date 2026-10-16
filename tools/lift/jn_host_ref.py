@@ -105,14 +105,18 @@ def main():
     hc = getattr(h, '_hc', 0x9000)
     log("boot_host done: heap bump 0x%x, hc 0x%x, com_next 0x%x" % (heap_top, hc, h.com_next))
     HEAP_MAP = ((heap_top - E.HEAP_BASE + 0x10000000 + 0xFFFFF) & ~0xFFFFF)     # the heap so far + 256 MB of room
-    COM_MAP = ((h.com_next - H.W.COM + 0xFFFFF) & ~0xFFFFF) or 0x100000
+    COM_MAP = H.W.COM_SIZE                 # map the WHOLE host arena (the oracle's COM_SIZE, 256 MB), not just the boot
+    #                                        size: a patch load bumps com_next far past boot, and the lifted host must
+    #                                        have the same arena to bump into (a 1 MB COM map faulted at patch 51 of 64)
     REGIONS = [("page0", 0x0, 0x100000), ("image", IB, E.IMGSZ), ("stack", E.STACK_BASE, E.STACK_SIZE),
                ("heap", E.HEAP_BASE, HEAP_MAP), ("stub", E.STUB_BASE, 0x8000), ("com", H.W.COM, COM_MAP),
                ("buf", E.BUF_BASE, E.BUF_SIZE), ("teb", H.W.TEB, 0x10000)]
 
-    def region_bytes(base, size):
+    def region_bytes(base, size):          # the heap and the COM arena are mapped with room; store only the used prefix
         if base == E.HEAP_BASE:
             return bytes(uc.mem_read(base, heap_top - base))
+        if base == H.W.COM:
+            return bytes(uc.mem_read(base, h.com_next - base))
         return bytes(uc.mem_read(base, size))
 
     mapped = [(b, e + 1) for b, e, _ in uc.mem_regions()]
@@ -164,8 +168,9 @@ def main():
         for (name, base, size), (b2, s2r, m2) in zip(REGIONS, regs):
             assert (b2, s2r) == (base, size), "region header %s" % name
             ref = region_bytes(base, size)
-            got = bytes(m2[:len(ref)]) if base == E.HEAP_BASE else bytes(m2)
-            tail = any(m2[len(ref):]) if base == E.HEAP_BASE else False
+            prefix = base in (E.HEAP_BASE, H.W.COM)      # mapped with room: only the used prefix is stored, tail zero
+            got = bytes(m2[:len(ref)]) if prefix else bytes(m2)
+            tail = any(m2[len(ref):]) if prefix else False
             if ref != got or tail:
                 bad += 1
                 log("SELF-CHECK: region %s differs" % name)
