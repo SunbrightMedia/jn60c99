@@ -136,3 +136,9 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   so it allocated twice and the heap / com end-state diverged. The oracle calls getState once. Fix: one call with a
   large buffer. The state bytes and audio were already bit-exact -- only the extra allocations showed. NEXT: the
   editor's set, MIDI controllers, multi-rate; then L3 and L6.
+- 2026-10-16 L5 EDITOR GREEN (the panel's set): tools/lift/jn_editor_{ref,c}.py + jn_editor_gate.sh. The editor's set
+  through the lifted model (junoh_model_set -> rva 0x283DB0, flag 1) for all 95 parameter records at 3 values each: the
+  237 performEdit calls the plugin's controller makes (id + ParamValue bits), the output words of a warm block, AND the
+  end-state memory all byte-identical to the oracle; the value tooth (each set one higher) makes all three differ. The
+  lifted JUNO-60.exe twin of JX-18. First try GREEN (no new glue defect). NEXT: MIDI controllers (CC map / bend / mod /
+  sustain / CC123) and multi-rate; then L3 and L6 (the machine search over every entry point).
