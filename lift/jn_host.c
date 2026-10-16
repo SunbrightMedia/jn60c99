@@ -52,6 +52,8 @@ extern void jp8_heap_reuse(int on);
 extern void jp8_heap_free(uint64_t p);
 extern uint64_t jp8_heap_alloc(uint64_t sz);
 extern uint64_t jp8_hc_next(void);
+extern void jp8_trace_open(const char *path);   /* the per-instruction trace (a --trace lift), for the L5 diff */
+extern void jp8_trace_close(void);
 
 /* the IBStream interface id (wrapper_emu.IID_IBSTREAM, vst_iid byte order) */
 static const uint8_t IID_IBSTREAM[16] = { 0xA2,0x6E,0xBF,0xC3, 0x99,0x30,0x52,0x47, 0x9B,0x6B,0xF9,0x90, 0x1E,0xE3,0x3E,0x9B };
@@ -302,6 +304,11 @@ static int call(uint64_t fn, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r
     c->r[1] = rcx; c->r[2] = rdx; c->r[8] = r8; c->r[9] = r9;
     if (jp8_call_x(c, fn - IB)) {
         snprintf(H.msg, sizeof H.msg, "%s (call rva 0x%llx)", jp8_last_trap(), (unsigned long long)(fn - IB));
+        if (getenv("JN_DEBUG")) {                 /* the image return addresses on the stack at the trap: the call chain */
+            int k; fprintf(stderr, "jn: %s; stack image addrs:", H.msg);
+            for (k = 0; k < 220; k++) { uint64_t v = gq(c->r[4] + 8 * (uint64_t)k); if (v >= IB && v < IB + 0xd75000) fprintf(stderr, " +%x:0x%llx", 8 * k, (unsigned long long)(v - IB)); }
+            fprintf(stderr, "\n");
+        }
         H.st = 2; return -1;
     }
     return 0;
@@ -558,6 +565,8 @@ int junoh_process(int n, const junoh_event *ev, int nev, const junoh_param *par,
 }
 
 /* ---------------------------------------------------------------- the gates' accessors */
+void junoh_trace_open(const char *path) { jp8_trace_open(path); }    /* the L5 trace-diff: a --trace lift records each insn */
+void junoh_trace_close(void) { jp8_trace_close(); }
 uint64_t junoh_heap_top(void) { return jp8_heap_get(); }
 uint64_t junoh_com_next(void) { return H.com_next; }
 uint64_t junoh_renders(void) { return H.njobs; }

@@ -33,6 +33,8 @@ int  junoh_model_set(uint64_t obj, uint32_t value);                  /* the edit
 int  junoh_rec_id(int index, uint32_t *id, uint64_t *obj);           /* the record at index -> its parameter id + object */
 /* gates / the drive */
 const char *junoh_error(void);
+void     junoh_trace_open(const char *path);   /* the L5 trace-diff: with a --trace lift, record each insn to path */
+void     junoh_trace_close(void);
 void    *junoh_guest(uint64_t gaddr, size_t len);                    /* host pointer of [a, a+n) (one band) */
 uint64_t junoh_heap_top(void);
 uint64_t junoh_com_next(void);
