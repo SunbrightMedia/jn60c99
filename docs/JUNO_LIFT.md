@@ -29,6 +29,11 @@ progress = 5·L1 + 25·L2 + 15·L3 + 10·L4 + 20·L5 + 15·L6 + 10·L7, each ter
 L1 1 when the census exists; L2 census instructions in the lift / census instructions; L3 forms proven / forms in the
 census; L4 entries in the API / root entries; L5 gate drives EXACTLY 0 / gate drives planned; L6 clean hours / 24;
 L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
+L5's planned drives (fixed 2026-10-16, so the fraction is counted, not felt -- 13): init; process() at 48 / 44.1 /
+96 kHz (3); the bank (64 patches); DAW state; the editor's set; the surfaces (voice count, engine rate, UI timer,
+learn / forget, commit, host rates); MIDI controllers (CC map, bend, mod, sustain, CC 123); the keyboard object /
+KEY HOLD; the LED + meters; the CC menu on the GUI tree; the patch window + window zoom (the last four need the
+editor path in the lift).
 
 ## Log
 
@@ -142,3 +147,23 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   end-state memory all byte-identical to the oracle; the value tooth (each set one higher) makes all three differ. The
   lifted JUNO-60.exe twin of JX-18. First try GREEN (no new glue defect). NEXT: MIDI controllers (CC map / bend / mod /
   sustain / CC123) and multi-rate; then L3 and L6 (the machine search over every entry point).
+- 2026-10-16 MODEL NOTE + REVIEW: from 2026-10-15 20:57 to 2026-10-16 02:28 UTC a safeguard fallback served this work
+  with Opus 4.8 (everything above from L1 on); the user was not told (playbook 282). Opus 5.5 then reviewed that code
+  and re-ran every gate. Found and fixed: (a) the glue's import layer differed from the oracle on reached imports and
+  trapped where the oracle answers by default; the oracle's Python-side state (TLS, a 128-node SList pool, run-once
+  flags) was in no template region -> lift/jn_oracle_imports.h GENERATED from the oracle's source (drift tooth), an
+  exact mirror of its rule order and defaults, a trap on any unmirrored special name, the state carried as template
+  facts (playbook 279; tools/lift/jn_import_census.py is the per-surface work list); (b) two glue entries are pdata-less
+  leaves only the glue calls (0x31AA40 Learn, 0x2853C0 commit) -> lift/jn_entries.h, rooted by jn_extra_roots.py
+  (playbook 280); (c) the census ran one host rate -> the 96 kHz identity render object was missing (playbook 281).
+  Checked and right: pshuflw / pshufhw semantics (Intel), the oracle's driver trampolines at 0x600008000+ (not imports).
+- 2026-10-16 L5 COMPLETE ON ITS ENGINE SURFACES: tools/lift/jn_build.sh (imports list, lift, template, .so) +
+  jn_l5_all.sh (every gate, teeth) = jn_l5_full.sh, job l5_full EXIT 0: init; process() at 48 / 44.1 / 96 kHz; the
+  bank (64 patches, 114,688 words); DAW state; the editor's set (95 records, 237 performEdits); the SURFACES gate
+  (tools/lift/jn_surf_{seq,ref,c}.py: 42 ops -- voice count, four engine-rate rebuilds, UI timer, learn / forget,
+  commit, a state round trip, host rates 44.1 / 96 / 48 kHz -- every op's end-state digest equal, final memory
+  byte-identical, default-answered imports equal). Every tooth bites. The lift: 4677 functions, 794,101 instructions;
+  the L2 check: 0 reached traps of 64,630 executed instructions. L5 = 8 / 13 planned drives (the list above).
+  NEXT: L6 -- tools/lift/jn_search*.py + jn_ops.py (one vocabulary for the census AND the search: seeded random plans
+  over every host entry, compared after every op); the census runs its seeds 0..11, the 24-hour search seeds 1000+.
+  Then L3 (the lifter instruction by instruction vs the real CPU and Unicorn) while the search runs.

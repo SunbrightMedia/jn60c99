@@ -39,9 +39,10 @@ def main():
         getattr(lib, fn).restype = ctypes.c_uint64
     lib.junoh_guest.restype = ctypes.c_void_p
     lib.junoh_guest.argtypes = [ctypes.c_uint64, ctypes.c_size_t]
+    rate = json.load(open(os.path.join(refdir, 'meta.json'))).get('rate', 48000.0)   # the host rate the oracle used
     t = open(tmpl, 'rb').read()
     b = ctypes.create_string_buffer(t, len(t))
-    rc = lib.junoh_init(b, len(t), 48000.0, 512)
+    rc = lib.junoh_init(b, len(t), rate, 512)
     if rc:
         print('junoh_init rc=%d: %s' % (rc, lib.junoh_error().decode('latin1', 'replace'))); return 2
     ref = open(os.path.join(refdir, 'words.bin'), 'rb').read()

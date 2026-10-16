@@ -4686,3 +4686,79 @@ engine were EQUAL even with the old switch.
 ### The rule
 Where the plugin's value goes through a listener, compare what the engine renders after it, not only the model's
 own state; and drive a setting several times inside one block -- "at once" and "at the next block" differ only there.
+
+## 276. GLUE COPIED FROM ONE ORACLE MUST BE RE-READ AGAINST THE NEXT ORACLE -- THE JUNO HEAP NEVER REUSES
+Paid 2026-10-16 (the JUNO lift, L5 bank gate). lift/jn_host.c was built from the JP8 host glue and kept its
+`jp8_heap_reuse(1)`: the JP8 oracle reuses freed blocks (LIFO by size), the JUNO oracle (e2e_emu._alloc, the CRT
+allocator 0x67522C, and every HeapAlloc / HeapFree) is a PURE BUMP that never reuses. The init and process gates were
+GREEN because their drives free nothing; the first gate that loads patches (the browser frees the old patch) went RED
+on the heap end-state while all 3584 output words were EXACT (addresses do not change samples). EXECUTED: reuse OFF ->
+the bank gate GREEN on all 64 patches, words AND end-state.
+### The rule
+When glue is copied from another plugin's path, list every policy it inherits (heap, handles, stubs, defaults) and
+check each against THIS oracle's source before the first gate; and grade end-state memory, not only the output --
+an allocator divergence is silent in the audio.
+
+## 277. A REGION MAPPED AT ITS BOOT SIZE FAULTS WHEN THE ARENA GROWS -- MAP WHAT THE ORACLE MAPS
+Paid 2026-10-16 (JUNO lift, bank gate). The template mapped the host-object arena (COM, 0x5A0000000) as its boot use
+rounded to 1 MB, while the heap got +256 MB of room. 51 patch loads bumped the arena past 1 MB and a store faulted
+(SIGSEGV, not a trap: the band had no page there). gdb gave the host pointer; minus the band delta it was guest
+0x5A0102D10. The oracle maps the whole COM_SIZE (256 MB). EXECUTED: map the oracle's 256 MB, store only the used
+prefix -> 64 patches GREEN.
+### The rule
+Every region the lift maps must be at least as large as the oracle maps it, whatever was used at the cut; a SIGSEGV
+in lifted code is first a mapping question (host pointer -> guest address -> which region), then a lift question.
+
+## 278. A SIZE PROBE IS A SECOND CALL -- AN ENTRY WITH SIDE EFFECTS MUST BE CALLED EXACTLY AS OFTEN AS THE ORACLE CALLS IT
+Paid 2026-10-16 (JUNO lift, state gate). The test called junoh_get_state twice (NULL buffer for the size, then the
+data). Each call runs the plugin's getState and makes a stream object, so the lift allocated twice where the oracle
+allocated once: state bytes and audio EXACT, heap / arena end-state RED. EXECUTED: one call with a 1 MB buffer -> GREEN.
+### The rule
+A test drives an entry as many times as the oracle does; "ask the size first" is a protocol, not a free query.
+
+## 279. THE GLUE ANSWERS EVERY IMPORT AS THE ORACLE DOES, OR STOPS -- GENERATE THE ORACLE'S LIST FROM ITS SOURCE
+Paid 2026-10-16 (JUNO lift review, Opus 5.5 over the code an Opus 4.8 fallback wrote). A per-surface import census
+(tools/lift/jn_import_census.py) showed the glue differed from the oracle on imports the census reached: HeapReAlloc
+did not copy (the oracle copies min(size, 0x1000)), HeapSize / TlsGetValue / SList / WakeAllConditionVariable had no
+shim, an unknown import TRAPPED where the oracle answers by its defaults (Create* / Open* a handle, Get* / Query* 0,
+else 0 counted as unhandled), and the oracle's PYTHON-SIDE state at the cut (2 TLS slots, a 128-node SList pool,
+3 run-once flags) was in no template region. No gate failed: no lift gate drove those surfaces yet (commit, editor).
+Fix: lift/jn_oracle_imports.h GENERATED from the oracle's own _imp source (143 names; a drift tooth on an edited COPY
+fails the generator); the glue mirrors the oracle's rule order and defaults exactly, TRAPS on any name the oracle
+singles out that it does not mirror, counts its unhandled imports for comparison; the template carries the
+Python-side state as facts. EXECUTED: the drift tooth bites; init / process / bank / state / editor GREEN on it.
+### The rule
+Mirror the oracle's import layer by construction (a list generated from its source), never by memory; trap on what
+is not mirrored instead of answering a default; and carry every piece of oracle state that is not guest memory.
+
+## 280. AN ENTRY ONLY THE GLUE CALLS IS A ROOT -- LEAVES HAVE NO PDATA
+Paid 2026-10-16 (JUNO lift, surfaces gate). The lift's roots were the census's pdata function starts plus indirect
+targets. The glue also calls plugin code DIRECTLY (junoh_cc_learn -> 0x31AA40, junoh_commit -> 0x2853C0): both are
+leaf functions with no unwind data, so no pdata start, and only the glue calls them, so no edge in the plugin's code
+reaches them -> not lifted -> the first Learn trapped ("indirect target 0x31aa40 not lifted"). 0x355A60 (the assigner
+count, also a leaf) had worked only because lifted plugin code calls it too. Fix: lift/jn_entries.h names every rva
+the glue calls; jn_host.c uses it and tools/lift/jn_extra_roots.py roots all of it (one source of truth). EXECUTED:
+the surfaces gate GREEN -- learn / forget / commit included -- on the rebuilt lift.
+### The rule
+Root every address the HOST side enters, from the same list the host code uses; a leaf has no pdata, so "pdata
+starts + indirect targets" is never the whole entry set.
+
+## 281. A CENSUS RUN AT ONE HOST RATE MISSES THE OTHER RENDER OBJECT -- DRIVE EVERY RATE THE PRODUCT TAKES
+Paid 2026-10-16 (JUNO lift, process gate at 96 kHz). The L1 census ran the host at 48 kHz only. At 96 kHz the host
+rate equals the engine rate and the core's render object takes its identity path (0x344270) instead of the rate
+converter (0x343E30) -- an indirect target the census had never seen -> the lift trapped at the first 96 kHz block.
+Fix: the census changes the host rate (44.1 / 96 / 48 kHz) under its hook. EXECUTED: re-census, re-lift, the
+process gate GREEN at 48 / 44.1 / 96 kHz with teeth.
+### The rule
+A census is the union of the product's real inputs: every value of every setting that selects code (host rate,
+engine rate, voice count, block size, transport) must be driven, or the lift has a hole exactly there.
+
+## 282. SAY WHICH MODEL IS ANSWERING -- A FALLBACK IS NEWS FOR THE USER, IN THE NEXT REPLY
+Paid 2026-10-16. At 20:57 UTC on 2026-10-15 the session's safeguards fell back from Opus 5.5 to Opus 4.8
+(transcript event "model_refusal_fallback"). It answered for 5 h 31 min -- the whole lift L1-L5 build -- and the only
+sign the user got was "Trailer noted: Opus 4.8". The user found it later and asked, angry, how long it had lasted.
+EXECUTED: the transcript's per-message model field gives the window (2026-10-15 20:57:35 -> 2026-10-16 02:28:22);
+Opus 5.5 then re-reviewed that window's code (playbooks 279-281) and re-ran every gate.
+### The rule
+When the serving model or the commit trailer changes, tell the user plainly in the next reply: which model, since
+when, why if known. A change of the reasoner is a change of the instrument; the user decides what to re-check.

@@ -141,6 +141,22 @@ def main():
         facts['x%dlo' % k] = v & (2 ** 64 - 1)
         facts['x%dhi' % k] = v >> 64
     facts['eflags'] = uc.reg_read(XC.UC_X86_REG_EFLAGS)
+    # the oracle's PYTHON-SIDE state at the cut -- not guest memory, so no region carries it: the TLS / FLS dicts (keyed
+    # by the full rcx, as the oracle keys them), their counters, the run-once set, and the SList stacks (bottom first).
+    # The lifted glue seeds its tables from these facts (jn_host.c load); tools/lift/jn_import_census.py shows the
+    # editor path reads them (2 TLS slots and a 128-node SList pool exist at the cut).
+    facts['tls_ctr'] = h.tls_ctr
+    facts['fls_ctr'] = h.fls_ctr
+    for k, v in sorted(h.tls.items()):
+        facts['tls:%d' % k] = v
+    for k, v in sorted(h.fls.items()):
+        facts['fls:%d' % k] = v
+    for i, a in enumerate(sorted(h.once)):
+        facts['once:%d' % i] = a
+    for head, lst in sorted(h.__dict__.get('slists', {}).items()):
+        for i, e in enumerate(lst):
+            facts['sl:%d:%d' % (head, i)] = e
+    assert all(len(k) <= 24 for k in facts), 'a fact key is longer than the 24-byte key field'
     stubs = sorted((a, nm[1]) for a, nm in h.stub2name.items())
 
     body = bytearray(b"JNH1" + struct.pack("<II", 1, len(REGIONS)))

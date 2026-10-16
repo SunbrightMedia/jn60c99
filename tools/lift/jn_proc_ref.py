@@ -19,9 +19,10 @@ import jn_proc_seq                                                 # noqa: E402
 
 def main():
     out = sys.argv[1]
+    rate = float(sys.argv[2]) if len(sys.argv) > 2 else 48000.0
     os.makedirs(out, exist_ok=True)
     h = H.HostProcess()
-    h.start(48000.0, 512)
+    h.start(rate, 512)
     words = bytearray()
     for st in jn_proc_seq.steps():
         L, R = h.process(st['n'], events=list(st['events']), params=list(st['params']), ctx=jn_proc_seq.oracle_ctx(st['ctx']))
@@ -38,7 +39,7 @@ def main():
     open(os.path.join(out, 'image.bin'), 'wb').write(bytes(h.uc.mem_read(IB, E.IMGSZ)))
     open(os.path.join(out, 'heap.bin'), 'wb').write(bytes(h.uc.mem_read(E.HEAP_BASE, h.heap - E.HEAP_BASE)))
     open(os.path.join(out, 'com.bin'), 'wb').write(bytes(h.uc.mem_read(COM, h.com_next - COM)))
-    json.dump(dict(nsteps=len(jn_proc_seq.steps()), nwords=len(words) // 4, edits=edits,
+    json.dump(dict(nsteps=len(jn_proc_seq.steps()), nwords=len(words) // 4, edits=edits, rate=rate,
                    heap_top=h.heap, com_next=h.com_next, IB=IB, IMGSZ=E.IMGSZ, HEAP_BASE=E.HEAP_BASE, COM=COM),
               open(os.path.join(out, 'meta.json'), 'w'))
     print('oracle process ref: %d output words, %d performEdits, end heap_top 0x%x com_next 0x%x -> %s'

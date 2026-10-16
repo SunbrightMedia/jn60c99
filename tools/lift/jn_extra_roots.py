@@ -12,6 +12,7 @@ Both are the plugin's own code; the oracle still grades every output word (L5).
 usage: python3 tools/lift/jn_extra_roots.py <reach.json>      (prints 0xrva,... to stdout)"""
 import sys
 import os
+import re
 import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,9 +79,21 @@ def main():
             if CLO <= t < CHI and t not in pstarts:
                 roots.add(t)
 
+    # 3. every rva the host glue CALLS DIRECTLY (lift/jn_entries.h, one source of truth): only the glue calls some of
+    #    them, and some are leaves with no pdata (CC_LEARN 0x31AA40, the commit's 0x2853C0), so rules 1-2 miss them
+    ent = open(os.path.join(REPO, 'lift', 'jn_entries.h')).read()
+    nent = 0
+    for m in re.finditer(r'#define\s+JN_RVA_\w+\s+0x([0-9A-Fa-f]+)ULL', ent):
+        t = int(m.group(1), 16)
+        if not CLO <= t < CHI:
+            sys.exit('jn_extra_roots: lift/jn_entries.h entry 0x%x is outside .text' % t)
+        roots.add(t); nent += 1
+    if not nent:
+        sys.exit('jn_extra_roots: no JN_RVA_* entry in lift/jn_entries.h')
+
     roots = sorted(roots)
-    sys.stderr.write('jn_extra_roots: %d gaps, %d thunks, %d total extra roots (incl. interior indirect targets)\n'
-                     % (len(gaps), nthunk, len(roots)))
+    sys.stderr.write('jn_extra_roots: %d gaps, %d thunks, %d host entries, %d total extra roots (incl. interior '
+                     'indirect targets)\n' % (len(gaps), nthunk, nent, len(roots)))
     print(','.join('%#x' % r for r in roots))
 
 

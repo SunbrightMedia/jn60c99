@@ -173,6 +173,16 @@ def main():
             h.process(256, params=[(pid, 0, val)], ctx=T)
             h.process(256, ctx=T)
 
+    def s_rates():                             # the HOST-rate paths: setupProcessing at each host rate reaches the
+        #                                        core's render object both ways -- the rate converter (rva 0x343E30,
+        #                                        host rate != engine 96 kHz) AND the identity object (rva 0x344270,
+        #                                        host rate == engine rate). The 48 kHz census reaches only the
+        #                                        converter; 96000 reaches the identity path (playbook: it trapped).
+        for r in (44100.0, 96000.0, 48000.0):
+            h.set_active(0); h.setup_processing(r); h.set_active(1)
+            h.process(256, events=[ev_on(60)], ctx=T)
+            h.process(256, events=[ev_off(60)], ctx=T)
+
     def s_editor_attach():                     # attach the editor FIRST: it builds the GUI tree the panel paths need
         h.attach_editor(1920, 1080)
         for size in list(getattr(h, 'windows', {})):
@@ -201,9 +211,31 @@ def main():
         h.set_state(st)
         h.process(256, ctx=T)
 
-    for name, fn in [('midi', s_midi), ('editor_attach', s_editor_attach), ('model_set', s_model_set),
+    for name, fn in [('midi', s_midi), ('rates', s_rates), ('editor_attach', s_editor_attach), ('model_set', s_model_set),
                      ('commit', s_commit), ('uitick', s_uitick), ('learn', s_learn), ('state', s_state)]:
         step(name, fn)
+
+    # the L6 search's OWN vocabulary (tools/lift/jn_search_seq.py): its census seeds, each on a FRESH oracle booted and
+    # set up as the search's are, under this same block hook -- so the lift covers what the machine search drives (host
+    # automation of the panel records and MIDI controllers through process(), odd block sizes, transport states, the
+    # editor's set, patch loads, ...) and the census and the search can never drift apart.
+    import jn_search_seq as SS                                       # noqa: E402
+    import jn_ops                                                    # noqa: E402
+    nseed = int(os.environ.get('JUNO_REACH_SEARCH_SEEDS', str(SS.CENSUS_SEEDS)))
+    nops = int(os.environ.get('JUNO_REACH_SEARCH_NOPS', '120'))
+    for seed in range(nseed):
+        def s_seed(seed=seed):
+            prev_ind[0] = None
+            h2 = H.HostProcess()
+            h2.boot_host(log=lambda s: None)
+            h2.uc.hook_add(UC_HOOK_BLOCK, block)        # the same stubs at the same addresses (a deterministic boot)
+            h2.setup(48000.0, 512)
+            ops = jn_ops.OracleOps(h2, bank)
+            for op in SS.plan(seed, nops):
+                if ops.run(op)[0] == 'throw':
+                    break
+            del ops, h2
+        step('search seed %d' % seed, s_seed)
     log('drive done')
 
     funcs = sorted({f for f in (func_of(a) for a in executed) if f is not None})

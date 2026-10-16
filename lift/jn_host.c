@@ -13,29 +13,34 @@
  * oracle's TEB 0x580000000). The lift generated with gen_juno_lift.sh (--hostcalls --alloc 0x67522C --replace). */
 #include "jp8_cpu.h"
 #include "junoh.h"
+#include "jn_oracle_imports.h"   /* GENERATED (tools/lift/gen_oracle_imports.py): every import the oracle singles out */
 #ifndef JP8_RELOC
 #error "jn_host.c needs JP8_RELOC"
 #endif
 
+#include "jn_entries.h"            /* every rva the glue calls directly -- each is a lift root (jn_extra_roots.py) */
 #define IB            0x180000000ULL
 #define ENGINE_RENDER 0x3C7400ULL     /* CWaveGen vt+56: the engine render's thread transport (served by the host) */
-#define VOICE_WRAP    0x398F30ULL     /* one sample of one voice: rcx=state[v], edx=v, r8=&{*main, *sub} */
-#define MASTER_WRAP   0x398EC0ULL     /* one sample of the master mix: rcx=state[8], rdx=a2[16], r8=&{*L, *R} */
-#define ASG_GET_COUNT 0x355A60ULL     /* the assigner's voice count (rcx=assign[v]) */
-#define ASG_SET_COUNT 0x355940ULL     /* set it (rcx=assign[v], edx=count) -- resets the assigner */
+#define VOICE_WRAP    JN_RVA_VOICE_WRAP
+#define MASTER_WRAP   JN_RVA_MASTER_WRAP
+#define ASG_GET_COUNT JN_RVA_ASG_GET_COUNT
+#define ASG_SET_COUNT JN_RVA_ASG_SET_COUNT
 #define HOST_NVOICE   0x38ULL         /* the engine's voice count (HOST + 0x38) */
 #define ASG_COUNTER   168ULL          /* the assigner sample counter (assign[v] + 168) += block */
 #define BUF_BASE      0x700000000ULL  /* the audio buffers (per-voice main/sub, then master L/R) + render scratch */
-#define UITICK        0x320120ULL     /* the plugin's UI timer (host_process_emu drains it through the core) */
-#define CC_LEARN      0x31AA40ULL     /* the CC menu's Learn: rcx = core + 24, edx = the record index */
-#define CC_FORGET     0x3192E0ULL     /* the CC menu's Forget */
-#define REC_ID        0x319C50ULL     /* the record at an index -> its parameter id: rcx = core + 24, edx = index */
-#define MODEL_SET     0x283DB0ULL     /* the editor's record set: rcx = model, rdx = object, r8 = value, r9 = 1 */
+#define UITICK        JN_RVA_UITICK
+#define CC_LEARN      JN_RVA_CC_LEARN
+#define CC_FORGET     JN_RVA_CC_FORGET
+#define REC_ID        JN_RVA_REC_ID
+#define MODEL_SET     JN_RVA_MODEL_SET
 #define PROCESS_SLOT  9               /* IAudioProcessor::process (rva 0x34A380) */
 #define NPQ           8               /* parameter queues a block may use (one per parameter id) */
 #define NCC_MAX       1024
 #define NREG_MAX      16
 #define NSTUB_MAX     4096
+#define NKV_MAX       256             /* TLS / FLS slots and run-once entries the oracle's dicts may hold */
+#define NSL_MAX       16              /* SList heads */
+#define NUNH_MAX      128             /* distinct imports answered by the oracle's default (counted, like its .unhandled) */
 #define MAXEV         512
 #define S_OK_         0ULL
 #define E_FAIL_       0x80004005ULL
@@ -81,6 +86,15 @@ static struct {
     uint64_t njobs;                      /* engine render calls served */
     /* the engine the plugin built (core+272) and its per-unit objects (host_process_emu.setup), for the render */
     uint64_t HOST, state[9], assign[9];
+    /* the oracle's PYTHON-SIDE state -- not guest memory, so the template carries it as facts (jn_host_ref.py) and the
+     * glue keeps it exactly as the oracle keeps it: the TLS / FLS dicts (key = the full rcx, as the oracle's dict keys),
+     * the SList heads (each a stack, bottom first: wrapper_emu.slists), the run-once set (wrapper_emu.once), and the
+     * imports answered by the oracle's default (0, counted as its .unhandled is) */
+    int ntls; uint64_t tls_k[NKV_MAX], tls_v[NKV_MAX], tls_ctr;
+    int nfls; uint64_t fls_k[NKV_MAX], fls_v[NKV_MAX], fls_ctr;
+    int nsl; uint64_t sl_head[NSL_MAX]; uint64_t *sl_e[NSL_MAX]; int sl_n[NSL_MAX], sl_cap[NSL_MAX];
+    int nonce; uint64_t once[NKV_MAX];
+    int nunh; const char *unh_name[NUNH_MAX]; uint64_t unh_n[NUNH_MAX];
 } H;
 
 /* ---------------------------------------------------------------- guest memory (one mapped band region) */
@@ -130,10 +144,48 @@ static void record_edit(uint32_t id, double v) {
 }
 static int pq_index(uint64_t this_) { int i; for (i = 0; i < NPQ; i++) if (H.pq[i] == this_) return i; return -1; }
 
+/* ---------------------------------------------------------------- the oracle's Python-side state (TLS, FLS, SLists, once) */
+static int kv_find(int n, const uint64_t *k, uint64_t key) { int i; for (i = 0; i < n; i++) if (k[i] == key) return i; return -1; }
+static int kv_set(int *n, uint64_t *k, uint64_t *v, uint64_t key, uint64_t val) {   /* the oracle's d[key] = val; -1: full */
+    int i = kv_find(*n, k, key);
+    if (i < 0) { if (*n == NKV_MAX) return -1; i = (*n)++; k[i] = key; }
+    v[i] = val; return 0;
+}
+static uint64_t kv_get(int n, const uint64_t *k, const uint64_t *v, uint64_t key) {   /* the oracle's d.get(key, 0) */
+    int i = kv_find(n, k, key); return i < 0 ? 0 : v[i];
+}
+static int sl_of(uint64_t head) {                    /* wrapper_emu: slists.setdefault(head, []); -1: no room */
+    int i;
+    for (i = 0; i < H.nsl; i++) if (H.sl_head[i] == head) return i;
+    if (H.nsl == NSL_MAX) return -1;
+    H.sl_head[H.nsl] = head; H.sl_n[H.nsl] = 0; return H.nsl++;
+}
+static int sl_put(int s, int idx, uint64_t e) {      /* entry idx of head s (bottom first), growing the stack */
+    if (idx >= H.sl_cap[s]) {
+        int cap = H.sl_cap[s] ? 2 * H.sl_cap[s] : 256; uint64_t *p;
+        while (cap <= idx) cap *= 2;
+        p = (uint64_t *)realloc(H.sl_e[s], sizeof *p * (size_t)cap); if (!p) return -1;
+        H.sl_e[s] = p; H.sl_cap[s] = cap;
+    }
+    H.sl_e[s][idx] = e; if (idx >= H.sl_n[s]) H.sl_n[s] = idx + 1;
+    return 0;
+}
+static int once_has(uint64_t a) { int i; for (i = 0; i < H.nonce; i++) if (H.once[i] == a) return 1; return 0; }
+static void unhandled(const char *n) {               /* e2e_emu: self.unhandled[name] += 1 (n lives in the stub table) */
+    int i;
+    for (i = 0; i < H.nunh; i++) if (!strcmp(H.unh_name[i], n)) { H.unh_n[i]++; return; }
+    if (H.nunh < NUNH_MAX) { H.unh_name[H.nunh] = n; H.unh_n[H.nunh++] = 1; }
+}
+static int cmp_name(const void *a, const void *b) { return strcmp((const char *)a, *(const char *const *)b); }
+static int oracle_special(const char *n) {           /* the oracle singles this name out (lift/jn_oracle_imports.h) */
+    return bsearch(n, JN_ORACLE_SPECIAL, JN_ORACLE_NSPECIAL, sizeof JN_ORACLE_SPECIAL[0], cmp_name) != NULL;
+}
+static int name_in(const char *n, const char *const *set) { for (; *set; set++) if (!strcmp(n, *set)) return 1; return 0; }
+
 /* ---------------------------------------------------------------- the host objects and the imports (jp8_hostcall) */
 void jp8_hostcall(CPU *c, uint64_t target) {
     const char *n = stub_name(target); uint64_t rcx = c->r[1], rdx = c->r[2], r8 = c->r[8], r9 = c->r[9];
-    char msg[112];
+    char msg[160];
     if (!n) { snprintf(msg, sizeof msg, "stub 0x%llx not in the template", (unsigned long long)target); jp8_trap(c, target, msg); return; }
     if (!strncmp(n, "COM:", 4)) {
         const char *kind = n + 4; const char *colon = strchr(kind, ':'); int slot = colon ? atoi(colon + 1) : -1;
@@ -206,32 +258,87 @@ void jp8_hostcall(CPU *c, uint64_t target) {
         }
         snprintf(msg, sizeof msg, "host object method %s not served", n); jp8_trap(c, target, msg); return;
     }
-    /* the imports the host path reaches, answered as the oracle's shims answer them (e2e_emu / wrapper_emu) */
-    if (!strcmp(n, "AcquireSRWLockExclusive") || !strcmp(n, "ReleaseSRWLockExclusive") ||
-        !strcmp(n, "AcquireSRWLockShared") || !strcmp(n, "ReleaseSRWLockShared") ||
-        !strcmp(n, "EnterCriticalSection") || !strcmp(n, "LeaveCriticalSection") ||
-        !strncmp(n, "Initialize", 10) || !strcmp(n, "DeleteCriticalSection")) { c->r[0] = 1; return; }
-    if (!strcmp(n, "GetCurrentThreadId") || !strcmp(n, "GetCurrentProcessId")) { c->r[0] = 0x1000; return; }
-    if (!strcmp(n, "GetProcessHeap")) { c->r[0] = H.fake_heap ? H.fake_heap : 0x4242000000ULL; return; }
-    if (!strcmp(n, "HeapAlloc") || !strcmp(n, "calloc")) { c->r[0] = jp8_heap_alloc(r8 ? r8 : rdx ? rdx : 16); return; }
-    if (!strcmp(n, "HeapReAlloc")) { c->r[0] = jp8_heap_alloc(r9); return; }
-    if (!strcmp(n, "malloc")) { c->r[0] = jp8_heap_alloc(rcx ? rcx : 16); return; }
-    if (!strcmp(n, "HeapFree") || !strcmp(n, "free") || !strcmp(n, "??3@YAXPEAX@Z")) { jp8_heap_free(!strcmp(n, "HeapFree") ? r8 : rcx); c->r[0] = 1; return; }
-    if (!strcmp(n, "EncodePointer") || !strcmp(n, "DecodePointer")) { c->r[0] = rcx; return; }
-    if (!strcmp(n, "GetLastError")) { c->r[0] = H.lasterr & 0xFFFFFFFFu; return; }
-    if (!strcmp(n, "SetLastError")) { H.lasterr = rcx & 0xFFFFFFFFu; c->r[0] = 0; return; }
-    if (!strcmp(n, "GetFocus") || !strcmp(n, "SetFocus")) { c->r[0] = 0; return; }
-    if (!strcmp(n, "IsProcessorFeaturePresent")) { c->r[0] = 1; return; }
-    if (!strcmp(n, "GetCurrentProcess")) { c->r[0] = 0; return; }
-    if (!strncmp(n, "Create", 6) || !strncmp(n, "Open", 4)) { c->r[0] = jp8_hc_next(); return; }
-    if (!strcmp(n, "ResumeThread") || !strcmp(n, "GetModuleHandleExW") || !strcmp(n, "IsDebuggerPresent")) { c->r[0] = 0; return; }
-    if (!strcmp(n, "RaiseException")) {
-        if ((uint32_t)rcx == 0xE06D7363u) { jp8_trap(c, target, "the plugin threw a C++ exception (RaiseException 0xE06D7363)"); return; }
-        c->r[0] = 0; return;
+    /* the imports, answered EXACTLY as the oracle answers them (tools/verify/e2e_emu.py under probes/b6/wrapper_emu.py):
+     * wrapper_emu._imp's rules, then e2e_emu._imp's, in their order. A name the oracle SINGLES OUT that this glue does
+     * not mirror TRAPS (lift/jn_oracle_imports.h, generated from the oracle's own source): the oracle does something the
+     * glue does not. Only a name the oracle does not single out takes its defaults -- Create* / Open* a new handle,
+     * Get* / Query* 0, anything else 0 counted as unhandled (junoh_unhandled; a gate compares it with the oracle's). */
+    {
+        static const char *const PTR[] = { "EncodePointer", "DecodePointer", "EncodeSystemPointer", "DecodeSystemPointer", NULL };
+        static const char *const ONE[] = { "InitCommonControlsEx", "AcquireSRWLockExclusive", "ReleaseSRWLockExclusive",
+            "AcquireSRWLockShared", "ReleaseSRWLockShared", "WakeAllConditionVariable", "WakeConditionVariable",
+            "MakeSureDirectoryPathExists", "AllocateAndInitializeSid", "FlushInstructionCache", "LoadCursorA", "LoadCursorW",
+            "FlsFree", NULL };
+        static const char *const CLASS[] = { "RegisterClassExA", "RegisterClassExW", "RegisterClassA", "RegisterClassW", NULL };
+        static const char *const ACL[] = { "SetEntriesInAclA", "SetEntriesInAclW", "SetNamedSecurityInfoA", "SetNamedSecurityInfoW", NULL };
+        static const char *const E_ONE[] = { "HeapFree", "HeapDestroy", "DeleteCriticalSection", "EnterCriticalSection",
+            "LeaveCriticalSection", NULL };
+        static const char *const E_UNH[] = { "RaiseException", "RtlPcToFileHeader", "RtlUnwind", "RtlUnwindEx",
+            "RtlCaptureContext", "RtlLookupFunctionEntry", "RtlVirtualUnwind", "_CxxThrowException", "terminate", "abort", NULL };
+        int s;
+        /* ---- wrapper_emu._imp */
+        if (!strcmp(n, "RaiseException") && (uint32_t)rcx == 0xE06D7363u) { jp8_trap(c, target, "the plugin threw a C++ exception (RaiseException 0xE06D7363)"); return; }
+        if (name_in(n, PTR)) { c->r[0] = rcx; return; }
+        if (!strcmp(n, "IsProcessorFeaturePresent")) { c->r[0] = 1; return; }
+        if (!strcmp(n, "IsDebuggerPresent")) { c->r[0] = 0; return; }
+        if (!strcmp(n, "FlsAlloc")) { c->r[0] = H.fls_ctr++; return; }
+        if (!strcmp(n, "FlsSetValue")) { if (kv_set(&H.nfls, H.fls_k, H.fls_v, rcx, rdx)) { jp8_trap(c, target, "FLS table full"); return; } c->r[0] = 1; return; }
+        if (!strcmp(n, "FlsGetValue")) { c->r[0] = kv_get(H.nfls, H.fls_k, H.fls_v, rcx); return; }
+        if (!strcmp(n, "GetModuleHandleW") || !strcmp(n, "GetModuleHandleA")) { c->r[0] = IB; return; }
+        if (!strncmp(n, "Initialize", 10) || name_in(n, ONE)) { c->r[0] = 1; return; }
+        if (!strcmp(n, "InitOnceExecuteOnce")) {
+            if (once_has(rcx)) { c->r[0] = 1; return; }
+            jp8_trap(c, target, "InitOnceExecuteOnce first run after the template (the oracle runs the callback in place; not mirrored)"); return;
+        }
+        if (!strcmp(n, "GetProcAddress") && rdx < 0x10000) { c->r[0] = 0; return; }   /* by name it makes a stub: traps below */
+        if (!strcmp(n, "GetLastError")) { c->r[0] = H.lasterr & 0xFFFFFFFFu; return; }
+        if (!strcmp(n, "SetLastError")) { H.lasterr = rcx & 0xFFFFFFFFu; c->r[0] = 0; return; }
+        if (name_in(n, CLASS)) { c->r[0] = 0xC001; return; }
+        if (!strcmp(n, "InterlockedPushEntrySList")) {     /* entry->Next = the old top (in memory); push; return the old top */
+            uint64_t old;
+            if ((s = sl_of(rcx)) < 0) { jp8_trap(c, target, "SList table full"); return; }
+            old = H.sl_n[s] ? H.sl_e[s][H.sl_n[s] - 1] : 0;
+            wq(rdx, old);
+            if (sl_put(s, H.sl_n[s], rdx)) { jp8_trap(c, target, "no memory for an SList"); return; }
+            c->r[0] = old; return;
+        }
+        if (!strcmp(n, "InterlockedPopEntrySList")) {      /* the oracle pops its list; memory is not read */
+            if ((s = sl_of(rcx)) < 0) { jp8_trap(c, target, "SList table full"); return; }
+            c->r[0] = H.sl_n[s] ? H.sl_e[s][--H.sl_n[s]] : 0; return;
+        }
+        if (!strcmp(n, "InterlockedFlushSList")) {
+            if ((s = sl_of(rcx)) < 0) { jp8_trap(c, target, "SList table full"); return; }
+            c->r[0] = H.sl_n[s] ? H.sl_e[s][H.sl_n[s] - 1] : 0; H.sl_n[s] = 0; return;
+        }
+        if (name_in(n, ACL)) { c->r[0] = 0; return; }
+        /* ---- e2e_emu._imp (wrapper_emu's super) */
+        if (!strcmp(n, "GetProcessHeap")) { c->r[0] = H.fake_heap ? H.fake_heap : 0x4242000000ULL; return; }
+        if (!strcmp(n, "HeapAlloc")) { c->r[0] = jp8_heap_alloc(r8); return; }   /* bump(dwBytes); fresh memory is zero */
+        if (!strcmp(n, "HeapReAlloc")) {                   /* bump(dwBytes), then copy min(dwBytes, 0x1000) of the old block */
+            uint64_t p = jp8_heap_alloc(r9); size_t k = r9 < 0x1000 ? (size_t)r9 : 0x1000;
+            if (r8 && k) { void *src = junoh_guest(r8, k), *dst = junoh_guest(p, k); if (src && dst) memmove(dst, src, k); }
+            c->r[0] = p; return;
+        }
+        if (name_in(n, E_ONE)) { c->r[0] = 1; return; }    /* HeapFree frees nothing: the oracle's heap is a pure bump */
+        if (!strcmp(n, "HeapSize")) { c->r[0] = 0x1000; return; }
+        if (!strcmp(n, "VirtualAlloc") || !strcmp(n, "VirtualAllocEx")) { c->r[0] = jp8_heap_alloc(rdx ? rdx : 0x1000); return; }
+        if (!strcmp(n, "CoTaskMemAlloc") || !strcmp(n, "GlobalAlloc") || !strcmp(n, "GdipAlloc") || !strcmp(n, "SysAllocString")) { c->r[0] = jp8_heap_alloc(rcx ? rcx : 0x100); return; }
+        if (!strcmp(n, "TlsAlloc")) { c->r[0] = H.tls_ctr++; return; }
+        if (!strcmp(n, "TlsSetValue")) { if (kv_set(&H.ntls, H.tls_k, H.tls_v, rcx, rdx)) { jp8_trap(c, target, "TLS table full"); return; } c->r[0] = 1; return; }
+        if (!strcmp(n, "TlsGetValue")) { c->r[0] = kv_get(H.ntls, H.tls_k, H.tls_v, rcx); return; }
+        if (!strcmp(n, "GetCurrentThreadId") || !strcmp(n, "GetCurrentProcessId")) { c->r[0] = 0x1000; return; }
+        /* ---- a name the oracle singles out that is not mirrored above: stop (never answer it with a default) */
+        if (oracle_special(n) && !name_in(n, E_UNH)) {
+            snprintf(msg, sizeof msg, "the oracle answers import %s specially; not mirrored here (from rva 0x%llx)", n,
+                     (unsigned long long)(gq(c->r[4]) - IB));
+            jp8_trap(c, target, msg); return;
+        }
+        /* ---- e2e_emu._imp's tail: Create* / Open*, its RaiseException group, Get* / Query*, then the default */
+        if (!strncmp(n, "Create", 6) || !strncmp(n, "Open", 4)) { c->r[0] = jp8_hc_next(); return; }
+        if (name_in(n, E_UNH)) { unhandled(n); c->r[0] = 0; return; }
+        if (!strncmp(n, "Get", 3) || !strncmp(n, "Query", 5)) { c->r[0] = 0; return; }
+        unhandled(n); c->r[0] = 0; return;
     }
-    snprintf(msg, sizeof msg, "import %s not shimmed on the host path (from rva 0x%llx)", n,
-             (unsigned long long)(gq(c->r[4]) - IB));
-    jp8_trap(c, target, msg);
 }
 int jp8_thunk(CPU *c, uint64_t target) { (void)c; (void)target; return 0; }   /* no ATL run-time thunk on the host path (yet) */
 
@@ -357,6 +464,15 @@ static int load(const unsigned char *b, size_t len) {
         KV("process_fn", H.process_fn); KV("patch_fn", H.patch_fn); KV("com_next", H.com_next);
         KV("vt_events", H.vt_events); KV("vt_pchanges", H.vt_pchanges); KV("vt_pqueue", H.vt_pqueue);
         KV("vt_stream", H.vt_stream); KV("fake_heap", H.fake_heap); KV("lasterr", H.lasterr); KV("eflags", H.eflags);
+        KV("tls_ctr", H.tls_ctr); KV("fls_ctr", H.fls_ctr);
+        /* the oracle's Python-side state at the cut (jn_host_ref.py): tls:<key>, fls:<key>, once:<i>, sl:<head>:<i> */
+        else if (!strncmp(key, "tls:", 4)) { if (kv_set(&H.ntls, H.tls_k, H.tls_v, strtoull(key + 4, NULL, 10), v)) return err(JUNOH_E_TEMPLATE, "template: TLS table full"); }
+        else if (!strncmp(key, "fls:", 4)) { if (kv_set(&H.nfls, H.fls_k, H.fls_v, strtoull(key + 4, NULL, 10), v)) return err(JUNOH_E_TEMPLATE, "template: FLS table full"); }
+        else if (!strncmp(key, "once:", 5)) { if (H.nonce == NKV_MAX) return err(JUNOH_E_TEMPLATE, "template: once table full"); H.once[H.nonce++] = v; }
+        else if (!strncmp(key, "sl:", 3)) {
+            char *e; uint64_t head = strtoull(key + 3, &e, 10); long idx = (*e == ':') ? strtol(e + 1, NULL, 10) : -1; int s_;
+            if (idx < 0 || (s_ = sl_of(head)) < 0 || sl_put(s_, (int)idx, v)) return err(JUNOH_E_TEMPLATE, "template: an SList entry");
+        }
         else if (key[0] == 'r' && key[1] >= '0' && key[1] <= '9') { int r_ = atoi(key + 1); if (r_ >= 0 && r_ < 16) H.reg[r_] = v; }
         else if (key[0] == 'x' && key[1] >= '0' && key[1] <= '9') {
             int r_ = atoi(key + 1); const char *t = strstr(key, "hi"); if (r_ >= 0 && r_ < 16) H.xreg[r_][t ? 1 : 0] = v;
@@ -400,7 +516,12 @@ static int set_active(int on) {                 /* IComponent::setActive: slot 1
 
 int junoh_init(const void *tmpl, size_t len, double rate, int max_block) {
     int rc, i;
-    memset(&H.njobs, 0, 0); H.st = 0; H.msg[0] = 0; H.nedit = 0; H.njobs = 0; H.s_addr = 0; H.s_len = 0; H.s_pos = 0; H.nev = 0; H.npq = 0;
+    H.st = 0; H.msg[0] = 0; H.nedit = 0; H.njobs = 0; H.s_addr = 0; H.s_len = 0; H.s_pos = 0; H.nev = 0; H.npq = 0;
+    /* the oracle's Python-side state starts as the oracle's constructors start it (e2e_emu tls_ctr 1, wrapper_emu
+     * fls_ctr 1); the template's facts then set it to its value at the cut */
+    H.ntls = 0; H.nfls = 0; H.nonce = 0; H.nunh = 0; H.tls_ctr = 1; H.fls_ctr = 1;
+    for (i = 0; i < H.nsl; i++) H.sl_n[i] = 0;
+    H.nsl = 0;
     if (!tmpl) return err(JUNOH_E_ARG, "no template");
     if (max_block <= 0 || !(rate > 0.0)) return err(JUNOH_E_ARG, "rate or block size");
     if ((rc = load((const unsigned char *)tmpl, len)) != JUNOH_OK) return rc;
@@ -516,6 +637,24 @@ int junoh_model_set(uint64_t obj, uint32_t value) {
     if (rc) return rc;
     model = gq(gq(H.core + 8));
     return call(IB + MODEL_SET, model, obj, (uint64_t)value, 1) ? JUNOH_E_TRAP : JUNOH_OK;
+}
+int junoh_commit(void) {         /* the panel's commit: rva 0x285320, 0x2853C0, 0x283120 on the model (editor_gate TRIO) */
+    static const uint64_t trio[3] = { JN_RVA_COMMIT0, JN_RVA_COMMIT1, JN_RVA_COMMIT2 };
+    int rc = live(), i; uint64_t model;
+    if (rc) return rc;
+    model = gq(gq(H.core + 8));
+    for (i = 0; i < 3; i++) if (call(IB + trio[i], model, 0, 0, 0)) return JUNOH_E_TRAP;
+    return JUNOH_OK;
+}
+int junoh_unhandled(char *buf, size_t cap) {   /* "name=count\n" per import answered by the oracle's default; distinct names */
+    size_t p = 0; int i;
+    if (buf && cap) buf[0] = 0;
+    for (i = 0; i < H.nunh && buf; i++) {
+        int k = snprintf(buf + p, cap > p ? cap - p : 0, "%s=%llu\n", H.unh_name[i], (unsigned long long)H.unh_n[i]);
+        if (k < 0) break;
+        p += (size_t)k;
+    }
+    return H.nunh;
 }
 
 /* ---------------------------------------------------------------- process() (host_process_emu.process) */

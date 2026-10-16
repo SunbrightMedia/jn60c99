@@ -31,6 +31,7 @@ int  junoh_set_state(const void *data, size_t n, uint32_t *result);  /* ICompone
  * buffers the calls write are bump-allocated in the host-object area as the oracle allocates them. */
 int  junoh_model_set(uint64_t obj, uint32_t value);                  /* the editor's record set (rva 0x283DB0) */
 int  junoh_rec_id(int index, uint32_t *id, uint64_t *obj);           /* the record at index -> its parameter id + object */
+int  junoh_commit(void);                                             /* the panel's commit (0x285320, 0x2853C0, 0x283120) */
 /* gates / the drive */
 const char *junoh_error(void);
 void     junoh_trace_open(const char *path);   /* the L5 trace-diff: with a --trace lift, record each insn to path */
@@ -40,5 +41,7 @@ uint64_t junoh_heap_top(void);
 uint64_t junoh_com_next(void);
 uint64_t junoh_renders(void);                                        /* engine render calls served so far */
 int      junoh_edits(uint32_t *id, double *val, int cap);            /* the performEdit calls so far (all, count) */
+int      junoh_unhandled(char *buf, size_t cap);                      /* imports answered by the oracle's default 0:
+                                                                         "name=count\n" lines; returns distinct names */
 uint64_t junoh_core(void);                                           /* the plugin's core object (a template fact) */
 #endif
