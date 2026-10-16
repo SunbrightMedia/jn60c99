@@ -167,3 +167,30 @@ editor path in the lift).
   NEXT: L6 -- tools/lift/jn_search*.py + jn_ops.py (one vocabulary for the census AND the search: seeded random plans
   over every host entry, compared after every op); the census runs its seeds 0..11, the 24-hour search seeds 1000+.
   Then L3 (the lifter instruction by instruction vs the real CPU and Unicorn) while the search runs.
+- 2026-10-16 L6 FIRST SEED + L3 BUILT AND RUN. L6: seed 1000 (122 ops) found a gap at op 5 -- host automation through
+  process() reached an indirect target the census had not seen (0x347180) -> the census now runs the search's own
+  seeds 0..11 under its hook (tools/verify/juno_lift_reach.py; one vocabulary, tools/lift/jn_search_seq.py).
+  L3 (tools/lift/l3_gate.sh): every SHIPPED statement of lift/jn_lift.c whose rva the census executed (64,609
+  statements, 342 forms = mnemonic + operand kinds) runs against the REAL CPU executing the plugin's own bytes for one
+  step (trap flag; tools/lift/l3_harness.c) and against Unicorn (tools/lift/l3_unicorn.py, its own process), from the
+  same seeded states: edge + random GPRs, flags, XMM lanes (float / double edge tables: signed zeros, denormals,
+  FLT_MIN, NaNs with payloads, sNaNs, infinities, integer-conversion bounds), MXCSR 0x1F80 / 0x9FC0, memory (a test
+  window, the gs page, the image); 16 states per statement, 256 for each form's first. FIRST RUN on the old lift: 2,092
+  states differed from the CPU in 30 forms -- THREE LIFT DEFECTS no whole-program gate had seen:
+  (1) a 32-bit cmov must clear the destination's upper half when its condition is false (701 statements; playbook
+  283); (2) add / mul with two NaN operands returned the second NaN (GCC at -O0 swaps a commutative operation; x86
+  returns the first; playbook 284); (3) min / max under DAZ returned a denormal's raw bits where the CPU returns it
+  flushed (the result hung on -O level; playbook 285). FIXED in the shared lifter (jp8/tools/jp8_lift.py) and the
+  runtime (jp8/src/jp8_cpu.h hardware path, ISO C99: the c99 gate rejected a first fix by intrinsics) -> re-lift ->
+  L3: 0 of 1,115,824 states differ from the CPU.
+  Unicorn 2.1.4 departs from the CPU in four NAMED classes only (playbook 286): unflushed denormals (FTZ, min / max
+  under DAZ), the NaN it picks from two NaN operands, bsf of zero, MXCSR's sticky flags; any other Unicorn difference
+  is RED. MXCSR's sticky flags: neither the lift nor the oracle holds them; the plugin's 7 executed stmxcsr sites
+  (JUCE's ScopedNoDenormals at 0x34AD10 / 0x34ADB0, a CRT routine at 0x6EF5B8) mask the word to FTZ / DAZ or load it
+  back, so the flags reach only dead stack slots -- no result can differ. Undefined flags: tools/lift/l3_flags.py
+  proves no lifted code reads a flag x86 leaves undefined (or AF): 4677 functions, 792,933 instructions, 48,132 flag
+  reads, 0 violations (entries of call targets start all-undefined -- the ABI; interior roots and chained unwind
+  fragments are judged inside the function that holds them); its tooth bites. Teeth (tools/lift/l3_teeth.sh): cmp as
+  add, jl as jle, mulss as addss, a 32-bit load as 16-bit -- each seen by the CPU side; one flipped Unicorn input
+  seen by the oracle side; the CPU against itself equal. L3 measure: 342 / 342 executed forms proven -> 1 (re-run on
+  the next census).

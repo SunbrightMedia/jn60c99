@@ -88,6 +88,41 @@ def plan(seed, nops=120):
     return ops
 
 
+def plan_midi():
+    """L5's MIDI-controller drive (docs/JUNO_LIFT.md; deterministic, not seeded): a held chord under every CC 0..127
+    but 123 at 1, 1/2 and 0, four to a block at offsets 0 / 64 / 128 / 192; the mod wheel (CC 1) at sixteen offsets in
+    one block; pitch bend (129) and aftertouch (128) across their range; sustain (CC 64) holding released keys, then
+    letting go; all notes off (CC 123) on a sounding chord; a voice-count and an engine-rate change between notes"""
+    T = ('play', 120.0)
+    chord = [('on', 0, 0, p, 0.8) for p in (60, 64, 67)]
+    rel = [('off', 0, 0, p, 0.0) for p in (60, 64, 67)]
+    ops = [('proc', 512, [], [], T), ('proc', 512, [], [], T), ('proc', 256, chord, [], T)]
+    items = [(MIDI_BASE + cc, v) for v in (1.0, 0.5, 0.0) for cc in range(128) if cc != 123]
+    for i in range(0, len(items), 4):
+        ops.append(('proc', 256, [], [(('id', pid), 64 * j, v) for j, (pid, v) in enumerate(items[i:i + 4])], T))
+    ops.append(('proc', 256, [], [(('id', MIDI_BASE + 1), 16 * j, j / 15.0) for j in range(16)], T))
+    for pid in (MIDI_BASE + 129, MIDI_BASE + 128):
+        for v in (0.0, 0.25, 8191 / 16383.0, 0.5, 8192 / 16383.0, 0.75, 1.0, 0.5):
+            ops.append(('proc', 128, [], [(('id', pid), 0, v)], T))
+    ops.append(('proc', 256, rel, [], T))
+    ops.append(('proc', 256, chord, [(('id', MIDI_BASE + 64), 0, 1.0)], T))     # sustain down, keys down
+    ops.append(('proc', 256, rel, [], T))                                       # keys up: held by the pedal
+    ops += [('proc', 256, [], [], T)] * 2
+    ops.append(('proc', 256, [], [(('id', MIDI_BASE + 64), 100, 0.0)], T))     # pedal up mid-block: release
+    ops += [('proc', 256, [], [], T)] * 2
+    ops.append(('proc', 256, chord, [], T))
+    ops.append(('proc', 256, [], [(('id', MIDI_BASE + 123), 50, 1.0)], T))     # all notes off on a sounding chord
+    ops += [('proc', 256, [], [], T)] * 2
+    ops.append(('proc', 256, [], [(('id', VOICES), 0, 1.0)], T))
+    ops.append(('proc', 256, chord, [(('id', MIDI_BASE + 129), 10, 1.0)], T))
+    ops.append(('proc', 256, rel, [(('id', VOICES), 128, 6.0)], T))
+    ops.append(('proc', 256, [], [(('id', SRATE), 0, 2.0)], T))
+    ops.append(('proc', 256, chord, [(('id', MIDI_BASE + 1), 0, 0.75)], T))
+    ops.append(('proc', 256, rel, [], T))
+    ops += [('proc', 512, [], [], T)] * 2
+    return ops
+
+
 def ctx_fields(ctx):
     """(state, ppq, cycle_start, cycle_end, tempo) of a ctx op field, or None (no ProcessContext)"""
     if ctx is None:

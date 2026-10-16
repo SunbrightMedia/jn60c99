@@ -3,7 +3,8 @@
 seeded plan (jn_search_seq.plan) through jn_ops.OracleOps; after EVERY op the end-state digest (image + heap + host
 arena), the heap / arena tops and any output words. A C++ throw ends the plan (both sides must throw at the same op);
 an oracle failure ends it as 'oracle_error' (a limit of the harness, reported, never counted as clean).
-Unicorn only (two-process rule). usage: python3 tools/lift/jn_search_ref.py <outdir> <seed> [nops]"""
+Unicorn only (two-process rule). usage: python3 tools/lift/jn_search_ref.py <outdir> <seed | midi> [nops]
+(midi: L5's fixed MIDI-controller drive, jn_search_seq.plan_midi)"""
 import sys
 import os
 import json
@@ -22,11 +23,14 @@ import jn_ops                                                      # noqa: E402
 
 
 def main():
-    out, seed = sys.argv[1], int(sys.argv[2])
+    out = sys.argv[1]
     nops = int(sys.argv[3]) if len(sys.argv) > 3 else 120
+    if sys.argv[2] == 'midi':                                     # L5's MIDI-controller drive (a fixed plan)
+        seed, plan = -1, S.plan_midi()
+    else:
+        seed = int(sys.argv[2]); plan = S.plan(seed, nops)
     os.makedirs(out, exist_ok=True)
     t0 = time.time()
-    plan = S.plan(seed, nops)
     h = H.HostProcess()
     h.start(48000.0, 512)
     ops = jn_ops.OracleOps(h, open(truth.BANK, 'rb').read())

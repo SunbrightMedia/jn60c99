@@ -4762,3 +4762,55 @@ Opus 5.5 then re-reviewed that window's code (playbooks 279-281) and re-ran ever
 ### The rule
 When the serving model or the commit trailer changes, tell the user plainly in the next reply: which model, since
 when, why if known. A change of the reasoner is a change of the instrument; the user decides what to re-check.
+
+## 283. A 32-BIT CMOV CLEARS THE UPPER HALF EVEN WHEN IT DOES NOT MOVE -- GRADE THE LIFTER AGAINST THE CPU, ONE INSTRUCTION AT A TIME
+Paid 2026-10-16 (JUNO lift, L3). The shared lifter emitted `if (cc) { R(d) = zext(src); }` for `cmovcc r32, r/m32`.
+x86-64 writes the 32-bit destination -- clearing bits 63..32 -- WHATEVER the condition (SDM CMOVcc). 701 lifted
+statements, 218 of them executed by the product. Eight whole-program gates were EXACTLY 0 with the defect in place:
+on every gated path the upper halves happened to be zero already. The per-instruction proof (tools/lift/l3_harness.c:
+each shipped statement against the plugin's own bytes single-stepped on the CPU with the trap flag, random and edge
+states) showed it in its first full run. EXECUTED: lifter fixed (else-branch clears the upper half); L3 0 differences
+in 1,115,824 states.
+### The rule
+A whole-program gate proves the paths it drives with the values they meet. An instruction's semantics must be proven
+alone, against the CPU, over states no program run makes; only then is "every path is right" a claim.
+
+## 284. PLAIN C `a * b` DOES NOT KEEP x86's NaN ORDER -- THE COMPILER MAY SWAP A COMMUTATIVE OPERATION
+Paid 2026-10-16 (JUNO lift, L3). The hardware float path was `#define JP8_MULSS(a,b) ((a)*(b))`. When both operands
+are NaN, SSE returns the FIRST source's NaN (quieted); GCC at -O0 evaluated the product with the operands swapped,
+so the lift returned the second NaN (add and mul only; sub / div keep their order by C semantics). EXECUTED: a NaN
+result is re-chosen by the x86 rule (jp8_cpu.h jp8_hwnf / jp8_hwnd; a non-NaN result untouched); L3 0 differences.
+### The rule
+IEEE leaves NaN payload choice open, so a C compiler may commute; x86 does not. Every float operation whose NaN
+choice matters must state the rule in code, not inherit it from evaluation order.
+
+## 285. A RESULT THAT DEPENDS ON THE OPTIMIZATION LEVEL IS A DEFECT EVEN WHEN ONE LEVEL IS RIGHT
+Paid 2026-10-16 (JUNO lift, L3). `fmin_ss(a,b) = (a < b) ? a : b` compiled at -O1 to minss (under DAZ the CPU returns
+the FLUSHED operand) and at -O0 -- the product build -- to a compare + select (returns the operand's raw denormal
+bits). jp8_cpu.h even noted the split. EXECUTED: the hardware path flushes both operands when the real MXCSR has
+DAZ (the runtime loads the guest's at every entry), then compares and selects -- the same bits at -O0 and -O1, in
+ISO C99 (a first fix called _mm_min_ss: the c99 gate turned RED on it, as it must); L3 0 differences at -O0.
+### The rule
+If the generated code's meaning changes with -O, the source does not say what it means. Write the semantics so every
+build level gives the same bits, and prove it at the level that ships.
+
+## 286. THE EMULATOR IS NOT THE CPU -- GRADE SINGLE INSTRUCTIONS AGAINST THE CPU AND LIST THE EMULATOR'S DEPARTURES
+Paid 2026-10-16 (JUNO lift, L3). The same 1.1 M states through Unicorn 2.1.4 (the engine under every oracle here)
+departed from the CPU in four classes: a denormal result or min / max operand it does not flush (FTZ / DAZ), the NaN it
+picks from two NaN operands (it may take the second), `bsf` of zero (it clears the register; the CPU keeps it), and
+MXCSR's sticky flags (never set). The lift now follows the CPU in all four (the last one is unobservable: the plugin
+only saves and reloads MXCSR, the flags reach three dead stack slots). EXECUTED: tools/lift/l3_unicorn.py classes them;
+any other Unicorn difference turns L3 RED.
+### The rule
+A whole-program oracle built on an emulator inherits the emulator's departures. Find them instruction by instruction
+against the CPU, name them, and make an unnamed one a failure.
+
+## 287. A SINGLE-STEP HARNESS HAS ITS OWN SEMANTICS: REP STEPS ONE ITERATION, A RANDOM JUMP TARGET FAULTS
+Paid 2026-10-16 (JUNO lift, L3, harness defects -- never the lift's). With the trap flag a REP string instruction traps
+after EACH iteration with rip unchanged, and Unicorn's count=1 also runs one iteration: both looked like a lift
+difference until stepped to the end. A random 64-bit jump / call / return target is non-canonical: the CPU faults AT
+the instruction. EXECUTED: the harness steps a REP until rip moves (Unicorn runs it to its end); indirect targets are
+canonical (a jump table's own cases half the time); the CPU-against-itself control and four planted lift faults bite.
+### The rule
+Before a difference is the code's, rule out the harness: give the test the semantics the hardware really has, and
+keep a control that must equal the CPU.

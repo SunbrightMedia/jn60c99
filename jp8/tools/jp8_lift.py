@@ -299,7 +299,12 @@ class Lifter:
             t = op[0].imm - IB
             return "if (%s) goto L_%x;" % (CC[m[1:]], t)
         if m.startswith("cmov") and m[4:] in CC:
-            return "if (%s) { %s }" % (CC[m[4:]], wr_int(ins, op[0], rd_int(ins, op[1])))
+            # x86-64: a 32-bit CMOVcc clears the destination's upper half WHATEVER the condition (SDM CMOVcc); the
+            # lift wrote only on a true condition (found by L3 against the CPU, 2026-10-16, docs/JUNO_LIFT.md)
+            w = wr_int(ins, op[0], rd_int(ins, op[1]))
+            if op[0].size == 4:
+                return "if (%s) { %s } else { R(%d)&=0xFFFFFFFFULL; }" % (CC[m[4:]], w, reg(ins, op[0].reg)[0])
+            return "if (%s) { %s }" % (CC[m[4:]], w)
         if m.startswith("set") and m[3:] in CC:
             return wr_int(ins, op[0], "(%s)?1:0" % CC[m[3:]], 8)
         # ---- integer moves

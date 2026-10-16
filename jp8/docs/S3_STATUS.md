@@ -19,6 +19,11 @@ Labels: PROVEN = executed under Unicorn on the plugin's own code; READ = static 
 | 5 | Transcribe (layer 3: the hosted boot) | GREEN 2026-09-22 (logs/lift_gate_layer3_boot.log, job jp8_L3gate3): from the POST-STATIC-INIT image the C twin runs the lifted BUILD 0x445020 -> SETSR 0x4464F0 (float xmm1, 44100) -> host_init through HOSTPARAM 0x4465B0 -> recall of patch 5 through DISPATCH (flag 0) + ASG_NOTIFY -> 2200 samples (no snap: the plugin's own walker settles) -> NOTEON 60 / 64 / NOTEOFF / 64, on boot patches 2 and 63: 167,616 output words and the whole heap EXACTLY 0. Lift: 762 functions, 156,488 instructions, 280 trap sites (none reached). TOOTH (FINE TUNE setter + 0.0003 at 0x38633e): FAILS with 432 differences, first at state[0]+0x1480. Two harness defects paid on the way (PORT_LESSONS 12): the stack is state (BUILD copies static-init stack residue into 8 voice records) and the C side entered every call 8 bytes below the oracle's rsp. | PROVEN (EXACTLY 0) |
 
 ## ⚑ RESUME HERE (written 2026-09-28 when the chat was retired; everything below this block is the dated record)
+**2026-10-16 -- THE SHARED LIFTER CHANGED UNDER THE JUNO L3 PROOF (docs/JUNO_LIFT.md).** jp8/tools/jp8_lift.py: a
+32-bit cmov now clears the destination's upper half when its condition is false (playbook 283); jp8/src/jp8_cpu.h's
+hardware float path: x86's NaN order for add / sub / mul / div and min / max as the instruction itself (playbooks
+284-285). The committed JP8 lifts predate both: regenerate and re-gate them before any new JP8 claim, and check that
+jp8/tools/jp8_fast.py parses the cmov statement's new else-branch.
 **2026-10-12 -- THE USER'S ORDER: STEP 1 IS THE FAST LIFTER (playbook 230).** The lifter's output is exact and 5-13x
 slower than the plugin's own code (measured on the JX-3P's voice render against the plugin run natively: 2,320 ms
 per second of audio vs 159). jp8/tools/jp8_fast.py rewrites a lifted source with each function's registers and flags

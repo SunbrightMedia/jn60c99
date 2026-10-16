@@ -275,14 +275,44 @@ static inline uint64_t sext(int sz, uint64_t v) { return sz == 64 ? v : sz == 32
 
 /* ---- SSE arithmetic entry points (the lifter emits these; default = the proven plain C expression) ---- */
 #ifndef JP8_SOFTFP
-#define JP8_ADDSS(a,b) ((a)+(b))
-#define JP8_SUBSS(a,b) ((a)-(b))
-#define JP8_MULSS(a,b) ((a)*(b))
-#define JP8_DIVSS(a,b) ((a)/(b))
-#define JP8_ADDSD(a,b) ((a)+(b))
-#define JP8_SUBSD(a,b) ((a)-(b))
-#define JP8_MULSD(a,b) ((a)*(b))
-#define JP8_DIVSD(a,b) ((a)/(b))
+/* the hardware's arithmetic, and x86's NaN ORDER (SDM 4.8.3.5): a NaN operand wins -- the FIRST source's, then the
+ * second's -- quieted; an invalid operation's default NaN is the hardware's own. Plain C (a)*(b) leaves the order to
+ * the compiler: GCC at -O0 evaluates a commutative add / mul either way round (L3 found it against the CPU, 2026-10-16,
+ * docs/JUNO_LIFT.md), so a NaN result is re-chosen here by the x86 rule. A result that is not a NaN is untouched. */
+static inline float jp8_hwnf(float r, float a, float b) {
+    uint32_t u, x;
+    memcpy(&u, &r, 4);
+    if ((u & 0x7FFFFFFFu) <= 0x7F800000u) return r;
+    memcpy(&x, &a, 4);
+    if ((x & 0x7FFFFFFFu) <= 0x7F800000u) memcpy(&x, &b, 4);
+    if ((x & 0x7FFFFFFFu) <= 0x7F800000u) return r;            /* no NaN operand: the invalid operation's own NaN */
+    x |= 0x00400000u; memcpy(&r, &x, 4); return r;
+}
+static inline double jp8_hwnd(double r, double a, double b) {
+    uint64_t u, x;
+    memcpy(&u, &r, 8);
+    if ((u & 0x7FFFFFFFFFFFFFFFULL) <= 0x7FF0000000000000ULL) return r;
+    memcpy(&x, &a, 8);
+    if ((x & 0x7FFFFFFFFFFFFFFFULL) <= 0x7FF0000000000000ULL) memcpy(&x, &b, 8);
+    if ((x & 0x7FFFFFFFFFFFFFFFULL) <= 0x7FF0000000000000ULL) return r;
+    x |= 0x0008000000000000ULL; memcpy(&r, &x, 8); return r;
+}
+static inline float jp8_hwaddss(float a, float b) { return jp8_hwnf(a + b, a, b); }
+static inline float jp8_hwsubss(float a, float b) { return jp8_hwnf(a - b, a, b); }
+static inline float jp8_hwmulss(float a, float b) { return jp8_hwnf(a * b, a, b); }
+static inline float jp8_hwdivss(float a, float b) { return jp8_hwnf(a / b, a, b); }
+static inline double jp8_hwaddsd(double a, double b) { return jp8_hwnd(a + b, a, b); }
+static inline double jp8_hwsubsd(double a, double b) { return jp8_hwnd(a - b, a, b); }
+static inline double jp8_hwmulsd(double a, double b) { return jp8_hwnd(a * b, a, b); }
+static inline double jp8_hwdivsd(double a, double b) { return jp8_hwnd(a / b, a, b); }
+#define JP8_ADDSS(a,b) jp8_hwaddss((a),(b))
+#define JP8_SUBSS(a,b) jp8_hwsubss((a),(b))
+#define JP8_MULSS(a,b) jp8_hwmulss((a),(b))
+#define JP8_DIVSS(a,b) jp8_hwdivss((a),(b))
+#define JP8_ADDSD(a,b) jp8_hwaddsd((a),(b))
+#define JP8_SUBSD(a,b) jp8_hwsubsd((a),(b))
+#define JP8_MULSD(a,b) jp8_hwmulsd((a),(b))
+#define JP8_DIVSD(a,b) jp8_hwdivsd((a),(b))
 #define JP8_CVTSS2SD(a) ((double)(a))
 #define JP8_CVTSD2SS(a) ((float)(a))
 #define JP8_SQRTSS(a) sqrtf(a)
@@ -459,11 +489,20 @@ static inline void cmp_d(CPU *c, double a, double b) {
     if (a != a || b != b) { c->zf = c->pf = c->cf = 1; } else { c->zf = (a == b); c->cf = (a < b); c->pf = 0; } c->of = c->sf = 0;
 }
 /* hardware min/max: return the SECOND operand when the compare is false (NaN, equal, signed zeros) */
-#if !defined(JP8_SOFTFP)       /* NOTE: gcc -O1 turns these into minss/maxss (hardware DAZ result), -O0 into comiss+select */
-static inline float  fmin_ss(float a, float b)   { return (a < b) ? a : b; }
-static inline float  fmax_ss(float a, float b)   { return (a > b) ? a : b; }
-static inline double fmin_sd(double a, double b) { return (a < b) ? a : b; }
-static inline double fmax_sd(double a, double b) { return (a > b) ? a : b; }
+#if !defined(JP8_SOFTFP)       /* the hardware's minss / maxss: under DAZ (the REAL MXCSR's bit 6 -- the runtime sets the
+                                  guest's at every entry) the CPU flushes both operands BEFORE the compare and returns
+                                  the flushed one. A bare C compare + select returned the raw denormal at -O0 and the
+                                  instruction's flushed value at -O1 (L3, 2026-10-16): flushing first gives both. */
+static inline float jp8_hwdazf(float x) {
+    uint32_t u; memcpy(&u, &x, 4); if (!(u & 0x7F800000u)) u &= 0x80000000u; memcpy(&x, &u, 4); return x;
+}
+static inline double jp8_hwdazd(double x) {
+    uint64_t u; memcpy(&u, &x, 8); if (!(u & 0x7FF0000000000000ULL)) u &= 0x8000000000000000ULL; memcpy(&x, &u, 8); return x;
+}
+static inline float  fmin_ss(float a, float b)   { if (_mm_getcsr() & 0x40u) { a = jp8_hwdazf(a); b = jp8_hwdazf(b); } return (a < b) ? a : b; }
+static inline float  fmax_ss(float a, float b)   { if (_mm_getcsr() & 0x40u) { a = jp8_hwdazf(a); b = jp8_hwdazf(b); } return (a > b) ? a : b; }
+static inline double fmin_sd(double a, double b) { if (_mm_getcsr() & 0x40u) { a = jp8_hwdazd(a); b = jp8_hwdazd(b); } return (a < b) ? a : b; }
+static inline double fmax_sd(double a, double b) { if (_mm_getcsr() & 0x40u) { a = jp8_hwdazd(a); b = jp8_hwdazd(b); } return (a > b) ? a : b; }
 #elif JP8_SOFTFP == 2          /* hardware: the flushed operand is returned (PROVEN T5 T6 T11) */
 static inline float  fmin_ss(float a, float b)   { a = jp8_dazf(a); b = jp8_dazf(b); return (a < b) ? a : b; }
 static inline float  fmax_ss(float a, float b)   { a = jp8_dazf(a); b = jp8_dazf(b); return (a > b) ? a : b; }

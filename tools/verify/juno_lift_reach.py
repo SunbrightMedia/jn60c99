@@ -16,6 +16,7 @@ insn_total are L1's denominator for the progress measure; the forms are L3's wor
 
 usage: python3 tools/verify/juno_lift_reach.py            (Unicorn only; two-process rule: never loads libjuno)
 """
+import gc
 import os
 import sys
 import json
@@ -235,6 +236,7 @@ def main():
                 if ops.run(op)[0] == 'throw':
                     break
             del ops, h2
+            gc.collect()                                 # one engine at a time: free the seed's emulator now
         step('search seed %d' % seed, s_seed)
     log('drive done')
 
