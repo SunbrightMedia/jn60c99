@@ -1,0 +1,1128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<script>
+	<panel>
+		<type>main</type>
+	</panel>
+	<panel>
+		<type>patch</type>
+	</panel>
+	<panel>
+		<type>auth</type>
+	</panel>
+
+	<panelType>
+		<type>main</type>
+		<name>main</name>
+		<position>0,0</position>
+		<windowPosition>40,40</windowPosition>
+		<size>1848,1618</size>	<!-- browse -->
+		<size>944,1618</size>	<!-- !browse !pro -->
+		<size>944,797</size>	<!-- PRO EDIT : 0 DS-1 -->
+		<size>944,1222</size>	<!-- PRO EDIT : 1 DD-8 -->
+		<size>944,984</size>	<!-- PRO EDIT : 2 TR-2 -->
+		<size>944,1222</size>	<!-- PRO EDIT : 3 TEST -->
+		<size>944,797</size>	<!-- PRO EDIT : 4 SD-1 -->
+		<size>944,797</size>	<!-- PRO EDIT : 5 BD-2 -->
+		<size>944,797</size>	<!-- PRO EDIT : 6 OD-1 -->
+		<size>944,797</size>	<!-- PRO EDIT : 7 OS-2 -->
+		<size>944,984</size>	<!-- PRO EDIT : 8 DS-2 -->
+		<size>944,984</size>	<!-- PRO EDIT : 9 MT-2 -->
+		<size>944,1222</size>	<!-- PRO EDIT :10 BF-3 -->
+		<size>944,1222</size>	<!-- PRO EDIT :11 PH-3 -->
+		<size>944,797</size>	<!-- PRO EDIT :12 ML-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :13 GE-7 -->
+		<size>944,984</size>	<!-- PRO EDIT :14 ODB-3 -->
+		<size>944,984</size>	<!-- PRO EDIT :15 MD-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :16 RV-6 -->
+		<size>944,797</size>	<!-- PRO EDIT :17 CS-3 -->
+		<size>944,984</size>	<!-- PRO EDIT :18 CH-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :19 PH-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :20 DS-1X -->
+		<size>944,797</size>	<!-- PRO EDIT :21 OD-3 -->
+		<size>944,797</size>	<!-- PRO EDIT :22 TE-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :23 MO-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :24 OC-5 -->
+		<size>944,797</size>	<!-- PRO EDIT :25 AW-3 -->
+		<size>944,797</size>	<!-- PRO EDIT :26 SY-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :27 CS-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :28 SP-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :29 SG-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :30 TW-1 -->
+		<size>944,797</size>	<!-- PRO EDIT :31 CE-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :32 DC-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :33 DM-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :34 BF-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :35 PN-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :36 OC-2 -->
+		<size>944,1222</size>	<!-- PRO EDIT :37 PS-2 -->
+		<size>944,1222</size>	<!-- PRO EDIT :38 DD-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :39 VB-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :40 DF-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :41 OD-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :42 PW-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :43 XT-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :44 CS-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :45 HM-2 -->
+		<size>944,984</size>	<!-- PRO EDIT :46 HM-3 -->
+		<size>944,984</size>	<!-- PRO EDIT :47 MZ-2 -->
+		<size>944,797</size>	<!-- PRO EDIT :48  -->
+		<size>944,797</size>	<!-- PRO EDIT :49  -->
+		<size>944,797</size>	<!-- PRO EDIT :50  -->
+		<size>944,797</size>	<!-- PRO EDIT :51  -->
+		<size>944,797</size>	<!-- PRO EDIT :52  -->
+		<size>944,797</size>	<!-- PRO EDIT :53  -->
+		<size>944,797</size>	<!-- PRO EDIT :54  -->
+		<size>944,797</size>	<!-- PRO EDIT :55  -->
+		<size>944,797</size>	<!-- PRO EDIT :56  -->
+		<size>944,797</size>	<!-- PRO EDIT :57  -->
+		<size>944,797</size>	<!-- PRO EDIT :58  -->
+		<size>944,797</size>	<!-- PRO EDIT :59  -->
+		<size>944,797</size>	<!-- PRO EDIT :60  -->
+		<size>944,797</size>	<!-- PRO EDIT :61  -->
+		<size>944,797</size>	<!-- PRO EDIT :62  -->
+		<size>944,797</size>	<!-- PRO EDIT :63  -->
+		<size>944,797</size>	<!-- PRO EDIT :64  -->
+		<sizeIndex>vm.vs.screen,!,vm.vs.edit,fm.tt.ms.model,2,+,1,?,*</sizeIndex>
+		<bitmapRef>pnBkGround_Main.png</bitmapRef>
+		<zoomValueRef>vm.vs.ZOOM</zoomValueRef>
+		<textWriterRef>zoom</textWriterRef>
+
+		<panel>
+			<type>browse</type>
+		</panel>
+		<panel>
+			<type>base</type>
+		</panel>
+		<panel>
+			<type>mfx</type>
+		</panel>
+		<panel>
+			<type>mfxEdit</type>
+		</panel>
+		<panel>
+			<type>resize</type>
+		</panel>
+		<panel>
+			<type>notOwnedModel</type>
+		</panel>
+		<panel>
+			<type>setup</type>
+		</panel>
+		<panel>
+			<type>about</type>
+			<backSize>1848,1618</backSize>
+			<appName>BOSS Effects Pedals</appName>
+			<!-- VersionDumper insertion C -->
+			<textMacArm64>
+				version 1.1.4
+				build 22092 ARM 64 bit
+			</textMacArm64>
+			<textMacX86_64>
+				version 1.1.4
+				build 22092 X86 64 bit
+			</textMacX86_64>
+			<textWin>
+				version 1.14
+				build 22092
+			</textWin>
+			<!-- VersionDumper insertion C -->
+			<copyright>
+				<!-- VersionDumper insertion B -->
+				Copyright (C) 2025 Roland Corporation
+				<!-- VersionDumper insertion B -->
+			</copyright>
+		</panel>
+		<panel>
+			<type>actNonActivated</type>
+		</panel>
+		<panel>
+			<type>actExpired</type>
+		</panel>
+		<control>
+			<type>ccAssign</type>
+		</control>
+	</panelType>
+	<panelType>
+		<type>resize</type>
+		<position>1788,1558</position><!-- browse -->
+		<position>884,1558</position><!-- !browse !pro -->
+		<position>884,737</position>	<!-- PRO EDIT : 0 DS-1 -->
+		<position>884,1160</position>	<!-- PRO EDIT : 1 DD-8 -->
+		<position>884,923</position>	<!-- PRO EDIT : 2 TR-2 -->
+		<position>884,1160</position>	<!-- PRO EDIT : 3 TEST -->
+		<position>884,737</position>	<!-- PRO EDIT : 4 SD-1 -->
+		<position>884,737</position>	<!-- PRO EDIT : 5 BD-2 -->
+		<position>884,737</position>	<!-- PRO EDIT : 6 OD-1 -->
+		<position>884,737</position>	<!-- PRO EDIT : 7 OS-2 -->
+		<position>884,923</position>	<!-- PRO EDIT : 8 DS-2 -->
+		<position>884,923</position>	<!-- PRO EDIT : 9 MT-2 -->
+		<position>884,1160</position>	<!-- PRO EDIT :10 BF-3 -->
+		<position>884,1160</position>	<!-- PRO EDIT :11 PH-3 -->
+		<position>884,737</position>	<!-- PRO EDIT :12 ML-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :13 GE-7 -->
+		<position>884,923</position>	<!-- PRO EDIT :14 ODB-3 -->
+		<position>884,923</position>	<!-- PRO EDIT :15 MD-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :16 RV-6 -->
+		<position>884,737</position>	<!-- PRO EDIT :17 CS-3 -->
+		<position>884,923</position>	<!-- PRO EDIT :18 CH-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :19 PH-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :20 DS-1X -->
+		<position>884,737</position>	<!-- PRO EDIT :21 OD-3 -->
+		<position>884,737</position>	<!-- PRO EDIT :22 TE-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :23 MO-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :24 OC-5 -->
+		<position>884,737</position>	<!-- PRO EDIT :25 AW-3 -->
+		<position>884,737</position>	<!-- PRO EDIT :26 SY-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :27 CS-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :28 SP-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :29 SG-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :30 TW-1 -->
+		<position>884,737</position>	<!-- PRO EDIT :31 CE-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :32 DC-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :33 DM-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :34 BF-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :35 PN-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :36 OC-2 -->
+		<position>884,1160</position>	<!-- PRO EDIT :37 PS-2 -->
+		<position>884,1160</position>	<!-- PRO EDIT :38 DD-2 -->
+		<position>884,1160</position>	<!-- PRO EDIT :39 VB-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :40 DF-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :41 OD-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :42 PW-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :43 XT-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :44 CS-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :45 HM-2 -->
+		<position>884,923</position>	<!-- PRO EDIT :46 HM-3 -->
+		<position>884,923</position>	<!-- PRO EDIT :47 MZ-2 -->
+		<position>884,737</position>	<!-- PRO EDIT :48  -->
+		<position>884,737</position>	<!-- PRO EDIT :49  -->
+		<position>884,737</position>	<!-- PRO EDIT :50  -->
+		<position>884,737</position>	<!-- PRO EDIT :51  -->
+		<position>884,737</position>	<!-- PRO EDIT :52  -->
+		<position>884,737</position>	<!-- PRO EDIT :53  -->
+		<position>884,737</position>	<!-- PRO EDIT :54  -->
+		<position>884,737</position>	<!-- PRO EDIT :55  -->
+		<position>884,737</position>	<!-- PRO EDIT :56  -->
+		<position>884,737</position>	<!-- PRO EDIT :57  -->
+		<position>884,737</position>	<!-- PRO EDIT :58  -->
+		<position>884,737</position>	<!-- PRO EDIT :59  -->
+		<position>884,737</position>	<!-- PRO EDIT :60  -->
+		<position>884,737</position>	<!-- PRO EDIT :61  -->
+		<position>884,737</position>	<!-- PRO EDIT :62  -->
+		<position>884,737</position>	<!-- PRO EDIT :63  -->
+		<position>884,737</position>	<!-- PRO EDIT :64  -->
+		<positionIndex>vm.vs.screen,!,vm.vs.edit,fm.tt.ms.model,2,+,1,?,*</positionIndex>
+		<size>40,40</size>
+
+		<control>
+			<type>label</type>
+			<position>0,0</position>
+			<size>40,40</size>
+			<bitmapRef>lbZoomGripCmn.png</bitmapRef>
+		</control>
+	</panelType>
+	<panelType>
+		<type>browse</type>
+		<position>944,0</position>
+		<size>904,1618</size>
+		<bitmapRef>pnBkGround_PedalSelect.png</bitmapRef>
+		<openCondition>vm.vs.screen</openCondition>
+		<control>
+			<type>label</type>
+			<position>15,21</position>
+			<size>170,36</size>
+			<textWriterRef>btOff</textWriterRef>
+			<text>PEDAL SELECT</text>
+		</control>
+		<control>
+			<type>browseModelGroup</type>
+			<position>14,72</position>
+			<size>860,116</size>
+			<sizeT>2,2</sizeT>
+			<textWriterRef>btOff</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<stringTableRef>modelGroupName</stringTableRef>
+			<numberTableRef>modelGroup</numberTableRef>
+			<feedbackColor>0x31,0x31,0x31</feedbackColor>
+			<bitmapRef>btPdlCategory.png</bitmapRef>
+		</control>
+		<control>
+			<type>browseButton</type>
+			<position>444,21</position>
+			<bitmapRef>btMyPdl.png</bitmapRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>1</role>
+			<textWriterRef>btOff</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<label>MY PEDALS</label>
+		</control>
+		<control>
+			<type>browseModel</type>
+			<position>15,204</position>
+			<size>852,1371</size>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<valueRef>fm.tt.ms.model</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<widthT>5</widthT>
+			<modelGroupHeight>46</modelGroupHeight>
+			<modelHeight>352</modelHeight>
+			<scrollWidth>28</scrollWidth>
+			<feedbackColor>0xFF,0xFF,0xFF,0x40</feedbackColor>
+			<scrollColor>0x50,0x50,0x50</scrollColor>
+			<selectColor>0x40,0x40,0x40</selectColor>
+			<textWriterRef>listCS</textWriterRef>
+			<stringTableRef>modelGroupName</stringTableRef>
+			<numberTableRef>modelGroup</numberTableRef>
+			<numberTableRef>modelX</numberTableRef>
+			<!-- index: display model -->
+			<!-- OVERDRIVE / DISTORTION -->
+			<bitmapRef>bmDF2.png</bitmapRef>
+			<bitmapRef>bmDS1.png</bitmapRef>
+			<bitmapRef>bmHM2.png</bitmapRef>
+			<bitmapRef>bmHM3.png</bitmapRef>
+			<bitmapRef>bmMZ2.png</bitmapRef>
+			<bitmapRef>bmOD1.png</bitmapRef>
+			<bitmapRef>bmOD2.png</bitmapRef>
+			<bitmapRef>bmPW2.png</bitmapRef>
+			<bitmapRef>bmSD1.png</bitmapRef>
+			<bitmapRef>bmXT2.png</bitmapRef>
+			<!-- DELAY -->
+			<bitmapRef>bmDD2.png</bitmapRef>
+			<bitmapRef>bmDM2.png</bitmapRef>
+			<!-- MODULATION -->
+			<bitmapRef>bmBF2.png</bitmapRef>
+			<bitmapRef>bmCE2.png</bitmapRef>
+			<bitmapRef>bmDC2.png</bitmapRef>
+			<bitmapRef>bmOC2.png</bitmapRef>
+			<bitmapRef>bmPH1.png</bitmapRef>
+			<bitmapRef>bmPN2.png</bitmapRef>
+			<bitmapRef>bmPS2.png</bitmapRef>
+			<bitmapRef>bmVB2.png</bitmapRef>
+			<!-- OTHERS -->
+			<bitmapRef>bmCS1.png</bitmapRef>
+			<bitmapRef>bmCS2.png</bitmapRef>
+			<bitmapRef>bmSG1.png</bitmapRef>
+			<bitmapRef>bmSP1.png</bitmapRef>
+			<bitmapRef>bmTW1.png</bitmapRef>
+			<!-- N: LOCK -->
+			<bitmapRef>bmKey.png</bitmapRef>
+			<!-- N+1: FRAME -->
+			<bitmapRef>bmFrame.png</bitmapRef>
+		</control>
+	</panelType>
+	<panelType>
+		<type>notOwnedModel</type>
+		<position>477,350</position>
+		<size>460,77</size>
+		<openCondition>vm.vs.notOwnedModel</openCondition>
+		<control>
+			<type>label</type>
+			<position>0,0</position>
+			<size>368,23</size>
+			<textWriterRef>demoModeRed</textWriterRef>
+			<text>DEMO MODE</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>0,24</position>
+			<size>368,23</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>Get full access with</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>0,47</position>
+			<size>368,23</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>Ultimate membership</text>
+		</control>
+		<control>
+			<type>label</type>
+			<position>308,15</position>
+			<bitmapRef>lbHdBtBase.png</bitmapRef>
+		</control>
+		<control>
+			<type>unlatchButton</type>
+			<position>309,16</position>
+			<function>OpenUrl</function>
+			<action>0</action>
+			<bitmapRef>btUnlock.png</bitmapRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<textWriterRef>btOff</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOff</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<label>MORE INFO</label>
+		</control>
+	</panelType>
+	<panelType>
+		<type>base</type>
+		<position>0,0</position>
+		<size>944,352</size>
+		<panel>
+			<type>meterMono</type>
+		</panel>
+		<panel>
+			<type>meterStereo</type>
+		</panel>
+		<control>
+			<type>menuButton</type>
+			<position>786,14</position>
+			<bitmapRef>btMenu.png</bitmapRef>
+			<valueRef>vm.vs.sampleRate</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<valueRef>vm.vs.auth</valueRef>
+			<valueRef>vm.vs.about</valueRef>
+			<valueRef>vm.vs.setup</valueRef>
+			<valueRef>vm.vs.forDev</valueRef>
+			<valueRef>vm.vs.bankId</valueRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<action>1</action>
+		</control>
+		<control>
+			<type>patchCombo</type>
+			<position>20,76</position>
+			<size>680,108</size>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<valueRef>fm.tt.ms.model</valueRef>
+			<valueRef>vm.vs.notOwnedModel</valueRef>
+			<textWriterRef>lcdLL</textWriterRef>
+			<tableRef>modelGroup</tableRef>
+			<tableRef>modelX</tableRef>
+			<tableRef>modelGroupName</tableRef>
+			<tableRef>modelNameDescription</tableRef>
+			<!-- index: display model -->
+			<!-- OVERDRIVE / DISTORTION -->
+			<modelBitmapRef>bmDF2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmDS1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmHM2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmHM3_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmMZ2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmOD1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmOD2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmPW2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmSD1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmXT2_Name.png</modelBitmapRef>
+			<!-- DELAY -->
+			<modelBitmapRef>bmDD2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmDM2_Name.png</modelBitmapRef>
+			<!-- MODULATION -->
+			<modelBitmapRef>bmBF2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmCE2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmDC2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmOC2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmPH1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmPN2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmPS2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmVB2_Name.png</modelBitmapRef>
+			<!-- OTHERS -->
+			<modelBitmapRef>bmCS1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmCS2_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmSG1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmSP1_Name.png</modelBitmapRef>
+			<modelBitmapRef>bmTW1_Name.png</modelBitmapRef>
+			<useWheel>2</useWheel>
+			<useKey>2</useKey>
+			<feedback>1</feedback>
+			<role>1</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>720,77</position>
+			<bitmapRef>btDec_L.png</bitmapRef>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<feedback>1</feedback>
+			<role>8</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>720,129</position>
+			<bitmapRef>btInc_L.png</bitmapRef>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<feedback>1</feedback>
+			<role>9</role>
+		</control>
+		<control>
+			<type>patchCombo</type>
+			<position>20,186</position>
+			<size>680,50</size>
+			<textPosition>12,0</textPosition>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<valueRef>fm.tt.ms.model</valueRef>
+			<valueRef>vm.vs.dawTrack</valueRef>
+			<valueRef>vm.vs.calcTime</valueRef>
+			<valueRef>fm.tt.cm.name0</valueRef>
+			<valueRef>fm.tt.cm.name1</valueRef>
+			<valueRef>fm.tt.cm.name2</valueRef>
+			<valueRef>fm.tt.cm.name3</valueRef>
+			<valueRef>fm.tt.cm.name4</valueRef>
+			<valueRef>fm.tt.cm.name5</valueRef>
+			<valueRef>fm.tt.cm.name6</valueRef>
+			<valueRef>fm.tt.cm.name7</valueRef>
+			<valueRef>fm.tt.cm.name8</valueRef>
+			<valueRef>fm.tt.cm.name9</valueRef>
+			<valueRef>fm.tt.cm.name10</valueRef>
+			<valueRef>fm.tt.cm.name11</valueRef>
+			<valueRef>fm.tt.cm.name12</valueRef>
+			<valueRef>fm.tt.cm.name13</valueRef>
+			<valueRef>fm.tt.cm.name14</valueRef>
+			<valueRef>fm.tt.cm.name15</valueRef>
+			<textWriterRef>lcdLL</textWriterRef>
+			<useWheel>2</useWheel>
+			<useKey>2</useKey>
+			<feedback>1</feedback>
+			<role>0</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>724,189</position>
+			<bitmapRef>btDec_S.png</bitmapRef>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<feedback>1</feedback>
+			<role>6</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>724,211</position>
+			<bitmapRef>btInc_S.png</bitmapRef>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<feedback>1</feedback>
+			<role>7</role>
+		</control>
+		<control>
+			<type>spareButton</type>
+			<position>786,72</position>
+			<bitmapRef>btCopyAB.png</bitmapRef>
+			<flatLabel>1</flatLabel>
+			<feedback>1</feedback>
+			<role>3</role>
+		</control>
+		<control>
+			<type>spareButton</type>
+			<position>786,130</position>
+			<bitmapRef>btSelAB.png</bitmapRef>
+			<flatLabel>1</flatLabel>
+			<feedback>1</feedback>
+			<role>2</role>
+		</control>
+		<control>
+			<type>undoButton</type>
+			<position>786,188</position>
+			<bitmapRef>btUndo.png</bitmapRef>
+			<flatLabel>1</flatLabel>
+			<feedback>1</feedback>
+			<role>0</role>
+		</control>
+		<control>
+			<type>undoButton</type>
+			<position>860,188</position>
+			<bitmapRef>btRedo.png</bitmapRef>
+			<flatLabel>1</flatLabel>
+			<feedback>1</feedback>
+			<role>1</role>
+		</control>
+		<control>
+			<type>latchButton</type>
+			<position>786,264</position>
+			<bitmapRef>btProEdit.png</bitmapRef>
+			<valueRef>vm.vs.edit</valueRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<textWriterRef>btOff</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<textWriterRef>btOn</textWriterRef>
+			<label>PRO EDIT</label>
+		</control>
+	</panelType>
+	<panelType>
+		<type>meterMono</type>
+		<position>0,254</position>
+		<size>769,72</size>
+		<openCondition>vm.vs.dawTrack,0,==</openCondition>
+		<control>
+			<type>label</type>
+			<position>17,18</position>
+			<size>32,36</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>IN</text>
+		</control>
+		<control>
+			<type>knob</type>
+			<position>49,0</position>
+			<valueRef>vm.vs.inGain</valueRef>
+			<stringTableRef>ioGain</stringTableRef>
+			<unit>dB</unit>
+			<bitmapRef>knMC.png</bitmapRef>
+			<tipBarPosition>80,-10</tipBarPosition>
+		</control>
+		<control>
+			<type>label</type>
+			<position>129,32</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>129,32</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>2</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>392,18</position>
+			<size>55,36</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>OUT</text>
+		</control>
+		<control>
+			<type>knob</type>
+			<position>447,0</position>
+			<valueRef>vm.vs.outGain</valueRef>
+			<stringTableRef>ioGain</stringTableRef>
+			<unit>dB</unit>
+			<bitmapRef>knMC.png</bitmapRef>
+			<tipBarPosition>80,-10</tipBarPosition>
+		</control>
+		<control>
+			<type>label</type>
+			<position>527,32</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>527,32</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>0</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+	</panelType>
+	<panelType>
+		<type>meterStereo</type>
+		<position>0,254</position>
+		<size>769,72</size>
+		<openCondition>vm.vs.dawTrack,0,!=</openCondition>
+		<control>
+			<type>label</type>
+			<position>17,18</position>
+			<size>32,36</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>IN</text>
+		</control>
+		<control>
+			<type>knob</type>
+			<position>49,0</position>
+			<valueRef>vm.vs.inGain</valueRef>
+			<stringTableRef>ioGain</stringTableRef>
+			<unit>dB</unit>
+			<bitmapRef>knMC.png</bitmapRef>
+			<tipBarPosition>80,-10</tipBarPosition>
+		</control>
+		<control>
+			<type>label</type>
+			<position>129,26</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>129,26</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>2</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>129,38</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>129,38</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>3</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>392,18</position>
+			<size>55,36</size>
+			<textWriterRef>btOn</textWriterRef>
+			<text>OUT</text>
+		</control>
+		<control>
+			<type>knob</type>
+			<position>447,0</position>
+			<valueRef>vm.vs.outGain</valueRef>
+			<stringTableRef>ioGain</stringTableRef>
+			<unit>dB</unit>
+			<bitmapRef>knMC.png</bitmapRef>
+			<tipBarPosition>80,-10</tipBarPosition>
+		</control>
+		<control>
+			<type>label</type>
+			<position>527,26</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>527,26</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>0</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>527,38</position>
+			<bitmapRef>lbMeter.png</bitmapRef>
+		</control>
+		<control>
+			<type>barGraphX</type>
+			<position>527,38</position>
+			<size>242,8</size>
+			<direction>1</direction>
+			<decay>8</decay>
+			<ch>1</ch>
+			<bitmapRef>bgMeter.png</bitmapRef>
+		</control>
+	</panelType>
+
+	<panelType>
+		<type>actNonActivated</type>
+		<name>actNonActivated</name>
+		<position>0,0</position>
+		<size>1848,1618</size>
+		<backColor>0x00,0x00,0x00,0x80</backColor>
+		<openCondition>vm.vs.activation,1,==</openCondition>
+		<control>
+			<type>label</type>
+			<position>322,70</position>
+			<size>300,74</size>
+			<text>Not Activated</text>
+			<textWriterRef>actN</textWriterRef>
+		</control>
+	</panelType>
+	<panelType>
+		<type>actExpired</type>
+		<name>actExpired</name>
+		<position>0,0</position>
+		<size>1848,1618</size>
+		<backColor>0x00,0x00,0x00,0x80</backColor>
+		<openCondition>vm.vs.activation,2,==</openCondition>
+		<control>
+			<type>label</type>
+			<position>322,70</position>
+			<size>300,74</size>
+			<text>Demo Mode</text>
+			<textWriterRef>actE</textWriterRef>
+		</control>
+	</panelType>
+
+	<panelType>
+		<type>patch</type>
+		<name>Patch Manager</name>
+		<position>0,0</position>
+		<windowPosition>40,40</windowPosition>
+		<size>1424,1476</size>
+		<modal>1</modal>
+		<bitmapRef>pnPatch.png</bitmapRef>
+		<openCondition>vm.vs.patch,1,==</openCondition>
+		<zoomValueRef>vm.vs.browseZoom</zoomValueRef>
+		<textWriterRef>zoom</textWriterRef>
+
+		<control>
+			<type>patchBank</type>
+			<position>16,116</position>
+			<size>428,714</size>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<textWriterRef>listN</textWriterRef>
+			<textWriterRef>listC</textWriterRef>
+			<cellWidth>400</cellWidth>
+			<heightT>14</heightT>
+			<scrollColor>0x80,0x80,0x80</scrollColor>
+			<scrollBackColor>0x40,0x40,0x40</scrollBackColor>
+			<feedbackColor>0xFF,0xFF,0xFF,0x1F</feedbackColor>
+		</control>
+		<control>
+			<type>patch</type>
+			<position>480,116</position>
+			<size>916,1288</size>
+			<valueRef>vm.vs.bankId</valueRef>
+			<valueRef>vm.vs.patchId</valueRef>
+			<valueRef>vm.vs.patch</valueRef>
+			<valueRef>vm.vs.patchManager</valueRef>
+			<textWriterRef>listN</textWriterRef>
+			<textWriterRef>listC</textWriterRef>
+			<textWriterRef>listL</textWriterRef>
+			<stringTableRef>modelNameDescription</stringTableRef>
+			<numberTableRef>modelX</numberTableRef>
+			<bitmapRef>brLock.png</bitmapRef>
+			<cellWidth>150,424,314</cellWidth>
+			<label>PEDAL,NAME,NOTES</label>
+			<heightT>23</heightT>
+			<scrollColor>0x50,0x50,0x50</scrollColor>
+			<feedbackColor>0x31,0x31,0x31</feedbackColor>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>23,1210</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>IMPORT</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>2</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>247,1210</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>EXPORT</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>3</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>23,1290</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>LOAD(TSV)</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>10</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>247,1290</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>SAVE(TSV)</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>11</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>23,1130</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>NEW</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>0</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>247,1130</position>
+			<bitmapRef>btMg.png</bitmapRef>
+			<label>DELETE</label>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>1</role>
+		</control>
+		<control>
+			<type>patchButton</type>
+			<position>480,16</position>
+			<bitmapRef>btMgWrite.png</bitmapRef>
+			<textWriterRef>btOff</textWriterRef>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<role>4</role>
+		</control>
+		<control>
+			<type>label</type>
+			<position>24,1368</position>
+			<size>60,60</size>
+			<bitmapRef>lbInfoL.png</bitmapRef>
+		</control>
+		<control>
+			<type>label</type>
+			<position>16,493</position>
+			<size>856,874</size>
+			<textWriterRef>info</textWriterRef>
+			<visiblePosition>0,878</visiblePosition>
+			<visibleSize>60,60</visibleSize>
+			<text-win>
+				- ctrl+R: new bank
+				- ctrl+T: delete bank
+				- ctrl+I: import bank from file
+				- ctrl+E: export bank to file
+				- ctrl+N: new tone
+				- Delete: delete tone
+				- ctrl+O: read tone
+				- ctrl+S: write tone
+				- Space: rename tone
+				- ctrl+C: copy tone to clipboard
+				- ctrl+X: cut tone to clipboard
+				- ctrl+V: replace tone from clipboard
+				- ctrl+Y: insert tone from clipboard
+				- ctrl+Z: undo
+				- ctrl+shift+Z: redo
+				- ctrl+shift+D: dump patch name
+				- Up/Down/PageUp/PageDown: select
+				- Esc: close
+			</text-win>
+			<text-mac>
+				- command+R: new bank
+				- command+T: delete bank
+				- command+I: import bank from file
+				- command+E: export bank to file
+				- command+N: new tone
+				- Delete(forward): delete tone
+				- command+O: read tone
+				- command+S: write tone
+				- Space: rename tone
+				- command+C: copy tone to clipboard
+				- command+X: cut tone to clipboard
+				- command+V: replace tone from clipboard
+				- command+Y: insert tone from clipboard
+				- command+Z: undo
+				- command+shift+Z: redo
+				- command+shift+D: dump patch name
+				- Up/Down/PageUp/PageDown: select
+				- Esc: close
+			</text-mac>
+		</control>
+		<control>
+			<type>label</type>
+			<position>1364,1416</position>
+			<size>40,40</size>
+			<bitmapRef>lbZoomGripCmn.png</bitmapRef>
+		</control>
+	</panelType>
+
+	<panelType>
+		<type>setup</type>
+		<position>0,0</position>
+		<size>1848,1618</size>
+		<backColor>0x00,0x00,0x00,0x80</backColor>
+		<openCondition>vm.vs.setup,1,==</openCondition>
+		<modal>1</modal>
+		
+		<panel>
+			<type>setupA</type>
+		</panel>
+	</panelType>
+	<panelType>
+		<type>setupA</type>
+		<position>72,0</position>
+		<size-win-sa>800,700</size-win-sa>
+		<size-win-pi>800,260</size-win-pi>
+		<size-mac-sa>800,740</size-mac-sa>
+		<size-mac-pi>800,380</size-mac-pi>
+		<backColor>0x20,0x20,0x20</backColor>
+
+		<control>
+			<type>setupButton</type>
+			<position>80,60</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>midiIn</function>
+			<arguments>0,MIDI CTRL Input</arguments>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control>
+		<control>
+			<type>setupButton</type>
+			<position>80,140</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>midiOut</function>
+			<arguments>0,MIDI CTRL Output</arguments>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control>
+		<control-sa>
+			<type>setupButton</type>
+			<position>80,220</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>midiIn</function>
+			<arguments>1,MIDI Input</arguments>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-sa>
+
+		<control-sa>
+			<type>setupButton</type>
+			<position>80,340</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>audioOut</function>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-sa>
+		<control-sa>
+			<type>setupButton</type>
+			<position>80,420</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>audioOutBus</function>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-sa>
+		<control-sa>
+			<type>setupButton</type>
+			<position>80,500</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>audioSampleRate</function>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-sa>
+		<control-win-sa>
+			<type>setupButton</type>
+			<position>80,580</position>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>asioControlPanel</function>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-win-sa>
+
+		<control-mac>
+			<type>setupButton</type>
+			<position-mac-sa>160,1240</position-mac-sa>
+			<position-mac-pi>160,600</position-mac-pi>
+			<bitmapRef>btSetup1.png</bitmapRef>
+			<function>invertWheel</function>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateSetup</valueRef>
+			<textWriterRef>setupN</textWriterRef>
+			<textWriterRef>setupA</textWriterRef>
+			<textWriterRef>setupD</textWriterRef>
+		</control-mac>
+	</panelType>
+
+	<panelType>
+		<type>auth</type>
+		<name>Authentication</name>
+		<backColor>0x00,0x00,0x00,0x80</backColor>
+		<modal>1</modal>
+		<windowPosition>40,40</windowPosition>
+		<size>380,226</size>
+		<openCondition>vm.vs.auth,1,==</openCondition>
+
+		<panel>
+			<type>authA</type>
+		</panel>
+	</panelType>
+	<panelType>
+		<type>authA</type>
+		<position>0,0</position>
+		<size>380,226</size>
+		<backColor>0x20,0x20,0x20</backColor>
+
+		<control>
+			<type>label</type>
+			<position>30,20</position>
+			<size>100,20</size>
+			<text>Email Address:</text>
+			<textWriterRef>authCaption</textWriterRef>
+		</control>
+		<control>
+			<type>authDisplay</type>
+			<position>30,40</position>
+			<size>320,20</size>
+			<role>0</role>
+			<textWriterRef>authContent</textWriterRef>
+			<valueRef>vm.vs.authDummy</valueRef>
+		</control>
+
+		<control>
+			<type>label</type>
+			<position>30,70</position>
+			<size>100,20</size>
+			<text>Password:</text>
+			<textWriterRef>authCaption</textWriterRef>
+		</control>
+		<control>
+			<type>authDisplay</type>
+			<position>30,90</position>
+			<size>320,20</size>
+			<role>1</role>
+			<textWriterRef>authContent</textWriterRef>
+			<valueRef>vm.vs.authDummy</valueRef>
+		</control>
+
+		<control>
+			<type>authDisplay</type>
+			<position>30,130</position>
+			<size>320,20</size>
+			<role>2</role>
+			<textWriterRef>authState</textWriterRef>
+			<valueRef>vm.vs.updateAuth</valueRef>
+		</control>
+		<control>
+			<type>authButton</type>
+			<position>30,170</position>
+			<bitmapRef>btSetup2.png</bitmapRef>
+			<action>1</action>
+			<feedback>1</feedback>
+			<flatLabel>1</flatLabel>
+			<valueRef>vm.vs.updateAuth</valueRef>
+			<textWriterRef>authN</textWriterRef>
+			<textWriterRef>authA</textWriterRef>
+			<textWriterRef>authD</textWriterRef>
+		</control>
+	</panelType>
+</script>

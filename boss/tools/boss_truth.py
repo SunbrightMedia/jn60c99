@@ -3,7 +3,10 @@
 Pedals port (the twin of tools/verify/truth.py).
 
 THE ONLY TRUTH is the Roland Cloud "BOSS Effects Pedals" VST3 binary in
-boss/truth/. Every BOSS tool resolves it through here -- never a hardcoded path.
+boss/truth/, with its Script folder (Script.xml + the other XML, TextCodeTable.dat,
+Initial.bin, BX00_DATA.BIN, the GUI art) in boss/truth/Script/ and the factory
+presets (Preset<model>.bin) in boss/truth/Preset/, all as the user supplied them.
+Every BOSS tool resolves them through here -- never a hardcoded path.
 
 Resolution order:
   1. $BOSS_TRUTH (a directory) if set.
@@ -19,8 +22,19 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 TRUTH_DIR = os.environ.get('BOSS_TRUTH') or os.path.join(_HERE, '..', 'truth')
 TRUTH_DIR = os.path.abspath(TRUTH_DIR)
 
-VST3 = os.path.join(TRUTH_DIR, 'BOSS_Effects_Pedals.vst3')
-SUMS = os.path.join(TRUTH_DIR, 'SHA256SUMS')
+VST3       = os.path.join(TRUTH_DIR, 'BOSS_Effects_Pedals.vst3')
+SCRIPT_DIR = os.path.join(TRUTH_DIR, 'Script')
+SCRIPT_XML = os.path.join(SCRIPT_DIR, 'Script.xml')
+TEXT_CODE  = os.path.join(SCRIPT_DIR, 'TextCodeTable.dat')
+INITIAL    = os.path.join(SCRIPT_DIR, 'Initial.bin')
+BX00_DATA  = os.path.join(SCRIPT_DIR, 'BX00_DATA.BIN')
+PRESET_DIR = os.path.join(TRUTH_DIR, 'Preset')
+SUMS       = os.path.join(TRUTH_DIR, 'SHA256SUMS')
+
+
+def preset(model):
+    """The factory preset file of one pedal model, e.g. preset('DS1')."""
+    return os.path.join(PRESET_DIR, 'Preset%s.bin' % model.upper().replace('-', ''))
 
 
 def _sha256(path):
@@ -52,17 +66,17 @@ def verify(truth_dir=None):
 
 def require():
     """Fail loudly if the ground truth is missing."""
-    if not os.path.exists(VST3):
-        raise SystemExit("ground truth missing: %s\nPut BOSS_Effects_Pedals.vst3 in %s "
-                         "(or set $BOSS_TRUTH)." % (VST3, TRUTH_DIR))
+    for p in (VST3, SCRIPT_XML, TEXT_CODE, INITIAL, BX00_DATA, SUMS):
+        if not os.path.exists(p):
+            raise SystemExit("ground truth missing: %s\n(truth dir %s, or set $BOSS_TRUTH)"
+                             % (p, TRUTH_DIR))
 
 
 def _tooth():
     """The check must FAIL on one flipped byte (a scratch copy; truth untouched)."""
     with tempfile.TemporaryDirectory() as t:
-        shutil.copy(SUMS, t)
+        shutil.copytree(TRUTH_DIR, t, dirs_exist_ok=True)
         dst = os.path.join(t, os.path.basename(VST3))
-        shutil.copy(VST3, dst)
         with open(dst, 'r+b') as f:
             f.seek(0x1000)
             b = f.read(1)
@@ -78,7 +92,8 @@ def _tooth():
 if __name__ == '__main__':
     require()
     verify()
-    print("OK  %s  %s" % (os.path.basename(VST3), _sha256(VST3)))
+    n = sum(1 for l in open(SUMS) if l.strip())
+    print("OK  %d files pinned; %s  %s" % (n, os.path.basename(VST3), _sha256(VST3)))
     if '--tooth' in sys.argv:
         if not _tooth():
             raise SystemExit("TOOTH FAILED: a flipped byte passed verify()")

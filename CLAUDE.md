@@ -339,8 +339,8 @@ mine is a hypothesis (playbook 80).
   ~66 % of one S3, NOT listen-certified; the harness was lost — rebuild it
   from jp8/tools/jp8_emu.py.
 - **BOSS Effects Pedals** (a separate track, 2026-10-16): intake only (boss/docs/S3_STATUS.md):
-  the .vst3 pinned in boss/truth/ (resolve via boss/tools/boss_truth.py); 31 pedal models (READ); the
-  companion files (Script.xml, TextCodeTable.dat, Initial.bin) are owed by the user.
+  the .vst3, its Script folder and 25 factory presets pinned in boss/truth/ (resolve via
+  boss/tools/boss_truth.py); 31 pedal classes, 25 shipped (READ). Next: census, oracle boot, then the lift.
 - **Parked tracks**: DAW-parity (HOSTPATH_PARITY_SCOPE steps 2-5) and Track B
   Daisi sonic-identity fork (harness done, zero voice code, blind-gate warning
   stands). Both resumable from HISTORY.md pointers.
