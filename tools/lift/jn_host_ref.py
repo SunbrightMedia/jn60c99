@@ -128,6 +128,7 @@ def main():
     facts = dict(audio=h.audio, comp=h.comp, core=h.core, ctrl=h.ctrl, com_next=h.com_next,
                  process_fn=q(q(h.audio) + 8 * PROCESS_SLOT), patch_fn=H.W.PATCH_LOAD,
                  vt_events=h.vt['events'], vt_pchanges=h.vt['pchanges'], vt_pqueue=h.vt['pqueue'], vt_stream=h.vt['stream'],
+                 vt_frame=h.vt['frame'],
                  heap_ptr=heap_top, heap_limit=E.HEAP_BASE + HEAP_MAP, hc=hc, mxcsr=uc.reg_read(UC_X86_REG_MXCSR),
                  rsp=(E.STACK_BASE + E.STACK_SIZE - 0x10000) & ~0xF, ret=E.SCRATCH + 0x5000,
                  lasterr=getattr(h, 'lasterr', 0), fake_heap=E.FAKE_HEAP)

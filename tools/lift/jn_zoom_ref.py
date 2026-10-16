@@ -34,7 +34,7 @@ def run(scn, panel, lay):
     rows, zoom = [], None
     for st in Z.steps(scn):
         if st[0] == 'attach':
-            h.attach_editor(st[1], st[2])
+            h.attach_editor(st[1], st[2], frame=True)      # a real host sets an IPlugFrame before attached (playbook 293)
         elif st[0] == 'screen':
             h.screen = {0x4E: st[1], 0x4F: st[2]}
         elif st[0] == 'mset':

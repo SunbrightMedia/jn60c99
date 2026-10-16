@@ -78,7 +78,7 @@ static struct {
     int nreg; uint64_t rbase[NREG_MAX], rsize[NREG_MAX];
     /* the template's facts (tools/lift/jn_host_ref.py) */
     uint64_t rsp, ret, audio, comp, core, ctrl, process_fn, patch_fn, com_next, mx0,
-             vt_events, vt_pchanges, vt_pqueue, vt_stream, fake_heap, lasterr;
+             vt_events, vt_pchanges, vt_pqueue, vt_stream, vt_frame, fake_heap, lasterr;
     uint64_t reg[16], xreg[16][2], eflags;
     /* the host objects junoh_init makes after the setup calls (host_process_emu.setup's order) */
     uint64_t bufl, bufr, bus, ctx, pd, ev, pc, pq[NPQ]; double rate; uint64_t maxblock;
@@ -104,7 +104,7 @@ static struct {
     int nunh; const char *unh_name[NUNH_MAX]; uint64_t unh_n[NUNH_MAX];
     /* the editor (host_process_emu.attach_editor): from its first attach on, each panel window found by its fit's
      * call (WINDOW_FIT) -- windows[(w, h)] = the window, the latest of a size */
-    int ed_on; int nwin; struct { int32_t w, h; uint64_t win; } win[NWIN_MAX];
+    int ed_on; uint64_t frame; int nwin; struct { int32_t w, h; uint64_t win; } win[NWIN_MAX];
     /* the editor's imports (wrapper_emu._imp / _gdip): the virtual screen (GetSystemMetrics 78 / 79, others 0), the
      * GUI's clock (GetTickCount: the oracle's tick_ms), the GDI+ images (gdip_imgs: handle -> w, h, format), the DIB
      * sections (dibs) and the skin's blank-image sizes by file name (wrapper_emu.skin_sizes over Script.xml): the
@@ -388,6 +388,10 @@ void jp8_hostcall(CPU *c, uint64_t target) {
             if (slot == 4) record_edit((uint32_t)rdx, c->x[2].d[0]);     /* performEdit(id, ParamValue in xmm2) */
             if (slot >= 3) { c->r[0] = 0; return; }
         }
+        if (kl == 5 && !strncmp(kind, "frame", 5)) {                                           /* IPlugFrame (editor) */
+            if (slot == 0) { wq(r8, 0); c->r[0] = E_NOINTERFACE_; return; }   /* queryInterface: no extra interface */
+            c->r[0] = 0; return;                                             /* addRef / release / resizeView -> kResultOk */
+        }
         snprintf(msg, sizeof msg, "host object method %s not served", n); jp8_trap(c, target, msg); return;
     }
     /* the imports, answered EXACTLY as the oracle answers them (tools/verify/e2e_emu.py under probes/b6/wrapper_emu.py):
@@ -512,7 +516,8 @@ void jp8_hook(CPU *c, uint64_t rva) {
         for (v = 0; v < 8; v++) {               /* voices: a unit at or above the voice count outputs zeros */
             if (v >= nv) {
                 void *m = junoh_guest(mainb[v], 4 * (size_t)n), *s = junoh_guest(subb[v], 4 * (size_t)n);
-                if (m) memset(m, 0, 4 * (size_t)n); if (s) memset(s, 0, 4 * (size_t)n);
+                if (m) memset(m, 0, 4 * (size_t)n);
+                if (s) memset(s, 0, 4 * (size_t)n);
                 continue;
             }
             for (i = 0; i < n; i++) {
@@ -609,7 +614,7 @@ static int load(const unsigned char *b, size_t len) {
         KV("ret", H.ret); KV("audio", H.audio); KV("comp", H.comp); KV("core", H.core); KV("ctrl", H.ctrl);
         KV("process_fn", H.process_fn); KV("patch_fn", H.patch_fn); KV("com_next", H.com_next);
         KV("vt_events", H.vt_events); KV("vt_pchanges", H.vt_pchanges); KV("vt_pqueue", H.vt_pqueue);
-        KV("vt_stream", H.vt_stream); KV("fake_heap", H.fake_heap); KV("lasterr", H.lasterr); KV("eflags", H.eflags);
+        KV("vt_stream", H.vt_stream); KV("vt_frame", H.vt_frame); KV("fake_heap", H.fake_heap); KV("lasterr", H.lasterr); KV("eflags", H.eflags);
         KV("tls_ctr", H.tls_ctr); KV("fls_ctr", H.fls_ctr);
         /* the oracle's Python-side state at the cut (jn_host_ref.py): tls:<key>, fls:<key>, once:<i>, sl:<head>:<i> */
         else if (!strncmp(key, "tls:", 4)) { if (kv_set(&H.ntls, H.tls_k, H.tls_v, strtoull(key + 4, NULL, 10), v)) return err(JUNOH_E_TEMPLATE, "template: TLS table full"); }
@@ -654,7 +659,7 @@ static int load(const unsigned char *b, size_t len) {
         }
 #undef KV
     }
-    if (!H.audio || !H.comp || !H.core || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream)
+    if (!H.audio || !H.comp || !H.core || !H.ctrl || !H.process_fn || !H.patch_fn || !H.vt_events || !H.vt_pchanges || !H.vt_pqueue || !H.vt_stream || !H.vt_frame)
         return err(JUNOH_E_TEMPLATE, "template: a fact is missing");
     for (k = 0; k < (uint32_t)H.ngd; k++) if (!H.gd[k].hd) return err(JUNOH_E_TEMPLATE, "template: a GDI+ image is missing");
     for (k = 0; k < (uint32_t)H.ndib; k++)            /* the oracle's handles: 0xB0000 + 0x10 * (the count before it) */
@@ -830,8 +835,9 @@ int junoh_screen(int32_t cx, int32_t cy) {      /* the machine's virtual screen 
     int rc = live(); if (rc) return rc;
     H.scr_cx = cx; H.scr_cy = cy; return JUNOH_OK;
 }
-int junoh_attach_editor(int32_t cx, int32_t cy, uint64_t *view) {   /* attach_editor(cx, cy), the oracle's steps in order */
+int junoh_attach_editor(int32_t cx, int32_t cy, uint64_t *view) {   /* attach_editor(cx, cy, frame=True), the oracle's order */
     uint64_t name, t, v; int rc = live(); if (rc) return rc;
+    if (!H.vt_frame) return err(JUNOH_E_TEMPLATE, "the template names no frame vtable (fact 'vt_frame')");
     H.scr_cx = cx; H.scr_cy = cy;
     H.ed_on = 1;                                 /* its window-fit hook, installed at the first attach, stays */
     name = alloc_com(16); t = alloc_com(16);
@@ -839,6 +845,8 @@ int junoh_attach_editor(int32_t cx, int32_t cy, uint64_t *view) {   /* attach_ed
     if (call(gq(gq(H.ctrl) + 8 * 17), H.ctrl, name, 0, 0)) return JUNOH_E_TRAP;     /* IEditController::createView */
     v = H.cpu.r[0];
     if (!v) return err(JUNOH_E_STATE, "createView(\"editor\") gave no view");
+    H.frame = new_obj(H.vt_frame);                                                   /* IPlugFrame */
+    if (call(gq(gq(v) + 8 * 12), v, H.frame, 0, 0)) return JUNOH_E_TRAP;              /* IPlugView::setFrame */
     if (call(gq(gq(v) + 8 * 4), v, 0x10010, t, 0)) return JUNOH_E_TRAP;               /* IPlugView::attached */
     if (view) *view = v;
     return JUNOH_OK;

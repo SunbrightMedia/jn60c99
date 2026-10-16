@@ -60,7 +60,7 @@ from pm_common import panel_sizes                          # noqa: E402,F401  (t
 class HostProcess(W.Wrapper):
     def __init__(self):
         super().__init__()
-        for k, n in (('events', 6), ('pchanges', 6), ('pqueue', 7)):
+        for k, n in (('events', 6), ('pchanges', 6), ('pqueue', 7), ('frame', 4)):
             self.vt[k] = self._vtable(k, n)
         self._req = None
         self._nested_top = None
@@ -100,11 +100,16 @@ class HostProcess(W.Wrapper):
         self.renders.append(n)
 
     # ------------------------------------------------------------ the editor (docs/WINDOW_ZOOM.md)
-    def attach_editor(self, cx, cy):
+    def attach_editor(self, cx, cy, frame=False):
         """the host opens the plugin's editor on a machine whose virtual screen is cx x cy
-        (GetSystemMetrics 78 / 79): IEditController::createView("editor"), IPlugView::attached on a
-        parent window. Each panel window is found by its fit's calls (rva 0x312750) as it appears:
-        self.windows[(w, h)] = the window (w x h: its panel's Script.xml size)."""
+        (GetSystemMetrics 78 / 79): IEditController::createView("editor"), optional IPlugView::setFrame,
+        IPlugView::attached on a parent window. Each panel window is found by its fit's calls (rva 0x312750)
+        as it appears: self.windows[(w, h)] = the window (w x h: its panel's Script.xml size).
+        frame=True gives the view a host IPlugFrame (slot 12) BEFORE attached, as a real VST3 host does: the
+        plugin's attached() then calls frame->resizeView (IPlugFrame slot 3) on a real host method, not a null
+        frame. (The old default, frame=False, left the frame null; the plugin's resizeView then dereferenced
+        guest 0, which Unicorn tolerated as a zeroed page but the lifted port cannot -- playbook 293. A40's
+        zoom_fit_gate keeps frame=False, unchanged.)"""
         uc = self.uc
         self.screen = {0x4E: cx, 0x4F: cy}
         if not hasattr(self, 'windows'):
@@ -121,6 +126,9 @@ class HostProcess(W.Wrapper):
         view = self.vcall(self.ctrl, 17, name, count=4_000_000_000)      # IEditController::createView
         if not view:
             raise RuntimeError('createView("editor") gave no view')
+        if frame:
+            self.frame = self.new_obj('frame')                            # IPlugFrame
+            self.vcall(view, 12, self.frame, count=4_000_000_000)          # IPlugView::setFrame
         self.vcall(view, 4, 0x10010, t, count=4_000_000_000)               # IPlugView::attached
         self.view = view
         return view
@@ -181,10 +189,14 @@ class HostProcess(W.Wrapper):
     def _com(self, uc, name, this, a1, a2, a3):
         _, kind, slot = name.split(':')
         slot = int(slot)
-        if kind not in ('events', 'pchanges', 'pqueue'):
+        if kind not in ('events', 'pchanges', 'pqueue', 'frame'):
             return super()._com(uc, name, this, a1, a2, a3)
-        o = self.objs[this]
         ret = lambda v: self._ret(uc, v)
+        if kind == 'frame':                          # IPlugFrame: resizeView (slot 3) acknowledges with kResultOk
+            if slot == 0:                            # queryInterface: the host grants no extra interface
+                uc.mem_write(a2, struct.pack('<Q', 0)); return ret(0x80004002)
+            return ret(0)                            # addRef / release / resizeView
+        o = self.objs[this]
         if slot in (1, 2):
             return ret(1)
         if kind == 'events':                         # IEventList

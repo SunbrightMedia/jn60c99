@@ -4877,3 +4877,22 @@ l3_flags.py) still read the one file -- the split is a build step, not a new sou
 A generated translation unit can outgrow the compiler's memory. Split it by text into independent parts that provably
 re-join to the original, compile them within the memory budget, and keep the single file as the source everything
 else reads.
+
+## 293. A REAL VST3 HOST SETS THE FRAME BEFORE attached() -- A NULL-FRAME SHORTCUT ONLY WORKS UNDER THE EMULATOR
+Paid 2026-10-16 (JUNO lift, L5 editor + window-zoom drive). The lifted editor attach trapped in all four scenarios:
+IPlugView::attached (rva 0x3c89e0) calls this->frame->resizeView (IPlugFrame slot 3) after it computes the window
+size. The JUNO host oracle's attach_editor (host_process_emu) called createView + attached but NOT setFrame, so the
+frame (view+0x30) was NULL; attached() then did mov rcx,[this+0x30]=0; mov rax,[0]; call [rax+0x18] -- a call to
+guest address 0. Unicorn TOLERATES this (page 0 is mapped and zeroed, the call returns), so the oracle "succeeded";
+the lifted port cannot lift address 0 and trapped (jp8_icall: indirect target 0xffffffff00000000 not lifted). Per the
+VST3 contract a host ALWAYS calls IPlugView::setFrame before attached (JP8's host does). EXECUTED: host_process_emu.
+attach_editor gained an optional frame=True that creates an IPlugFrame host object (a 4-slot COM vtable, resizeView ->
+kResultOk) and calls setFrame (slot 12) before attached; the L5 zoom drive uses it on both sides; the frame vtable is
+built at boot so the template carries it, and jn_host.c answers COM:frame:* and reads vt_frame from the template.
+A40's hand-port zoom_fit_gate keeps frame=False (its zoom read is frame-independent) and is unchanged. Found by the
+gate that first drove the lifted attach; the init gate never looked (it compares image+heap+com, and the null-frame
+call's divergence was on a code path, not those regions).
+### The rule
+Model the host the way the spec says a real host behaves, not the way the emulator happens to tolerate. A degenerate
+input (a null frame) that the oracle survives by accident is not a license to feed the port the same input; give both
+the realistic input and prove they agree.
