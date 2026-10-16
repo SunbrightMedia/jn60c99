@@ -22,7 +22,12 @@ cc $BASE -pedantic-errors -c "$R/lift/jn_host.c" -o "$OUT/jn_host.o"
 cc -shared -o "$OUT/libjunohost.so" "$OUT/jn_lift.o" "$OUT/jn_rt.o" "$OUT/jn_host.o" -lm
 echo "[4/5] the oracle reference (Unicorn, a process of its own)"
 python3 "$R/tools/lift/jn_host_mem_ref.py" "$OUT/ref"
-echo "[5/5] the lifted host vs the oracle (ctypes, a process of its own) + the tooth"
+echo "[5/7] the lifted host vs the oracle after init (ctypes) + the tooth"
 python3 "$R/tools/lift/jn_host_mem_c.py" "$OUT/libjunohost.so" "$OUT/jn_host_template.bin" "$OUT/ref"
 python3 "$R/tools/lift/jn_host_mem_c.py" "$OUT/libjunohost.so" "$OUT/jn_host_template.bin" "$OUT/ref" --tooth
-echo "jn_host_gate: GREEN"
+echo "[6/7] the oracle process() reference (Unicorn, a process of its own)"
+python3 "$R/tools/lift/jn_proc_ref.py" "$OUT/proc_ref"
+echo "[7/7] the lifted process() output words vs the oracle (ctypes) + the note tooth"
+python3 "$R/tools/lift/jn_proc_c.py" "$OUT/libjunohost.so" "$OUT/jn_host_template.bin" "$OUT/proc_ref"
+python3 "$R/tools/lift/jn_proc_c.py" "$OUT/libjunohost.so" "$OUT/jn_host_template.bin" "$OUT/proc_ref" --tooth
+echo "jn_host_gate: GREEN (init memory + process output words both EXACTLY 0, teeth bite)"

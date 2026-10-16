@@ -87,3 +87,17 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   0x317aec780, com_next 0x5a0001ab0); the rate tooth bites (image differs at +0xc43c20). NEXT L5: the render
   composition (jp8_hook 0x3C7400 over the plugin's own voice 0x398F30 / master 0x398EC0), then process()/patch/state/
   editor drives EXACTLY 0.
+- 2026-10-16 L5 PROCESS GREEN: the lifted render is bit-exact. jn_host.c's jp8_hook(0x3C7400) composes the engine
+  render over the plugin's own VOICE_WRAP (0x398F30) / MASTER_WRAP (0x398EC0) per sample, with the assigner
+  voice-count sync, on a copy of the process() CPU (a nested stack) -- the oracle's host_process_emu._serve in C.
+  junoh_process builds the events / parameter queues / context / process-data like host_process_emu.process and calls
+  IAudioProcessor::process (slot 9). Gate (tools/lift/jn_proc_{ref,c}.py, jn_proc_seq.py shared drive): the oracle vs
+  the lifted host over no-context AND context blocks, a chord, release, flush, 512-sample blocks -- 4224 output words
+  BYTE-IDENTICAL; the note tooth bites (a semitone up differs at byte 3720). On the way: a trace-diff
+  (jn_otrace.py + the --trace lift) PROVED the lifted process() identical to the oracle for all 3155 instructions --
+  no mislift; the only gaps were completeness (interior indirect-call / tail-jmp targets with no pdata of their own,
+  e.g. 0x3c7c6f no-context, 0x3b929f context). Robust fix: the census records jmp edges too, jn_extra_roots.py roots
+  every interior indirect target (plus the pdata-gap thunks), and the census + reference + gate share ONE process
+  drive (jn_proc_seq) so no path is un-censused. jn_host_gate.sh now runs both the init and the process gate. The
+  quick-census (2-patch) lift proved it; NEXT: the FULL 64-patch census for the committed lift, then the state /
+  patch / editor drives and the all-patch product gate, then L3 (per-instruction) and L6 (machine search).
