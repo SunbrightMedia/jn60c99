@@ -21,6 +21,7 @@ from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX,  
 E = H.E
 IB = E.IB
 LO, HI = IB, IB + E.IMGSZ
+ER = IB + 0x3C7400          # the engine render dispatch: stop the trace here (the prefix is the process() path we diff)
 
 
 def main():
@@ -35,6 +36,9 @@ def main():
     def rec(uc_, addr, size, ud):
         if not (LO <= addr < HI):
             return
+        if addr == ER:                     # the render dispatch: record it, then stop (do not enter the composition)
+            buf.extend(struct.pack('<IQQQQI', addr - IB, 0, 0, 0, 0, 0))
+            uc_.emu_stop(); return
         rax = uc_.reg_read(UC_X86_REG_RAX); rcx = uc_.reg_read(UC_X86_REG_RCX)
         rdx = uc_.reg_read(UC_X86_REG_RDX); rbx = uc_.reg_read(UC_X86_REG_RBX)
         x = uc_.reg_read(UC_X86_REG_XMM0) & 0xFFFFFFFF
@@ -43,7 +47,10 @@ def main():
         if n[0] >= cap:
             uc_.emu_stop()
     uc.hook_add(UC_HOOK_CODE, rec, begin=LO, end=HI)
-    h.process(64, events=[('on', 0, 0, 60, 0.8)], ctx=None)
+    try:
+        h.process(64, events=[('on', 0, 0, 60, 0.8)], ctx=None)   # the render is served after the stop; ignore it
+    except Exception as e:
+        sys.stderr.write('process stopped (prefix kept): %s\n' % e)
     out.write(bytes(buf)); out.close()
     print('oracle trace: %d image instructions -> %s' % (n[0], sys.argv[1]))
 
