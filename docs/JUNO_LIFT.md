@@ -101,3 +101,8 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   drive (jn_proc_seq) so no path is un-censused. jn_host_gate.sh now runs both the init and the process gate. The
   quick-census (2-patch) lift proved it; NEXT: the FULL 64-patch census for the committed lift, then the state /
   patch / editor drives and the all-patch product gate, then L3 (per-instruction) and L6 (machine search).
+- 2026-10-16 FULL census confirm: tools/verify/juno_lift_reach.py over all 64 factory patches + the shared process
+  drive -> 4667 functions, 789,263 instructions in lift/jn_lift.c. jn_host_gate.sh GREEN on this committed-quality
+  lift: init (image+heap+com byte-identical, tooth bites) AND process (4224 output words byte-identical, note tooth
+  bites). The lifted JUNO boots and renders bit-exact to the oracle. NEXT: end-state memory compare after the process
+  drive, the state save/load + patch load + editor drives, the all-patch product gate; then L3 and L6.
