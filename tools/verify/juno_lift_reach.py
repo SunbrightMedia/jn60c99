@@ -138,6 +138,14 @@ def main():
     ev_off = lambda p: ('off', 0, 0, p, 0.0)
 
     log('boot done; functions so far %d' % len({func_of(a) for a in executed} - {None}))
+    # 0. the gate's OWN scenario first: the INITIAL (template) patch, a chord + release + flush -- the process paths
+    #    the factory-patch loop does not reach (e.g. the indirect target 0x3c7c6f), so the host lift covers them too
+    h.process(256, events=[ev_on(60), ev_on(64, 0.7), ev_on(67, 0.9)], ctx=T)
+    h.process(256, ctx=T)
+    h.process(256, events=[ev_off(60), ev_off(64), ev_off(67)], ctx=T)
+    h.process(128, ctx=T)
+    h.process(0, ctx=T)
+    log('initial-patch process done; functions %d' % len({func_of(a) for a in executed} - {None}))
     npatch = int(os.environ.get('JUNO_REACH_PATCHES', '64'))
     # 1. every factory patch: load + a chord + release + a few blocks (arp patches included)
     for idx in range(npatch):
