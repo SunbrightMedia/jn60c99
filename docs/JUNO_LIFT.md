@@ -74,3 +74,16 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   thread transport, served by the host). Regenerated lift/jn_lift.c: 1883 functions, 157054 instructions, 601 traps
   (471 int3 padding + AVX/FMA/SSE4 in unreached CRT branches). L2 check PASS (0 reached traps of 566). Compiles clean
   under the device/web build flags (-DJP8_RELOC -DJP8_FLAT -DJP8_GS_BASE=0x580000000ULL, rc 0, 8.3 MB object).
+- 2026-10-16 L5 INIT GREEN: the lifted JUNO host boots EXACTLY like the oracle. lift/junoh.h (API) + lift/jn_host.c
+  (the host glue: JNH1 template loader, COM + import shims, live setupProcessing + setActive + host objects, patch
+  load, get/set state, UI timer, MIDI learn, editor record set; process/render stubbed) built with lift/jn_lift.c +
+  jp8/src/jp8_rt.c -> libjunohost.so. tools/lift/jn_host_gate.sh (two processes): the oracle (jn_host_mem_ref.py,
+  Unicorn) vs the lifted host (jn_host_mem_c.py, ctypes) after boot_host + setup(48000, 512). Found and fixed on the
+  way: (1) juno_lift_reach.py installed its hook AFTER start(), so setupProcessing/setActive ran un-censused -- now
+  boot, hook, setup; (2) the census keyed indirect edges by the block start, not the call instruction, dropping every
+  non-pdata indirect target -- now keyed by the call; (3) the plugin's adjustor / ILT thunks (pdata gaps, reached by
+  indirect call) are not pdata starts -- tools/lift/thunk_roots.py roots each whose jmp lands on an executed method
+  (1665 thunks). Lift grew 1889 -> 3652 functions. junoh_init rc 0; image + heap + com byte-identical (heap_top
+  0x317aec780, com_next 0x5a0001ab0); the rate tooth bites (image differs at +0xc43c20). NEXT L5: the render
+  composition (jp8_hook 0x3C7400 over the plugin's own voice 0x398F30 / master 0x398EC0), then process()/patch/state/
+  editor drives EXACTLY 0.
