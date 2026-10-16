@@ -19,6 +19,13 @@
 
 #define IB            0x180000000ULL
 #define ENGINE_RENDER 0x3C7400ULL     /* CWaveGen vt+56: the engine render's thread transport (served by the host) */
+#define VOICE_WRAP    0x398F30ULL     /* one sample of one voice: rcx=state[v], edx=v, r8=&{*main, *sub} */
+#define MASTER_WRAP   0x398EC0ULL     /* one sample of the master mix: rcx=state[8], rdx=a2[16], r8=&{*L, *R} */
+#define ASG_GET_COUNT 0x355A60ULL     /* the assigner's voice count (rcx=assign[v]) */
+#define ASG_SET_COUNT 0x355940ULL     /* set it (rcx=assign[v], edx=count) -- resets the assigner */
+#define HOST_NVOICE   0x38ULL         /* the engine's voice count (HOST + 0x38) */
+#define ASG_COUNTER   168ULL          /* the assigner sample counter (assign[v] + 168) += block */
+#define BUF_BASE      0x700000000ULL  /* the audio buffers (per-voice main/sub, then master L/R) + render scratch */
 #define UITICK        0x320120ULL     /* the plugin's UI timer (host_process_emu drains it through the core) */
 #define CC_LEARN      0x31AA40ULL     /* the CC menu's Learn: rcx = core + 24, edx = the record index */
 #define CC_FORGET     0x3192E0ULL     /* the CC menu's Forget */
@@ -70,6 +77,8 @@ static struct {
     uint32_t *edit_id; double *edit_val; int nedit, edit_cap;
     stub_t stub[NSTUB_MAX]; int nstub;
     uint64_t njobs;                      /* engine render calls served */
+    /* the engine the plugin built (core+272) and its per-unit objects (host_process_emu.setup), for the render */
+    uint64_t HOST, state[9], assign[9];
 } H;
 
 /* ---------------------------------------------------------------- guest memory (one mapped band region) */
@@ -224,13 +233,63 @@ void jp8_hostcall(CPU *c, uint64_t target) {
 }
 int jp8_thunk(CPU *c, uint64_t target) { (void)c; (void)target; return 0; }   /* no ATL run-time thunk on the host path (yet) */
 
-/* ---------------------------------------------------------------- the render transport (--replace 0x3C7400) */
+/* ---------------------------------------------------------------- the render transport (--replace 0x3C7400)
+ * The plugin's engine render (CWaveGen vt+56) drives its voice workers through thread events this runtime does not
+ * run. The oracle (host_process_emu._serve) stops at its entry and composes the render over the plugin's OWN voice
+ * (VOICE_WRAP, one sample of one voice) and master (MASTER_WRAP, one sample of the mix) -- the DSP is the plugin's,
+ * lifted. This is that composition in C, the twin of jp8_host.c's thread transport. The sub-calls run on a COPY of
+ * the process() CPU, on a stack 1 MB below it, so the in-flight process() frame is preserved; a trap inside falls
+ * through to the outer jp8_call_x and fails the process call. */
+static void rcall(CPU *nc, uint64_t top, uint64_t rva, uint64_t rcx, uint64_t rdx, uint64_t r8) {
+    nc->r[1] = rcx; nc->r[2] = rdx; nc->r[8] = r8; nc->r[9] = 0;
+    nc->r[4] = top - 8;                         /* rsp at a callee's entry: 16-aligned top, less the pushed return */
+    JP8_FPENV(nc);
+    jp8_run(nc, rva);
+}
 void jp8_hook(CPU *c, uint64_t rva) {
     if (rva == ENGINE_RENDER) {
-        /* TODO L4/L5: compose the render over the plugin's own voice (0x398F30) / master (0x398EC0) as the oracle's
-         * host_process_emu._serve does; for now the static paths (init, patch, state, UI, CC, editor set) do not
-         * reach it. A reach here before the composition is written is a named stop, never a silent zero. */
-        jp8_trap(c, rva, "the engine render composition is not written yet (L4/L5 process path)");
+        CPU nc; uint64_t top, a4, mainb[8], subb[8], offL, offR, A3, A2, LR, p; int32_t nch, n, nv; int v, i, k;
+        if (c->r[1] != H.HOST) { jp8_trap(c, rva, "engine render on an engine this runtime did not build"); return; }
+        a4 = c->r[9]; nch = gi(c->r[4] + 0x28); n = gi(c->r[4] + 0x30);
+        if (nch != 2) { jp8_trap(c, rva, "engine render with a channel count other than 2"); return; }
+        H.njobs++;
+        nv = gi(H.HOST + (int)HOST_NVOICE);
+        memcpy(&nc, c, sizeof nc);
+        top = (c->r[4] - 0x100000ULL) & ~0xFULL;
+        for (v = 0; v < 8; v++) {               /* the assigner voice-count sync, and (n>0) its sample counter += n */
+            rcall(&nc, top, ASG_GET_COUNT, H.assign[v], 0, 0);
+            if ((uint32_t)nc.r[0] != (uint32_t)nv) rcall(&nc, top, ASG_SET_COUNT, H.assign[v], (uint32_t)nv, 0);
+            if (n > 0) wq(H.assign[v] + ASG_COUNTER, gq(H.assign[v] + ASG_COUNTER) + (uint64_t)n);
+        }
+        if (n <= 0) { JP8_FPENV(c); c->r[0] = 0; return; }    /* the flush / preamble (no samples, host_process_emu) */
+        p = BUF_BASE;                           /* per-voice main[n], sub[n]; then master L, R (the oracle's layout) */
+        for (v = 0; v < 8; v++) { mainb[v] = p; p += 4 * (uint64_t)n; subb[v] = p; p += 4 * (uint64_t)n; }
+        offL = p; p += 4 * (uint64_t)n; offR = p; p += 4 * (uint64_t)n;
+        A3 = BUF_BASE + 0x1C0000; A2 = A3 + 16; LR = A2 + 128;   /* the render's pointer scratch (above the audio) */
+        for (v = 0; v < 8; v++) {               /* voices: a unit at or above the voice count outputs zeros */
+            if (v >= nv) {
+                void *m = junoh_guest(mainb[v], 4 * (size_t)n), *s = junoh_guest(subb[v], 4 * (size_t)n);
+                if (m) memset(m, 0, 4 * (size_t)n); if (s) memset(s, 0, 4 * (size_t)n);
+                continue;
+            }
+            for (i = 0; i < n; i++) {
+                wq(A3, mainb[v] + 4 * (uint64_t)i); wq(A3 + 8, subb[v] + 4 * (uint64_t)i);
+                rcall(&nc, top, VOICE_WRAP, H.state[v], (uint64_t)(uint32_t)v, A3);   /* one sample of voice v */
+            }
+        }
+        for (i = 0; i < n; i++) {               /* master: one sample of the mix over the 16 voice buffers */
+            for (k = 0; k < 8; k++) { wq(A2 + 16 * (uint64_t)k, mainb[k] + 4 * (uint64_t)i); wq(A2 + 16 * (uint64_t)k + 8, subb[k] + 4 * (uint64_t)i); }
+            wq(LR, offL + 4 * (uint64_t)i); wq(LR + 8, offR + 4 * (uint64_t)i);
+            rcall(&nc, top, MASTER_WRAP, H.state[8], A2, LR);
+        }
+        {   /* the render writes L / R to the buffers the plugin passed (a4 -> {outL, outR}) */
+            uint64_t outL = gq(a4), outR = gq(a4 + 8);
+            void *dl = junoh_guest(outL, 4 * (size_t)n), *sl = junoh_guest(offL, 4 * (size_t)n);
+            void *dr = junoh_guest(outR, 4 * (size_t)n), *sr = junoh_guest(offR, 4 * (size_t)n);
+            if (dl && sl) memcpy(dl, sl, 4 * (size_t)n);
+            if (dr && sr) memcpy(dr, sr, 4 * (size_t)n);
+        }
+        JP8_FPENV(c); c->r[0] = 0;               /* the render's MXCSR restored; the callers ignore the return value */
         return;
     }
     { char m[64]; snprintf(m, sizeof m, "a hook this runtime does not know (rva 0x%llx)", (unsigned long long)rva); jp8_trap(c, rva, m); }
@@ -347,6 +406,8 @@ int junoh_init(const void *tmpl, size_t len, double rate, int max_block) {
     /* host_process_emu.setup: setupProcessing, setActive(1), then the blocks' host objects in its order */
     H.maxblock = (uint64_t)max_block;
     if ((rc = setup_processing(rate)) || (rc = set_active(1))) return rc;
+    H.HOST = gq(H.core + 272);           /* the engine the plugin built; its per-unit objects (host_process_emu.setup) */
+    for (i = 0; i < 9; i++) { H.state[i] = gq(H.HOST + 80 + 64 * (uint64_t)i); H.assign[i] = gq(H.HOST + 104 + 64 * (uint64_t)i); }
     H.bufl = alloc_com(4 * H.maxblock); H.bufr = alloc_com(4 * H.maxblock);
     {
         uint64_t chans = alloc_com(16); uint8_t bus[24]; int32_t two = 2;
@@ -443,11 +504,57 @@ int junoh_model_set(uint64_t obj, uint32_t value) {
     return call(IB + MODEL_SET, model, obj, (uint64_t)value, 1) ? JUNOH_E_TRAP : JUNOH_OK;
 }
 
-/* ---------------------------------------------------------------- process() -- TODO L4/L5 (needs the render) */
+/* ---------------------------------------------------------------- process() (host_process_emu.process) */
 int junoh_process(int n, const junoh_event *ev, int nev, const junoh_param *par, int npar, const junoh_ctx *ctx,
                   uint32_t *outl, uint32_t *outr) {
-    (void)n; (void)ev; (void)nev; (void)par; (void)npar; (void)ctx; (void)outl; (void)outr;
-    return err(JUNOH_E_STATE, "junoh_process is not written yet (the render composition is the next L4/L5 step)");
+    uint8_t pd[96]; uint64_t cptr = 0; int i; int rc = live();
+    if (rc) return rc;
+    if (n < 0 || (uint64_t)n > H.maxblock || nev < 0 || nev > MAXEV || npar < 0) return err(JUNOH_E_ARG, "block, events or parameters out of range");
+    /* the events: 48-byte VST3 Events (host_process_emu.process) */
+    H.nev = nev;
+    for (i = 0; i < nev; i++) {
+        uint8_t *b = H.evs[i]; int32_t off = ev[i].offset; int16_t ch = (int16_t)ev[i].channel, pitch = (int16_t)ev[i].pitch;
+        float z = 0.0f, vel = ev[i].velocity; int32_t m1 = -1; uint16_t t;
+        memset(b, 0, 48); memcpy(b + 4, &off, 4);
+        if (ev[i].on) { t = 0; memcpy(b + 18, &t, 2); memcpy(b + 24, &ch, 2); memcpy(b + 26, &pitch, 2); memcpy(b + 28, &z, 4); memcpy(b + 32, &vel, 4); memcpy(b + 36, &m1, 4); memcpy(b + 40, &m1, 4); }
+        else { t = 1; memcpy(b + 18, &t, 2); memcpy(b + 24, &ch, 2); memcpy(b + 26, &pitch, 2); memcpy(b + 28, &vel, 4); memcpy(b + 32, &m1, 4); }
+    }
+    /* the parameter changes: one queue per id, in the order the ids first appear (the oracle's dict order); the
+     * IParamValueQueue objects are created lazily and reused, as host_process_emu does (so com_next matches) */
+    H.npq = 0;
+    for (i = 0; i < npar; i++) {
+        int q;
+        for (q = 0; q < H.npq; q++) if (H.pq_id[q] == par[i].id) break;
+        if (q == H.npq) {
+            if (H.npq == NPQ) return err(JUNOH_E_ARG, "more parameter ids in one block than the template's queues");
+            if (!H.pq[q]) H.pq[q] = new_obj(H.vt_pqueue);     /* lazily made, bumping com_next like the oracle */
+            H.pq_id[q] = par[i].id; H.pq_n[q] = 0; H.npq++;
+            free(H.pq_off[q]); free(H.pq_val[q]);
+            H.pq_off[q] = (int32_t *)malloc(sizeof(int32_t) * (size_t)npar); H.pq_val[q] = (double *)malloc(sizeof(double) * (size_t)npar);
+            if (!H.pq_off[q] || !H.pq_val[q]) return err(JUNOH_E_ARG, "no memory");
+        }
+        H.pq_off[q][H.pq_n[q]] = par[i].offset; H.pq_val[q][H.pq_n[q]] = par[i].value; H.pq_n[q]++;
+    }
+    if (ctx) {      /* host_process_emu.process's ProcessContext: state, the host rate, ppq, the cycle, the tempo */
+        uint8_t cx[160];
+        memset(cx, 0, sizeof cx); memcpy(cx, &ctx->state, 4); memcpy(cx + 8, &H.rate, 8); memcpy(cx + 40, &ctx->ppq, 8);
+        memcpy(cx + 56, &ctx->cycle_start, 8); memcpy(cx + 64, &ctx->cycle_end, 8); memcpy(cx + 72, &ctx->tempo, 8);
+        wmem(H.ctx, cx, sizeof cx); cptr = H.ctx;
+    }
+    memset(pd, 0, sizeof pd);
+    { int32_t v[5]; v[0] = 0; v[1] = 0; v[2] = n; v[3] = 0; v[4] = 1; memcpy(pd, v, sizeof v); }
+    { uint64_t q7[7]; q7[0] = 0; q7[1] = H.bus; q7[2] = npar ? H.pc : 0; q7[3] = 0; q7[4] = nev ? H.ev : 0; q7[5] = 0; q7[6] = cptr;
+      memcpy(pd + 24, q7, sizeof q7); }
+    wmem(H.pd, pd, sizeof pd);
+    if (n) {
+        void *l = junoh_guest(H.bufl, 4 * (size_t)n), *r = junoh_guest(H.bufr, 4 * (size_t)n);
+        if (!l || !r) return err(JUNOH_E_STATE, "output buffers");
+        memset(l, 0, 4 * (size_t)n); memset(r, 0, 4 * (size_t)n);
+    }
+    if (call(H.process_fn, H.audio, H.pd, 0, 0)) return JUNOH_E_TRAP;      /* IAudioProcessor::process (slot 9) */
+    if ((uint32_t)H.cpu.r[0] != 0) return err(JUNOH_E_STATE, "process() returned an error");
+    if (n) { memcpy(outl, junoh_guest(H.bufl, 4 * (size_t)n), 4 * (size_t)n); memcpy(outr, junoh_guest(H.bufr, 4 * (size_t)n), 4 * (size_t)n); }
+    return JUNOH_OK;
 }
 
 /* ---------------------------------------------------------------- the gates' accessors */
