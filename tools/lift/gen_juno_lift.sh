@@ -14,6 +14,9 @@ R=${REPO:-.}
 REACH="$R/scratchpad/lift/juno_reach.json"
 [ -f "$REACH" ] || { echo "no $REACH -- run tools/verify/juno_lift_reach.py first (L1)"; exit 2; }
 ROOTS=$(python3 -c "import json;print(','.join('%#x'%r for r in json.load(open('$REACH'))['functions']))")
+# the plugin's adjustor / ILT thunks (pdata gaps): reached by indirect call, not pdata starts, so added as roots too
+THUNKS=$(python3 "$R/tools/lift/thunk_roots.py" "$REACH")
+[ -n "$THUNKS" ] && ROOTS="$ROOTS,$THUNKS"
 BIN=$(python3 -c "import sys;sys.path.insert(0,'$R/tools/verify');import truth;print(truth.VST3)")
 LIFT_BIN="$BIN" python3 "$R/jp8/tools/jp8_lift.py" "$R/lift/jn_lift.c" "$ROOTS" --dyn "$REACH" \
     --name jn --hostcalls --alloc 0x67522C --alloc-tailcall --replace 0x3c7400
