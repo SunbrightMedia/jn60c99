@@ -1,7 +1,8 @@
 /* JUNO LITE firmware -- see ../README.md.
  * I2S: GPIO 5/6/7 (BCK/WS/SD), MIDI IN: UART1 RX GPIO 17 (31250) -- the
  * ESP32-S3_Motherboard v1.0 fab netlist (H1A1 pads 5/6/7 and 10).
- * Boot: a 6-voice benchmark of every preset (BENCH lines), then the demo until the
+ * VOL_POT (H1A1 pad 4 = GPIO 4, ADC1) selects the factory patch: fully down = 1, fully up = 64.
+ * Boot: a 6-voice benchmark (BENCH lines), then the demo chords on the pot's patch until the
  * first MIDI note. Log once a second: JL line (load, underruns, voices, peak, MIDI)
  * and the SILENCE PROBE (no voice sounding -> the output must be 0, else STUCK). */
 #include <stdio.h>
@@ -10,17 +11,53 @@
 #include "driver/i2s_std.h"
 #include "driver/uart.h"
 #include "esp_timer.h"
+#include "esp_adc/adc_oneshot.h"
 #include "jl_synth.h"
 #include "jl_demo.h"
+#include "jl_bank.h"
 
 #define PIN_BCK 5
 #define PIN_WS  6
 #define PIN_SD  7
 #define PIN_MIDI_RX 17
+#define PIN_POT 4
 #define BLOCK_US (1e6 * JL_BLOCK / JL_SR)          /* 1451 us */
 
 static i2s_chan_handle_t TX;
-static int preset;
+static int patch = -1;                      /* factory patch 0..63 now playing */
+static volatile int pot_patch = -1, pc_patch = -1;
+
+#ifdef JL_QEMU
+static void pot_start(void) { pot_patch = 0; }
+#else
+/* VOL_POT: 8 reads averaged every 20 ms; 64 equal bins, a new bin only when the reading is
+ * 24 counts (of 4095) inside it -- no flicker at a bin edge. */
+static adc_oneshot_unit_handle_t ADC;
+static adc_channel_t POTCH;
+static void pot_task(void *a)
+{
+    int cur = -1;
+    for (;;) {
+        int sum = 0, r;
+        for (int i = 0; i < 8; ++i) { adc_oneshot_read(ADC, POTCH, &r); sum += r; }
+        int raw = sum / 8, idx = raw * 64 / 4096;
+        if (idx > 63) idx = 63;
+        int lo = idx * 4096 / 64, hi = (idx + 1) * 4096 / 64;
+        if (cur < 0 || (idx != cur && raw > lo + 24 && raw < hi - 24) || (idx != cur && (idx == 0 || idx == 63)))
+            { cur = idx; pot_patch = idx; }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+static void pot_start(void)
+{
+    adc_unit_t u;
+    adc_oneshot_unit_init_cfg_t uc = { .unit_id = ADC_UNIT_1 };
+    adc_oneshot_chan_cfg_t cc = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
+    if (adc_oneshot_io_to_channel(PIN_POT, &u, &POTCH) != ESP_OK || adc_oneshot_new_unit(&uc, &ADC) != ESP_OK
+        || adc_oneshot_config_channel(ADC, POTCH, &cc) != ESP_OK) { printf("JL pot: ADC FAIL, patch 1\n"); pot_patch = 0; return; }
+    xTaskCreatePinnedToCore(pot_task, "jl_pot", 3072, NULL, 5, NULL, 0);
+}
+#endif
 
 #ifdef JL_QEMU   /* QEMU has no I2S or MIDI: pace blocks in real time. Built only by test/qemu.sh. */
 static int64_t q0; static long qn;
@@ -51,7 +88,7 @@ static int hw_start(void)
 #endif
 
 /* MIDI: omni, running status. Notes, bend (+-2), CC 1 mod, 7 volume, 71 res,
- * 74 cutoff, 120/123 all off, program change = preset. */
+ * 74 cutoff, 120/123 all off, program change = factory patch (1..64). */
 static int midi_notes;
 static void midi_byte(uint8_t c)
 {
@@ -66,7 +103,7 @@ static void midi_byte(uint8_t c)
     if (t == 0x90 && d[1]) { jl_note_on(d[0], d[1]); ++midi_notes; }
     else if (t == 0x80 || t == 0x90) jl_note_off(d[0]);
     else if (t == 0xE0) jl_bend(((d[1] << 7 | d[0]) - 8192) / 4096.0f);
-    else if (t == 0xC0) { preset = d[0] % jl_npresets; jl_set_patch(&jl_presets[preset]); }
+    else if (t == 0xC0) pc_patch = d[0] & 63;
     else if (t == 0xB0) {
         float v = d[1] / 127.0f;
         if (d[0] == 1) jl_mod(v); else if (d[0] == 7) jl_volume(v * 0.5f);
@@ -87,9 +124,21 @@ static void bench(void)
         double us = (esp_timer_get_time() - t0) / 200.0;
         printf("BENCH %-8s 6 voices: %6.1f us/block = %4.1f %% of one core (budget 100 %%)\n",
                jl_presets[p].name, us, 100 * us / BLOCK_US);
-        jl_all_off();
-        for (int i = 0; i < 3000 && jl_active(); ++i) jl_render(b);
+        jl_panic();
     }
+    double worst = 0; int wi = 0;                         /* the 64 factory patches, 6 voices each */
+    for (int p = 0; p < JL_BANK_COUNT; ++p) {
+        jl_patch q; jl_bank_patch(p, &q); jl_set_patch(&q);
+        for (int i = 0; i < 6; ++i) jl_note_on(jl_chordA[i], 100);
+        for (int i = 0; i < 5; ++i) jl_render(b);
+        int64_t t0 = esp_timer_get_time();
+        for (int i = 0; i < 40; ++i) jl_render(b);
+        double us = (esp_timer_get_time() - t0) / 40.0;
+        if (us > worst) { worst = us; wi = p; }
+        jl_panic();
+    }
+    printf("BENCH factory bank, worst of 64: patch %d %s %6.1f us/block = %4.1f %% of one core\n",
+           wi + 1, jl_bank[wi].name, worst, 100 * worst / BLOCK_US);
 }
 
 static void audio_task(void *arg)
@@ -102,7 +151,15 @@ static void audio_task(void *arg)
         int n = midi_read(mb, sizeof mb);
         for (int i = 0; i < n; ++i) midi_byte(mb[i]);
         if (demo && midi_notes) { demo = 0; jl_all_off(); printf("JL MIDI note seen: demo off\n"); }
-        if (demo) { int p = jl_demo_step(t); if (p != preset) preset = p; }
+        int want = -1;
+        if (pc_patch >= 0) { want = pc_patch; pc_patch = -1; }
+        static int last_pot = -1;
+        if (pot_patch != last_pot) { last_pot = pot_patch; want = pot_patch; }
+        if (want >= 0 && want != patch) {
+            jl_patch q; patch = want; jl_bank_patch(patch, &q); jl_set_patch(&q);
+            printf("JL patch %d %s\n", patch + 1, q.name);
+        }
+        if (demo) jl_demo_notes(t);
         int64_t r0 = esp_timer_get_time();
         jl_render(b);
         double ld = (esp_timer_get_time() - r0) / BLOCK_US;
@@ -117,8 +174,8 @@ static void audio_task(void *arg)
         out_block(b); ++t;
         if (esp_timer_get_time() >= next) {
             next += 1000000;
-            printf("JL t=%lds preset=%-8s %s load avg %4.1f%% max %4.1f%% underruns(total)=%d voices<=%d peak=%5d midi_notes=%d  SIL:%s\n",
-                   (long)(t * BLOCK_US / 1e6), jl_presets[preset].name, demo ? "DEMO" : "MIDI",
+            printf("JL t=%lds patch=%2d %s load avg %4.1f%% max %4.1f%% underruns(total)=%d voices<=%d peak=%5d midi_notes=%d  SIL:%s\n",
+                   (long)(t * BLOCK_US / 1e6), patch + 1, demo ? "DEMO" : "MIDI",
                    100 * sumload / 689, 100 * maxload, under, maxv, peak, midi_notes,
                    quiet_blocks ? (stuck ? "STUCK" : "SILENT") : "playing");
             sumload = maxload = 0; peak = maxv = 0; quiet_blocks = stuck = 0;
@@ -134,6 +191,7 @@ void app_main(void)
     jl_init();
     printf("JL tables built in %lld ms\n", (esp_timer_get_time() - t0) / 1000);
     bench();
+    pot_start();
     if (!hw_start()) { printf("JL FAIL: I2S/UART did not start\n"); return; }
     printf("JL I2S + MIDI started; demo plays until the first MIDI note\n");
     xTaskCreatePinnedToCore(audio_task, "jl_audio", 6144, NULL, 10, NULL, 1);

@@ -7,15 +7,19 @@
 #define JL_DEMO_PRESET_BLOCKS ((int)(5.0 * JL_SR / JL_BLOCK))
 static const int jl_chordA[6] = { 45, 57, 60, 64, 67, 72 };   /* Am7 add, 6 voices */
 static const int jl_chordB[4] = { 53, 57, 60, 65 };            /* F */
-static inline int jl_demo_step(long t)
+static inline void jl_demo_notes(long t)                        /* the notes only: any patch */
 {
-    int pr = (int)((t / JL_DEMO_PRESET_BLOCKS) % jl_npresets);
     long b = t % JL_DEMO_PRESET_BLOCKS, s = JL_SR / JL_BLOCK;   /* blocks per second (689) */
-    if (b == 0) jl_set_patch(&jl_presets[pr]);
     if (b == 0)          for (int i = 0; i < 6; ++i) jl_note_on(jl_chordA[i], 100);
     if (b == 16 * s / 10) for (int i = 0; i < 6; ++i) jl_note_off(jl_chordA[i]);
     if (b == 2 * s)      for (int i = 0; i < 4; ++i) jl_note_on(jl_chordB[i], 100);
     if (b == 36 * s / 10) for (int i = 0; i < 4; ++i) jl_note_off(jl_chordB[i]);
+}
+static inline int jl_demo_step(long t)                           /* the hand presets in turn + the notes */
+{
+    int pr = (int)((t / JL_DEMO_PRESET_BLOCKS) % jl_npresets);
+    if (t % JL_DEMO_PRESET_BLOCKS == 0) jl_set_patch(&jl_presets[pr]);
+    jl_demo_notes(t);
     return pr;
 }
 #endif

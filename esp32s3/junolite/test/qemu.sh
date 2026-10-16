@@ -13,7 +13,8 @@ timeout 40 qemu-system-xtensa -nographic -machine esp32s3 -drive file="$B/flash.
   -serial mon:stdio > "$B.log" 2>&1 || true
 L="$B.log"; f=0
 grep -q "JUNO LITE v1" "$L" || { echo "FAIL no banner"; f=1; }
-[ "$(grep -c '^BENCH' "$L")" = 5 ] || { echo "FAIL want 5 BENCH lines"; f=1; }
+[ "$(grep -c '^BENCH' "$L")" = 6 ] || { echo "FAIL want 6 BENCH lines"; f=1; }
+grep -q "JL patch 1 " "$L" || { echo "FAIL pot did not select patch 1"; f=1; }
 grep -q "SIL:STUCK" "$L" && { echo "FAIL silence probe STUCK"; f=1; }
 grep -q "SIL:SILENT" "$L" || { echo "FAIL never silent between presets"; f=1; }
 grep -q "voices<=6" "$L" || { echo "FAIL never 6 voices"; f=1; }

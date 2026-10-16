@@ -44,6 +44,22 @@ int main(int argc, char **argv)
         h[0] = 4; h[1] = 16; fwrite(h, 2, 2, f); fwrite("data", 1, 4, f); fwrite(&d, 4, 1, f);
         fwrite(w, 1, d, f); fclose(f);
     }
+    /* the 64 factory patches (jl_bank_patch): 6-note chord 1 s, release up to 15 s; finite, no clip, release ends */
+    int sounding = 0, bclip = 0, bhang = 0;
+    for (int bp = 0; bp < JL_BANK_COUNT; ++bp) {
+        jl_patch q; jl_bank_patch(bp, &q); jl_set_patch(&q);
+        int pk = 0;
+        for (int i = 0; i < 6; ++i) jl_note_on(jl_chordA[i], 100);
+        for (int t = 0; t < 689; ++t) { jl_render(w); for (int i = 0; i < 2 * JL_BLOCK; ++i) { int a = abs(w[i]); if (a > pk) pk = a; if (a >= 16000) ++bclip; } }
+        jl_all_off();
+        int t = 0; while (jl_active() && t < 15 * 689) { jl_render(w); ++t; }
+        if (jl_active()) { ++bhang; printf("  bank %2d %-18s still sounding 15 s after release\n", bp + 1, q.name); }
+        for (t = 0; t < 200; ++t) jl_render(w);           /* let the FX tail end */
+        if (pk > 100) ++sounding; else printf("  bank %2d %-18s quiet (peak %d)\n", bp + 1, q.name, pk);
+    }
+    printf("factory bank: %d of 64 sound, %d samples at the clip ceiling, %d hang\n", sounding, bclip, bhang);
+    CHECK(sounding == 64 && bclip == 0 && bhang == 0, "factory bank");
+
     /* aliasing: one saw voice, filter open, no FX; note 97 = 2217 Hz */
     jl_patch a = { .name = "alias", .saw = 1, .cutoff = 1, .level = 1, .s = 1, .a = 0, .d = 0, .r = 0 };
     jl_set_patch(&a); jl_all_off();

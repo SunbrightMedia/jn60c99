@@ -9,6 +9,7 @@
 #include <math.h>
 #include <string.h>
 #include "jl_synth.h"
+#include "jl_bank.h"
 
 #define TL   2048
 #define NT   11
@@ -93,6 +94,7 @@ void jl_note_off(int note)
 }
 void jl_all_off(void) { for (int i = 0; i < JL_VOICES; ++i) if (V[i].stage) { V[i].gate = 0; V[i].stage = 3; } }
 
+void jl_panic(void) { memset(V, 0, sizeof V); }
 int jl_active(void) { int n = 0; for (int i = 0; i < JL_VOICES; ++i) n += V[i].stage != 0; return n; }
 
 static inline float lut(const float *t, float p)       /* p in [0,1) */
@@ -132,7 +134,7 @@ void jl_render(int16_t *lr)
     float w = 0.5f - 0.45f * (P.pwm_lfo ? P.pwm * (0.5f + 0.5f * lfo) : P.pwm);
     if (w < 0.03f) w = 0.03f;
     float noise_amt = P.noise * 0.5f, sub_amt = P.sub * 0.5f;
-    float gsaw = P.saw ? 0.5f : 0, gpul = P.pulse ? 0.5f : 0;
+    float gsaw = P.saw ? 0.5f * (P.saw_lv > 0 ? P.saw_lv : 1) : 0, gpul = P.pulse ? 0.5f * (P.pul_lv > 0 ? P.pul_lv : 1) : 0;
 
     for (int vi = 0; vi < JL_VOICES; ++vi) {
         voice *v = &V[vi];
@@ -204,4 +206,28 @@ void jl_render(int16_t *lr)
         lr[2 * i] = (int16_t)L; lr[2 * i + 1] = (int16_t)R;
     }
     if (fabsf(hp_y) < 1e-20f) hp_y = 0;
+}
+
+/* The plugin's factory bank -> JUNO LITE's panel. The bytes are the plugin's (jl_bank.h, generated); this
+ * mapping is glue and approximate: levels and sliders scale 0..255 -> 0..1, VCF ENV MOD is taken as bipolar
+ * around 128 (INFERRED), the single ADSR takes ENV2 (the amp envelope), the chorus mode from EFFECT TYPE when
+ * EFFECT DEPTH > 0 (INFERRED). The plugin's PWM width, LFO and delay / reverb have no JUNO LITE control. */
+void jl_bank_patch(int i, jl_patch *p)
+{
+    const unsigned char *v = jl_bank[i & 63].v;
+    float f[JL_BANK_F];
+    for (int k = 0; k < JL_BANK_F; ++k) f[k] = v[k] / 255.0f;
+    jl_patch q = { 0 };
+    q.name = jl_bank[i & 63].name;
+    q.saw = v[0] > 0; q.saw_lv = f[0];
+    q.pulse = v[1] > 0; q.pul_lv = f[1];
+    q.sub = f[2]; q.noise = f[3];
+    q.cutoff = f[4]; q.res = f[5];
+    q.env_amt = (v[6] - 128) / 127.0f; if (q.env_amt < 0) { q.env_neg = 1; q.env_amt = -q.env_amt; }
+    q.kybd = f[7]; q.hpf = f[8];
+    q.a = f[9]; q.d = f[10]; q.s = f[11]; q.r = f[12];
+    q.level = 0.5f + 0.5f * f[13];
+    q.chorus = v[15] ? 1 + (v[14] % 3) : 0;
+    q.lfo_rate = 0.5f;
+    *p = q;
 }

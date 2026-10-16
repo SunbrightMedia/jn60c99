@@ -27,3 +27,11 @@ program change = preset. No MIDI → a demo plays every preset (6-note + 4-note 
 BENCH (6 voices, one core, MEASURED): Strings 48.5 %, Brass 48.3 %, PWM Pad 62.2 %, Bass 58.3 %, Organ 61.8 %.
 Demo 17 s: underruns 0, max block load 82 % (first block), SIL never STUCK; every JL peak equals the QEMU log's
 (2602, 2458, 1973, ... 4645) — the chip renders the same samples as the host build. Core 0 is idle.
+
+## VOL_POT = patch select (2026-10-16, the user's request)
+The pot on VOL_POT (H1A1 pad 4 = GPIO 4, ADC1) picks the factory patch: fully down = 1, fully up = 64 (64 equal
+steps, 24-count hysteresis). MIDI program change 0..63 also picks one. The 64 patches are the plugin's own bank
+(`truth/presetbankog1.bin` → `main/jl_bank.h` by `tools/gen_bank.py`, the proven reader); the map to JUNO LITE's
+controls (`jl_bank_patch`) is glue and approximate (ENV2 = the one ADSR; ENV MOD bipolar at 128 and the chorus mode
+from EFFECT TYPE are INFERRED; no PWM width, LFO, delay or reverb). host_check: all 64 sound, none clips, every
+release ends. The board's new BENCH line gives the worst of the 64.
