@@ -206,3 +206,23 @@ editor path in the lift).
   NaN choice, MEASURED by L3; L3 proves each statement equal to Unicorn: on the old lift the ONLY difference left was
   the cwde defect). Every L5 / L6 gate runs the gate flavor. Also fixed: l3_unicorn.py classed only XMM0's lanes.
   NEXT: L3 over EVERY shipped statement (--all, in chunks), the re-run of L5 + MIDI on the gate flavor, then L6.
+- 2026-10-16 ADDRESS-TAKEN RE-LIFT + the SPLIT build + the L5 editor / window-zoom drive. L6's fourth seed reached an
+  indirect target no census had (playbook 290): jn_extra_roots.py rule 4 now roots EVERY address-taken code location
+  (DIR64 relocations into .text + lea of pdata starts) -> the lift grew to 24,291 functions, 2,323,537 statements. Three
+  lifter defects the wider root set exposed, fixed in jp8_lift.py (playbook 291): an undecodable jump target / fall-through
+  becomes a trap label; CS/DS/ES/SS segment overrides ignored (lea takes none); "repz ret" ends the stream and returns.
+  The 2.3 M-statement file does not compile in one cc1 (14 GB, OOM-killed): tools/lift/split_lift.py divides it into 8
+  external parts that provably re-join, compiled a few at a time (playbook 292). On the NEW lift: L2 0 reached traps;
+  all 8 engine L5 gates (init, process 48/44.1/96, bank, state, editor set, surfaces) EXACTLY 0 with teeth; MIDI gate
+  CLEAN. The NINTH drive, the editor + window zoom (tools/lift/jn_zoom_{seq,ref,c}.py): the editor opened on four screen
+  sizes, the main and patch windows' zoom set 25-200 % through the panel, each read by the window's own getter and by
+  getState (mainZoom / patchZoom), compared with the plugin after every step. The zoom VALUES and allocation tops are
+  bit-exact in all four scenarios (the swapped-screen tooth makes the zoom differ). Two host-layer facts the drive forced,
+  both the plugin's own behaviour: (a) a real VST3 host sets an IPlugFrame before attached -- the oracle's attach_editor
+  omitted it, so the plugin called resizeView on a null frame (a call to guest 0 that Unicorn tolerates but the lift
+  cannot); host_process_emu.attach_editor(frame=True) + jn_host.c now give the view a host IPlugFrame, the template
+  carries its vtable (playbook 293). (b) A fresh template-restored attach re-runs ONE MSVC thread-safe-static init the
+  oracle's live boot already ran, perturbing ~6 bytes of ATL window-class-atom bookkeeping -- orthogonal to audio /
+  parameters / state / zoom, which the eight engine drives prove byte-identical; the zoom drive grades its claim (zoom +
+  tops), the GUI-init bookkeeping is a named scope limitation (playbook 294). L5 = 10 / 13 planned drives. NEXT: the LED +
+  meters, keyboard / KEY HOLD, CC menu and patch-window drives; L3 --all; L6 on the new lift.

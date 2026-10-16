@@ -4896,3 +4896,22 @@ call's divergence was on a code path, not those regions).
 Model the host the way the spec says a real host behaves, not the way the emulator happens to tolerate. A degenerate
 input (a null frame) that the oracle survives by accident is not a license to feed the port the same input; give both
 the realistic input and prove they agree.
+
+## 294. A TEMPLATE-RESTORED PROCESS RE-RUNS ONE THREAD-SAFE-STATIC INIT THE LIVE BOOT ALREADY DID
+Paid 2026-10-16 (JUNO lift, L5 editor + window-zoom drive). With the null-frame fixed (playbook 293), the lifted
+editor attach no longer trapped but its end-state memory digest differed from the oracle by exactly 6 bytes, in all
+four scenarios. Root cause (traced by diffing the two sides' image/heap/com dumps, then the import-call sequence):
+the lift's attach begins with four extra imports -- GetCurrentThreadId, AcquireSRWLockExclusive, GetCurrentThreadId,
+ReleaseSRWLockExclusive -- a MSVC thread-safe-static init guard (_Init_thread_header at rva 0x64a8e0). The ORACLE is
+a live Unicorn process that booted (ran DllMain and the static constructors on its real thread); the LIFT is a fresh
+process restored from the JNH1 template, whose thread has not run that init. So the lift re-runs one guarded static
+construction that the oracle did at boot, perturbing ~6 bytes of ATL window-class-atom bookkeeping (a global
+CSimpleArray of class atoms). Image and the host arena stayed byte-identical; heap and arena TOPS matched exactly;
+the class names and RegisterClassExA / GetClassInfoExA answers were identical on both sides. The divergence never
+touches audio, parameters, DAW state or the window zoom.
+### The rule
+A snapshot template captures MEMORY, not the per-thread CRT bookkeeping (thread-safe-static epochs) that a live boot
+set on its own thread. A fresh editor attach can re-run one such init. Grade the drive on its CLAIM (here the zoom
+value and allocation parity), prove engine / parameter / state memory byte-identical with the drives that boot no GUI,
+and record the GUI-init bookkeeping as a named scope limitation -- never fake the byte-match, and keep a tooth (the
+swapped screen) that makes the claimed value itself differ.

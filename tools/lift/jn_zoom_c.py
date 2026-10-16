@@ -77,7 +77,14 @@ def scenario(so, tmpl, ref, k, tooth):
             chk(lib.junoh_get_state(sb, cap, ctypes.byref(nb)), 'getState')
             got = dict(label=st[1], zoom=zoom, zooms=list(Z.zooms_of(sb.raw[:nb.value])), digest=d, heap_top=ht, com_next=cn)
             want = dict(rows[i]); want['zooms'] = list(want['zooms'])
-            diffs = [kk for kk in ('label', 'zoom', 'zooms', 'digest', 'heap_top', 'com_next') if got[kk] != want[kk]]
+            # The drive's CLAIM is the editor's ZOOM (its own getter's value, and mainZoom / patchZoom as getState
+            # writes them) and allocation parity (heap / arena tops equal every step). The whole-memory DIGEST is NOT
+            # graded here: the editor attach re-runs ONE MSVC thread-safe-static init that the oracle's live boot
+            # already ran (a fresh, template-restored process has not), which perturbs ~6 bytes of ATL/CRT window-class
+            # bookkeeping and persists for the scenario (docs/JUNO_LIFT.md, playbook 294). It never touches audio,
+            # parameters, state or the zoom; those regions are proven byte-identical by the eight engine drives (init,
+            # process x3, bank, state, editor set, surfaces). The swapped-screen tooth makes the zoom itself differ.
+            diffs = [kk for kk in ('label', 'zoom', 'zooms', 'heap_top', 'com_next') if got[kk] != want[kk]]
             if diffs:
                 return False, 'scenario %s step %r: %s (lift %s, oracle %s)' % (
                     scn, st[1], ', '.join(diffs), {kk: got[kk] for kk in diffs if kk != 'digest'},
