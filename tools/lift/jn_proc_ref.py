@@ -29,8 +29,20 @@ def main():
             words += struct.pack('<%dI' % len(L), *L) + struct.pack('<%dI' % len(R), *R)
     open(os.path.join(out, 'words.bin'), 'wb').write(bytes(words))
     edits = [[e[1], struct.unpack('<Q', struct.pack('<d', e[2]))[0]] for e in h.edits if e[0] == 'performEdit']
-    json.dump(dict(nsteps=len(jn_proc_seq.steps()), nwords=len(words) // 4, edits=edits), open(os.path.join(out, 'meta.json'), 'w'))
-    print('oracle process ref: %d output words, %d performEdits -> %s' % (len(words) // 4, len(edits), out))
+    # the END-STATE memory after the drive: the plugin's internal state (image globals, heap, host arena) the render
+    # wrote -- a stronger proof than the output words alone (it catches an internal divergence that has not yet reached
+    # the output). BUF (render scratch) and the stack are not compared.
+    E = H.E
+    IB = E.IB
+    COM = H.W.COM
+    open(os.path.join(out, 'image.bin'), 'wb').write(bytes(h.uc.mem_read(IB, E.IMGSZ)))
+    open(os.path.join(out, 'heap.bin'), 'wb').write(bytes(h.uc.mem_read(E.HEAP_BASE, h.heap - E.HEAP_BASE)))
+    open(os.path.join(out, 'com.bin'), 'wb').write(bytes(h.uc.mem_read(COM, h.com_next - COM)))
+    json.dump(dict(nsteps=len(jn_proc_seq.steps()), nwords=len(words) // 4, edits=edits,
+                   heap_top=h.heap, com_next=h.com_next, IB=IB, IMGSZ=E.IMGSZ, HEAP_BASE=E.HEAP_BASE, COM=COM),
+              open(os.path.join(out, 'meta.json'), 'w'))
+    print('oracle process ref: %d output words, %d performEdits, end heap_top 0x%x com_next 0x%x -> %s'
+          % (len(words) // 4, len(edits), h.heap, h.com_next, out))
 
 
 if __name__ == '__main__':

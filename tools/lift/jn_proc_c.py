@@ -8,6 +8,7 @@ import ctypes
 import sys
 import os
 import struct
+import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -34,6 +35,10 @@ def main():
     lib.junoh_process.restype = ctypes.c_int
     lib.junoh_process.argtypes = [ctypes.c_int, ctypes.POINTER(EV), ctypes.c_int, ctypes.c_void_p, ctypes.c_int,
                                   ctypes.POINTER(CTX), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)]
+    for fn in ('junoh_heap_top', 'junoh_com_next'):
+        getattr(lib, fn).restype = ctypes.c_uint64
+    lib.junoh_guest.restype = ctypes.c_void_p
+    lib.junoh_guest.argtypes = [ctypes.c_uint64, ctypes.c_size_t]
     t = open(tmpl, 'rb').read()
     b = ctypes.create_string_buffer(t, len(t))
     rc = lib.junoh_init(b, len(t), 48000.0, 512)
@@ -73,7 +78,33 @@ def main():
         print('L5 process RED: output differs at word %d of %d (byte %d); got %d bytes, ref %d'
               % (d // 4, len(ref) // 4, d, len(got), len(ref)))
         return 1
-    print('L5 process GREEN: %d output words byte-identical to the oracle' % (len(ref) // 4))
+    # the END-STATE memory after the drive: the plugin's internal state must match too (not only the output words)
+    meta = json.load(open(os.path.join(refdir, 'meta.json')))
+
+    def read(base, size):
+        p = lib.junoh_guest(base, size)
+        if not p:
+            raise RuntimeError('junoh_guest(0x%x, %d) -> NULL' % (base, size))
+        return ctypes.string_at(p, size)
+    bad = []
+    if lib.junoh_heap_top() != meta['heap_top']:
+        bad.append('heap_top 0x%x != 0x%x' % (lib.junoh_heap_top(), meta['heap_top']))
+    if lib.junoh_com_next() != meta['com_next']:
+        bad.append('com_next 0x%x != 0x%x' % (lib.junoh_com_next(), meta['com_next']))
+    for name, base, size in (('image.bin', meta['IB'], meta['IMGSZ']),
+                             ('heap.bin', meta['HEAP_BASE'], meta['heap_top'] - meta['HEAP_BASE']),
+                             ('com.bin', meta['COM'], meta['com_next'] - meta['COM'])):
+        r = open(os.path.join(refdir, name), 'rb').read()
+        g = read(base, len(r))
+        if g != r:
+            first = next((i for i in range(min(len(g), len(r))) if g[i] != r[i]), -1)
+            bad.append('%s differs at +0x%x (guest 0x%x)' % (name, first, base + first))
+    if bad:
+        print('L5 process RED: output words match but the END STATE differs:')
+        [print('  ' + x) for x in bad]
+        return 1
+    print('L5 process GREEN: %d output words AND the end-state memory (image+heap+com) byte-identical to the oracle'
+          % (len(ref) // 4))
     return 0
 
 
