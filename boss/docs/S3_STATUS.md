@@ -31,6 +31,31 @@ flipped byte (PROVEN, seen to fail 2026-10-16).
 | Companion files the binary names | `Script.xml`, `TextCodeTable.dat`, `Initial.bin` (received 2026-10-16, below); `auth_strings_*.bin` not supplied — the login, out of scope ("leave out anything Roland related", the user 2026-10-15) |
 | Build path (pdb string) | `...\SsxFx\AppFx\BX00\Editor\Win\BOSS Effects Pedals.pdb` — the "SsxFx" tree, product code BX00 |
 
+## The pedal selector (READ, ScriptEfx.xml / Script.xml, 2026-10-16)
+One parameter picks the pedal: `fm.tt.ms.model` (int, range 0..255; the panels use 0..47). Model -> panel:
+0 ds1, 1 dd8, 2 tr2, 3 testalg, 4 sd1, 5 bd2, 6 od1, 7 os2, 8 ds2, 9 mt2, 10 bf3, 11 ph3, 12 ml2, 13 ge7, 14 odb3,
+15 md2, 16 rv6, 17 cs3, 18 ch1, 19 ph1, 20 ds1x, 21 od3, 22 te2, 23 mo2, 24 oc5, 25 aw3, 26 sy1, 27 cs1, 28 sp1,
+29 sg1, 30 tw1, 31 ce2, 32 dc2, 33 dm2, 34 bf2, 35 pn2, 36 oc2, 37 ps2, 38 dd2, 39 vb2, 40 df2, 41 od2, 42 pw2,
+43 xt2, 44 cs2, 45 hm2, 46 hm3, 47 mz2.
+The 25 shipped pedals (art + preset): 0, 4, 6, 19, 27-47. The rest are in the script but not shipped (INFERRED).
+
+## The oracle (boss/tools/boss_emu.py, boss_host.py; 2026-10-16)
+- Boot by the VST3 interfaces only: TLS callback 0xb4d3c0, DllMain (entry 0x20b8), InitDll, GetPluginFactory,
+  getClassInfo, createInstance, initialize. Every address from the PE header (PROVEN: TLS + DllMain return in 0.9 s).
+- The JUNO wrapper profile does NOT apply: jx3p/tools/fw_map.py maps 3 of 24 JUNO wrapper functions into this
+  image (setActive 0x2BC070, setupProcessing 0x4040E0, automatic engine rate 0x2BCE70). The rest differ (READ).
+- InitDll reads every Script file from `<module>\Script\`, the fonts folder, and lists the ProgramData / user
+  folders (MEASURED, fslog). It reads BX00_DATA.BIN one byte per `std::istream::get` (~200 instructions a byte):
+  the boot costs ~2e9 instructions (~10 min) under Unicorn, so boss_boot.py boots once and saves
+  scratchpad/boss/boot.snap; every probe resumes from it.
+
+## STOPPED 2026-10-16
+InitDll does not return under the oracle: the plugin's start-up waits for its Roland Cloud licence check. Getting
+past it would mean working around that check, which this project does not do. The track waits for the user's
+decision (an authorized run on the user's own machine, Roland's permission, or another track). The oracle plumbing in
+boss/tools/ (threads run when their creator blocks, events, a virtual clock, the effect host, the census, the drive)
+is general and kept; no gate has run.
+
 ## Owed before any gate (PORT_PIPELINE steps 1-4, then the lift plan of docs/JUNO_LIFT.md)
 1. DONE 2026-10-16: the companion files (above).
 2. Census (`tools/verify/pe_recon.py`; needs `pip install pefile`), the ABI ledger, the oracle boot recipe
