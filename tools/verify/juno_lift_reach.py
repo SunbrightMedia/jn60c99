@@ -113,10 +113,11 @@ def main():
             executed.add(a)
             last = mn
             last_rva = a
-        if last == 'call':                              # the next block is the target; key the edge by the CALL
-            prev_ind[0] = last_rva                       # INSTRUCTION's rva -- discover() and the lifter's `extra`
-            #                                              both look dyn up by the call-site rva, not the block start
-            #                                              (a non-pdata indirect target, e.g. 0x3cacf0, was dropped)
+        if last in ('call', 'jmp'):                     # the next block is the target of a CALL or an unconditional
+            prev_ind[0] = last_rva                       # JMP (a tail call); key the edge by the transfer instruction.
+            #                                              Both are rooted (tools/lift/jn_extra_roots.py): interior
+            #                                              indirect targets (e.g. 0x3c7c6f, 0x3b929f) are functions
+            #                                              with no pdata of their own, reached only this way.
 
     uc.hook_add(UC_HOOK_BLOCK, block)
     h.setup(48000.0, 512)                 # setupProcessing + setActive(1) + the blocks' host objects: the lifted
@@ -138,14 +139,14 @@ def main():
     ev_off = lambda p: ('off', 0, 0, p, 0.0)
 
     log('boot done; functions so far %d' % len({func_of(a) for a in executed} - {None}))
-    # 0. the gate's OWN scenario first: the INITIAL (template) patch, a chord + release + flush -- the process paths
-    #    the factory-patch loop does not reach (e.g. the indirect target 0x3c7c6f), so the host lift covers them too
-    h.process(256, events=[ev_on(60), ev_on(64, 0.7), ev_on(67, 0.9)], ctx=T)
-    h.process(256, ctx=T)
-    h.process(256, events=[ev_off(60), ev_off(64), ev_off(67)], ctx=T)
-    h.process(128, ctx=T)
-    h.process(0, ctx=T)
-    log('initial-patch process done; functions %d' % len({func_of(a) for a in executed} - {None}))
+    # 0. the gate's OWN scenario first: the shared process drive (tools/lift/jn_proc_seq) on the INITIAL (template)
+    #    patch -- no-context AND context blocks, a chord, release, flush, sizes -- so the host lift covers exactly
+    #    what the L5 process gate drives (the paths the factory-patch loop does not reach)
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'lift'))
+    import jn_proc_seq                                                # noqa: E402
+    for st in jn_proc_seq.steps():
+        h.process(st['n'], events=list(st['events']), params=list(st['params']), ctx=jn_proc_seq.oracle_ctx(st['ctx']))
+    log('initial-patch process drive done; functions %d' % len({func_of(a) for a in executed} - {None}))
     npatch = int(os.environ.get('JUNO_REACH_PATCHES', '64'))
     # 1. every factory patch: load + a chord + release + a few blocks (arp patches included)
     for idx in range(npatch):
