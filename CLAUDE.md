@@ -369,7 +369,7 @@ lines, in this order, with the delete reminder first:
      --flash-freq 80m 0x0 bootloader.bin 0x8000 partitiontable.bin
      0x10000 juno_s3.bin`
   4. `python -m serial.tools.miniterm COM4 115200`
-     (COM4 since 2026-09-29 -- esptool's own "Connected ... on COM4" line;
+     (COM3 since 2026-10-16, the DevKit USB port; COM4 2026-09-29;
      was COM3, before that COM5. The flash line auto-finds the port; the
      monitor line does not. If it fails, the port esptool printed wins.)
 The three-bin set lives in `esp32s3/flash/meas/` -- partitiontable.bin has NO
