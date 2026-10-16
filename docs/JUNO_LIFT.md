@@ -125,3 +125,14 @@ L7 apps checked / 2. Rounded down to a whole percent; a regression lowers it.
   Both were invisible to the init and process gates (their drive frees nothing and never grows COM past 47 KB) --
   exactly "a defect where no gate looked", now closed by the first gate that looks. jn_host_gate.sh unchanged; the bank
   gate is its own (long) job. NEXT: state save/load, the editor's set, MIDI controllers, multi-rate; then L3 and L6.
+- 2026-10-16 L5 STATE GREEN (DAW save/load): tools/lift/jn_state_{ref,c}.py + jn_state_gate.sh. Two processes: the
+  oracle loads patch P, getState -> S_P, loads a DIFFERENT patch Q, setState(S_P) to restore P, getState -> S2, plays;
+  the lifted host does the same through its OWN getState / setState (IComponent slots 13 / 12). GREEN: S_P 1788 bytes
+  bit-exact, setState -> 0x0, S2 == S_P (idempotent), 1792 output words AND the end-state (image + heap + com) byte-
+  identical. Three teeth, each a one-line perturbation, each SEEN TO FAIL: getstate (load Q, not P -> S_P differs),
+  skip (skip the setState restore -> S2 + words + end-state differ, so setState is proven load-bearing), note (a
+  semitone up -> end-state differs). Found one more of MY harness defects (mantra 5): jn_state_c.py's get_state helper
+  called junoh_get_state TWICE (a size probe then the data); each call runs the plugin's getState AND makes a stream,
+  so it allocated twice and the heap / com end-state diverged. The oracle calls getState once. Fix: one call with a
+  large buffer. The state bytes and audio were already bit-exact -- only the extra allocations showed. NEXT: the
+  editor's set, MIDI controllers, multi-rate; then L3 and L6.
