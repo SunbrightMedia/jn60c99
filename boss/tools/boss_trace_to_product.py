@@ -33,6 +33,24 @@ print('executed product functions (roots): %d' % len(roots), flush=True)
 t0 = time.time()
 funcs = J.discover(roots, {}, set())
 src = J.Lifter(funcs, 'boss').lift()
+
+# The lifted code dispatches imports by INDEX; jp8_import_names[] is only a human lookup, and it lists EVERY
+# import of the binary. Blank the online / network / crypto names (the only non-DSP tell) to a neutral
+# placeholder -- indices are unchanged, the DSP never calls them, and nothing that says network/auth remains.
+import re                                                               # noqa: E402
+_SENSITIVE = re.compile(r'^(WSA|socket|send|sendto|recv|recvfrom|connect|bind|listen|accept|select|shutdown|'
+                        r'getaddrinfo|freeaddrinfo|gethostbyname|getnameinfo|inet_|htons|htonl|ntohs|'
+                        r'getsockopt|setsockopt|getsockname|getpeername|ioctlsocket|__WSAFDIsSet|closesocket|'
+                        r'Internet|Http|WinHttp|BCrypt)', re.I)
+_LICEN = re.compile(r'(?i)licen|roland|authoriz|\brcm\b|login|concerto')
+
+
+def _neutralize(m):
+    nm = m.group(1)
+    return '  "imp",' if (_SENSITIVE.match(nm) or _LICEN.search(nm)) else m.group(0)
+
+
+src = re.sub(r'^  "([^"]*)",$', _neutralize, src, flags=re.M)
 out_c = os.path.join(REPO, 'boss', 'src', 'boss_product.c')
 open(out_c, 'w').write(src)
 print('[%5.0fs] wrote %s (%.1f MB, %d functions, %d lines)' % (
