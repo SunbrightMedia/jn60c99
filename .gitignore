@@ -102,3 +102,4 @@ lift/jn_template.bin.gz
 
 # BOSS full lift: 358 MB generated C, too big for GitHub -- regenerate with boss/tools/boss_lift_all.py; delivered as a zip
 boss/src/boss_lift.c
+boss/src/boss_lift_removed.c
