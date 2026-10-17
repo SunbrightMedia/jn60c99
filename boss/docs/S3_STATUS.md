@@ -90,8 +90,16 @@ decision (an authorized run on the user's own machine, Roland's permission, or a
 boss/tools/ (threads run when their creator blocks, events, a virtual clock, the effect host, the census, the drive)
 is general and kept; no gate has run.
 
-## Owed before any gate (PORT_PIPELINE steps 1-4, then the lift plan of docs/JUNO_LIFT.md)
-1. DONE 2026-10-16: the companion files (above).
-2. Census (`tools/verify/pe_recon.py`; needs `pip install pefile`), the ABI ledger, the oracle boot recipe
-   (from `jp8/tools/jp8_emu.py`), the listen proof on the oracle.
-3. Then the lift (L1-L7), not a hand transcription (the user's 2026-10-15 rule).
+## Intake (PORT_PIPELINE steps 0-1) — DONE 2026-10-17
+1. DONE 2026-10-16: the `.vst3` + 238 companion files pinned; `boss_truth.verify()` True; the sha tooth bites.
+2. DONE 2026-10-17: the binary census — `boss/tools/boss_census.py` -> `boss/docs/census.json` (+ `--tooth`),
+   summarised in `boss/docs/CENSUS.md`: version, VST3 exports, 720 imports / 20 DLLs, sections (runtime-filled
+   tails), TLS + entry, and the product surface (31 effect-plugin instances in 4 wrapper categories over 30
+   model DSP classes). All READ (static), reproducible, bound to the pinned sha256.
+
+## Owed next (the lift — boss/docs/LIFT_PLAN.md, the JUNO way)
+- The ABI ledger (which imports the oracle must serve) and the booted instance are part of the lift, not intake:
+  the oracle cannot boot yet (the thread-model stop, above), so L1/L4/L5 wait on ROUTE A (a native host on the
+  user's licensed PC) or ROUTE B (fix the oracle thread model). L2 (lift the reachable instructions) and L3
+  (per-form proof vs the CPU) need no boot and start in-container now. Not a hand transcription (the user,
+  2026-10-15). The progress measure is in LIFT_PLAN.md section 6; today ~1%.
