@@ -71,6 +71,7 @@ their old paths so no comment pointer dangles. Live project state:
 | PHASE4_ARP_AUDIO_CERT.md | REFERENCE | Phase 4 — Arp audio certification |
 | PIPELINE.md | LIVING (method) | THE PIPELINE — .vst3 in → boards out (E3) — *banner 2026-09-28: the method stands, the two-board steps are superseded by the one-board rule* |
 | ONE_BOARD_BUDGET.md | REFERENCE | What fits ONE ESP32-S3 (JUNO exact/fork/PWM-off/wavetable, JP8, TB-303, a wavetable synth's modules, oscillator aliasing) — written 2026-09-28 |
+| PLAN_A_CLASSIC_S3.md | LIVING | Plan A: the classic JUNO on one S3 (does it fit, the mip-table DCO, the no-click rule: constant cost + closest-call measurement + data margin, next steps) — 2026-10-17 |
 | PLAN_5_STEPS.md | REFERENCE | THE 5-STEP PLAN TO THE END GOAL (written 2026-08-26, user-approved scope) — *PARKED scope of 2026-08-26; FINAL_GUIDE rules sequencing* |
 | PLAN_FINAL_STRETCH.md | REFERENCE | THE FINAL STRETCH — EXECUTION PLAN (binding, 2026-08-28) — *PARKED; its cycle budgets predate the voice-5 defect and are 2-voice numbers* |
 | POLYPHONY.md | REFERENCE | Polyphony — deriving the per-voice state layout from the binary |

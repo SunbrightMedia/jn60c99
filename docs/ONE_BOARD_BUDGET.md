@@ -4,7 +4,7 @@ Why this file: END_GOAL was amended 2026-09-23 — ONE board per synth, of ESP32
 These numbers were produced in a chat that is being retired; they existed nowhere else. Every row carries its label:
 MEASURED (silicon or executed code), MODELED (static Xtensa counts banded against silicon anchors, `tools/engineb/cost.py`),
 INFERRED (arithmetic on the rows above). Budget: ~10,000 S3 cycles per sample at 48 kHz (240 MHz, both cores);
-~7,000 is the comfortable ceiling (bursts, not averages, cause clicks — FINAL_GUIDE "three facts").
+~7,000 is the comfortable ceiling (bursts, not averages, cause clicks — FINAL_GUIDE "three facts"). NOTE 2026-10-17: ~7,000 is a rule of thumb with no derivation; PLAN_A_CLASSIC_S3.md section 3 replaces it with a measured margin.
 
 ## Per-synth verdicts
 | engine | cost | fits one S3? | source |
