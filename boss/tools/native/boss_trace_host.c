@@ -168,8 +168,15 @@ int main(int argc, char **argv){
     vst_iid(IID_ATTRS,          0x1E5F0AEB,0xCC7F4533,0xA2544011,0x38AD5EE4);
     vst_iid(IID_BSTREAM,        0xC3BF6EA2,0x30994752,0x9B6BF990,0x1EE33E9B);
 
-    mod = LoadLibraryA(argv[1]);
-    if(!mod){ fprintf(stderr,"LoadLibrary %s: %lu\n", argv[1], GetLastError()); return 1; }
+    {   /* the plugin loads sibling DLLs from its own folder; put that folder on the DLL search path */
+        char dir[1024]; char *bs; strncpy(dir, argv[1], sizeof dir - 1); dir[sizeof dir - 1] = 0;
+        bs = strrchr(dir, '\\'); if (bs) *bs = 0;
+        SetDllDirectoryA(dir);
+        mod = LoadLibraryExA(argv[1], NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+    }
+    if(!mod){ unsigned long e = GetLastError();
+        fprintf(stderr,"LoadLibrary %s: %lu%s\n", argv[1], e, e==126?" (126 = the file or a dependency DLL was not found -- check the path, and that Roland Cloud is installed)":"");
+        return 1; }
     init_dll = GetProcAddress(mod,"InitDll");
     if(!init_dll || !(((uint8_t(*)(void))(void(*)(void))init_dll)())){ fprintf(stderr,"InitDll failed\n"); return 1; }
     getf = GetProcAddress(mod,"GetPluginFactory");
