@@ -25,13 +25,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 import truth                                                       # noqa: E402
-os.environ['LIFT_BIN'] = truth.VST3
+# image-generic (the BOSS lift, 2026-10-17): L3_BIN / L3_LIFT / L3_EXE point it at another plugin; unset, the JUNO
+os.environ['LIFT_BIN'] = os.environ.get('L3_BIN') or truth.VST3
 sys.path.insert(0, os.path.join(REPO, 'jp8', 'tools'))
 import jp8_lift as L                                               # noqa: E402  (the lifter's own decoder + registers)
 from capstone import x86                                           # noqa: E402
 
-LIFT = os.path.join(REPO, 'lift', 'jn_lift.c')
-EXE = os.path.join(REPO, 'scratchpad', 'lift', 'juno_executed.json')
+LIFT = os.environ.get('L3_LIFT') or os.path.join(REPO, 'lift', 'jn_lift.c')
+EXE = os.environ.get('L3_EXE') or os.path.join(REPO, 'scratchpad', 'lift', 'juno_executed.json')
 OUT = os.path.join(REPO, 'build', 'l3')
 LINE = re.compile(r'^  /\*([0-9a-f]+) (.*?)\*/ (.*)$')
 TRAP = re.compile(r'^jp8_trap\(c, 0x[0-9a-f]+, ".*"\);$')
@@ -159,9 +160,10 @@ def main():
     ap.add_argument('--all', action='store_true')
     ap.add_argument('--tooth', type=int, default=0)
     ap.add_argument('--out', default=OUT)
+    ap.add_argument('--forms', default=None, help='m1,m2,..: only statements of these mnemonics (prove new lifter forms)')
     ap.add_argument('--chunk', default=None, help='i/n: the i-th of n equal slices of the work list (--all runs)')
     a = ap.parse_args()
-    exe = set(json.load(open(EXE)))
+    exe = set(json.load(open(EXE))) if os.path.exists(EXE) or not a.all else set()   # --all needs no census (static lift)
     seen, stmts, traps = set(), [], collections.Counter()
     for ln in open(LIFT):
         mt = LINE.match(ln)
@@ -179,6 +181,8 @@ def main():
             continue
         seen.add((rva, s))
         ins = L.dis(rva)
+        if a.forms and ins.mnemonic not in a.forms.split(','):
+            continue
         stmts.append((rva, ins, s))
     if traps['executed']:
         raise SystemExit('L2 regression: %d executed instructions are lifted as traps' % traps['executed'])

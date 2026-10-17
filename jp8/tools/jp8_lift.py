@@ -78,6 +78,8 @@ def read_table(tbl, near):
 # of AMD's branch predictor advice) IS a return: walked on as an ordinary instruction, it took the bytes after it as
 # the function's (the JUNO's address-taken lift, 2026-10-16: 1,023 of them)
 ENDS = ("ret", "repz ret", "int3", "hlt", "ud2")
+# the SSE compare predicates by their pseudo-op name (Intel SDM CMPPS imm8 0-7)
+CMP_PRED = {"eq": 0, "lt": 1, "le": 2, "unord": 3, "neq": 4, "nlt": 5, "nle": 6, "ord": 7}
 
 def discover(roots, dyn_ind, stops=()):
     """returns funcs: {entry: {insns:{rva:ins}, targets:set(rva), ijmp:{site:[targets]}}}; a direct jmp to an rva in
@@ -498,6 +500,17 @@ class Lifter:
         if m == "sqrtsd": return "XD(%d,0)=JP8_SQRTSD(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m == "sqrtps":
             d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XF(%d,%d)=JP8_SQRTSS(t1.f[%d]);" % (d, l, l) for l in range(4))
+        if m == "sqrtpd":                               # both lanes, sqrtsd's semantics each (the BOSS lift, 2026-10-17)
+            d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XD(%d,%d)=JP8_SQRTSD(t1.d[%d]);" % (d, l, l) for l in range(2))
+        if m == "pextrw" and op[0].type == x86.X86_OP_REG and op[1].type == x86.X86_OP_REG:   # SSE2 form: word imm&7, zero-extended
+            return wr_int(ins, op[0], "c->x[%d].w[%d]" % (reg(ins, op[1].reg)[0], op[2].imm & 7), 32)
+        # capstone prints cmpXX{ss,sd,ps,pd} with the predicate in the mnemonic and two operands (cmpnlepd x, y = cmppd x, y, 6)
+        if len(op) == 2 and m.startswith("cmp") and m[-2:] in ("ss", "sd", "ps", "pd") and m[3:-2] in CMP_PRED:
+            d = reg(ins, op[0].reg)[0]; p = CMP_PRED[m[3:-2]]; k = m[-2:]
+            if k == "ss": return "XU(%d,0)=cmp_pred_f(%d,XF(%d,0),%s);" % (d, p, d, xsrc(ins, op[1], "f"))
+            if k == "sd": return "XQ(%d,0)=cmp_pred_d(%d,XD(%d,0),%s);" % (d, p, d, xsrc(ins, op[1], "d"))
+            if k == "ps": return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XU(%d,%d)=cmp_pred_f(%d,XF(%d,%d),t1.f[%d]);" % (d, l, p, d, l, l) for l in range(4))
+            return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XQ(%d,%d)=cmp_pred_d(%d,XD(%d,%d),t1.d[%d]);" % (d, l, p, d, l, l) for l in range(2))
         if m in ("comiss", "ucomiss"): return "cmp_f(c,XF(%d,0),%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "f"))
         if m in ("comisd", "ucomisd"): return "cmp_d(c,XD(%d,0),%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m in ("cmpss", "cmpsd") and len(op) == 3:
