@@ -109,6 +109,8 @@ is general and kept; no gate has run.
   1,551,696 states. ONE defect found, in the SHARED runtime (not the plugin, not the lifter text): `op_rcr` / `op_rcl`
   wrote no OF and did not mask the count (playbook 295). Fixed; `tools/lift/rcx_cpu_check.c` sweeps it against the CPU
   (0 mismatches; the old helper fails 13.9 M). Teeth on the new forms bite (lane, predicate, pextrw word).
+  RE-RUN on 50a2565 GREEN (job boss_l3_static2, EXIT 0): lift == CPU in all 1,551,696 states; Unicorn != CPU only in
+  its known classes; the gate flavor == Unicorn (bsf-zero only).
 - OPEN: L3 never reaches equality against an image constant (playbook 295); the CPU-feature branches: on the user's
   PC (Route A) the CRT takes its AVX / FMA paths, the Unicorn oracle its SSE2 paths — which the port must equal is the
   native oracle's question (jp8/docs/NATIVE_ORACLE.md). Static reach is not product reach: L1 still needs a boot.
