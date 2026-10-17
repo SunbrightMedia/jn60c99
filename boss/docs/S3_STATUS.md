@@ -97,6 +97,22 @@ is general and kept; no gate has run.
    tails), TLS + entry, and the product surface (31 effect-plugin instances in 4 wrapper categories over 30
    model DSP classes). All READ (static), reproducible, bound to the pinned sha256.
 
+## L2 / L3 started in-container, static (2026-10-17) — no boot needed
+- ROOTS (READ): `boss/tools/boss_static_roots.py` finds the RTTI COLs of every `C<Model>Dsp` and `CEfx*` wrapper:
+  68 vtables, 491 distinct methods. (The DC-2 inner classes `CDc2DspInputMixer` etc. come in via the DC-2 wrapper.)
+- LIFT (the shared JP8 lifter, `LIFT_BIN`): 983 functions, 95,067 instructions, generic flavor, in
+  scratchpad/boss/boss_lift_static.c (generated, not committed; regenerate: see LIFT_PLAN.md log). Compiles as C99
+  against jp8/src/jp8_cpu.h, rc 0, no diagnostics. 998 traps: AVX / FMA / SSE4.1 / BMI2 in the CRT's CPU-feature
+  branches (rva >= 0xb3xxxx), int3 padding, `int 0x29` (fastfail). The SSE2 gaps found in PLUGIN code (sqrtpd in a
+  coefficient function at 0x2f6920; pextrw; the 2-operand cmpXX pseudo-ops) are now in the shared lifter.
+- L3 (`boss/tools/boss_l3.sh`, the shared JUNO prover via `L3_BIN` / `L3_LIFT`, --all): 91,086 statements, 393 forms,
+  1,551,696 states. ONE defect found, in the SHARED runtime (not the plugin, not the lifter text): `op_rcr` / `op_rcl`
+  wrote no OF and did not mask the count (playbook 295). Fixed; `tools/lift/rcx_cpu_check.c` sweeps it against the CPU
+  (0 mismatches; the old helper fails 13.9 M). Teeth on the new forms bite (lane, predicate, pextrw word).
+- OPEN: L3 never reaches equality against an image constant (playbook 295); the CPU-feature branches: on the user's
+  PC (Route A) the CRT takes its AVX / FMA paths, the Unicorn oracle its SSE2 paths — which the port must equal is the
+  native oracle's question (jp8/docs/NATIVE_ORACLE.md). Static reach is not product reach: L1 still needs a boot.
+
 ## Owed next (the lift — boss/docs/LIFT_PLAN.md, the JUNO way)
 - The ABI ledger (which imports the oracle must serve) and the booted instance are part of the lift, not intake:
   the oracle cannot boot yet (the thread-model stop, above), so L1/L4/L5 wait on ROUTE A (a native host on the

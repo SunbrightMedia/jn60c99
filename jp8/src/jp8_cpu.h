@@ -181,11 +181,20 @@ static inline uint64_t op_rol(CPU *c, int sz, uint64_t a, unsigned n) {
 static inline uint64_t op_ror(CPU *c, int sz, uint64_t a, unsigned n) {
     n %= sz; a &= jp8_mask(sz); if (!n) return a; uint64_t r = ((a >> n) | (a << (sz - n))) & jp8_mask(sz); c->cf = (r >> (sz - 1)) & 1; c->of = ((r >> (sz - 1)) ^ (r >> (sz - 2))) & 1; return r;
 }
+/* RCR / RCL (Intel SDM vol. 2B): the count masked to 5 bits (6 for 64-bit) THEN taken mod size+1; a zero count changes
+ * nothing; OF is defined for a count of 1 only (RCR: MSB(dest) ^ CF before the rotate; RCL: MSB(result) ^ CF after) and
+ * left as it was otherwise (undefined). Before 2026-10-17 neither wrote OF and the count was not masked: the BOSS L3 run
+ * found it (rcr r32,1 in the CRT, 170 of 336 states) */
 static inline uint64_t op_rcr(CPU *c, int sz, uint64_t a, unsigned n) {
-    n %= (sz + 1); a &= jp8_mask(sz); while (n--) { int cf = a & 1; a = (a >> 1) | ((uint64_t)c->cf << (sz - 1)); c->cf = cf; } return a & jp8_mask(sz);
+    n &= (sz == 64) ? 63 : 31; n %= (sz + 1); a &= jp8_mask(sz); if (!n) return a;
+    if (n == 1) c->of = (int)((a >> (sz - 1)) & 1) ^ c->cf;
+    while (n--) { int cf = a & 1; a = (a >> 1) | ((uint64_t)c->cf << (sz - 1)); c->cf = cf; } return a & jp8_mask(sz);
 }
 static inline uint64_t op_rcl(CPU *c, int sz, uint64_t a, unsigned n) {
-    n %= (sz + 1); a &= jp8_mask(sz); while (n--) { int cf = (a >> (sz - 1)) & 1; a = ((a << 1) | (uint64_t)c->cf) & jp8_mask(sz); c->cf = cf; } return a;
+    unsigned n0; n &= (sz == 64) ? 63 : 31; n %= (sz + 1); a &= jp8_mask(sz); n0 = n;
+    while (n--) { int cf = (a >> (sz - 1)) & 1; a = ((a << 1) | (uint64_t)c->cf) & jp8_mask(sz); c->cf = cf; }
+    if (n0 == 1) c->of = (int)((a >> (sz - 1)) & 1) ^ c->cf;
+    return a;
 }
 /* ---- the 64-bit multiply, divide and bit scans in ISO C99 (2026-10-11, docs/GATE_PARITY.tsv c99): no __int128 and
  * no compiler builtins -- exact integer arithmetic on 32-bit halves, the same results on every compiler and target */

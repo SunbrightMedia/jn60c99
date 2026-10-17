@@ -78,6 +78,13 @@ L2 and L3 need NO boot and start immediately in-container (section 3).
 progress = 5·L1 + 25·L2 + 15·L3 + 10·L4 + 20·L5 + 15·L6 + 10·L7, each term the fraction done (same weights as
 `docs/JUNO_LIFT.md`). Rounded down; a regression lowers it. Today: intake + boot diagnosis only → **~1%**.
 
+## 8. Log
+- 2026-10-17: L2/L3 STATIC start (S3_STATUS block of that date). Regenerate the static lift:
+  `python3 boss/tools/boss_static_roots.py > R; LIFT_BIN=boss/truth/BOSS_Effects_Pedals.vst3 python3 jp8/tools/jp8_lift.py
+  <out.c> "$(cat R)" --name boss`; prove it: `sh boss/tools/boss_l3.sh <out.c> <dir> 16 256`. The static lift is
+  NOT the L2 deliverable (that is every PRODUCT-reached instruction, from L1); it starts the form work early.
+  Progress ~3% (L2 ~5% of its term: the DSP vtables' static closure lifted, not yet product-complete; L3 ~5%).
+
 ## 7. FIRST actions for the fresh chat
 1. Read `boss/docs/S3_STATUS.md` (2026-10-17) then this page.
 2. Decide Route A vs B with the user (A recommended). If A, build the native host and give the user the exact
