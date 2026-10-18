@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(REPO, 'tools', 'verify'))
 import truth                                                       # noqa: E402
-# image-generic (the BOSS lift, 2026-10-17): L3_BIN / L3_LIFT / L3_EXE point it at another plugin; unset, the JUNO
+# image-generic (a later static lift, 2026-10-17): L3_BIN / L3_LIFT / L3_EXE point it at another plugin; unset, the JUNO
 os.environ['LIFT_BIN'] = os.environ.get('L3_BIN') or truth.VST3
 sys.path.insert(0, os.path.join(REPO, 'jp8', 'tools'))
 import jp8_lift as L                                               # noqa: E402  (the lifter's own decoder + registers)

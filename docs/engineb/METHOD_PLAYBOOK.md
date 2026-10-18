@@ -4917,10 +4917,10 @@ and record the GUI-init bookkeeping as a named scope limitation -- never fake th
 swapped screen) that makes the claimed value itself differ.
 
 ## 295. A FORM PROVEN ON ONE PLUGIN IS NOT PROVEN -- ONLY ITS REACHED STATES ARE; A NEW IMAGE FINDS THE REST
-(2026-10-17, the BOSS static L3.) The shared runtime's op_rcr / op_rcl (jp8/src/jp8_cpu.h) wrote no OF and did not
+(2026-10-17, a static L3 run.) The shared runtime's op_rcr / op_rcl (jp8/src/jp8_cpu.h) wrote no OF and did not
 mask the count to 5 / 6 bits before mod size+1. The JP8 lift ships six `rcr r32,1` (the same CRT routine) and its
 gates were green: no reader of OF follows them (jae / cmovae read CF; the next and / or overwrites OF). The JUNO census
-never executed one. The BOSS L3 run over EVERY static statement (91,086, 1.55 M states) found it in one form: lift !=
+never executed one. That static L3 run over EVERY static statement (91,086, 1.55 M states) found it in one form: lift !=
 CPU in 170 of 336 states, flags only. Fix to the SDM rule; tools/lift/rcx_cpu_check.c grades both helpers against
 the CPU at every size, count 0..255, CF 0/1 (16.4 M cases, 0 mismatches; the old helper 13.9 M -- the tooth).
 ### The rule

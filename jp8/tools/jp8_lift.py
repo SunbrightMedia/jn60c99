@@ -500,7 +500,7 @@ class Lifter:
         if m == "sqrtsd": return "XD(%d,0)=JP8_SQRTSD(%s);" % (reg(ins, op[0].reg)[0], xsrc(ins, op[1], "d"))
         if m == "sqrtps":
             d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XF(%d,%d)=JP8_SQRTSS(t1.f[%d]);" % (d, l, l) for l in range(4))
-        if m == "sqrtpd":                               # both lanes, sqrtsd's semantics each (the BOSS lift, 2026-10-17)
+        if m == "sqrtpd":                               # both lanes, sqrtsd's semantics each (a later static lift, 2026-10-17)
             d = reg(ins, op[0].reg)[0]; return "t1=%s; " % xsrc(ins, op[1], "X") + " ".join("XD(%d,%d)=JP8_SQRTSD(t1.d[%d]);" % (d, l, l) for l in range(2))
         if m == "pextrw" and op[0].type == x86.X86_OP_REG and op[1].type == x86.X86_OP_REG:   # SSE2 form: word imm&7, zero-extended
             return wr_int(ins, op[0], "c->x[%d].w[%d]" % (reg(ins, op[1].reg)[0], op[2].imm & 7), 32)

@@ -183,7 +183,7 @@ static inline uint64_t op_ror(CPU *c, int sz, uint64_t a, unsigned n) {
 }
 /* RCR / RCL (Intel SDM vol. 2B): the count masked to 5 bits (6 for 64-bit) THEN taken mod size+1; a zero count changes
  * nothing; OF is defined for a count of 1 only (RCR: MSB(dest) ^ CF before the rotate; RCL: MSB(result) ^ CF after) and
- * left as it was otherwise (undefined). Before 2026-10-17 neither wrote OF and the count was not masked: the BOSS L3 run
+ * left as it was otherwise (undefined). Before 2026-10-17 neither wrote OF and the count was not masked: a static L3 run
  * found it (rcr r32,1 in the CRT, 170 of 336 states) */
 static inline uint64_t op_rcr(CPU *c, int sz, uint64_t a, unsigned n) {
     n &= (sz == 64) ? 63 : 31; n %= (sz + 1); a &= jp8_mask(sz); if (!n) return a;

@@ -1,4 +1,4 @@
-/* rcx_cpu_check.c -- op_rcr / op_rcl (jp8/src/jp8_cpu.h) vs the CPU (the BOSS L3 find, 2026-10-17): every size, count 0..255,
+/* rcx_cpu_check.c -- op_rcr / op_rcl (jp8/src/jp8_cpu.h) vs the CPU (a static L3 find, 2026-10-17): every size, count 0..255,
  * CF in 0/1, 4000 random values; CF always, OF where the masked count is 1. Build: cc -std=gnu99 -O1 -Ijp8/src tools/lift/rcx_cpu_check.c
  * -lm. Tooth: build it with -I<dir> holding the pre-fix jp8_cpu.h (git show 5f98ea5:jp8/src/jp8_cpu.h): 13,929,007 mismatches. */
 #include "jp8_cpu.h"
