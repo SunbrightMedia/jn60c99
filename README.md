@@ -64,7 +64,6 @@ needed). Engine-B gates: `tools/engineb/` (`o2_gates.sh`, `o3_gates.sh`, …).
 | `esp32s3/` | ESP32-S3 firmware (the live device target) and its images |
 | `pi/` | The bare-metal Raspberry Pi build (Circle submodule) |
 | `jx3p/`, `jp8/`, `tb303/` | The next synths' ports -- proof the method repeats |
-| `boss/` | BOSS Effects Pedals (.vst3) port -- intake + census done; the lift is next (`boss/docs/LIFT_PLAN.md`) |
 | `refs/` | The decompile archive (provenance for READ claims) and a June live-plugin memory dump (`refs/state_dump/`, diagnostic only) |
 | `archive/` | Retired device targets: the Daisy Seed and Teensy builds (history) |
 | `docs/` | All findings -- start at `docs/INDEX.md`; the user's older charters `docs/GOAL.md`, `docs/AIRTIGHT_PLAN.md` |
