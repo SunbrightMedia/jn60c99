@@ -79,6 +79,10 @@ mine is a hypothesis (playbook 80).
 - **NEVER open/read/reference `user_patch5_ableton.json` or
   `captured_coeffs.json`** — anywhere, incl. subagent prompts. If such a file
   appears, delete it by name without reading it.
+- **BOSS: NEVER use git history** (user-binding 2026-10-18). Every file the old BOSS work left in git
+  history (any commit's `boss/`, incl. `boss/truth/`) is FORBIDDEN: never restore, read, checkout, cat-file,
+  or cite it, and never name it to a subagent. The BOSS inputs are ONLY the files the user hands over in
+  chat (the first: `boss_product.c`, sha256 3b8475aa...0ca0c5) and what the user sends later.
 - No captures as data. A capture-derived constant is a bug (ledger CAPTURED).
 - **Two-process rule**: never build a Unicorn E2E instance AND ctypes-load
   `libjuno.so` in one Python process. They meet only through pickles.
